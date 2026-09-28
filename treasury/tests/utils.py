@@ -321,6 +321,116 @@ class TreasuryTestMixin:
 		super().setUpClass()
 		cls.data = setup_treasury_test_data()
 
+	def use_company_settings(self, **values):
+		"""Change Treasury Company Settings for the current test only (restored by a cleanup).
+
+		IntegrationTestCase rolls back only at the end of the class, so every change must be undone.
+		"""
+		previous = frappe.db.get_value("Treasury Company Settings", COMPANY, list(values), as_dict=True)
+		frappe.db.set_value("Treasury Company Settings", COMPANY, values)
+		self.addCleanup(frappe.db.set_value, "Treasury Company Settings", COMPANY, dict(previous))
+
+
+# ---------------------------------------------------------------------------
+# PDC helpers
+# ---------------------------------------------------------------------------
+
+
+# The shipped defaults of Treasury Company Settings; PDC test classes start every test from them.
+DEFAULT_PDC_SETTINGS = {
+	"outgoing_party_posting": "On Handover",
+	"outgoing_bank_posting": "On Actual Clearance",
+	"incoming_party_posting": "On Receipt",
+	"incoming_under_collection": "On Deposit",
+	"incoming_bank_posting": "On Actual Clearance",
+	"on_bounce": "Reverse by Journal Entry",
+	"bounce_charges_account": None,
+}
+
+
+def day(offset: int):
+	"""Today + `offset` days, as a date."""
+	return getdate(add_days(today(), offset))
+
+
+def bank_account_name(currency: str = "EGP") -> str:
+	return f"{BANK_SETUP[currency]['bank_account_name']} - {BANK}"
+
+
+def unique_cheque_no() -> str:
+	return frappe.generate_hash(length=10).upper()
+
+
+def make_pdc_cheque(
+	direction: str = "Outgoing",
+	amount: float = 1000,
+	party: str | None = None,
+	currency: str = "EGP",
+	issue_date=None,
+	due_date=None,
+	invoice=None,
+	cheque_no: str | None = None,
+	cheque_book: str | None = None,
+	**values,
+):
+	"""Insert a PDC Cheque (status Created). `invoice` adds a reference for the full amount."""
+	outgoing = direction == "Outgoing"
+	issue_date = getdate(issue_date or today())
+	references = values.pop("references", None) or []
+	if invoice:
+		references.append(
+			{"reference_doctype": invoice.doctype, "reference_name": invoice.name, "allocated_amount": amount}
+		)
+	if cheque_no is None and not cheque_book:
+		cheque_no = unique_cheque_no()
+	doc = frappe.get_doc(
+		{
+			"doctype": "PDC Cheque",
+			"direction": direction,
+			"company": COMPANY,
+			"party_type": "Supplier" if outgoing else "Customer",
+			"party": party or (SUPPLIER if outgoing else CUSTOMER),
+			"bank_account": bank_account_name(currency),
+			"cheque_book": cheque_book,
+			"cheque_no": cheque_no,
+			"amount": amount,
+			"issue_date": issue_date,
+			"original_due_date": getdate(due_date or add_days(issue_date, 30)),
+			"references": references,
+			**values,
+		}
+	)
+	doc.insert()
+	return doc
+
+
+def make_cheque_book(start_no: int, end_no: int, currency: str = "EGP", **values):
+	return frappe.get_doc(
+		{
+			"doctype": "Cheque Book",
+			"company": COMPANY,
+			"bank_account": bank_account_name(currency),
+			"start_no": start_no,
+			"end_no": end_no,
+			**values,
+		}
+	).insert()
+
+
+def ensure_user(email: str, roles: list[str]) -> str:
+	"""A System User holding exactly `roles` (created inside the test transaction)."""
+	if not frappe.db.exists("User", email):
+		frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": email.split("@")[0],
+				"send_welcome_email": 0,
+				"roles": [{"role": role} for role in roles],
+			}
+		).insert(ignore_permissions=True)
+	return email
+
 
 # ---------------------------------------------------------------------------
 # Invoice factories
@@ -459,6 +569,14 @@ def assert_party_balance(
 	testcase, party_type: str, party: str, date, expected: float, company: str = COMPANY
 ):
 	testcase.assertEqual(flt(expected, 2), flt(get_party_balance(party_type, party, date, company), 2), party)
+
+
+def get_voucher_count(source_doctype: str, source_name: str, docstatus: int | None = None) -> int:
+	"""Number of Payment Entries + Journal Entries created for a Treasury source."""
+	filters = {"treasury_source_doctype": source_doctype, "treasury_source_name": source_name}
+	if docstatus is not None:
+		filters["docstatus"] = docstatus
+	return sum(frappe.db.count(doctype, filters) for doctype in ("Payment Entry", "Journal Entry"))
 
 
 def get_party_outstanding(voucher_type: str, voucher_no: str) -> float:

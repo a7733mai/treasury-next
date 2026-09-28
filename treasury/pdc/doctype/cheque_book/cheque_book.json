@@ -1,0 +1,171 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "company",
+  "bank_account",
+  "book_no",
+  "column_break_main",
+  "status",
+  "range_section",
+  "start_no",
+  "end_no",
+  "column_break_range",
+  "next_no",
+  "leaf_digits",
+  "cancelled_leaves_section",
+  "cancelled_leaves"
+ ],
+ "fields": [
+  {
+   "default": "CHB-.YYYY.-.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "CHB-.YYYY.-.####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "book_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Book No"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Active\nExhausted\nClosed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "range_section",
+   "fieldtype": "Section Break",
+   "label": "Leaves"
+  },
+  {
+   "fieldname": "start_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Start No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "End No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_range",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "next_no",
+   "fieldtype": "Int",
+   "label": "Next No",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "6",
+   "description": "Cheque numbers are zero-padded to this number of digits.",
+   "fieldname": "leaf_digits",
+   "fieldtype": "Int",
+   "label": "Leaf Digits",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "cancelled_leaves_section",
+   "fieldtype": "Section Break",
+   "label": "Cancelled Leaves"
+  },
+  {
+   "fieldname": "cancelled_leaves",
+   "fieldtype": "Table",
+   "label": "Cancelled Leaves",
+   "no_copy": 1,
+   "options": "Cheque Book Cancelled Leaf",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Cheque Book",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "bank_account",
+ "track_changes": 1
+}

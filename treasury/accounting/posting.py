@@ -58,6 +58,17 @@ def get_account_mapping(company: str, bank_account: str) -> frappe._dict:
 	)
 
 
+def get_cheque_exchange_rate(currency: str, company: str, posting_date) -> float:
+	"""Rate converting `currency` to the company currency on `posting_date` (1 for the company currency)."""
+	company_currency = erpnext.get_company_currency(company)
+	if not currency or currency == company_currency:
+		return 1.0
+	rate = flt(get_exchange_rate(currency, company_currency, getdate(posting_date)))
+	if not rate:
+		frappe.throw(_("Exchange rate from {0} to {1} is required.").format(currency, company_currency))
+	return rate
+
+
 # ---------------------------------------------------------------------------
 # Linked vouchers
 # ---------------------------------------------------------------------------
@@ -424,12 +435,18 @@ def create_journal_entry(
 	reversal_of: str | None = None,
 	cycle: int = 1,
 	submit: bool = True,
+	balance_exchange_difference: bool = False,
 ) -> str:
 	"""Create (or return the existing) Journal Entry for (source, event, cycle).
 
 	`accounts` rows accept the Journal Entry Account fields (account, debit_in_account_currency,
 	credit_in_account_currency, party_type, party, exchange_rate, reference_type, reference_name,
 	cost_center, user_remark). `clearance_date` requires `submit=True`.
+
+	With `balance_exchange_difference`, rows booked at different exchange rates (e.g. a foreign currency
+	cheque carried at the party posting rate and cleared at today's rate) are balanced in the company
+	currency by a row on the company's Exchange Gain / Loss account: a Journal Entry does not book that
+	difference by itself, it rejects the unbalanced entry.
 	"""
 	if clearance_date and not submit:
 		frappe.throw(_("Clearance Date can only be set on a submitted Journal Entry."))
@@ -444,6 +461,9 @@ def create_journal_entry(
 
 	if not accounts:
 		frappe.throw(_("At least one account row is required."))
+
+	if balance_exchange_difference and (row := _exchange_difference_row(company, accounts)):
+		accounts = [*accounts, row]
 
 	company_currency = erpnext.get_company_currency(company)
 	je = frappe.new_doc("Journal Entry")
@@ -471,6 +491,43 @@ def create_journal_entry(
 		if clearance_date:
 			_set_clearance_date(je.name, clearance_date)
 	return je.name
+
+
+def _exchange_difference_row(company: str, accounts: list[dict]) -> dict | None:
+	"""Row on the Exchange Gain / Loss account that balances `accounts` in the company currency, if needed.
+
+	Company-currency amounts are rounded per row exactly as JournalEntry.set_amounts_in_company_currency does.
+	"""
+	precision = frappe.get_precision("Journal Entry Account", "debit")
+	company_currency = erpnext.get_company_currency(company)
+	difference = 0.0
+	for row in accounts:
+		if get_account_currency(row["account"]) == company_currency:
+			rate = 1.0
+		else:
+			rate = flt(row.get("exchange_rate"))
+			if not rate:
+				frappe.throw(_("Exchange rate is required for account {0}.").format(frappe.bold(row["account"])))
+		debit = flt(flt(row.get("debit_in_account_currency")) * rate, precision)
+		credit = flt(flt(row.get("credit_in_account_currency")) * rate, precision)
+		difference += debit - credit
+
+	difference = flt(difference, precision)
+	if not difference:
+		return None
+
+	account = frappe.get_cached_value("Company", company, "exchange_gain_loss_account")
+	if not account:
+		frappe.throw(
+			_("Set the Exchange Gain / Loss Account in company {0}.").format(frappe.bold(company)),
+			title=_("Missing Settings"),
+		)
+	row = {"account": account, "cost_center": erpnext.get_default_cost_center(company)}
+	if difference > 0:
+		row["credit_in_account_currency"] = difference
+	else:
+		row["debit_in_account_currency"] = -difference
+	return row
 
 
 def _set_clearance_date(name: str, clearance_date):

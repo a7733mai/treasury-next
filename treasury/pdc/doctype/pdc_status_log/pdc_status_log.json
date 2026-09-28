@@ -1,0 +1,112 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "datetime",
+  "user",
+  "event",
+  "column_break_status",
+  "from_operational",
+  "to_operational",
+  "from_accounting",
+  "to_accounting",
+  "column_break_voucher",
+  "voucher_type",
+  "voucher_no",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "datetime",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Date and Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Event",
+   "options": "Created\nDelivered\nReceived\nParty Posted\nDeposited\nUnder Collection Posted\nCleared\nBank Posted\nBank Charges Posted\nPostponed\nBounced\nBounce Charges Posted\nVoucher Cancelled\nVoucher Reversed\nReversed\nRe-presented\nReplaced\nCancelled\nReturned",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "from_operational",
+   "fieldtype": "Data",
+   "label": "From Operational Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "to_operational",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "To Operational Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "from_accounting",
+   "fieldtype": "Data",
+   "label": "From Accounting Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "to_accounting",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "To Accounting Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_voucher",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "voucher_type",
+   "fieldtype": "Link",
+   "label": "Voucher Type",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "voucher_no",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Voucher No",
+   "options": "voucher_type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "PDC Status Log",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

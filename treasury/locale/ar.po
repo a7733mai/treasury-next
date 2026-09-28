@@ -302,3 +302,633 @@ msgstr "{0} {1} لا تتم إدارته من الخزينة."
 
 msgid "Reversal of {0} {1}"
 msgstr "عكس {0} {1}"
+
+msgid "Exchange rate is required for account {0}."
+msgstr "سعر الصرف مطلوب للحساب {0}."
+
+msgid "Set the Exchange Gain / Loss Account in company {0}."
+msgstr "حدد حساب أرباح / خسائر فروق العملة في الشركة {0}."
+
+# Phase 1a — DocTypes
+msgid "Cheque Book"
+msgstr "دفتر الشيكات"
+
+msgid "Cheque Book Cancelled Leaf"
+msgstr "ورقة ملغاة من دفتر الشيكات"
+
+msgid "PDC Cheque"
+msgstr "شيك آجل"
+
+msgid "PDC Cheque Reference"
+msgstr "مرجع الشيك الآجل"
+
+msgid "PDC Status Log"
+msgstr "سجل حالات الشيك الآجل"
+
+msgid "PDC Postponement"
+msgstr "تأجيل الشيك الآجل"
+
+# Cheque Book fields
+msgid "Series"
+msgstr "السلسلة"
+
+msgid "Book No"
+msgstr "رقم الدفتر"
+
+msgid "Status"
+msgstr "الحالة"
+
+msgid "Leaves"
+msgstr "الأوراق"
+
+msgid "Start No"
+msgstr "رقم البداية"
+
+msgid "End No"
+msgstr "رقم النهاية"
+
+msgid "Next No"
+msgstr "الرقم التالي"
+
+msgid "Leaf Digits"
+msgstr "عدد خانات رقم الورقة"
+
+msgid "Cheque numbers are zero-padded to this number of digits."
+msgstr "يتم إكمال أرقام الشيكات بأصفار على اليسار حتى هذا العدد من الخانات."
+
+msgid "Cancelled Leaves"
+msgstr "الأوراق الملغاة"
+
+msgid "Active"
+msgstr "نشط"
+
+msgid "Exhausted"
+msgstr "مستنفد"
+
+msgid "Closed"
+msgstr "مغلق"
+
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgid "Date"
+msgstr "التاريخ"
+
+msgid "Reason"
+msgstr "السبب"
+
+# PDC Cheque fields
+msgid "Direction"
+msgstr "الاتجاه"
+
+msgid "Outgoing"
+msgstr "صادر"
+
+msgid "Incoming"
+msgstr "وارد"
+
+msgid "Party Type"
+msgstr "نوع الطرف"
+
+msgid "Party"
+msgstr "الطرف"
+
+msgid "Party Name"
+msgstr "اسم الطرف"
+
+msgid "Customer"
+msgstr "عميل"
+
+msgid "Supplier"
+msgstr "مورد"
+
+msgid "For incoming cheques: the bank the cheque is (or will be) deposited to."
+msgstr "للشيكات الواردة: البنك الذي تم (أو سيتم) إيداع الشيك فيه."
+
+msgid "Leave empty on an outgoing cheque to take the next leaf of the cheque book."
+msgstr "اتركه فارغاً في الشيك الصادر ليتم أخذ الورقة التالية من دفتر الشيكات."
+
+msgid "Drawer Bank"
+msgstr "بنك الساحب"
+
+msgid "Amount"
+msgstr "المبلغ"
+
+msgid "Currency"
+msgstr "العملة"
+
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgid "Cheque currency to company currency. Left empty on a foreign currency cheque, it is fetched at the party posting date."
+msgstr "من عملة الشيك إلى عملة الشركة. إذا ترك فارغاً في شيك بعملة أجنبية يتم جلبه بتاريخ ترحيل الطرف."
+
+msgid "Amount in Words"
+msgstr "المبلغ بالحروف"
+
+msgid "Bank Charges"
+msgstr "المصاريف البنكية"
+
+msgid "Dates"
+msgstr "التواريخ"
+
+msgid "Issue Date"
+msgstr "تاريخ التحرير"
+
+msgid "Handover / Receipt Date"
+msgstr "تاريخ التسليم / الاستلام"
+
+msgid "Original Due Date"
+msgstr "تاريخ الاستحقاق الأصلي"
+
+msgid "Effective Due Date"
+msgstr "تاريخ الاستحقاق الفعلي"
+
+msgid "Deposit Date"
+msgstr "تاريخ الإيداع"
+
+msgid "Actual Clearance Date"
+msgstr "تاريخ الصرف الفعلي"
+
+msgid "Bank Transaction Date"
+msgstr "تاريخ حركة البنك"
+
+msgid "Party Posting Date"
+msgstr "تاريخ ترحيل الطرف"
+
+msgid "Bank Posting Date"
+msgstr "تاريخ ترحيل البنك"
+
+msgid "Operational Status"
+msgstr "الحالة التشغيلية"
+
+msgid "Accounting Status"
+msgstr "الحالة المحاسبية"
+
+msgid "Postponed"
+msgstr "مؤجل"
+
+msgid "Postponement Count"
+msgstr "عدد مرات التأجيل"
+
+msgid "Cycle"
+msgstr "الدورة"
+
+msgid "Allocation"
+msgstr "التخصيص"
+
+msgid "Invoices / orders to settle. The allocation is final only when the cheque is posted to the party."
+msgstr "الفواتير / الأوامر المطلوب سدادها. يصبح التخصيص نهائياً فقط عند ترحيل الشيك على الطرف."
+
+msgid "References"
+msgstr "المراجع"
+
+msgid "Vouchers"
+msgstr "السندات"
+
+msgid "Linked Vouchers"
+msgstr "السندات المرتبطة"
+
+msgid "Party Payment Entry"
+msgstr "سند دفع الطرف"
+
+msgid "Under Collection Journal"
+msgstr "قيد التحصيل"
+
+msgid "Bank Journal"
+msgstr "قيد البنك"
+
+msgid "Bank Charges Journal"
+msgstr "قيد المصاريف البنكية"
+
+msgid "Reversal Journal"
+msgstr "قيد العكس"
+
+msgid "Bounce Charges Journal"
+msgstr "قيد مصاريف الارتداد"
+
+msgid "Replaced By"
+msgstr "مستبدل بـ"
+
+msgid "Replaces"
+msgstr "بديل عن"
+
+msgid "Postponements"
+msgstr "التأجيلات"
+
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgid "Cheque Image"
+msgstr "صورة الشيك"
+
+# Operational / accounting statuses and log events
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgid "Delivered"
+msgstr "تم التسليم"
+
+msgid "Received"
+msgstr "تم الاستلام"
+
+msgid "Deposited"
+msgstr "تحت التحصيل"
+
+msgid "Cleared"
+msgstr "تم الصرف"
+
+msgid "Bounced"
+msgstr "مرتد"
+
+msgid "Returned"
+msgstr "مرتجع"
+
+msgid "Endorsed"
+msgstr "مُظهّر"
+
+msgid "Discounted"
+msgstr "مخصوم"
+
+msgid "Replaced"
+msgstr "مستبدل"
+
+msgid "Cancelled"
+msgstr "ملغي"
+
+msgid "Not Posted"
+msgstr "غير مرحل"
+
+msgid "Party Posted"
+msgstr "مرحل على الطرف"
+
+msgid "Under Collection Posted"
+msgstr "مرحل تحت التحصيل"
+
+msgid "Bank Posted"
+msgstr "مرحل على البنك"
+
+msgid "Reversed"
+msgstr "معكوس"
+
+msgid "Bank Charges Posted"
+msgstr "تم ترحيل المصاريف البنكية"
+
+msgid "Bounce Charges Posted"
+msgstr "تم ترحيل مصاريف الارتداد"
+
+msgid "Voucher Cancelled"
+msgstr "تم إلغاء السند"
+
+msgid "Voucher Reversed"
+msgstr "تم عكس السند"
+
+msgid "Re-presented"
+msgstr "أعيد تقديمه"
+
+# Child table fields
+msgid "Reference Type"
+msgstr "نوع المرجع"
+
+msgid "Reference Name"
+msgstr "اسم المرجع"
+
+msgid "Allocated Amount"
+msgstr "المبلغ المخصص"
+
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgid "User"
+msgstr "المستخدم"
+
+msgid "Event"
+msgstr "الحدث"
+
+msgid "From Operational Status"
+msgstr "من الحالة التشغيلية"
+
+msgid "To Operational Status"
+msgstr "إلى الحالة التشغيلية"
+
+msgid "From Accounting Status"
+msgstr "من الحالة المحاسبية"
+
+msgid "To Accounting Status"
+msgstr "إلى الحالة المحاسبية"
+
+msgid "Voucher Type"
+msgstr "نوع السند"
+
+msgid "Voucher No"
+msgstr "رقم السند"
+
+msgid "Old Due Date"
+msgstr "تاريخ الاستحقاق القديم"
+
+msgid "New Due Date"
+msgstr "تاريخ الاستحقاق الجديد"
+
+msgid "Contact Person"
+msgstr "الشخص المسؤول عن التواصل"
+
+msgid "Approved By"
+msgstr "اعتمده"
+
+msgid "Payment Entry"
+msgstr "سند دفع"
+
+msgid "Journal Entry"
+msgstr "قيد يومية"
+
+# Cheque Book messages
+msgid "Bank Account {0} must be a company bank account of {1}."
+msgstr "يجب أن يكون الحساب البنكي {0} حساباً بنكياً للشركة {1}."
+
+msgid "Start No must be greater than zero."
+msgstr "يجب أن يكون رقم البداية أكبر من صفر."
+
+msgid "Start No cannot be greater than End No."
+msgstr "لا يمكن أن يكون رقم البداية أكبر من رقم النهاية."
+
+msgid "The range of a cheque book cannot be changed after leaves have been used."
+msgstr "لا يمكن تغيير نطاق دفتر الشيكات بعد استخدام أوراق منه."
+
+msgid "The range {0} - {1} overlaps with Cheque Book {2} of the same bank account."
+msgstr "النطاق {0} - {1} يتداخل مع دفتر الشيكات {2} لنفس الحساب البنكي."
+
+msgid "Row #{0}: Cheque No {1} is cancelled more than once."
+msgstr "الصف #{0}: رقم الشيك {1} ملغي أكثر من مرة."
+
+msgid "Cheque No {0} is not a valid leaf number."
+msgstr "رقم الشيك {0} ليس رقم ورقة صحيحاً."
+
+msgid "Cheque No {0} is outside the range {1} - {2} of Cheque Book {3}."
+msgstr "رقم الشيك {0} خارج نطاق دفتر الشيكات {3} ({1} - {2})."
+
+msgid "Cheque Book {0} is already closed."
+msgstr "دفتر الشيكات {0} مغلق بالفعل."
+
+msgid "Cheque Book {0} is {1}; no cheque number can be allocated from it."
+msgstr "دفتر الشيكات {0} حالته {1}؛ لا يمكن أخذ رقم شيك منه."
+
+msgid "Cheque Book {0} has no free leaves left."
+msgstr "لا توجد أوراق متاحة في دفتر الشيكات {0}."
+
+msgid "A reason is required to cancel a leaf."
+msgstr "يجب إدخال سبب لإلغاء الورقة."
+
+msgid "Cheque No {0} is already cancelled."
+msgstr "رقم الشيك {0} ملغي بالفعل."
+
+msgid "Cheque No {0} is used by a PDC Cheque. Cancel that cheque instead."
+msgstr "رقم الشيك {0} مستخدم في شيك آجل. قم بإلغاء ذلك الشيك بدلاً من ذلك."
+
+# PDC Cheque messages
+msgid "Cheque {0} has accounting entries and cannot be deleted. Cancel it instead."
+msgstr "الشيك {0} له قيود محاسبية ولا يمكن حذفه. قم بإلغائه بدلاً من ذلك."
+
+msgid "Party Type must be one of: {0}."
+msgstr "يجب أن يكون نوع الطرف أحد: {0}."
+
+msgid "Party is required."
+msgstr "الطرف مطلوب."
+
+msgid "Bank Account is required for outgoing cheques."
+msgstr "الحساب البنكي مطلوب للشيكات الصادرة."
+
+msgid "Bank Account {0} has no GL account."
+msgstr "الحساب البنكي {0} غير مرتبط بحساب في دليل الحسابات."
+
+msgid "Exchange Rate cannot be negative."
+msgstr "لا يمكن أن يكون سعر الصرف سالباً."
+
+msgid "A cheque book can only be used on outgoing cheques."
+msgstr "يمكن استخدام دفتر الشيكات مع الشيكات الصادرة فقط."
+
+msgid "Cheque Book {0} does not belong to Bank Account {1}."
+msgstr "دفتر الشيكات {0} لا يتبع الحساب البنكي {1}."
+
+msgid "Cheque Book {0} is {1}."
+msgstr "دفتر الشيكات {0} حالته {1}."
+
+msgid "Cheque No {0} is a cancelled leaf of Cheque Book {1}."
+msgstr "رقم الشيك {0} ورقة ملغاة من دفتر الشيكات {1}."
+
+msgid "Cheque No is required."
+msgstr "رقم الشيك مطلوب."
+
+msgid "Cheque No {0} is already used on Bank Account {1} by {2}."
+msgstr "رقم الشيك {0} مستخدم بالفعل على الحساب البنكي {1} في {2}."
+
+msgid "The Original Due Date cannot be before the Issue Date."
+msgstr "لا يمكن أن يكون تاريخ الاستحقاق الأصلي قبل تاريخ التحرير."
+
+msgid "Row #{0}: Reference Type must be one of: {1}."
+msgstr "الصف #{0}: يجب أن يكون نوع المرجع أحد: {1}."
+
+msgid "Row #{0}: Allocated Amount must be greater than zero."
+msgstr "الصف #{0}: يجب أن يكون المبلغ المخصص أكبر من صفر."
+
+msgid "Row #{0}: {1} {2} must be a submitted document of company {3}."
+msgstr "الصف #{0}: يجب أن يكون {1} {2} مستنداً معتمداً للشركة {3}."
+
+msgid "Row #{0}: {1} {2} does not belong to {3}."
+msgstr "الصف #{0}: {1} {2} لا يخص {3}."
+
+msgid "The total allocated amount cannot be greater than the cheque amount."
+msgstr "لا يمكن أن يكون إجمالي المبلغ المخصص أكبر من مبلغ الشيك."
+
+msgid "{0} cannot be changed after the cheque is posted to accounts."
+msgstr "لا يمكن تغيير {0} بعد ترحيل الشيك محاسبياً."
+
+# PDC lifecycle messages
+msgid "Cheque {0} is already posted to the party."
+msgstr "الشيك {0} مرحل على الطرف بالفعل."
+
+msgid "The bank account cannot be changed after the cheque is posted to accounts."
+msgstr "لا يمكن تغيير الحساب البنكي بعد ترحيل الشيك محاسبياً."
+
+msgid "Bank Transaction Date is required because the bank posting of this cheque happens on it."
+msgstr "تاريخ حركة البنك مطلوب لأن ترحيل البنك لهذا الشيك يتم بهذا التاريخ."
+
+msgid "Bank charges cannot be negative."
+msgstr "لا يمكن أن تكون المصاريف البنكية سالبة."
+
+msgid "Cheque {0} is already posted to the bank."
+msgstr "الشيك {0} مرحل على البنك بالفعل."
+
+msgid "Cheque {0} is {1} and cannot be postponed."
+msgstr "الشيك {0} حالته {1} ولا يمكن تأجيله."
+
+msgid "A reason is required."
+msgstr "السبب مطلوب."
+
+msgid "Bounce charges cannot be negative."
+msgstr "لا يمكن أن تكون مصاريف الارتداد سالبة."
+
+msgid "Bounce charges can only be charged on incoming cheques."
+msgstr "يمكن تحميل مصاريف الارتداد على الشيكات الواردة فقط."
+
+msgid "Re-presented after bounce"
+msgstr "أعيد تقديمه بعد الارتداد"
+
+msgid "Cheque {0} is posted to accounts. Bounce, return or replace it first so its postings are reversed."
+msgstr "الشيك {0} مرحل محاسبياً. قم بتسجيل ارتداده أو إرجاعه أو استبداله أولاً حتى يتم عكس قيوده."
+
+msgid "Set the Under Collection Account of Bank Account {0} in Treasury Company Settings."
+msgstr "حدد حساب شيكات تحت التحصيل للحساب البنكي {0} في إعدادات الخزينة للشركة."
+
+msgid "Bank charges of cheque {0}"
+msgstr "المصاريف البنكية للشيك {0}"
+
+msgid "Set the Bank Charges Account of Bank Account {0} in Treasury Company Settings."
+msgstr "حدد حساب المصاريف البنكية للحساب البنكي {0} في إعدادات الخزينة للشركة."
+
+msgid "Set the Bounce Charges Account in Treasury Company Settings of {0}."
+msgstr "حدد حساب مصاريف الارتداد في إعدادات الخزينة للشركة {0}."
+
+msgid "Bounce charges can only be charged to a party account in the company currency {0}."
+msgstr "يمكن تحميل مصاريف الارتداد فقط على حساب طرف بعملة الشركة {0}."
+
+msgid "Bounce charges of cheque {0}"
+msgstr "مصاريف ارتداد الشيك {0}"
+
+msgid "{0} {1} could not be cancelled (see the message above). If its accounting period is closed, set On Bounce to 'Reverse by Journal Entry' in Treasury Company Settings."
+msgstr "تعذر إلغاء {0} {1} (راجع الرسالة السابقة). إذا كانت فترته المحاسبية مقفلة، اضبط \"عند الارتداد\" على \"عكس بقيد يومية\" في إعدادات الخزينة للشركة."
+
+msgid "Cancellation Failed"
+msgstr "فشل الإلغاء"
+
+msgid "This action requires one of the roles: {0}."
+msgstr "هذا الإجراء يتطلب أحد الأدوار: {0}."
+
+msgid "Not Permitted"
+msgstr "غير مصرح"
+
+msgid "Cheque {0} ({1})"
+msgstr "الشيك {0} ({1})"
+
+msgid "The new due date is required."
+msgstr "تاريخ الاستحقاق الجديد مطلوب."
+
+msgid "The new due date is the same as the current due date."
+msgstr "تاريخ الاستحقاق الجديد هو نفس تاريخ الاستحقاق الحالي."
+
+msgid "This action is only available for {0} cheques."
+msgstr "هذا الإجراء متاح فقط للشيكات من نوع {0}."
+
+msgid "Cheque {0} is already {1}."
+msgstr "الشيك {0} حالته بالفعل {1}."
+
+msgid "This action is not allowed while cheque {0} is {1}."
+msgstr "هذا الإجراء غير مسموح بينما حالة الشيك {0} هي {1}."
+
+msgid "Set the Bank Account of cheque {0} first."
+msgstr "حدد الحساب البنكي للشيك {0} أولاً."
+
+msgid "The date"
+msgstr "التاريخ"
+
+msgid "{0} ({1}) cannot be before {2}."
+msgstr "لا يمكن أن يكون {0} ({1}) قبل {2}."
+
+msgid "Clearance Date {0} cannot be in the future (see Treasury Settings)."
+msgstr "لا يمكن أن يكون تاريخ الصرف {0} في المستقبل (راجع إعدادات الخزينة)."
+
+# PDC / Cheque Book UI
+msgid "Actions"
+msgstr "إجراءات"
+
+msgid "Cancel Leaf"
+msgstr "إلغاء ورقة"
+
+msgid "Close Book"
+msgstr "إغلاق الدفتر"
+
+msgid "Close this cheque book? No more cheque numbers will be allocated from it."
+msgstr "إغلاق دفتر الشيكات هذا؟ لن يتم أخذ أرقام شيكات منه بعد ذلك."
+
+msgid "Overdue"
+msgstr "متأخر"
+
+msgid "Receipt Date"
+msgstr "تاريخ الاستلام"
+
+msgid "Handover Date"
+msgstr "تاريخ التسليم"
+
+msgid "No vouchers yet."
+msgstr "لا توجد سندات بعد."
+
+msgid "Draft"
+msgstr "مسودة"
+
+msgid "Submitted"
+msgstr "معتمد"
+
+msgid "Posting Date"
+msgstr "تاريخ الترحيل"
+
+msgid "Deliver"
+msgstr "تسليم"
+
+msgid "Receive"
+msgstr "استلام"
+
+msgid "Post to Party Now"
+msgstr "ترحيل على الطرف الآن"
+
+msgid "Deposit"
+msgstr "إيداع"
+
+msgid "Clear"
+msgstr "صرف"
+
+msgid "Exchange Rate at Clearance"
+msgstr "سعر الصرف عند الصرف"
+
+msgid "Bounce Date"
+msgstr "تاريخ الارتداد"
+
+msgid "Bounce Charges"
+msgstr "مصاريف الارتداد"
+
+msgid "Post to Bank"
+msgstr "ترحيل على البنك"
+
+msgid "Postpone"
+msgstr "تأجيل"
+
+msgid "Re-present"
+msgstr "إعادة تقديم"
+
+msgid "Return to Party"
+msgstr "إرجاع للطرف"
+
+msgid "Return Date"
+msgstr "تاريخ الإرجاع"
+
+msgid "Replace"
+msgstr "استبدال"
+
+msgid "Cancel Cheque"
+msgstr "إلغاء الشيك"
+
+msgid "New Cheque No"
+msgstr "رقم الشيك الجديد"
+
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
+
+msgid "Replacement Date"
+msgstr "تاريخ الاستبدال"
+
+msgid "Leave empty to take the next leaf of the cheque book."
+msgstr "اتركه فارغاً لأخذ الورقة التالية من دفتر الشيكات."
