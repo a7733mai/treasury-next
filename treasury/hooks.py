@@ -8,7 +8,7 @@ app_license = "mit"
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -86,12 +86,13 @@ app_license = "mit"
 # ------------
 
 # before_install = "treasury.install.before_install"
-# after_install = "treasury.install.after_install"
+after_install = "treasury.install.after_install"
+after_migrate = "treasury.install.after_migrate"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "treasury.uninstall.before_uninstall"
+before_uninstall = "treasury.install.before_uninstall"
 # after_uninstall = "treasury.uninstall.after_uninstall"
 
 # Integration Setup
@@ -144,13 +145,16 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Payment Entry": {
+		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
+		"on_trash": "treasury.overrides.voucher_guard.on_trash",
+	},
+	"Journal Entry": {
+		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
+		"on_trash": "treasury.overrides.voucher_guard.on_trash",
+	},
+}
 
 # Scheduled Tasks
 # ---------------

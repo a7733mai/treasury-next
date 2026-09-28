@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "alerts_section",
+  "default_alert_days",
+  "column_break_alerts",
+  "allow_future_clearance_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "alerts_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "default": "3",
+   "description": "Number of days before the due date to send cheque alerts.",
+   "fieldname": "default_alert_days",
+   "fieldtype": "Int",
+   "label": "Default Alert Days",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_future_clearance_date",
+   "fieldtype": "Check",
+   "label": "Allow Future Clearance Date"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Treasury Setup",
+ "name": "Treasury Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Treasury User"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

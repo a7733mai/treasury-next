@@ -1,0 +1,262 @@
+# Arabic translations for the Treasury app.
+# Copyright (C) 2026 Ahmed Abdelmageed
+# This file is distributed under the same license as the treasury package.
+msgid ""
+msgstr ""
+"Project-Id-Version: treasury\n"
+"Report-Msgid-Bugs-To: ahmed3mageed@gmail.com\n"
+"POT-Creation-Date: 2026-09-28 12:00+0000\n"
+"PO-Revision-Date: 2026-09-28 12:00+0000\n"
+"Last-Translator: ahmed3mageed@gmail.com\n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+# Modules
+msgid "Treasury Setup"
+msgstr "إعدادات الخزينة"
+
+msgid "PDC"
+msgstr "الشيكات الآجلة"
+
+msgid "Security Cheques"
+msgstr "شيكات الضمان"
+
+msgid "Bank Facilities"
+msgstr "التسهيلات البنكية"
+
+# Roles
+msgid "Treasury Manager"
+msgstr "مدير الخزينة"
+
+msgid "Treasury User"
+msgstr "مستخدم الخزينة"
+
+msgid "Cheque Approver"
+msgstr "معتمد الشيكات"
+
+# DocTypes
+msgid "Treasury Settings"
+msgstr "إعدادات الخزينة العامة"
+
+msgid "Treasury Company Settings"
+msgstr "إعدادات الخزينة للشركة"
+
+msgid "PDC Account Mapping"
+msgstr "ربط حسابات الشيكات الآجلة"
+
+# Treasury Settings fields
+msgid "General"
+msgstr "عام"
+
+msgid "Default Alert Days"
+msgstr "أيام التنبيه الافتراضية"
+
+msgid "Number of days before the due date to send cheque alerts."
+msgstr "عدد الأيام قبل تاريخ الاستحقاق لإرسال تنبيهات الشيكات."
+
+msgid "Allow Future Clearance Date"
+msgstr "السماح بتاريخ صرف مستقبلي"
+
+# Treasury Company Settings fields
+msgid "Company"
+msgstr "الشركة"
+
+msgid "Outgoing Cheques"
+msgstr "الشيكات الصادرة"
+
+msgid "Outgoing Party Posting"
+msgstr "ترحيل الطرف للشيكات الصادرة"
+
+msgid "Outgoing Bank Posting"
+msgstr "ترحيل البنك للشيكات الصادرة"
+
+msgid "Incoming Cheques"
+msgstr "الشيكات الواردة"
+
+msgid "Incoming Party Posting"
+msgstr "ترحيل الطرف للشيكات الواردة"
+
+msgid "Incoming Under Collection Stage"
+msgstr "مرحلة التحصيل للشيكات الواردة"
+
+msgid "Incoming Bank Posting"
+msgstr "ترحيل البنك للشيكات الواردة"
+
+msgid "Bounce"
+msgstr "الارتداد"
+
+msgid "On Bounce"
+msgstr "عند الارتداد"
+
+msgid "Bounce Charges Account"
+msgstr "حساب مصاريف الارتداد"
+
+msgid "Accounts"
+msgstr "الحسابات"
+
+msgid "PDC Accounts"
+msgstr "حسابات الشيكات الآجلة"
+
+# PDC Account Mapping fields
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgid "PDC Payable Account"
+msgstr "حساب أوراق الدفع"
+
+msgid "PDC Receivable Account"
+msgstr "حساب أوراق القبض"
+
+msgid "Under Collection Account"
+msgstr "حساب شيكات تحت التحصيل"
+
+msgid "Bank Charges Account"
+msgstr "حساب المصاريف البنكية"
+
+msgid "Cheque Print Format"
+msgstr "نموذج طباعة الشيك"
+
+# Select options
+msgid "On Handover"
+msgstr "عند التسليم"
+
+msgid "On Cheque Date"
+msgstr "في تاريخ الشيك"
+
+msgid "On Creation"
+msgstr "عند الإنشاء"
+
+msgid "Manual"
+msgstr "يدوي"
+
+msgid "On Actual Clearance"
+msgstr "عند الصرف الفعلي"
+
+msgid "On Bank Transaction Date"
+msgstr "في تاريخ حركة البنك"
+
+msgid "On Receipt"
+msgstr "عند الاستلام"
+
+msgid "On Deposit"
+msgstr "عند الإيداع"
+
+msgid "Disabled"
+msgstr "معطل"
+
+msgid "Cancel Payment Entry"
+msgstr "إلغاء سند الدفع"
+
+msgid "Reverse by Journal Entry"
+msgstr "عكس بقيد يومية"
+
+msgid "Liability"
+msgstr "خصوم"
+
+msgid "Asset"
+msgstr "أصول"
+
+# Custom fields on Payment Entry / Journal Entry
+msgid "Treasury"
+msgstr "الخزينة"
+
+msgid "Treasury Source Type"
+msgstr "نوع مصدر الخزينة"
+
+msgid "Treasury Source"
+msgstr "مصدر الخزينة"
+
+msgid "Treasury Event"
+msgstr "حدث الخزينة"
+
+# Messages
+msgid "Outgoing cheques will be posted to the party as soon as they are created, even if they are never handed over."
+msgstr "سيتم ترحيل الشيكات الصادرة على الطرف بمجرد إنشائها، حتى لو لم يتم تسليمها أبداً."
+
+msgid "Warning"
+msgstr "تحذير"
+
+msgid "Row #{0}: Bank Account {1} appears more than once."
+msgstr "الصف #{0}: الحساب البنكي {1} مكرر أكثر من مرة."
+
+msgid "Row #{0}: {1} {2} must have Account Type 'Bank'."
+msgstr "الصف #{0}: يجب أن يكون نوع الحساب {1} {2} هو 'بنك'."
+
+msgid "Row #{0}: {1} {2} must have Root Type '{3}'."
+msgstr "الصف #{0}: يجب أن يكون النوع الرئيسي للحساب {1} {2} هو '{3}'."
+
+msgid "Row #{0}: {1} {2} must be in the bank account currency {3}."
+msgstr "الصف #{0}: يجب أن يكون الحساب {1} {2} بعملة الحساب البنكي {3}."
+
+msgid "Row #{0}: Bank Account {1} must be a company bank account of {2}."
+msgstr "الصف #{0}: يجب أن يكون الحساب البنكي {1} حساباً بنكياً للشركة {2}."
+
+msgid "Row #{0}: "
+msgstr "الصف #{0}: "
+
+msgid "{0} {1} does not belong to company {2}."
+msgstr "{0} {1} لا يتبع الشركة {2}."
+
+msgid "{0} {1} cannot be a group account."
+msgstr "{0} {1} لا يمكن أن يكون حساباً رئيسياً (مجموعة)."
+
+msgid "This voucher is managed by {0} {1}. Cancel it from there."
+msgstr "هذا السند تتم إدارته من {0} {1}. قم بإلغائه من هناك."
+
+msgid "Not Allowed"
+msgstr "غير مسموح"
+
+msgid "Treasury Company Settings are missing for company {0}."
+msgstr "إعدادات الخزينة غير موجودة للشركة {0}."
+
+msgid "Missing Settings"
+msgstr "إعدادات ناقصة"
+
+msgid "No PDC account mapping found for Bank Account {0} in Treasury Company Settings {1}."
+msgstr "لا يوجد ربط لحسابات الشيكات الآجلة للحساب البنكي {0} في إعدادات الخزينة للشركة {1}."
+
+msgid "{0} {1} does not exist"
+msgstr "{0} {1} غير موجود"
+
+msgid "Payment Type must be Pay or Receive."
+msgstr "يجب أن يكون نوع الدفع صرف أو قبض."
+
+msgid "Currency {0} does not match the currency {1} of account {2}."
+msgstr "العملة {0} لا تطابق عملة الحساب {2} وهي {1}."
+
+msgid "No party account found for {0} {1}."
+msgstr "لم يتم العثور على حساب للطرف {0} {1}."
+
+msgid "Exchange rate from {0} to {1} is required."
+msgstr "سعر الصرف من {0} إلى {1} مطلوب."
+
+msgid "Amount must be greater than zero."
+msgstr "يجب أن يكون المبلغ أكبر من صفر."
+
+msgid "Party account currency {0} must be either {1} or the company currency {2}."
+msgstr "عملة حساب الطرف {0} يجب أن تكون {1} أو عملة الشركة {2}."
+
+msgid "The following references are no longer outstanding enough and were reduced or skipped: {0}. The difference is kept as an unallocated advance."
+msgstr "المستندات التالية لم يعد رصيدها المستحق كافياً فتم تخفيض التخصيص عليها أو تخطيها: {0}. الفرق مسجل كدفعة مقدمة غير مخصصة."
+
+msgid "Allocation Adjusted"
+msgstr "تم تعديل التخصيص"
+
+msgid "At least one account row is required."
+msgstr "مطلوب سطر حساب واحد على الأقل."
+
+msgid "Only Payment Entry and Journal Entry can be cancelled here."
+msgstr "يمكن إلغاء سندات الدفع وقيود اليومية فقط من هنا."
+
+msgid "{0} {1} must be submitted to be reversed."
+msgstr "يجب اعتماد {0} {1} حتى يمكن عكسه."
+
+msgid "{0} {1} is not managed by Treasury."
+msgstr "{0} {1} لا تتم إدارته من الخزينة."
+
+msgid "Reversal of {0} {1}"
+msgstr "عكس {0} {1}"

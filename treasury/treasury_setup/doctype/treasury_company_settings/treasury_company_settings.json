@@ -1,0 +1,171 @@
+{
+ "actions": [],
+ "autoname": "field:company",
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "outgoing_section",
+  "outgoing_party_posting",
+  "column_break_outgoing",
+  "outgoing_bank_posting",
+  "incoming_section",
+  "incoming_party_posting",
+  "incoming_under_collection",
+  "column_break_incoming",
+  "incoming_bank_posting",
+  "bounce_section",
+  "on_bounce",
+  "column_break_bounce",
+  "bounce_charges_account",
+  "accounts_section",
+  "pdc_accounts"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "outgoing_section",
+   "fieldtype": "Section Break",
+   "label": "Outgoing Cheques"
+  },
+  {
+   "default": "On Handover",
+   "fieldname": "outgoing_party_posting",
+   "fieldtype": "Select",
+   "label": "Outgoing Party Posting",
+   "options": "On Handover\nOn Cheque Date\nOn Creation\nManual",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_outgoing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "On Actual Clearance",
+   "fieldname": "outgoing_bank_posting",
+   "fieldtype": "Select",
+   "label": "Outgoing Bank Posting",
+   "options": "On Actual Clearance\nOn Bank Transaction Date\nManual",
+   "reqd": 1
+  },
+  {
+   "fieldname": "incoming_section",
+   "fieldtype": "Section Break",
+   "label": "Incoming Cheques"
+  },
+  {
+   "default": "On Receipt",
+   "fieldname": "incoming_party_posting",
+   "fieldtype": "Select",
+   "label": "Incoming Party Posting",
+   "options": "On Receipt\nOn Cheque Date\nManual",
+   "reqd": 1
+  },
+  {
+   "default": "On Deposit",
+   "fieldname": "incoming_under_collection",
+   "fieldtype": "Select",
+   "label": "Incoming Under Collection Stage",
+   "options": "On Deposit\nDisabled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_incoming",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "On Actual Clearance",
+   "fieldname": "incoming_bank_posting",
+   "fieldtype": "Select",
+   "label": "Incoming Bank Posting",
+   "options": "On Actual Clearance\nOn Bank Transaction Date\nManual",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bounce_section",
+   "fieldtype": "Section Break",
+   "label": "Bounce"
+  },
+  {
+   "default": "Reverse by Journal Entry",
+   "fieldname": "on_bounce",
+   "fieldtype": "Select",
+   "label": "On Bounce",
+   "options": "Cancel Payment Entry\nReverse by Journal Entry",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_bounce",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bounce_charges_account",
+   "fieldtype": "Link",
+   "label": "Bounce Charges Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "fieldname": "pdc_accounts",
+   "fieldtype": "Table",
+   "label": "PDC Accounts",
+   "options": "PDC Account Mapping"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Treasury Setup",
+ "name": "Treasury Company Settings",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
