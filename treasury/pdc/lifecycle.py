@@ -144,13 +144,16 @@ def receive(name: str, receipt_date=None, remarks: str | None = None) -> dict:
 	return _save(doc)
 
 
-def post_party(name: str, posting_date=None) -> dict:
+def post_party(name: str, posting_date=None, *, system: bool = False) -> dict:
 	"""Post the party settlement now ("Post Now"; also used by the `On Cheque Date` scheduler).
 
 	The default posting date is the effective (possibly postponed) due date, or the handover / receipt date
 	when the cheque was handed over after its due date.
+
+	`system=True` is the internal entry point of the scheduler (treasury.pdc.scheduler): it skips the user
+	permission check only; every business rule below still applies. Never pass it from a whitelisted method.
 	"""
-	doc = _begin(name)
+	doc = _begin(name, system=system)
 	if doc.accounting_status != NOT_POSTED:
 		frappe.throw(_("Cheque {0} is already posted to the party.").format(frappe.bold(doc.name)))
 	_require_status(doc, ("Created", "Delivered", "Received", "Deposited"))
@@ -171,19 +174,11 @@ def deposit(name: str, deposit_date=None, bank_account: str | None = None, remar
 	date = _date(deposit_date)
 	_not_before(doc, date, "deposit_date", _latest_date(doc, "handover_date"))
 
-	if bank_account and bank_account != doc.bank_account:
-		if doc.accounting_status != NOT_POSTED:
-			frappe.throw(_("The bank account cannot be changed after the cheque is posted to accounts."))
-		currency = doc.currency
-		doc.bank_account = bank_account
-		doc.validate_bank_account()
-		doc.set_currency_and_rate()
-		if currency and doc.currency != currency:
-			# the amount (and any exchange rate) was entered in the cheque currency
-			message = _("Cheque {0} is in {1} and cannot be deposited to Bank Account {2}, which is in {3}.")
-			frappe.throw(
-				message.format(frappe.bold(doc.name), currency, frappe.bold(bank_account), doc.currency)
-			)
+	_set_bank_account(
+		doc,
+		bank_account,
+		_("Cheque {0} is in {1} and cannot be deposited to Bank Account {2}, which is in {3}."),
+	)
 	_require_bank_account(doc)
 
 	doc.deposit_date = date
@@ -201,15 +196,31 @@ def clear(
 	bank_charges=0,
 	exchange_rate=None,
 	remarks: str | None = None,
+	bank_account: str | None = None,
 ) -> dict:
 	"""Mark the cheque cleared by the bank and post the bank settlement according to the settings.
 
 	`exchange_rate` (foreign currency cheques) is the bank rate of the clearance; the difference to the
 	rate the cheque was carried at is booked as exchange gain / loss.
+
+	`bank_account`: the bank an incoming cheque received without one was cleared into (same checks as a
+	deposit). A cheque that already has a bank account keeps it.
 	"""
 	doc = _begin(name)
 	allowed = ("Delivered",) if doc.direction == OUTGOING else ("Received", "Deposited")
 	_require_status(doc, allowed, "Cleared")
+	if bank_account and doc.bank_account and bank_account != doc.bank_account:
+		frappe.throw(
+			_("Cheque {0} is already assigned to Bank Account {1}.").format(
+				frappe.bold(doc.name), frappe.bold(doc.bank_account)
+			)
+		)
+	_set_bank_account(
+		doc,
+		bank_account,
+		_("Cheque {0} is in {1} and cannot be cleared into Bank Account {2}, which is in {3}."),
+	)
+	_require_bank_account(doc)
 	date = _date(clearance_date)
 	latest = _latest_date(doc, "handover_date", "deposit_date")
 	_validate_clearance_date(doc, date, latest)
@@ -237,14 +248,23 @@ def clear(
 	return _save(doc)
 
 
-def post_bank(name: str, posting_date=None, bank_charges=None, exchange_rate=None) -> dict:
-	"""Post the bank settlement of a cleared cheque (bank posting mode `Manual`)."""
+def post_bank(
+	name: str, posting_date=None, bank_charges=None, exchange_rate=None, bank_transaction_date=None
+) -> dict:
+	"""Post the bank settlement of a cleared cheque (bank posting mode `Manual`).
+
+	`bank_transaction_date` (e.g. from the PDC Bank Clearing tool) is recorded if the cheque has none yet.
+	"""
 	doc = _begin(name)
 	if doc.accounting_status == BANK_POSTED:
 		frappe.throw(_("Cheque {0} is already posted to the bank.").format(frappe.bold(doc.name)))
 	_require_status(doc, ("Cleared",))
+	latest = _latest_date(doc, "handover_date", "deposit_date")
+	if bank_transaction_date and not doc.bank_transaction_date:
+		_not_before(doc, bank_transaction_date, "bank_transaction_date", latest)
+		doc.bank_transaction_date = getdate(bank_transaction_date)
 	date = getdate(posting_date or doc.bank_transaction_date or doc.actual_clearance_date)
-	_not_before(doc, date, "bank_posting_date", _latest_date(doc, "handover_date", "deposit_date"))
+	_not_before(doc, date, "bank_posting_date", latest)
 	if bank_charges is not None:
 		if flt(bank_charges) < 0:
 			frappe.throw(_("Bank charges cannot be negative."))
@@ -657,11 +677,16 @@ def _cancel_voucher(doctype: str, name: str):
 # ---------------------------------------------------------------------------
 
 
-def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write"):
-	"""Lock the cheque row, reload it and check permissions."""
+def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write", system: bool = False):
+	"""Lock the cheque row, reload it and check permissions.
+
+	`system`: internal service call (scheduler) — no user permission / role check.
+	"""
 	if not name or not frappe.db.get_value(DOCTYPE, name, "name", for_update=True):
 		frappe.throw(_("{0} {1} does not exist").format(_(DOCTYPE), name), frappe.DoesNotExistError)
 	doc = frappe.get_doc(DOCTYPE, name)
+	if system:
+		return doc
 	doc.check_permission(ptype)
 	if roles and not set(roles) & set(frappe.get_roles()):
 		frappe.throw(
@@ -836,6 +861,26 @@ def _require_status(doc, allowed: tuple[str, ...], target: str | None = None):
 			_("This action is not allowed while cheque {0} is {1}.").format(
 				frappe.bold(doc.name), _(doc.operational_status)
 			)
+		)
+
+
+def _set_bank_account(doc, bank_account: str | None, currency_message: str):
+	"""Move a not yet posted incoming cheque to `bank_account` (deposit / clearance into another bank).
+
+	`currency_message` ({0} cheque, {1} its currency, {2} bank account, {3} bank currency) is raised when
+	the bank is in another currency: the amount (and any exchange rate) was entered in the cheque currency.
+	"""
+	if not bank_account or bank_account == doc.bank_account:
+		return
+	if doc.accounting_status != NOT_POSTED:
+		frappe.throw(_("The bank account cannot be changed after the cheque is posted to accounts."))
+	currency = doc.currency
+	doc.bank_account = bank_account
+	doc.validate_bank_account()
+	doc.set_currency_and_rate()
+	if currency and doc.currency != currency:
+		frappe.throw(
+			currency_message.format(frappe.bold(doc.name), currency, frappe.bold(bank_account), doc.currency)
 		)
 
 

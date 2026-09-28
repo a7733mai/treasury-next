@@ -43,7 +43,11 @@ required_apps = ["erpnext"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+# Plain files (no bundle): a "Managed by Treasury" intro and a link back to the source document.
+doctype_js = {
+	"Payment Entry": "public/js/voucher_treasury_link.js",
+	"Journal Entry": "public/js/voucher_treasury_link.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -76,11 +80,14 @@ required_apps = ["erpnext"]
 # Jinja
 # ----------
 
-# add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "treasury.utils.jinja_methods",
-# 	"filters": "treasury.utils.jinja_filters"
-# }
+# add methods and filters to jinja environment (used by the PDC print formats)
+jinja = {
+	"methods": [
+		"treasury.utils.amount_in_words.treasury_amount_in_words",
+		"treasury.utils.print_helpers.treasury_print_direction",
+		"treasury.utils.print_helpers.treasury_print_date",
+	],
+}
 
 # Installation
 # ------------
@@ -158,6 +165,14 @@ doc_events = {
 
 # Scheduled Tasks
 # ---------------
+
+# `daily_long`: the posting job may submit many Payment Entries (catch-up after days without a run).
+scheduler_events = {
+	"daily_long": [
+		"treasury.pdc.scheduler.post_due_party_postings",
+		"treasury.pdc.scheduler.send_due_alerts",
+	],
+}
 
 # scheduler_events = {
 # 	"all": [

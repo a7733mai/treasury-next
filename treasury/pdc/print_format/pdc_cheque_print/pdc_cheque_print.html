@@ -1,0 +1,18 @@
+{#- The cheque leaf: payee, date (effective due date), amount in figures and in words, absolutely positioned
+    for a standard 17.5cm x 8cm cheque. Adjust the positions in a copy of this format for other banks, or use
+    ERPNext's Cheque Print Template ("Print on Cheque Template" on the cheque form). -#}
+{%- set direction = treasury_print_direction() -%}
+<div class="pdc-cheque-leaf" dir="{{ direction }}" style="position: relative; width: 17.5cm; height: 8cm;">
+	<div class="pdc-cheque-date" style="position: absolute; top: 1cm; {{ 'left' if direction == 'rtl' else 'right' }}: 1cm;">
+		{{ frappe.utils.formatdate(doc.effective_due_date or doc.original_due_date) }}
+	</div>
+	<div class="pdc-cheque-payee" style="position: absolute; top: 2.4cm; {{ 'right' if direction == 'rtl' else 'left' }}: 2.5cm; width: 11cm;">
+		{{ (doc.party_name or doc.party) | e }}
+	</div>
+	<div class="pdc-cheque-words" style="position: absolute; top: 3.5cm; {{ 'right' if direction == 'rtl' else 'left' }}: 2.5cm; width: 10cm;">
+		{{ treasury_amount_in_words(doc.amount, doc.currency) }}
+	</div>
+	<div class="pdc-cheque-figures" style="position: absolute; top: 4cm; {{ 'left' if direction == 'rtl' else 'right' }}: 1cm; font-weight: bold;">
+		{{ doc.get_formatted("amount") }}
+	</div>
+</div>

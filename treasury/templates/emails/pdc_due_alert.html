@@ -1,0 +1,35 @@
+<div>
+	<p>{{ _("Cheques of {0} due up to the alert date, as of {1}:").format(company | e, as_of) }}</p>
+	{% for group in groups %}
+	<h4>{{ group.title }}</h4>
+	<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+		<thead>
+			<tr>
+				<th>{{ _("Cheque") }}</th>
+				<th>{{ _("Cheque No") }}</th>
+				<th>{{ _("Party") }}</th>
+				<th>{{ _("Bank") }}</th>
+				<th>{{ _("Amount") }}</th>
+				<th>{{ _("Effective Due Date") }}</th>
+				<th>{{ _("Status") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in group.rows %}
+			<tr>
+				<td>{{ row.name | e }}</td>
+				<td>{{ row.cheque_no | e }}</td>
+				<td>{{ (row.party_name or row.party) | e }}</td>
+				<td>{{ row.bank | e }}</td>
+				<td style="text-align: right;">{{ row.amount_formatted }}</td>
+				<td>{{ row.due_date }}</td>
+				<td>
+					{{ _(row.operational_status) }}
+					{% if row.overdue %}<strong style="color: #c0392b;">({{ _("Overdue") }})</strong>{% endif %}
+				</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% endfor %}
+</div>

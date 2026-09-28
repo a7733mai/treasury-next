@@ -947,3 +947,243 @@ msgstr "لا يمكن تغيير {0} بعد تسليم الشيك أو استل�
 
 msgid "Cheque {0} is in {1} and cannot be deposited to Bank Account {2}, which is in {3}."
 msgstr "الشيك {0} بعملة {1} ولا يمكن إيداعه في الحساب البنكي {2} الذي عملته {3}."
+
+# Phase 1b — clearing into a bank account
+msgid "Cheque {0} is already assigned to Bank Account {1}."
+msgstr "الشيك {0} مرتبط بالفعل بالحساب البنكي {1}."
+
+msgid "Cheque {0} is in {1} and cannot be cleared into Bank Account {2}, which is in {3}."
+msgstr "الشيك {0} بعملة {1} ولا يمكن صرفه في الحساب البنكي {2} الذي عملته {3}."
+
+# Phase 1b — scheduler and due alerts
+msgid "PDC scheduled party posting failed for cheque {0}"
+msgstr "فشل الترحيل المجدول على الطرف للشيك {0}"
+
+msgid "Cheques due for {0} as of {1}"
+msgstr "الشيكات المستحقة لشركة {0} حتى {1}"
+
+msgid "PDC due alert email could not be sent"
+msgstr "تعذر إرسال بريد تنبيه استحقاق الشيكات"
+
+msgid "Cheques of {0} due up to the alert date, as of {1}:"
+msgstr "شيكات {0} المستحقة حتى تاريخ التنبيه، في {1}:"
+
+msgid "Cheque"
+msgstr "الشيك"
+
+msgid "Bank"
+msgstr "البنك"
+
+# Phase 1b — amount in words
+msgid "{0} and {1} {2}"
+msgstr "{0} و{1} {2}"
+
+msgid "{0} only"
+msgstr "فقط {0} لا غير"
+
+msgid "Egyptian Pound"
+msgstr "جنيه مصري"
+
+msgid "US Dollar"
+msgstr "دولار أمريكي"
+
+msgid "Euro"
+msgstr "يورو"
+
+msgid "Pound Sterling"
+msgstr "جنيه إسترليني"
+
+msgid "Saudi Riyal"
+msgstr "ريال سعودي"
+
+msgid "UAE Dirham"
+msgstr "درهم إماراتي"
+
+msgid "Kuwaiti Dinar"
+msgstr "دينار كويتي"
+
+msgid "Qatari Riyal"
+msgstr "ريال قطري"
+
+msgid "Bahraini Dinar"
+msgstr "دينار بحريني"
+
+msgid "Omani Rial"
+msgstr "ريال عماني"
+
+msgid "Jordanian Dinar"
+msgstr "دينار أردني"
+
+msgid "Piastre"
+msgstr "قرش"
+
+msgid "Cent"
+msgstr "سنت"
+
+msgid "Halala"
+msgstr "هللة"
+
+msgid "Fils"
+msgstr "فلس"
+
+msgid "Baisa"
+msgstr "بيسة"
+
+msgid "Dirham"
+msgstr "درهم"
+
+msgid "Penny"
+msgstr "بنس"
+
+# Phase 1b — print formats
+msgid "PDC Cheque Receipt"
+msgstr "إيصال شيك آجل"
+
+msgid "PDC Cheque Print"
+msgstr "طباعة ورقة الشيك"
+
+msgid "Cheque Receipt"
+msgstr "إيصال استلام شيك"
+
+msgid "Cheque Delivery Voucher"
+msgstr "سند تسليم شيك"
+
+msgid "Print Date"
+msgstr "تاريخ الطباعة"
+
+msgid "Received by"
+msgstr "المستلم"
+
+msgid "Delivered by"
+msgstr "المسلِّم"
+
+msgid "Approved by"
+msgstr "المعتمد"
+
+msgid "Print"
+msgstr "طباعة"
+
+msgid "Print Receipt"
+msgstr "طباعة الإيصال"
+
+msgid "Print Cheque"
+msgstr "طباعة الشيك"
+
+msgid "Print on Cheque Template"
+msgstr "الطباعة على نموذج الشيك"
+
+# Phase 1b — Payment Entry / Journal Entry link
+msgid "Managed by Treasury — cancel from the source document {0}."
+msgstr "هذا المستند تديره الخزينة — يتم الإلغاء من المستند المصدر {0}."
+
+msgid "Open {0}"
+msgstr "فتح {0}"
+
+# Phase 1b — PDC Bank Clearing
+msgid "PDC Bank Clearing"
+msgstr "تسوية الشيكات مع البنك"
+
+msgid "PDC Clearing Match"
+msgstr "مطابقة تسوية الشيكات"
+
+msgid "From Date"
+msgstr "من تاريخ"
+
+msgid "To Date"
+msgstr "إلى تاريخ"
+
+msgid "Date Tolerance (Days)"
+msgstr "هامش التاريخ (أيام)"
+
+msgid "A bank transaction of the same amount within this many days of the effective due date is a weak match."
+msgstr "الحركة البنكية بنفس المبلغ خلال هذا العدد من الأيام من تاريخ الاستحقاق الفعلي تعتبر مطابقة ضعيفة."
+
+msgid "Get Suggestions"
+msgstr "جلب الاقتراحات"
+
+msgid "Clear Selected"
+msgstr "صرف المحدد"
+
+msgid "Suggested Matches"
+msgstr "المطابقات المقترحة"
+
+msgid "Matches"
+msgstr "المطابقات"
+
+msgid "Select"
+msgstr "اختيار"
+
+msgid "Match Quality"
+msgstr "جودة المطابقة"
+
+msgid "Strong"
+msgstr "قوية"
+
+msgid "Weak"
+msgstr "ضعيفة"
+
+msgid "Bank Transaction"
+msgstr "حركة بنكية"
+
+msgid "Transaction Date"
+msgstr "تاريخ الحركة"
+
+msgid "Result"
+msgstr "النتيجة"
+
+msgid "Company and Bank Account are required."
+msgstr "الشركة والحساب البنكي مطلوبان."
+
+msgid "Bank Account {0} does not belong to company {1}."
+msgstr "الحساب البنكي {0} لا يتبع الشركة {1}."
+
+msgid "From Date cannot be after To Date."
+msgstr "لا يمكن أن يكون تاريخ البداية بعد تاريخ النهاية."
+
+msgid "Not permitted"
+msgstr "غير مسموح"
+
+msgid "Cleared and reconciled"
+msgstr "تم الصرف والتسوية"
+
+msgid "PDC Bank Clearing failed for cheque {0}"
+msgstr "فشلت تسوية الشيك {0} مع البنك"
+
+msgid "Could not be cleared."
+msgstr "تعذر الصرف."
+
+msgid "The cheque or the bank transaction no longer exists."
+msgstr "الشيك أو الحركة البنكية لم يعد موجودًا."
+
+msgid "Cheque {0} is already cleared or no longer open."
+msgstr "الشيك {0} تم صرفه بالفعل أو لم يعد مفتوحًا."
+
+msgid "Cheque {0} does not belong to Bank Account {1}."
+msgstr "الشيك {0} لا يتبع الحساب البنكي {1}."
+
+msgid "Bank Transaction {0} is not an open transaction of this bank account."
+msgstr "الحركة البنكية {0} ليست حركة مفتوحة لهذا الحساب البنكي."
+
+msgid "Bank Transaction {0} is in {1} but cheque {2} is in {3}."
+msgstr "الحركة البنكية {0} بعملة {1} بينما الشيك {2} بعملة {3}."
+
+msgid "The open amount of Bank Transaction {0} does not match cheque {1}."
+msgstr "المبلغ المفتوح للحركة البنكية {0} لا يطابق الشيك {1}."
+
+msgid "Cheque {0} has no bank Journal Entry to reconcile."
+msgstr "الشيك {0} ليس له قيد بنكي لتسويته."
+
+msgid "{0} cheque(s) cleared and reconciled."
+msgstr "تم صرف وتسوية {0} شيك."
+
+msgid "{0} row(s) skipped:"
+msgstr "تم تخطي {0} سطر:"
+
+msgid "No matching bank transactions found."
+msgstr "لم يتم العثور على حركات بنكية مطابقة."
+
+msgid "Select the matches to clear."
+msgstr "اختر المطابقات المراد صرفها."
+
+msgid "Clear {0} cheque(s) and reconcile their bank transactions?"
+msgstr "صرف {0} شيك وتسوية حركاتها البنكية؟"

@@ -55,7 +55,52 @@ frappe.ui.form.on("PDC Cheque", {
 		frm.events.set_indicator(frm);
 		if (!frm.is_new()) {
 			frm.events.add_actions(frm);
+			frm.events.add_print_buttons(frm);
 		}
+	},
+
+	add_print_buttons(frm) {
+		const open_print = (doctype, name, format) => {
+			const params = new URLSearchParams({ doctype, name, format, _lang: frappe.boot.lang || "" });
+			window.open(`/printview?${params.toString()}`);
+		};
+		frm.add_custom_button(
+			__("Print Receipt"),
+			() => open_print(frm.doctype, frm.doc.name, "PDC Cheque Receipt"),
+			__("Print")
+		);
+		// the PDC Account Mapping of the bank may name its own cheque layout
+		const cheque_format = (frm.doc.__onload && frm.doc.__onload.cheque_print_format) || "PDC Cheque Print";
+		frm.add_custom_button(
+			__("Print Cheque"),
+			() => open_print(frm.doctype, frm.doc.name, cheque_format),
+			__("Print")
+		);
+		frm.events.add_cheque_template_button(frm, open_print);
+	},
+
+	add_cheque_template_button(frm, open_print) {
+		// ERPNext's Cheque Print Template (named after the Bank) prints a Payment Entry: offer it for the
+		// party Payment Entry of an outgoing cheque.
+		const doc = frm.doc;
+		if (doc.direction !== "Outgoing" || !doc.party_payment_entry || !doc.bank_account) {
+			return;
+		}
+		frappe.db.get_value("Bank Account", doc.bank_account, "bank").then((r) => {
+			const bank = r.message && r.message.bank;
+			if (!bank) {
+				return;
+			}
+			frappe.db.exists("Cheque Print Template", bank).then((exists) => {
+				if (exists) {
+					frm.add_custom_button(
+						__("Print on Cheque Template"),
+						() => open_print("Payment Entry", doc.party_payment_entry, bank),
+						__("Print")
+					);
+				}
+			});
+		});
 	},
 
 	direction(frm) {
@@ -222,6 +267,16 @@ frappe.ui.form.on("PDC Cheque", {
 		if (clearable.includes(status)) {
 			pdc_action(frm, "clear", __("Clear"), [
 				date("clearance_date", __("Actual Clearance Date")),
+				{
+					// an incoming cheque received without a bank: the bank it was cleared into
+					fieldname: "bank_account",
+					label: __("Bank Account"),
+					fieldtype: "Link",
+					options: "Bank Account",
+					reqd: doc.bank_account ? 0 : 1,
+					hidden: doc.bank_account ? 1 : 0,
+					get_query: () => ({ filters: { company: doc.company, is_company_account: 1 } }),
+				},
 				{ fieldname: "bank_transaction_date", label: __("Bank Transaction Date"), fieldtype: "Date" },
 				{ fieldname: "bank_charges", label: __("Bank Charges"), fieldtype: "Currency" },
 				{

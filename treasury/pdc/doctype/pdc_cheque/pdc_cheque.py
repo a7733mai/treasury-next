@@ -134,6 +134,23 @@ class PDCCheque(Document):
 	def onload(self):
 		if not self.is_new():
 			self.set_onload("vouchers", posting.get_linked_vouchers(self.doctype, self.name))
+			self.set_onload("cheque_print_format", self.get_cheque_print_format())
+
+	def get_cheque_print_format(self) -> str | None:
+		"""The Cheque Print Format hinted by the PDC Account Mapping row of the bank account, if any."""
+		if not self.bank_account:
+			return None
+		formats = frappe.get_all(
+			"PDC Account Mapping",
+			filters={
+				"parenttype": "Treasury Company Settings",
+				"parent": self.company,
+				"bank_account": self.bank_account,
+			},
+			pluck="cheque_print_format",
+			limit=1,
+		)
+		return formats[0] if formats else None
 
 	def insert(self, *args, **kwargs):
 		# Frappe validates links before `before_insert`, so a client-sent voucher link would fail link
@@ -494,6 +511,7 @@ class PDCCheque(Document):
 		bank_charges=0,
 		exchange_rate=None,
 		remarks=None,
+		bank_account=None,
 	):
 		return lifecycle.clear(
 			self.name,
@@ -502,6 +520,7 @@ class PDCCheque(Document):
 			flt(bank_charges),
 			flt(exchange_rate) or None,
 			remarks,
+			bank_account or None,
 		)
 
 	@frappe.whitelist(methods=["POST"])
