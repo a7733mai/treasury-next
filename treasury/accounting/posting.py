@@ -633,6 +633,8 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			gl.cost_center,
 			gl.against_voucher_type,
 			gl.against_voucher,
+			gl.advance_voucher_type,
+			gl.advance_voucher_no,
 			gl.debit,
 			gl.credit,
 			gl.debit_in_account_currency,
@@ -674,5 +676,9 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			# Unallocated (advance) part: the Payment Ledger books it against the Payment Entry itself,
 			# so match the reversal against it too; otherwise both would stay open.
 			row.update(reference_type="Payment Entry", reference_name=e.against_voucher or voucher_no)
+		if e.advance_voucher_no:
+			# Advance against a Sales / Purchase Order: carry the order so ERPNext books an opposite
+			# Advance Payment Ledger Entry and recomputes the order's `advance_paid`.
+			row.update(advance_voucher_type=e.advance_voucher_type, advance_voucher_no=e.advance_voucher_no)
 		rows.append(row)
 	return rows

@@ -62,7 +62,8 @@ class ChequeBook(Document):
 			frappe.throw(_("Start No cannot be greater than End No."))
 		if not self.is_new():
 			before = self.get_doc_before_save()
-			if before and (before.start_no, before.end_no) != (self.start_no, self.end_no) and self.has_used_leaves():
+			range_changed = before and (before.start_no, before.end_no) != (self.start_no, self.end_no)
+			if range_changed and self.has_used_leaves():
 				frappe.throw(_("The range of a cheque book cannot be changed after leaves have been used."))
 
 	def validate_overlap(self):
@@ -91,7 +92,9 @@ class ChequeBook(Document):
 		for row in self.cancelled_leaves:
 			number = self.parse_leaf(row.cheque_no)
 			if number in seen:
-				frappe.throw(_("Row #{0}: Cheque No {1} is cancelled more than once.").format(row.idx, row.cheque_no))
+				frappe.throw(
+					_("Row #{0}: Cheque No {1} is cancelled more than once.").format(row.idx, row.cheque_no)
+				)
 			seen.add(number)
 			row.cheque_no = self.format_leaf(number)
 			row.date = row.date or today()
@@ -163,7 +166,7 @@ class ChequeBook(Document):
 			{"cheque_no": self.format_leaf(number), "reason": reason, "date": getdate(date or today())},
 		)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def close(self):
 		self.check_permission("write")
 		if self.status == "Closed":
@@ -212,7 +215,7 @@ def record_cancelled_leaf(cheque_book: str, cheque_no: str, reason: str | None =
 	book.save()
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def cancel_leaf(cheque_book: str, cheque_no: str, reason: str | None = None):
 	"""Mark an unused leaf as cancelled (spoilt / lost) so it is never allocated."""
 	book = _lock_book(cheque_book)
@@ -224,7 +227,9 @@ def cancel_leaf(cheque_book: str, cheque_no: str, reason: str | None = None):
 		frappe.throw(_("Cheque No {0} is already cancelled.").format(frappe.bold(cheque_no)))
 	if book.used_numbers([number], exclude_cancelled_cheques=True):
 		frappe.throw(
-			_("Cheque No {0} is used by a PDC Cheque. Cancel that cheque instead.").format(frappe.bold(cheque_no))
+			_("Cheque No {0} is used by a PDC Cheque. Cancel that cheque instead.").format(
+				frappe.bold(cheque_no)
+			)
 		)
 	book.add_cancelled_leaf(number, reason)
 	book.save()

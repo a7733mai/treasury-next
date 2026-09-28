@@ -9,6 +9,15 @@ Idempotency: calling an action again once it has happened raises a clear "alread
 creates nothing. Underneath, every voucher is created idempotently by the posting service, keyed on
 (cheque, event, cycle); `cycle` is incremented when a bounced cheque is re-presented, so each presentation
 gets its own vouchers while the history of earlier cycles is kept.
+
+Only this module may change the statuses, lifecycle dates, voucher links and history tables of a cheque:
+it saves with `flags.treasury_lifecycle`, and the controller rejects any other change to them.
+
+Date order: an event or voucher may not be dated before the cheque's latest event / voucher date
+(`_latest_date`), so no PDC or Under Collection account is ever credited before it was debited.
+
+Status log `event` values (and the from/to statuses) are stored in English, like Select values, and are
+translated when displayed (Select formatter / pdc_cheque.js).
 """
 
 import frappe
@@ -93,6 +102,9 @@ def after_insert(doc):
 		return
 	_post_party(doc, doc.issue_date)
 	# The parent insert is still running: write the changes in place instead of a nested save.
+	# This relies on Frappe's insert order (the parent row and its existing children are already in the
+	# database when `after_insert` runs), so only the rows appended by `_post_party` are inserted here.
+	# Covered by test_outgoing_on_creation / test_replace_in_on_creation_mode.
 	doc.db_update()
 	for row in doc.status_log:
 		if not row.name or not frappe.db.exists("PDC Status Log", row.name):
@@ -109,7 +121,7 @@ def deliver(name: str, handover_date=None, remarks: str | None = None) -> dict:
 	_require_direction(doc, OUTGOING)
 	_require_status(doc, ("Created",), "Delivered")
 	date = _date(handover_date)
-	_not_before(doc, date, "handover_date", doc.issue_date)
+	_not_before(doc, date, "handover_date", _latest_date(doc))
 
 	doc.handover_date = date
 	_log(doc, "Delivered", operational="Delivered", remarks=remarks)
@@ -123,7 +135,7 @@ def receive(name: str, receipt_date=None, remarks: str | None = None) -> dict:
 	_require_direction(doc, INCOMING)
 	_require_status(doc, ("Created",), "Received")
 	date = _date(receipt_date)
-	_not_before(doc, date, "handover_date", doc.issue_date)
+	_not_before(doc, date, "handover_date", _latest_date(doc))
 
 	doc.handover_date = date
 	_log(doc, "Received", operational="Received", remarks=remarks)
@@ -135,13 +147,20 @@ def receive(name: str, receipt_date=None, remarks: str | None = None) -> dict:
 def post_party(name: str, posting_date=None) -> dict:
 	"""Post the party settlement now ("Post Now"; also used by the `On Cheque Date` scheduler).
 
-	The default posting date is the effective (possibly postponed) due date.
+	The default posting date is the effective (possibly postponed) due date, or the handover / receipt date
+	when the cheque was handed over after its due date.
 	"""
 	doc = _begin(name)
 	if doc.accounting_status != NOT_POSTED:
 		frappe.throw(_("Cheque {0} is already posted to the party.").format(frappe.bold(doc.name)))
 	_require_status(doc, ("Created", "Delivered", "Received", "Deposited"))
-	_post_party(doc, getdate(posting_date or doc.effective_due_date))
+	latest = _latest_date(doc, "handover_date")
+	if posting_date:
+		date = getdate(posting_date)
+		_not_before(doc, date, "party_posting_date", latest)
+	else:
+		date = max(getdate(doc.effective_due_date), latest)
+	_post_party(doc, date)
 	return _save(doc)
 
 
@@ -150,14 +169,21 @@ def deposit(name: str, deposit_date=None, bank_account: str | None = None, remar
 	_require_direction(doc, INCOMING)
 	_require_status(doc, ("Received",), "Deposited")
 	date = _date(deposit_date)
-	_not_before(doc, date, "deposit_date", doc.handover_date or doc.issue_date)
+	_not_before(doc, date, "deposit_date", _latest_date(doc, "handover_date"))
 
 	if bank_account and bank_account != doc.bank_account:
 		if doc.accounting_status != NOT_POSTED:
 			frappe.throw(_("The bank account cannot be changed after the cheque is posted to accounts."))
+		currency = doc.currency
 		doc.bank_account = bank_account
 		doc.validate_bank_account()
 		doc.set_currency_and_rate()
+		if currency and doc.currency != currency:
+			# the amount (and any exchange rate) was entered in the cheque currency
+			message = _("Cheque {0} is in {1} and cannot be deposited to Bank Account {2}, which is in {3}.")
+			frappe.throw(
+				message.format(frappe.bold(doc.name), currency, frappe.bold(bank_account), doc.currency)
+			)
 	_require_bank_account(doc)
 
 	doc.deposit_date = date
@@ -185,7 +211,8 @@ def clear(
 	allowed = ("Delivered",) if doc.direction == OUTGOING else ("Received", "Deposited")
 	_require_status(doc, allowed, "Cleared")
 	date = _date(clearance_date)
-	_validate_clearance_date(doc, date)
+	latest = _latest_date(doc, "handover_date", "deposit_date")
+	_validate_clearance_date(doc, date, latest)
 
 	mode = _bank_mode(doc)
 	transaction_date = getdate(bank_transaction_date) if bank_transaction_date else None
@@ -194,7 +221,7 @@ def clear(
 			_("Bank Transaction Date is required because the bank posting of this cheque happens on it.")
 		)
 	if transaction_date:
-		_not_before(doc, transaction_date, "bank_transaction_date", doc.issue_date)
+		_not_before(doc, transaction_date, "bank_transaction_date", latest)
 	if flt(bank_charges) < 0:
 		frappe.throw(_("Bank charges cannot be negative."))
 
@@ -215,6 +242,7 @@ def post_bank(name: str, posting_date=None, bank_charges=None, exchange_rate=Non
 		frappe.throw(_("Cheque {0} is already posted to the bank.").format(frappe.bold(doc.name)))
 	_require_status(doc, ("Cleared",))
 	date = getdate(posting_date or doc.bank_transaction_date or doc.actual_clearance_date)
+	_not_before(doc, date, "bank_posting_date", _latest_date(doc, "handover_date", "deposit_date"))
 	if bank_charges is not None:
 		if flt(bank_charges) < 0:
 			frappe.throw(_("Bank charges cannot be negative."))
@@ -227,7 +255,8 @@ def post_bank(name: str, posting_date=None, bank_charges=None, exchange_rate=Non
 
 def postpone(name: str, new_due_date, reason: str | None = None, contact_person: str | None = None) -> dict:
 	"""Move the effective due date. No accounting: a posted party entry stays as it is."""
-	doc = _begin(name, roles=(APPROVER, MANAGER))
+	# Cheque Approvers hold only read access to the cheque: the role check is what authorises them here.
+	doc = _begin(name, roles=(APPROVER, MANAGER), ptype="read")
 	if doc.operational_status in FINAL_STATUSES:
 		frappe.throw(
 			_("Cheque {0} is {1} and cannot be postponed.").format(
@@ -250,7 +279,7 @@ def bounce(name: str, bounce_date=None, reason: str | None = None, charges=0) ->
 	if flt(charges) and doc.direction != INCOMING:
 		frappe.throw(_("Bounce charges can only be charged on incoming cheques."))
 	date = _date(bounce_date)
-	_not_before(doc, date, None, doc.issue_date)
+	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
 
 	_log(doc, "Bounced", operational="Bounced", remarks=reason)
 	_undo_postings(doc, date, reason)
@@ -264,7 +293,7 @@ def represent(name: str, represent_date=None, new_due_date=None, remarks: str | 
 	doc = _begin(name, roles=(MANAGER,))
 	_require_status(doc, ("Bounced",))
 	date = _date(represent_date)
-	_not_before(doc, date, None, doc.issue_date)
+	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
 
 	doc.cycle = cint(doc.cycle) + 1
 	for fieldname in CYCLE_FIELDS:
@@ -280,18 +309,19 @@ def represent(name: str, represent_date=None, new_due_date=None, remarks: str | 
 	return _save(doc)
 
 
-def replace(name: str, new_cheque_values: dict | str | None = None) -> str:
+def replace(name: str, new_cheque_values: dict | str | None = None) -> dict:
 	"""Replace the cheque by a new one; the old one's postings are undone like on a bounce.
 
 	`new_cheque_values`: cheque_no (else the next leaf of the cheque book), amount, original_due_date,
 	issue_date, exchange_rate, cheque_book, replacement_date, reason. A cheque that was already handed over /
-	received is replaced by one handed over / received on the replacement date. Returns the new cheque name.
+	received is replaced by one handed over / received on the replacement date. Returns the statuses of the
+	replaced cheque and the new cheque name as `replaced_by`.
 	"""
 	doc = _begin(name, roles=(MANAGER,))
 	_require_status(doc, ("Created", "Delivered", "Received", "Bounced"), "Replaced")
 	values = frappe._dict(frappe.parse_json(new_cheque_values) or {})
 	date = _date(values.replacement_date)
-	_not_before(doc, date, None, doc.issue_date)
+	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
 	was_handed_over = doc.operational_status != "Created"
 
 	_undo_postings(doc, date, values.reason)
@@ -302,11 +332,11 @@ def replace(name: str, new_cheque_values: dict | str | None = None) -> str:
 	doc.replaced_by = new.name
 	doc.status_log[-1].voucher_type = DOCTYPE
 	doc.status_log[-1].voucher_no = new.name
-	_save(doc)
+	result = _save(doc)
 
 	if was_handed_over:
 		(deliver if new.direction == OUTGOING else receive)(new.name, date)
-	return new.name
+	return {**result, "replaced_by": new.name}
 
 
 def cancel_cheque(name: str, reason: str | None = None) -> dict:
@@ -338,7 +368,7 @@ def return_to_party(name: str, return_date=None, reason: str | None = None) -> d
 	if not reason:
 		frappe.throw(_("A reason is required."))
 	date = _date(return_date)
-	_not_before(doc, date, None, doc.issue_date)
+	_not_before(doc, date, None, _latest_date(doc, "handover_date"))
 
 	_log(doc, "Returned", operational="Returned", remarks=reason)
 	_undo_postings(doc, date, reason)
@@ -402,7 +432,8 @@ def _ensure_party_posted(doc, event_date):
 	scheduled = _scheduled_party_date(doc)
 	date = getdate(event_date)
 	if scheduled and getdate(scheduled) < date:
-		date = getdate(scheduled)
+		# never before the handover / receipt or an earlier voucher (e.g. a due date before the handover)
+		date = max(getdate(scheduled), _latest_date(doc, "handover_date"))
 	_post_party(doc, date)
 
 
@@ -440,7 +471,13 @@ def _post_under_collection(doc, posting_date):
 
 def _post_bank(doc, posting_date, exchange_rate=None):
 	"""Bank settlement: outgoing Dr PDC Payable / Cr Bank; incoming Dr Bank / Cr Under Collection or PDC
-	Receivable. The Journal Entry gets its clearance date for the bank reconciliation."""
+	Receivable. The Journal Entry gets its clearance date for the bank reconciliation.
+
+	Bank reconciliation dates, by design: `clearance_date` is the date the bank actually moved the money
+	(bank transaction date, else actual clearance date), even when the JE is posted later (`Manual` mode) —
+	the Bank Reconciliation Statement then simply never lists it as outstanding. `cheque_date` stays the
+	(effective) date of the cheque itself, which may be after the clearance when a cheque clears early.
+	"""
 	if doc.accounting_status == BANK_POSTED:
 		return
 	mapping = posting.get_account_mapping(doc.company, doc.bank_account)
@@ -618,12 +655,12 @@ def _cancel_voucher(doctype: str, name: str):
 # ---------------------------------------------------------------------------
 
 
-def _begin(name: str, roles: tuple[str, ...] | None = None):
+def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write"):
 	"""Lock the cheque row, reload it and check permissions."""
 	if not name or not frappe.db.get_value(DOCTYPE, name, "name", for_update=True):
 		frappe.throw(_("{0} {1} does not exist").format(_(DOCTYPE), name), frappe.DoesNotExistError)
 	doc = frappe.get_doc(DOCTYPE, name)
-	doc.check_permission("write")
+	doc.check_permission(ptype)
 	if roles and not set(roles) & set(frappe.get_roles()):
 		frappe.throw(
 			_("This action requires one of the roles: {0}.").format(", ".join(_(r) for r in roles)),
@@ -634,6 +671,9 @@ def _begin(name: str, roles: tuple[str, ...] | None = None):
 
 
 def _save(doc) -> dict:
+	# the permission (and role) was checked by `_begin`; the flag unlocks the lifecycle-only fields
+	doc.flags.treasury_lifecycle = True
+	doc.flags.ignore_permissions = True
 	doc.save()
 	return {
 		"name": doc.name,
@@ -767,6 +807,7 @@ def _make_replacement(doc, values: frappe._dict, date):
 	if flt(values.exchange_rate):
 		new.exchange_rate = flt(values.exchange_rate)
 	new.replaces = doc.name
+	new.flags.treasury_lifecycle = True  # keeps `replaces` (a lifecycle-only field) on insert
 	for ref in doc.references:
 		new.append(
 			"references",
@@ -805,8 +846,19 @@ def _date(value):
 	return getdate(value) if value else getdate(today())
 
 
+def _latest_date(doc, *fieldnames: str):
+	"""Latest of the issue date, the given event dates of the cheque and the posting dates of all its
+	submitted vouchers (every cycle, reversals included). A new event or voucher may not be dated before it,
+	so e.g. a bank JE never precedes the party PE and a reversal never precedes the voucher it reverses."""
+	dates = [getdate(doc.get(f)) for f in ("issue_date", *fieldnames) if doc.get(f)]
+	dates += [
+		getdate(v.posting_date) for v in posting.get_linked_vouchers(DOCTYPE, doc.name) if v.docstatus == 1
+	]
+	return max(dates)
+
+
 def _not_before(doc, date, fieldname: str | None, reference_date):
-	"""`date` may not be earlier than `reference_date` (usually the issue date)."""
+	"""`date` may not be earlier than `reference_date` (usually `_latest_date`)."""
 	if reference_date and getdate(date) < getdate(reference_date):
 		label = _(doc.meta.get_label(fieldname)) if fieldname else _("The date")
 		frappe.throw(
@@ -814,8 +866,8 @@ def _not_before(doc, date, fieldname: str | None, reference_date):
 		)
 
 
-def _validate_clearance_date(doc, date):
-	_not_before(doc, date, "actual_clearance_date", doc.handover_date or doc.issue_date)
+def _validate_clearance_date(doc, date, latest):
+	_not_before(doc, date, "actual_clearance_date", latest)
 	if getdate(date) > getdate(today()) and not frappe.db.get_single_value(
 		"Treasury Settings", "allow_future_clearance_date"
 	):

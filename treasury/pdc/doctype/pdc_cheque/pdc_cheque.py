@@ -3,8 +3,9 @@
 
 import frappe
 from frappe import _
+from frappe.model import no_value_fields
 from frappe.model.document import Document
-from frappe.utils import flt, getdate, money_in_words
+from frappe.utils import cint, flt, get_datetime, getdate, money_in_words
 
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
@@ -22,7 +23,35 @@ REFERENCE_PARTY_FIELD = {
 # Fields that cannot change once the cheque is posted to accounts (the vouchers were built from them).
 LOCKED_FIELDS = ("direction", "company", "party_type", "party", "bank_account", "currency", "cheque_no")
 LOCKED_AMOUNT_FIELDS = ("amount", "exchange_rate")
+# Dates that cannot change once the cheque left the Created status (the due date then moves only by Postpone).
 LOCKED_DATE_FIELDS = ("issue_date", "original_due_date")
+# Written only by treasury.pdc.lifecycle, which saves with `flags.treasury_lifecycle`. `read_only` in the
+# DocType only affects the form, so a REST / client save must be rejected here (see validate_protected_fields).
+PROTECTED_FIELDS = (
+	"operational_status",
+	"accounting_status",
+	"cycle",
+	"is_postponed",
+	"postponement_count",
+	"effective_due_date",
+	"handover_date",
+	"deposit_date",
+	"actual_clearance_date",
+	"bank_transaction_date",
+	"party_posting_date",
+	"bank_posting_date",
+	"bank_charges",
+	"party_payment_entry",
+	"under_collection_journal",
+	"bank_journal",
+	"bank_charges_journal",
+	"reversal_journal",
+	"bounce_charges_journal",
+	"replaced_by",
+	"replaces",
+)
+# Append-only history tables, appended to only by the lifecycle.
+PROTECTED_TABLES = ("status_log", "postponements")
 # A cheque number may be reused on a bank account only by cheques in these statuses.
 RELEASED_STATUSES = ("Cancelled", "Replaced")
 
@@ -106,6 +135,8 @@ class PDCCheque(Document):
 			self.set_onload("vouchers", posting.get_linked_vouchers(self.doctype, self.name))
 
 	def before_insert(self):
+		if not self.flags.treasury_lifecycle:
+			self.reset_protected_fields()
 		self.naming_series = NAMING_SERIES.get(self.direction, NAMING_SERIES["Outgoing"])
 		self.effective_due_date = self.original_due_date
 		if self.direction == "Outgoing" and self.cheque_book and not self.cheque_no:
@@ -119,6 +150,8 @@ class PDCCheque(Document):
 		lifecycle.after_insert(self)
 
 	def validate(self):
+		# first: later steps (validate_dates) legitimately derive effective_due_date
+		self.validate_protected_fields()
 		self.validate_party()
 		self.validate_bank_account()
 		self.set_currency_and_rate()
@@ -141,6 +174,69 @@ class PDCCheque(Document):
 			)
 
 	# ------------------------------------------------------------------ validation
+
+	def reset_protected_fields(self):
+		"""A new cheque starts clean, whatever the client sent (lifecycle.log_creation sets the statuses)."""
+		for fieldname in PROTECTED_FIELDS:
+			self.set(fieldname, None)
+		self.bank_charges = 0
+		for table in PROTECTED_TABLES:
+			self.set(table, [])
+
+	def validate_protected_fields(self):
+		"""Statuses, lifecycle dates, voucher links and the history tables change only through the lifecycle.
+
+		Otherwise a client could e.g. reset `accounting_status` / bump `cycle` and have the same cheque posted
+		twice, mark it Cleared without accounting, or move the due date without the approver role.
+		"""
+		if self.is_new():
+			return
+		before = self.get_doc_before_save()
+		if not before:
+			return
+		lifecycle_save = self.flags.treasury_lifecycle
+
+		changed = []
+		if not lifecycle_save:
+			changed = [f for f in PROTECTED_FIELDS if self._normalized(before, f) != self._normalized(self, f)]
+		for table in PROTECTED_TABLES:
+			old_rows, new_rows = self._table_key(before, table), self._table_key(self, table)
+			# existing rows never change; only the lifecycle appends new ones
+			if new_rows[: len(old_rows)] != old_rows or (len(new_rows) != len(old_rows) and not lifecycle_save):
+				changed.append(table)
+		if changed:
+			frappe.throw(
+				_("{0} can only be changed by the cheque actions.").format(
+					", ".join(_(self.meta.get_label(f)) for f in changed)
+				),
+				title=_("Not Allowed"),
+			)
+
+	@staticmethod
+	def _normalize(value, fieldtype: str):
+		if fieldtype == "Date":
+			return getdate(value) if value else None
+		if fieldtype == "Datetime":
+			return get_datetime(value) if value else None
+		if fieldtype in ("Int", "Check"):
+			return cint(value)
+		if fieldtype in ("Currency", "Float", "Percent"):
+			return flt(value, 9)
+		return value or None
+
+	def _normalized(self, doc, fieldname: str):
+		return self._normalize(doc.get(fieldname), self.meta.get_field(fieldname).fieldtype)
+
+	def _table_key(self, doc, table: str) -> list[tuple]:
+		fields = [
+			df
+			for df in frappe.get_meta(self.meta.get_field(table).options).fields
+			if df.fieldtype not in no_value_fields
+		]
+		return [
+			tuple(self._normalize(row.get(df.fieldname), df.fieldtype) for df in fields)
+			for row in doc.get(table)
+		]
 
 	def validate_party(self):
 		if self.party_type not in PARTY_TYPES:
@@ -180,13 +276,20 @@ class PDCCheque(Document):
 		"""The cheque currency is the currency of the bank GL account."""
 		company_currency = erpnext.get_company_currency(self.company)
 		if self.bank_account:
-			self.currency = get_account_currency(frappe.db.get_value("Bank Account", self.bank_account, "account"))
+			bank_gl = frappe.db.get_value("Bank Account", self.bank_account, "account")
+			self.currency = get_account_currency(bank_gl)
 		elif not self.currency:
 			self.currency = company_currency
 		if self.currency == company_currency:
 			self.exchange_rate = 1
-		elif flt(self.exchange_rate) < 0:
+			return
+		if flt(self.exchange_rate) < 0:
 			frappe.throw(_("Exchange Rate cannot be negative."))
+		before = None if self.is_new() else self.get_doc_before_save()
+		if before and before.currency != self.currency and flt(before.exchange_rate) == flt(self.exchange_rate):
+			# the rate of the previous currency (e.g. 1 for the company currency) is meaningless now;
+			# it is fetched again at the party posting date
+			self.exchange_rate = 0
 
 	def validate_amount(self):
 		self.amount = flt(self.amount, self.precision("amount"))
@@ -226,6 +329,10 @@ class PDCCheque(Document):
 			frappe.throw(_("Cheque No is required."))
 		if self.direction != "Outgoing" or self.operational_status in RELEASED_STATUSES:
 			return
+		if self.has_value_changed("cheque_no") or self.has_value_changed("bank_account"):
+			# Serialise concurrent saves of cheque numbers on this bank account until commit, so two
+			# transactions cannot both pass the duplicate check below with the same hand-typed number.
+			frappe.db.get_value("Bank Account", self.bank_account, "name", for_update=True)
 		duplicate = frappe.db.exists(
 			"PDC Cheque",
 			{
@@ -253,6 +360,7 @@ class PDCCheque(Document):
 
 	def validate_references(self):
 		allowed = REFERENCE_PARTY_FIELD.get(self.direction, {})
+		precision = self._allocation_precision()
 		total = 0
 		for row in self.references:
 			if row.reference_doctype not in allowed:
@@ -273,25 +381,44 @@ class PDCCheque(Document):
 					)
 				)
 			party_field = allowed[row.reference_doctype]
-			if party_field and frappe.db.get_value(row.reference_doctype, row.reference_name, party_field) != self.party:
+			reference_party = party_field and frappe.db.get_value(
+				row.reference_doctype, row.reference_name, party_field
+			)
+			if party_field and reference_party != self.party:
 				frappe.throw(
 					_("Row #{0}: {1} {2} does not belong to {3}.").format(
-						row.idx, _(row.reference_doctype), frappe.bold(row.reference_name), frappe.bold(self.party)
+						row.idx,
+						_(row.reference_doctype),
+						frappe.bold(row.reference_name),
+						frappe.bold(self.party),
 					)
 				)
-			total += flt(row.allocated_amount)
+			total += flt(row.allocated_amount, precision)
 
 		# Allocations are in the party account currency; compare only when that is the cheque currency.
-		if self.currency == erpnext.get_company_currency(self.company) and flt(total, 2) > flt(self.amount, 2):
+		company_currency = erpnext.get_company_currency(self.company)
+		if self.currency == company_currency and flt(total, precision) > flt(self.amount, precision):
 			frappe.throw(_("The total allocated amount cannot be greater than the cheque amount."))
 
 	def validate_locked_fields(self):
 		if self.is_new():
 			return
 		before = self.get_doc_before_save()
-		if not before or before.accounting_status == lifecycle.NOT_POSTED:
+		if not before:
 			return
 
+		if before.operational_status != "Created":
+			changed = [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
+			if changed:
+				frappe.throw(
+					_(
+						"{0} cannot be changed after the cheque is handed over or received. Use Postpone to move the due date."
+					).format(", ".join(_(self.meta.get_label(f)) for f in changed)),
+					title=_("Not Allowed"),
+				)
+
+		if before.accounting_status == lifecycle.NOT_POSTED:
+			return
 		changed = [f for f in LOCKED_FIELDS if (before.get(f) or None) != (self.get(f) or None)]
 		changed += [f for f in LOCKED_AMOUNT_FIELDS if flt(before.get(f), 9) != flt(self.get(f), 9)]
 		changed += [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
@@ -306,30 +433,37 @@ class PDCCheque(Document):
 			)
 
 	@staticmethod
-	def _references_key(doc) -> list[tuple]:
+	def _allocation_precision() -> int:
+		return frappe.get_precision("PDC Cheque Reference", "allocated_amount") or 2
+
+	@classmethod
+	def _references_key(cls, doc) -> list[tuple]:
+		precision = cls._allocation_precision()
 		return sorted(
-			(r.reference_doctype, r.reference_name, flt(r.allocated_amount, 2)) for r in doc.get("references")
+			(r.reference_doctype, r.reference_name, flt(r.allocated_amount, precision))
+			for r in doc.get("references")
 		)
 
 	# ------------------------------------------------------------------ actions (see treasury.pdc.lifecycle)
+	# POST only: they change data, and Frappe checks the CSRF token only on POST requests.
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def deliver(self, handover_date=None, remarks=None):
 		return lifecycle.deliver(self.name, handover_date, remarks)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def receive(self, receipt_date=None, remarks=None):
 		return lifecycle.receive(self.name, receipt_date, remarks)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def post_party(self, posting_date=None):
 		return lifecycle.post_party(self.name, posting_date)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def deposit(self, deposit_date=None, bank_account=None, remarks=None):
 		return lifecycle.deposit(self.name, deposit_date, bank_account, remarks)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def clear(
 		self,
 		clearance_date=None,
@@ -347,7 +481,7 @@ class PDCCheque(Document):
 			remarks,
 		)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def post_bank(self, posting_date=None, bank_charges=None, exchange_rate=None):
 		return lifecycle.post_bank(
 			self.name,
@@ -356,26 +490,26 @@ class PDCCheque(Document):
 			flt(exchange_rate) or None,
 		)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def postpone(self, new_due_date=None, reason=None, contact_person=None):
 		return lifecycle.postpone(self.name, new_due_date, reason, contact_person)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def bounce(self, bounce_date=None, reason=None, charges=0):
 		return lifecycle.bounce(self.name, bounce_date, reason, flt(charges))
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def represent(self, represent_date=None, new_due_date=None, remarks=None):
 		return lifecycle.represent(self.name, represent_date, new_due_date, remarks)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def replace(self, new_cheque_values=None):
 		return lifecycle.replace(self.name, new_cheque_values)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def cancel_cheque(self, reason=None):
 		return lifecycle.cancel_cheque(self.name, reason)
 
-	@frappe.whitelist()
+	@frappe.whitelist(methods=["POST"])
 	def return_to_party(self, return_date=None, reason=None):
 		return lifecycle.return_to_party(self.name, return_date, reason)

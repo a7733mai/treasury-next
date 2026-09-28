@@ -932,3 +932,12 @@ msgstr "تاريخ الاستبدال"
 
 msgid "Leave empty to take the next leaf of the cheque book."
 msgstr "اتركه فارغاً لأخذ الورقة التالية من دفتر الشيكات."
+
+msgid "{0} can only be changed by the cheque actions."
+msgstr "لا يمكن تغيير {0} إلا من خلال إجراءات الشيك."
+
+msgid "{0} cannot be changed after the cheque is handed over or received. Use Postpone to move the due date."
+msgstr "لا يمكن تغيير {0} بعد تسليم الشيك أو استلامه. استخدم التأجيل لتغيير تاريخ الاستحقاق."
+
+msgid "Cheque {0} is in {1} and cannot be deposited to Bank Account {2}, which is in {3}."
+msgstr "الشيك {0} بعملة {1} ولا يمكن إيداعه في الحساب البنكي {2} الذي عملته {3}."
