@@ -296,6 +296,45 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 			getdate(frappe.db.get_value("Journal Entry", cheque.bank_journal, "clearance_date")), day(-4)
 		)
 
+	def test_bank_transaction_date_before_cheque_date_posts_party_on_it(self):
+		"""`On Cheque Date` + `On Bank Transaction Date`: a bank transaction before the due date
+		takes the party posting with it, so PDC Payable is never debited before it is credited."""
+		self.use_company_settings(
+			outgoing_party_posting="On Cheque Date", outgoing_bank_posting="On Bank Transaction Date"
+		)
+		egp = self.data.egp
+		pi = make_purchase_invoice(1000, posting_date=day(-20))
+		cheque = make_pdc_cheque(amount=1000, issue_date=day(-20), due_date=day(-10), invoice=pi)
+		cheque.deliver(handover_date=day(-20))
+		self.assert_status(cheque, "Delivered", "Not Posted")
+
+		cheque.clear(clearance_date=day(-8), bank_transaction_date=day(-12))
+		self.assert_status(cheque, "Cleared", "Bank Posted")
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			cheque.party_payment_entry,
+			[(self.data.payable, 1000, 0, SUPPLIER, day(-12)), (egp.pdc_payable, 0, 1000, None, day(-12))],
+		)
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.bank_journal,
+			[(egp.pdc_payable, 1000, 0, None, day(-12)), (egp.bank_gl, 0, 1000, None, day(-12))],
+		)
+		self.assertEqual(getdate(cheque.actual_clearance_date), day(-8))
+		self.assertEqual(getdate(cheque.party_posting_date), day(-12))
+		self.assertEqual(getdate(cheque.bank_posting_date), day(-12))
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
+
+		# a bank transaction after the due date: the party posting keeps the cheque date
+		later = make_pdc_cheque(amount=500, issue_date=day(-20), due_date=day(-10))
+		later.deliver(handover_date=day(-20))
+		later.clear(clearance_date=day(-8), bank_transaction_date=day(-6))
+		later.reload()
+		self.assertEqual(self.posting_date("Payment Entry", later.party_payment_entry), day(-10))
+		self.assertEqual(self.posting_date("Journal Entry", later.bank_journal), day(-6))
+
 	def test_bank_charges_on_clearance(self):
 		egp = self.data.egp
 		cheque, _pi = self.delivered_outgoing()
@@ -828,6 +867,10 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		second = ensure_second_egp_bank()
 		cheque, _si = self.received_incoming()
 		self.assert_status(cheque, "Received", "Not Posted")
+		# a received cheque changes its bank only through the deposit action
+		cheque.bank_account = second.bank_account
+		self.assertRaises(frappe.ValidationError, cheque.save)
+		cheque.reload()
 
 		cheque.deposit(deposit_date=day(-20), bank_account=second.bank_account)
 		self.assert_status(cheque, "Deposited", "Under Collection Posted")

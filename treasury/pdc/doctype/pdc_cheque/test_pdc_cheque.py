@@ -14,6 +14,7 @@ from treasury.tests.utils import (
 	day,
 	ensure_account,
 	ensure_bank_account,
+	ensure_second_egp_bank,
 	get_voucher_count,
 	make_pdc_cheque,
 	make_purchase_invoice,
@@ -248,6 +249,33 @@ class TestPDCCheque(TreasuryTestMixin, IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, cheque.save)
 		cheque.reload()
 		self.assertEqual(getdate(cheque.effective_due_date), day(25))
+
+	def test_identity_fields_locked_after_handover(self):
+		"""Handed over but not posted yet (`On Cheque Date`): the cheque itself can no longer be edited."""
+		self.use_company_settings(outgoing_party_posting="On Cheque Date")
+		second = ensure_second_egp_bank()
+		cheque = make_pdc_cheque(amount=1000, issue_date=day(-10), due_date=day(20))
+		cheque.deliver(handover_date=day(-10))
+		cheque.reload()
+		self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Delivered", "Not Posted"))
+
+		changes = {
+			"amount": 900,
+			"direction": "Incoming",
+			"cheque_no": unique_cheque_no(),
+			"bank_account": second.bank_account,
+		}
+		for fieldname, value in changes.items():
+			cheque.reload()
+			cheque.set(fieldname, value)
+			with self.assertRaises(frappe.ValidationError, msg=fieldname):
+				cheque.save()
+		cheque.reload()
+		self.assertEqual((flt(cheque.amount), cheque.direction), (1000, "Outgoing"))
+
+		# free fields remain editable
+		cheque.remarks = "Handed to the supplier's accountant"
+		cheque.save()
 
 	def test_exchange_rate_is_reset_when_currency_changes(self):
 		incoming = make_pdc_cheque("Incoming", bank_account=None)

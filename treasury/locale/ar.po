@@ -942,5 +942,8 @@ msgstr "لا يمكن تغيير {0} إلا من خلال إجراءات الش�
 msgid "{0} cannot be changed after the cheque is handed over or received. Use Postpone to move the due date."
 msgstr "لا يمكن تغيير {0} بعد تسليم الشيك أو استلامه. استخدم التأجيل لتغيير تاريخ الاستحقاق."
 
+msgid "{0} cannot be changed after the cheque is handed over or received."
+msgstr "لا يمكن تغيير {0} بعد تسليم الشيك أو استلامه."
+
 msgid "Cheque {0} is in {1} and cannot be deposited to Bank Account {2}, which is in {3}."
 msgstr "الشيك {0} بعملة {1} ولا يمكن إيداعه في الحساب البنكي {2} الذي عملته {3}."

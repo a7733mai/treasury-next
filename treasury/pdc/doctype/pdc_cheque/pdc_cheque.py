@@ -20,7 +20,8 @@ REFERENCE_PARTY_FIELD = {
 	"Outgoing": {"Purchase Invoice": "supplier", "Purchase Order": "supplier", "Journal Entry": None},
 	"Incoming": {"Sales Invoice": "customer", "Sales Order": "customer", "Journal Entry": None},
 }
-# Fields that cannot change once the cheque is posted to accounts (the vouchers were built from them).
+# Fields that cannot change once the cheque left the Created status (except by lifecycle actions) or is
+# posted to accounts (the vouchers were built from them).
 LOCKED_FIELDS = ("direction", "company", "party_type", "party", "bank_account", "currency", "cheque_no")
 LOCKED_AMOUNT_FIELDS = ("amount", "exchange_rate")
 # Dates that cannot change once the cheque left the Created status (the due date then moves only by Postpone).
@@ -425,11 +426,20 @@ class PDCCheque(Document):
 					).format(", ".join(_(self.meta.get_label(f)) for f in changed)),
 					title=_("Not Allowed"),
 				)
+			# The cheque in the party's hands is what it is. Lifecycle actions may still change these
+			# (e.g. `deposit` into another bank account, the exchange rate set at the party posting).
+			changed = [] if self.flags.treasury_lifecycle else self._changed_identity_fields(before)
+			if changed:
+				frappe.throw(
+					_("{0} cannot be changed after the cheque is handed over or received.").format(
+						", ".join(_(self.meta.get_label(f)) for f in changed)
+					),
+					title=_("Not Allowed"),
+				)
 
 		if before.accounting_status == lifecycle.NOT_POSTED:
 			return
-		changed = [f for f in LOCKED_FIELDS if (before.get(f) or None) != (self.get(f) or None)]
-		changed += [f for f in LOCKED_AMOUNT_FIELDS if flt(before.get(f), 9) != flt(self.get(f), 9)]
+		changed = self._changed_identity_fields(before)
 		changed += [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
 		if self._references_key(before) != self._references_key(self):
 			changed.append("references")
@@ -440,6 +450,10 @@ class PDCCheque(Document):
 				),
 				title=_("Not Allowed"),
 			)
+
+	def _changed_identity_fields(self, before) -> list[str]:
+		changed = [f for f in LOCKED_FIELDS if (before.get(f) or None) != (self.get(f) or None)]
+		return changed + [f for f in LOCKED_AMOUNT_FIELDS if flt(before.get(f), 9) != flt(self.get(f), 9)]
 
 	@staticmethod
 	def _allocation_precision() -> int:

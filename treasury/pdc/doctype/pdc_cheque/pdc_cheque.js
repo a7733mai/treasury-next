@@ -49,6 +49,7 @@ frappe.ui.form.on("PDC Cheque", {
 
 	refresh(frm) {
 		frm.events.set_labels(frm);
+		frm.events.lock_identity_fields(frm);
 		frm.events.translate_status_log(frm);
 		frm.events.render_vouchers(frm);
 		frm.events.set_indicator(frm);
@@ -82,6 +83,25 @@ frappe.ui.form.on("PDC Cheque", {
 		frm.set_df_property("handover_date", "label", incoming ? __("Receipt Date") : __("Handover Date"));
 		frm.toggle_reqd("bank_account", !incoming);
 		frm.toggle_reqd("cheque_no", !(frm.doc.direction === "Outgoing" && frm.doc.cheque_book));
+	},
+
+	lock_identity_fields(frm) {
+		// mirrors PDCCheque.validate_locked_fields: fixed once the cheque left the Created status
+		const locked = !frm.is_new() && frm.doc.operational_status !== "Created";
+		const fieldnames = [
+			"direction",
+			"company",
+			"party_type",
+			"party",
+			"bank_account",
+			"cheque_book",
+			"cheque_no",
+			"amount",
+			"exchange_rate",
+			"issue_date",
+			"original_due_date",
+		];
+		fieldnames.forEach((fieldname) => frm.set_df_property(fieldname, "read_only", locked ? 1 : 0));
 	},
 
 	translate_status_log(frm) {
@@ -174,8 +194,11 @@ frappe.ui.form.on("PDC Cheque", {
 			doc.bank_account &&
 			["Created", "Delivered", "Received", "Deposited"].includes(status)
 		) {
+			// the server rejects a date before the handover / receipt (dates are "YYYY-MM-DD" strings)
+			const handover = doc.handover_date || "";
+			const default_date = handover > (doc.effective_due_date || "") ? handover : doc.effective_due_date;
 			pdc_action(frm, "post_party", __("Post to Party Now"), [
-				{ ...date("posting_date", __("Posting Date")), default: doc.effective_due_date },
+				{ ...date("posting_date", __("Posting Date")), default: default_date },
 			]);
 		}
 

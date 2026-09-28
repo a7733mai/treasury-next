@@ -229,9 +229,11 @@ def clear(
 	doc.bank_transaction_date = transaction_date
 	doc.bank_charges = flt(bank_charges, doc.precision("bank_charges"))
 	_log(doc, "Cleared", operational="Cleared", remarks=remarks)
-	_ensure_party_posted(doc, date)
+	# the party posting may not come after the bank posting (e.g. a bank transaction before the due date)
+	bank_date = transaction_date if mode == "On Bank Transaction Date" else date
+	_ensure_party_posted(doc, bank_date)
 	if mode != "Manual":
-		_post_bank(doc, transaction_date if mode == "On Bank Transaction Date" else date, exchange_rate)
+		_post_bank(doc, bank_date, exchange_rate)
 	return _save(doc)
 
 
@@ -248,7 +250,7 @@ def post_bank(name: str, posting_date=None, bank_charges=None, exchange_rate=Non
 			frappe.throw(_("Bank charges cannot be negative."))
 		doc.bank_charges = flt(bank_charges, doc.precision("bank_charges"))
 
-	_ensure_party_posted(doc, doc.actual_clearance_date or date)
+	_ensure_party_posted(doc, date)
 	_post_bank(doc, date, exchange_rate)
 	return _save(doc)
 
