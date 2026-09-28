@@ -6,7 +6,8 @@ and creates only what Treasury needs, inside the IntegrationTestCase transaction
 """
 
 import frappe
-from frappe.utils import add_days, flt, getdate, today
+from frappe.utils import add_days, add_years, flt, getdate, today
+from frappe.utils.nestedset import get_root_of
 
 from erpnext.accounts.utils import get_balance_on
 
@@ -20,6 +21,13 @@ CUSTOMER = "_Test Treasury Customer"
 ITEM = "_Test Treasury Service"
 BUYING_PRICE_LIST = "_Test Treasury Buying"
 SELLING_PRICE_LIST = "_Test Treasury Selling"
+CUSTOMER_GROUP = "_Test Treasury Customer Group"
+SUPPLIER_GROUP = "_Test Treasury Supplier Group"
+TERRITORY = "_Test Treasury Territory"
+ITEM_GROUP = "_Test Treasury Item Group"
+UOM = "_Test Treasury Unit"
+USD_RATE = 50.0
+RATE_DATE = "2000-01-01"
 
 # GL layout per currency: bank GL account + PDC accounts (all account_type "Bank").
 BANK_SETUP = {
@@ -43,20 +51,32 @@ def _ensure(doctype: str, name: str, values: dict) -> str:
 	return name
 
 
+def _ensure_tree_leaf(doctype: str, name_field: str, parent_field: str, root_name: str, leaf: str) -> str:
+	"""Non-group node `leaf` under the existing root of a tree DocType (root created only if missing).
+
+	The root name is looked up, not assumed: on a bare site it may be translated or differently named.
+	"""
+	root = get_root_of(doctype)
+	if not root:
+		root = _ensure(doctype, root_name, {name_field: root_name, "is_group": 1})
+	return _ensure(doctype, leaf, {name_field: leaf, parent_field: root, "is_group": 0})
+
+
 def ensure_base_masters():
 	"""Minimal setup-wizard records, in case the test site never ran the wizard."""
 	_ensure("Party Type", "Customer", {"party_type": "Customer", "account_type": "Receivable"})
 	_ensure("Party Type", "Supplier", {"party_type": "Supplier", "account_type": "Payable"})
 	_ensure("Warehouse Type", "Transit", {"name": "Transit"})
-	_ensure("UOM", "Nos", {"uom_name": "Nos", "must_be_whole_number": 1})
-	_ensure("Item Group", "All Item Groups", {"item_group_name": "All Item Groups", "is_group": 1})
-	_ensure(
-		"Customer Group", "All Customer Groups", {"customer_group_name": "All Customer Groups", "is_group": 1}
+	_ensure("UOM", UOM, {"uom_name": UOM, "must_be_whole_number": 1})
+	_ensure_tree_leaf("Item Group", "item_group_name", "parent_item_group", "All Item Groups", ITEM_GROUP)
+	_ensure_tree_leaf(
+		"Customer Group", "customer_group_name", "parent_customer_group", "All Customer Groups", CUSTOMER_GROUP
 	)
-	_ensure("Territory", "All Territories", {"territory_name": "All Territories", "is_group": 1})
-	_ensure(
-		"Supplier Group", "All Supplier Groups", {"supplier_group_name": "All Supplier Groups", "is_group": 1}
+	_ensure_tree_leaf("Territory", "territory_name", "parent_territory", "All Territories", TERRITORY)
+	_ensure_tree_leaf(
+		"Supplier Group", "supplier_group_name", "parent_supplier_group", "All Supplier Groups", SUPPLIER_GROUP
 	)
+	ensure_currencies()
 	_ensure(
 		"Price List",
 		BUYING_PRICE_LIST,
@@ -67,6 +87,33 @@ def ensure_base_masters():
 		SELLING_PRICE_LIST,
 		{"price_list_name": SELLING_PRICE_LIST, "currency": "EGP", "buying": 0, "selling": 1, "enabled": 1},
 	)
+
+
+def ensure_currencies():
+	"""Enable EGP/USD and provide a USD<->EGP rate so nothing calls the external rate API.
+
+	The rows are dated far back and stale rates are allowed, so any posting date resolves to them.
+	"""
+	for currency in ("EGP", "USD"):
+		if not frappe.db.get_value("Currency", currency, "enabled"):
+			frappe.db.set_value("Currency", currency, "enabled", 1)
+
+	if not frappe.db.get_single_value("Accounts Settings", "allow_stale"):
+		frappe.db.set_single_value("Accounts Settings", "allow_stale", 1)
+		frappe.clear_document_cache("Accounts Settings", "Accounts Settings")
+
+	for from_currency, to_currency, rate in (("USD", "EGP", USD_RATE), ("EGP", "USD", 1 / USD_RATE)):
+		filters = {"from_currency": from_currency, "to_currency": to_currency, "date": RATE_DATE}
+		if not frappe.db.exists("Currency Exchange", filters):
+			frappe.get_doc(
+				{
+					"doctype": "Currency Exchange",
+					**filters,
+					"exchange_rate": rate,
+					"for_buying": 1,
+					"for_selling": 1,
+				}
+			).insert(ignore_permissions=True)
 
 
 def ensure_company(company: str = COMPANY, abbr: str = ABBR) -> str:
@@ -81,7 +128,9 @@ def ensure_company(company: str = COMPANY, abbr: str = ABBR) -> str:
 				"chart_of_accounts": "Standard",
 			}
 		).insert(ignore_permissions=True)
-	ensure_fiscal_year(company)
+	# Previous/current/next year so tests may post back- or forward-dated cheques across a year end.
+	for years in (-1, 0, 1):
+		ensure_fiscal_year(company, add_years(today(), years))
 	return company
 
 
@@ -172,15 +221,15 @@ def ensure_parties():
 	_ensure(
 		"Supplier",
 		SUPPLIER,
-		{"supplier_name": SUPPLIER, "supplier_group": "All Supplier Groups", "supplier_type": "Company"},
+		{"supplier_name": SUPPLIER, "supplier_group": SUPPLIER_GROUP, "supplier_type": "Company"},
 	)
 	_ensure(
 		"Customer",
 		CUSTOMER,
 		{
 			"customer_name": CUSTOMER,
-			"customer_group": "All Customer Groups",
-			"territory": "All Territories",
+			"customer_group": CUSTOMER_GROUP,
+			"territory": TERRITORY,
 			"customer_type": "Company",
 		},
 	)
@@ -190,8 +239,8 @@ def ensure_parties():
 		{
 			"item_code": ITEM,
 			"item_name": ITEM,
-			"item_group": "All Item Groups",
-			"stock_uom": "Nos",
+			"item_group": ITEM_GROUP,
+			"stock_uom": UOM,
 			"is_stock_item": 0,
 			"include_item_in_manufacturing": 0,
 		},
