@@ -1,8 +1,9 @@
 """End-to-end PDC Cheque scenarios under the different Treasury Company Settings (PLAN.md §4, §12)."""
 
 import frappe
+from frappe.handler import run_doc_method
 from frappe.tests import IntegrationTestCase
-from frappe.utils import flt, getdate
+from frappe.utils import add_days, flt, getdate, today
 
 from treasury.pdc import lifecycle
 from treasury.tests.utils import (
@@ -13,14 +14,18 @@ from treasury.tests.utils import (
 	TreasuryTestMixin,
 	assert_gl_entries,
 	day,
+	ensure_second_egp_bank,
 	ensure_user,
 	get_account_balance,
+	get_ledger_open_amount,
 	get_party_balance,
 	get_party_outstanding,
 	get_voucher_count,
+	make_cheque_book,
 	make_pdc_cheque,
 	make_purchase_invoice,
 	make_sales_invoice,
+	make_sales_order,
 	unique_cheque_no,
 )
 
@@ -274,6 +279,8 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		cheque, _pi = self.delivered_outgoing()
 
 		self.assertRaises(frappe.ValidationError, cheque.clear, clearance_date=day(-6))
+		# the bank transaction may not precede the party posting (handover, day -59)
+		self.assertRaises(frappe.ValidationError, cheque.clear, day(-6), day(-60))
 		self.assert_status(cheque, "Delivered", "Party Posted")
 
 		cheque.clear(clearance_date=day(-6), bank_transaction_date=day(-4))
@@ -305,7 +312,8 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 
 	def test_future_clearance_date_is_rejected(self):
 		cheque, _pi = self.delivered_outgoing()
-		self.assertRaises(frappe.ValidationError, cheque.clear, clearance_date=day(5))
+		# a real future date: day() dates are fixed in the past
+		self.assertRaises(frappe.ValidationError, cheque.clear, clearance_date=add_days(today(), 5))
 		self.assert_status(cheque, "Delivered", "Party Posted")
 
 	# ------------------------------------------------------------------ 7. bounce
@@ -458,8 +466,14 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		cheque, pi = self.delivered_outgoing(issue=-30, due=-5, handover=-30)
 		new_cheque_no = unique_cheque_no()
 		new_name = cheque.replace(
-			{"cheque_no": new_cheque_no, "amount": 1000, "original_due_date": day(40), "reason": "Damaged"}
-		)
+			{
+				"cheque_no": new_cheque_no,
+				"amount": 1000,
+				"original_due_date": day(40),
+				"replacement_date": day(-3),
+				"reason": "Damaged",
+			}
+		)["replaced_by"]
 
 		self.assert_status(cheque, "Replaced", "Reversed")
 		self.assertEqual(cheque.replaced_by, new_name)
@@ -596,3 +610,321 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(get_account_balance(usd.bank_gl), flt(bank_before - 100))
 		self.assertEqual(get_account_balance(usd.pdc_payable), pdc_before)
 		self.assert_status(cheque, "Cleared", "Bank Posted")
+
+	def test_usd_outgoing_bounce_restores_balances(self):
+		usd = self.data.usd
+		pdc_before = get_account_balance(usd.pdc_payable)
+		pi = make_purchase_invoice(5000, posting_date=day(-20))
+		party_before = get_party_balance("Supplier", SUPPLIER)
+		cheque = make_pdc_cheque(
+			amount=100,
+			currency="USD",
+			issue_date=day(-20),
+			due_date=day(-5),
+			exchange_rate=50,
+			references=[
+				{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 5000}
+			],
+		)
+		cheque.deliver(handover_date=day(-20))
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
+
+		cheque.bounce(bounce_date=day(-3), reason="Stopped")
+		self.assert_status(cheque, "Bounced", "Reversed")
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.reversal_journal,
+			[(self.data.payable, 0, 5000, SUPPLIER, day(-3)), (usd.pdc_payable, 5000, 0, None, day(-3))],
+		)
+		# USD account: balance in USD
+		self.assertEqual(get_account_balance(usd.pdc_payable), pdc_before)
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 5000)
+		self.assertEqual(get_party_balance("Supplier", SUPPLIER), party_before)
+
+	def test_usd_incoming_return_restores_balances(self):
+		usd = self.data.usd
+		pdc_before = get_account_balance(usd.pdc_receivable)
+		si = make_sales_invoice(5000, posting_date=day(-20))
+		cheque = make_pdc_cheque(
+			"Incoming",
+			amount=100,
+			currency="USD",
+			issue_date=day(-20),
+			due_date=day(-5),
+			exchange_rate=50,
+			references=[
+				{"reference_doctype": "Sales Invoice", "reference_name": si.name, "allocated_amount": 5000}
+			],
+		)
+		cheque.receive(receipt_date=day(-20))
+		self.assertEqual(get_party_outstanding("Sales Invoice", si.name), 0)
+		self.assertEqual(get_account_balance(usd.pdc_receivable), flt(pdc_before + 100))
+
+		cheque.return_to_party(return_date=day(-10), reason="Customer paid by transfer")
+		self.assert_status(cheque, "Returned", "Reversed")
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.reversal_journal,
+			[
+				(self.data.receivable, 5000, 0, CUSTOMER, day(-10)),
+				(usd.pdc_receivable, 0, 5000, None, day(-10)),
+			],
+		)
+		self.assertEqual(get_account_balance(usd.pdc_receivable), pdc_before)
+		self.assertEqual(get_party_outstanding("Sales Invoice", si.name), 5000)
+
+	# ------------------------------------------------------------------ reversal of advances
+
+	def test_reversal_of_unallocated_payment(self):
+		for mode in ("Reverse by Journal Entry", "Cancel Payment Entry"):
+			with self.subTest(on_bounce=mode):
+				self.use_company_settings(on_bounce=mode)
+				party_before = get_party_balance("Supplier", SUPPLIER)
+				cheque, _pi = self.delivered_outgoing(invoice=False)
+				payment_entry = cheque.party_payment_entry
+				self.assertNotEqual(get_ledger_open_amount("Payment Entry", payment_entry), 0)
+				# balance = debit - credit: the payment debits the supplier
+				self.assertEqual(get_party_balance("Supplier", SUPPLIER), flt(party_before + 1000))
+
+				cheque.bounce(bounce_date=day(-2), reason="Stopped")
+				self.assert_status(cheque, "Bounced", "Reversed")
+				# the advance is closed by the reversal (or gone with the cancelled entry)
+				self.assertEqual(get_ledger_open_amount("Payment Entry", payment_entry), 0)
+				self.assertEqual(get_party_balance("Supplier", SUPPLIER), party_before)
+
+	def test_reversal_restores_sales_order_advance(self):
+		egp = self.data.egp
+		for mode in ("Reverse by Journal Entry", "Cancel Payment Entry"):
+			with self.subTest(on_bounce=mode):
+				self.use_company_settings(on_bounce=mode)
+				so = make_sales_order(3000, transaction_date=day(-40))
+				cheque = make_pdc_cheque(
+					"Incoming", amount=3000, issue_date=day(-40), due_date=day(-20), invoice=so
+				)
+				cheque.receive(receipt_date=day(-40))
+				cheque.reload()
+				self.assertEqual(flt(frappe.db.get_value("Sales Order", so.name, "advance_paid")), 3000)
+
+				cheque.bounce(bounce_date=day(-30), reason="Account closed")
+				self.assert_status(cheque, "Bounced", "Reversed")
+				self.assertEqual(flt(frappe.db.get_value("Sales Order", so.name, "advance_paid")), 0)
+				self.assertEqual(get_ledger_open_amount("Payment Entry", cheque.party_payment_entry), 0)
+				if mode == "Reverse by Journal Entry":
+					assert_gl_entries(
+						self,
+						"Journal Entry",
+						cheque.reversal_journal,
+						[
+							(self.data.receivable, 3000, 0, CUSTOMER, day(-30)),
+							(egp.pdc_receivable, 0, 3000, None, day(-30)),
+						],
+					)
+					self.assertTrue(
+						frappe.db.exists(
+							"Advance Payment Ledger Entry",
+							{
+								"voucher_type": "Journal Entry",
+								"voucher_no": cheque.reversal_journal,
+								"against_voucher_type": "Sales Order",
+								"against_voucher_no": so.name,
+								"delinked": 0,
+							},
+						)
+					)
+
+	# ------------------------------------------------------------------ replacement variants
+
+	def test_replace_bounced_cheque_takes_next_leaf(self):
+		book = make_cheque_book(72_000_000, 72_000_009, leaf_digits=8)
+		pi = make_purchase_invoice(1000, posting_date=day(-30))
+		cheque = make_pdc_cheque(
+			amount=1000, issue_date=day(-30), due_date=day(-10), invoice=pi, cheque_book=book.name
+		)
+		self.assertEqual(cheque.cheque_no, "72000000")
+		cheque.deliver(handover_date=day(-30))
+		cheque.bounce(bounce_date=day(-8), reason="Insufficient funds")
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 1000)
+
+		result = cheque.replace(
+			{"replacement_date": day(-6), "original_due_date": day(20), "reason": "New cheque"}
+		)
+		self.assert_status(cheque, "Replaced", "Reversed")
+		self.assertEqual(self.vouchers(cheque), 2)  # its PE and the bounce reversal; nothing new
+
+		new = frappe.get_doc(DOCTYPE, result["replaced_by"])
+		self.assertEqual((new.cheque_book, new.cheque_no), (book.name, "72000001"))
+		self.assertEqual(new.replaces, cheque.name)
+		self.assertEqual((new.operational_status, new.accounting_status), ("Delivered", "Party Posted"))
+		self.assertEqual(getdate(new.handover_date), day(-6))
+		self.assertEqual(self.posting_date("Payment Entry", new.party_payment_entry), day(-6))
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
+
+	def test_replace_in_on_creation_mode(self):
+		self.use_company_settings(outgoing_party_posting="On Creation")
+		cheque = make_pdc_cheque(issue_date=day(-10), due_date=day(10))
+		self.assert_status(cheque, "Created", "Party Posted")
+		first_payment = cheque.party_payment_entry
+
+		result = cheque.replace(
+			{"cheque_no": unique_cheque_no(), "replacement_date": day(-5), "reason": "Wrong payee name"}
+		)
+		self.assert_status(cheque, "Replaced", "Reversed")
+		self.assertTrue(cheque.reversal_journal)
+
+		new = frappe.get_doc(DOCTYPE, result["replaced_by"])
+		self.assertEqual(new.replaces, cheque.name)
+		self.assertEqual((new.operational_status, new.accounting_status), ("Created", "Party Posted"))
+		self.assertNotEqual(new.party_payment_entry, first_payment)
+		self.assertEqual(self.posting_date("Payment Entry", new.party_payment_entry), day(-5))
+		self.assertEqual(self.events(new), ["Created", "Party Posted"])
+
+	# ------------------------------------------------------------------ incoming bank posting modes
+
+	def test_incoming_manual_bank_posting(self):
+		self.use_company_settings(incoming_bank_posting="Manual")
+		egp = self.data.egp
+		cheque, _si = self.received_incoming()
+		cheque.deposit(deposit_date=day(-20))
+		cheque.clear(clearance_date=day(-18))
+		self.assert_status(cheque, "Cleared", "Under Collection Posted")
+		self.assertFalse(cheque.bank_journal)
+
+		cheque.post_bank(posting_date=day(-15))
+		self.assert_status(cheque, "Cleared", "Bank Posted")
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.bank_journal,
+			[(egp.bank_gl, 2000, 0, None, day(-15)), (egp.under_collection, 0, 2000, None, day(-15))],
+		)
+		# the bank moved the money on the clearance date
+		self.assertEqual(
+			getdate(frappe.db.get_value("Journal Entry", cheque.bank_journal, "clearance_date")), day(-18)
+		)
+
+	def test_incoming_bank_posting_on_bank_transaction_date(self):
+		self.use_company_settings(incoming_bank_posting="On Bank Transaction Date")
+		egp = self.data.egp
+		cheque, _si = self.received_incoming()
+		cheque.deposit(deposit_date=day(-20))
+		self.assertRaises(frappe.ValidationError, cheque.clear, day(-18))
+		self.assert_status(cheque, "Deposited", "Under Collection Posted")
+
+		cheque.clear(clearance_date=day(-18), bank_transaction_date=day(-17))
+		self.assert_status(cheque, "Cleared", "Bank Posted")
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.bank_journal,
+			[(egp.bank_gl, 2000, 0, None, day(-17)), (egp.under_collection, 0, 2000, None, day(-17))],
+		)
+
+	# ------------------------------------------------------------------ deposit bank
+
+	def test_deposit_to_another_bank_account(self):
+		self.use_company_settings(incoming_party_posting="Manual")
+		second = ensure_second_egp_bank()
+		cheque, _si = self.received_incoming()
+		self.assert_status(cheque, "Received", "Not Posted")
+
+		cheque.deposit(deposit_date=day(-20), bank_account=second.bank_account)
+		self.assert_status(cheque, "Deposited", "Under Collection Posted")
+		self.assertEqual(cheque.bank_account, second.bank_account)
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			cheque.party_payment_entry,
+			[
+				(second.pdc_receivable, 2000, 0, None, day(-20)),
+				(self.data.receivable, 0, 2000, CUSTOMER, day(-20)),
+			],
+		)
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.under_collection_journal,
+			[
+				(second.under_collection, 2000, 0, None, day(-20)),
+				(second.pdc_receivable, 0, 2000, None, day(-20)),
+			],
+		)
+		cheque.clear(clearance_date=day(-18))
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.bank_journal,
+			[(second.bank_gl, 2000, 0, None, day(-18)), (second.under_collection, 0, 2000, None, day(-18))],
+		)
+
+	def test_deposit_to_bank_in_another_currency_is_rejected(self):
+		self.use_company_settings(incoming_party_posting="Manual")
+		cheque, _si = self.received_incoming()
+		self.assertRaises(frappe.ValidationError, cheque.deposit, day(-20), self.data.usd.bank_account)
+		self.assert_status(cheque, "Received", "Not Posted")
+		self.assertEqual((cheque.currency, flt(cheque.exchange_rate)), ("EGP", 1))
+		self.assertEqual(self.vouchers(cheque), 0)
+
+	# ------------------------------------------------------------------ date order
+
+	def test_postings_cannot_precede_earlier_postings(self):
+		self.use_company_settings(outgoing_party_posting="Manual", outgoing_bank_posting="Manual")
+		cheque = make_pdc_cheque(issue_date=day(-30), due_date=day(-10))
+		self.assertRaises(frappe.ValidationError, cheque.deliver, day(-31))  # before the issue date
+		cheque.deliver(handover_date=day(-25))
+		self.assertRaises(frappe.ValidationError, cheque.post_party, day(-26))  # before the handover
+		cheque.post_party(posting_date=day(-20))
+		self.assertRaises(frappe.ValidationError, cheque.clear, day(-21))  # before the party posting
+		cheque.clear(clearance_date=day(-15))
+		self.assertRaises(frappe.ValidationError, cheque.post_bank, day(-21))  # before the party posting
+		cheque.post_bank(posting_date=day(-12))
+		self.assert_status(cheque, "Cleared", "Bank Posted")
+
+	def test_reversals_cannot_precede_the_reversed_postings(self):
+		cheque, _pi = self.delivered_outgoing(issue=-30, due=-10, handover=-20)
+		self.assertRaises(frappe.ValidationError, cheque.bounce, day(-21), "Too early")
+		cheque.bounce(bounce_date=day(-15), reason="Stopped")
+		self.assertRaises(frappe.ValidationError, cheque.represent, day(-16))  # before the bounce
+		cheque.represent(represent_date=day(-14))
+		self.assert_status(cheque, "Delivered", "Party Posted")
+
+		incoming, _si = self.received_incoming()
+		incoming.deposit(deposit_date=day(-20))
+		self.assertRaises(frappe.ValidationError, incoming.clear, day(-21))  # before the deposit
+		self.assertRaises(frappe.ValidationError, incoming.bounce, day(-21), "Too early")
+		self.assert_status(incoming, "Deposited", "Under Collection Posted")
+
+	# ------------------------------------------------------------------ HTTP path
+
+	def call_over_http(self, http_method: str, doc, method: str, **args):
+		"""Call a cheque action the way the form does (/api/method/run_doc_method)."""
+		previous = getattr(frappe.local, "request", None)
+		frappe.local.request = frappe._dict(method=http_method)
+		try:
+			return run_doc_method(method=method, dt=DOCTYPE, dn=doc.name, args=args)
+		finally:
+			frappe.local.request = previous
+
+	def test_actions_over_http_require_post(self):
+		cheque = make_pdc_cheque(issue_date=day(-10), due_date=day(20))
+		args = {"handover_date": str(day(-10))}
+		self.assertRaises(frappe.PermissionError, self.call_over_http, "GET", cheque, "deliver", **args)
+		self.assert_status(cheque, "Created", "Not Posted")
+
+		self.call_over_http("POST", cheque, "deliver", **args)
+		self.assert_status(cheque, "Delivered", "Party Posted")
+		self.assertEqual(getdate(cheque.handover_date), day(-10))
+
+		user = ensure_user("treasury.user@example.com", ["Treasury User"])
+		with self.set_user(user):
+			self.assertRaises(
+				frappe.PermissionError,
+				self.call_over_http,
+				"POST",
+				cheque,
+				"bounce",
+				bounce_date=str(day(-5)),
+				reason="Stopped",
+			)
+		self.assert_status(cheque, "Delivered", "Party Posted")

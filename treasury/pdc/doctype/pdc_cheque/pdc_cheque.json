@@ -473,7 +473,7 @@
  ],
  "image_field": "cheque_image",
  "links": [],
- "modified": "2026-09-28 12:00:00.000000",
+ "modified": "2026-09-29 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "PDC Cheque",
@@ -518,8 +518,7 @@
   {
    "read": 1,
    "report": 1,
-   "role": "Cheque Approver",
-   "write": 1
+   "role": "Cheque Approver"
   }
  ],
  "search_fields": "party_name,cheque_no,amount",

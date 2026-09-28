@@ -3,16 +3,18 @@
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import getdate
+from frappe.utils import flt, getdate
 
 from treasury.tests.utils import (
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
 	SUPPLIER,
 	TreasuryTestMixin,
+	bank_account_name,
 	day,
 	ensure_account,
 	ensure_bank_account,
+	get_voucher_count,
 	make_pdc_cheque,
 	make_purchase_invoice,
 	make_sales_invoice,
@@ -165,3 +167,93 @@ class TestPDCCheque(TreasuryTestMixin, IntegrationTestCase):
 		draft = make_pdc_cheque()
 		frappe.delete_doc("PDC Cheque", draft.name)
 		self.assertFalse(frappe.db.exists("PDC Cheque", draft.name))
+
+	# ------------------------------------------------------------------ lifecycle-only fields
+
+	def test_lifecycle_fields_cannot_be_changed_directly(self):
+		"""A client save (form / REST) cannot touch statuses, cycle, links, lifecycle dates or history."""
+		cheque = make_pdc_cheque(issue_date=day(-5), due_date=day(20))
+		cheque.deliver(handover_date=day(-5))
+
+		tampering = {
+			"accounting_status": "Not Posted",
+			"cycle": 5,
+			"operational_status": "Cleared",
+			"effective_due_date": day(60),
+			"handover_date": day(-4),
+			"party_payment_entry": None,
+		}
+		for fieldname, value in tampering.items():
+			with self.subTest(field=fieldname):
+				doc = frappe.get_doc("PDC Cheque", cheque.name)
+				doc.set(fieldname, value)
+				self.assertRaises(frappe.ValidationError, doc.save)
+
+		doc = frappe.get_doc("PDC Cheque", cheque.name)
+		doc.status_log[0].remarks = "Edited"
+		self.assertRaises(frappe.ValidationError, doc.save)
+		doc = frappe.get_doc("PDC Cheque", cheque.name)
+		doc.status_log.pop()
+		self.assertRaises(frappe.ValidationError, doc.save)
+		doc = frappe.get_doc("PDC Cheque", cheque.name)
+		doc.append("status_log", {"event": "Cleared", "to_operational": "Cleared"})
+		self.assertRaises(frappe.ValidationError, doc.save)
+
+		# so the cheque cannot be posted twice (the reset-and-post-again attack)
+		cheque.reload()
+		self.assertEqual((cheque.accounting_status, cheque.cycle), ("Party Posted", 1))
+		self.assertRaises(frappe.ValidationError, cheque.post_party)
+		self.assertEqual(get_voucher_count("PDC Cheque", cheque.name), 1)
+
+	def test_lifecycle_fields_are_reset_on_insert(self):
+		cheque = make_pdc_cheque(
+			issue_date=day(0),
+			due_date=day(30),
+			operational_status="Cleared",
+			accounting_status="Bank Posted",
+			cycle=7,
+			handover_date=day(1),
+			party_posting_date=day(1),
+			party_payment_entry="ACC-PAY-DOES-NOT-EXIST",
+			is_postponed=1,
+			postponement_count=3,
+			effective_due_date=day(90),
+			status_log=[{"event": "Cleared", "to_operational": "Cleared"}],
+			postponements=[{"old_due_date": day(30), "new_due_date": day(90), "reason": "Forged"}],
+		)
+		self.assertEqual(
+			(cheque.operational_status, cheque.accounting_status, cheque.cycle), ("Created", "Not Posted", 1)
+		)
+		self.assertFalse(cheque.handover_date or cheque.party_posting_date or cheque.party_payment_entry)
+		self.assertEqual((cheque.is_postponed, cheque.postponement_count), (0, 0))
+		self.assertEqual(getdate(cheque.effective_due_date), day(30))
+		self.assertEqual([row.event for row in cheque.status_log], ["Created"])
+		self.assertFalse(cheque.postponements)
+
+	def test_dates_locked_after_handover(self):
+		"""Once handed over the due date moves only through Postpone (approver role, postponement row)."""
+		self.use_company_settings(outgoing_party_posting="On Cheque Date")
+		cheque = make_pdc_cheque(issue_date=day(-10), due_date=day(20))
+		cheque.original_due_date = day(25)  # still Created: editable
+		cheque.save()
+		self.assertEqual(getdate(cheque.effective_due_date), day(25))
+
+		cheque.deliver(handover_date=day(-10))
+		cheque.reload()
+		self.assertEqual(cheque.accounting_status, "Not Posted")
+		cheque.original_due_date = day(40)
+		self.assertRaises(frappe.ValidationError, cheque.save)
+		cheque.reload()
+		cheque.issue_date = day(-12)
+		self.assertRaises(frappe.ValidationError, cheque.save)
+		cheque.reload()
+		self.assertEqual(getdate(cheque.effective_due_date), day(25))
+
+	def test_exchange_rate_is_reset_when_currency_changes(self):
+		incoming = make_pdc_cheque("Incoming", bank_account=None)
+		self.assertEqual((incoming.currency, flt(incoming.exchange_rate)), ("EGP", 1))
+		incoming.bank_account = bank_account_name("USD")
+		incoming.save()
+		self.assertEqual(incoming.currency, "USD")
+		# the EGP rate 1 is meaningless for USD: fetched again at the party posting date
+		self.assertFalse(flt(incoming.exchange_rate))

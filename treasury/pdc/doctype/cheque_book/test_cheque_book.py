@@ -1,8 +1,6 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
-import random
-
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -21,8 +19,9 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		# books accumulate until the class rolls back: give every test its own, non-overlapping range
-		cls.next_start = random.randint(1_000, 8_000) * 1_000
+		# books accumulate until the class rolls back: give every test its own, non-overlapping range.
+		# Fixed base, distinct from the ranges used by other test classes (e.g. test_pdc_lifecycle).
+		cls.next_start = 71_000_000
 
 	def setUp(self):
 		super().setUp()

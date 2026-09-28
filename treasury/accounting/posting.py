@@ -633,8 +633,6 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			gl.cost_center,
 			gl.against_voucher_type,
 			gl.against_voucher,
-			gl.advance_voucher_type,
-			gl.advance_voucher_no,
 			gl.debit,
 			gl.credit,
 			gl.debit_in_account_currency,
@@ -644,6 +642,7 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 		.orderby(gl.creation)
 	).run(as_dict=True)
 
+	order_advances = _get_order_advances(voucher_type, voucher_no)
 	rows = []
 	for e in entries:
 		if e.against_voucher_type == "Journal Entry":
@@ -673,12 +672,67 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			and voucher_type == "Payment Entry"
 			and e.against_voucher_type in (None, "", "Payment Entry")
 		):
-			# Unallocated (advance) part: the Payment Ledger books it against the Payment Entry itself,
-			# so match the reversal against it too; otherwise both would stay open.
+			# Unallocated and order-allocated parts: the Payment Ledger books both against the Payment Entry
+			# itself, so match the reversal against it too; otherwise both would stay open.
 			row.update(reference_type="Payment Entry", reference_name=e.against_voucher or voucher_no)
-		if e.advance_voucher_no:
-			# Advance against a Sales / Purchase Order: carry the order so ERPNext books an opposite
-			# Advance Payment Ledger Entry and recomputes the order's `advance_paid`.
-			row.update(advance_voucher_type=e.advance_voucher_type, advance_voucher_no=e.advance_voucher_no)
+			rows.extend(_split_order_advances(row, order_advances))
+			continue
 		rows.append(row)
+	return rows
+
+
+def _get_order_advances(voucher_type: str, voucher_no: str) -> list[dict]:
+	"""Sales / Purchase Order allocations of a Payment Entry (party account currency), oldest first.
+
+	GL Entry does not store the order (`advance_voucher_*` only exist on the voucher rows and on the Advance
+	Payment Ledger Entry), so the orders are read from the Payment Entry's own references.
+	"""
+	if voucher_type != "Payment Entry":
+		return []
+	return [
+		{"doctype": d.reference_doctype, "name": d.reference_name, "remaining": flt(d.allocated_amount)}
+		for d in frappe.get_all(
+			"Payment Entry Reference",
+			filters={
+				"parenttype": "Payment Entry",
+				"parent": voucher_no,
+				"reference_doctype": ["in", ORDER_DOCTYPES],
+			},
+			fields=["reference_doctype", "reference_name", "allocated_amount"],
+			order_by="idx asc",
+		)
+		if flt(d.allocated_amount) > 0
+	]
+
+
+def _split_order_advances(row: dict, order_advances: list[dict]) -> list[dict]:
+	"""Split a reversal party row into one row per order advance it covers, plus the unallocated rest.
+
+	Each order row carries `advance_voucher_type` / `advance_voucher_no`, so ERPNext books an opposite
+	Advance Payment Ledger Entry and recomputes the order's `advance_paid` (as it does for a Journal Entry
+	row referencing an order). `order_advances` is consumed so a later party row does not reuse it.
+	"""
+	precision = frappe.get_precision("Journal Entry Account", "debit_in_account_currency")
+	debit = flt(row["debit_in_account_currency"])
+	side = "debit_in_account_currency" if debit else "credit_in_account_currency"
+	left = flt(row[side], precision)
+	rows = []
+	for order in order_advances:
+		take = flt(min(order["remaining"], left), precision)
+		if take <= 0:
+			continue
+		rows.append(
+			{
+				**row,
+				"debit_in_account_currency": 0,
+				"credit_in_account_currency": 0,
+				side: take,
+				"advance_voucher_type": order["doctype"],
+				"advance_voucher_no": order["name"],
+			}
+		)
+		order["remaining"] = flt(order["remaining"] - take, precision)
+		left = flt(left - take, precision)
+	if left > 0 or not rows:
+		rows.append({**row, "debit_in_account_currency": 0, "credit_in_account_currency": 0, side: left})
 	return rows

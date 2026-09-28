@@ -49,6 +49,7 @@ frappe.ui.form.on("PDC Cheque", {
 
 	refresh(frm) {
 		frm.events.set_labels(frm);
+		frm.events.translate_status_log(frm);
 		frm.events.render_vouchers(frm);
 		frm.events.set_indicator(frm);
 		if (!frm.is_new()) {
@@ -81,6 +82,19 @@ frappe.ui.form.on("PDC Cheque", {
 		frm.set_df_property("handover_date", "label", incoming ? __("Receipt Date") : __("Handover Date"));
 		frm.toggle_reqd("bank_account", !incoming);
 		frm.toggle_reqd("cheque_no", !(frm.doc.direction === "Outgoing" && frm.doc.cheque_book));
+	},
+
+	translate_status_log(frm) {
+		// statuses are stored in English in the status log (Data fields): translate them on display
+		["from_operational", "to_operational", "from_accounting", "to_accounting"].forEach((fieldname) => {
+			for (const name of [null, frm.doc.name]) {
+				const df = frappe.meta.get_docfield("PDC Status Log", fieldname, name);
+				if (df) {
+					df.formatter = (value) => frappe.utils.escape_html(value ? __(value) : "");
+				}
+			}
+		});
+		frm.refresh_field("status_log");
 	},
 
 	set_indicator(frm) {
@@ -155,7 +169,11 @@ frappe.ui.form.on("PDC Cheque", {
 			}
 		}
 
-		if (doc.accounting_status === "Not Posted" && ["Created", "Delivered", "Received", "Deposited"].includes(status)) {
+		if (
+			doc.accounting_status === "Not Posted" &&
+			doc.bank_account &&
+			["Created", "Delivered", "Received", "Deposited"].includes(status)
+		) {
 			pdc_action(frm, "post_party", __("Post to Party Now"), [
 				{ ...date("posting_date", __("Posting Date")), default: doc.effective_due_date },
 			]);
@@ -182,7 +200,7 @@ frappe.ui.form.on("PDC Cheque", {
 			pdc_action(frm, "clear", __("Clear"), [
 				date("clearance_date", __("Actual Clearance Date")),
 				{ fieldname: "bank_transaction_date", label: __("Bank Transaction Date"), fieldtype: "Date" },
-				{ fieldname: "bank_charges", label: __("Bank Charges"), fieldtype: "Currency", options: "currency" },
+				{ fieldname: "bank_charges", label: __("Bank Charges"), fieldtype: "Currency" },
 				{
 					fieldname: "exchange_rate",
 					label: __("Exchange Rate at Clearance"),
@@ -296,8 +314,8 @@ function pdc_replace(frm) {
 		],
 		(values) => {
 			frm.call({ method: "replace", args: { new_cheque_values: values }, freeze: true }).then((r) => {
-				if (r.message) {
-					frappe.set_route("Form", "PDC Cheque", r.message);
+				if (r.message && r.message.replaced_by) {
+					frappe.set_route("Form", "PDC Cheque", r.message.replaced_by);
 				} else {
 					frm.reload_doc();
 				}

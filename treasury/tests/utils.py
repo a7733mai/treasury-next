@@ -29,6 +29,9 @@ ITEM_GROUP = "_Test Treasury Item Group"
 UOM = "_Test Treasury Unit"
 USD_RATE = 50.0
 RATE_DATE = "2000-01-01"
+# PDC scenarios use fixed dates around this day (see `day`), inside a fiscal year that ensure_company creates,
+# so their results never depend on the day the suite runs. Mid-year: offsets of ±180 days stay in one year.
+BASE_DATE = "2025-07-01"
 
 # GL layout per currency: bank GL account + PDC accounts (all account_type "Bank").
 BANK_SETUP = {
@@ -132,6 +135,7 @@ def ensure_company(company: str = COMPANY, abbr: str = ABBR) -> str:
 	# Previous/current/next year so tests may post back- or forward-dated cheques across a year end.
 	for years in (-1, 0, 1):
 		ensure_fiscal_year(company, add_years(today(), years))
+	ensure_fiscal_year(company, BASE_DATE)
 	return company
 
 
@@ -349,8 +353,8 @@ DEFAULT_PDC_SETTINGS = {
 
 
 def day(offset: int):
-	"""Today + `offset` days, as a date."""
-	return getdate(add_days(today(), offset))
+	"""BASE_DATE + `offset` days, as a date (a fixed date in the past: never "in the future")."""
+	return getdate(add_days(BASE_DATE, offset))
 
 
 def bank_account_name(currency: str = "EGP") -> str:
@@ -373,9 +377,9 @@ def make_pdc_cheque(
 	cheque_book: str | None = None,
 	**values,
 ):
-	"""Insert a PDC Cheque (status Created). `invoice` adds a reference for the full amount."""
+	"""Insert a PDC Cheque (status Created). `invoice` (or an order) adds a reference for the full amount."""
 	outgoing = direction == "Outgoing"
-	issue_date = getdate(issue_date or today())
+	issue_date = getdate(issue_date or day(0))
 	references = values.pop("references", None) or []
 	if invoice:
 		references.append(
@@ -503,6 +507,63 @@ def make_sales_invoice(amount: float, posting_date=None, customer: str = CUSTOME
 	if submit:
 		si.submit()
 	return si
+
+
+def make_sales_order(amount: float, transaction_date=None, customer: str = CUSTOMER, submit: bool = True):
+	"""Sales Order of one non-stock item (no warehouse needed), in the company currency."""
+	transaction_date = getdate(transaction_date or today())
+	so = frappe.get_doc(
+		{
+			"doctype": "Sales Order",
+			"company": COMPANY,
+			"customer": customer,
+			"order_type": "Sales",
+			"transaction_date": transaction_date,
+			"delivery_date": add_days(transaction_date, 30),
+			"currency": "EGP",
+			"conversion_rate": 1,
+			"selling_price_list": SELLING_PRICE_LIST,
+			"plc_conversion_rate": 1,
+			"ignore_pricing_rule": 1,
+			"items": [
+				{
+					"item_code": ITEM,
+					"qty": 1,
+					"rate": amount,
+					"delivery_date": add_days(transaction_date, 30),
+					"cost_center": acc("Main"),
+				}
+			],
+		}
+	)
+	so.insert(ignore_permissions=True)
+	if submit:
+		so.submit()
+	return so
+
+
+# ---------------------------------------------------------------------------
+# Extra bank
+# ---------------------------------------------------------------------------
+
+
+def ensure_second_egp_bank() -> frappe._dict:
+	"""A second EGP company bank account with its own PDC accounts and a PDC Account Mapping row."""
+	bank_gl = ensure_account("Treasury Bank EGP 2", "Bank Accounts", "Bank")
+	bank = frappe._dict(
+		currency="EGP",
+		bank_gl=bank_gl,
+		bank_account=ensure_bank_account("Treasury EGP Second", bank_gl),
+		pdc_payable=ensure_account("PDC Payable EGP 2", "Current Liabilities", "Bank"),
+		pdc_receivable=ensure_account("PDC Receivable EGP 2", "Current Assets", "Bank"),
+		under_collection=ensure_account("Cheques Under Collection EGP 2", "Current Assets", "Bank"),
+		bank_charges=ensure_account("Treasury Bank Charges", "Indirect Expenses"),
+	)
+	settings = frappe.get_doc("Treasury Company Settings", COMPANY)
+	if not any(row.bank_account == bank.bank_account for row in settings.pdc_accounts):
+		settings.append("pdc_accounts", mapping_row(bank))
+		settings.save(ignore_permissions=True)
+	return bank
 
 
 # ---------------------------------------------------------------------------

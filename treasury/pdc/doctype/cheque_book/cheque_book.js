@@ -9,7 +9,7 @@ frappe.ui.form.on("Cheque Book", {
 	},
 
 	refresh(frm) {
-		if (frm.is_new() || frm.doc.status === "Closed") {
+		if (frm.is_new() || frm.doc.status === "Closed" || !frm.has_perm("write")) {
 			return;
 		}
 
