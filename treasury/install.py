@@ -15,6 +15,7 @@ TREASURY_FIELDNAMES = (
 	"treasury_source_doctype",
 	"treasury_source_name",
 	"treasury_event",
+	"treasury_cycle",
 )
 
 
@@ -92,6 +93,17 @@ def get_voucher_fields(insert_after: str) -> list[dict]:
 			"read_only": 1,
 			"no_copy": 1,
 			"insert_after": "treasury_source_name",
+			"module": TREASURY_MODULE,
+		},
+		{
+			# Distinguishes repeated occurrences of the same event on one source
+			# (e.g. a bounced cheque that is re-presented posts party_posting again in cycle 2).
+			"fieldname": "treasury_cycle",
+			"fieldtype": "Int",
+			"label": "Treasury Cycle",
+			"read_only": 1,
+			"no_copy": 1,
+			"insert_after": "treasury_event",
 			"module": TREASURY_MODULE,
 		},
 	]

@@ -1,14 +1,21 @@
 """Treasury posting service — the only place that creates accounting vouchers.
 
 Every voucher is a standard Payment Entry or Journal Entry linked back to its Treasury source through the
-read-only custom fields `treasury_source_doctype`, `treasury_source_name` and `treasury_event`.
-All creators are idempotent on (source_doctype, source_name, event).
+read-only custom fields `treasury_source_doctype`, `treasury_source_name`, `treasury_event` and
+`treasury_cycle`. All creators are idempotent on (source_doctype, source_name, event, cycle): `cycle`
+starts at 1 and callers increment it when the same event legitimately happens again on one source
+(e.g. a bounced cheque that is re-presented posts `party_posting` again in cycle 2).
+
+Permissions: this service runs with `ignore_permissions` on purpose. The calling controller or whitelisted
+method checks the user's permission on the Treasury source document; Treasury users are not expected to
+hold Payment Entry / Journal Entry permissions themselves.
 """
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, getdate
+from frappe.query_builder.functions import Sum
+from frappe.utils import cint, flt, getdate
 
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
@@ -17,6 +24,8 @@ from erpnext.setup.utils import get_exchange_rate
 
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
 INVOICE_DOCTYPES = ("Sales Invoice", "Purchase Invoice")
+ORDER_DOCTYPES = ("Sales Order", "Purchase Order")
+REFERENCE_DOCTYPES = (*INVOICE_DOCTYPES, *ORDER_DOCTYPES, "Journal Entry")
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +70,7 @@ def get_linked_vouchers(source_doctype: str, source_name: str) -> list[dict]:
 		rows = frappe.get_all(
 			doctype,
 			filters={"treasury_source_doctype": source_doctype, "treasury_source_name": source_name},
-			fields=["name", "docstatus", "posting_date", "treasury_event", "creation"],
+			fields=["name", "docstatus", "posting_date", "treasury_event", "treasury_cycle", "creation"],
 			order_by="creation asc",
 		)
 		for row in rows:
@@ -71,14 +80,17 @@ def get_linked_vouchers(source_doctype: str, source_name: str) -> list[dict]:
 	return vouchers
 
 
-def find_voucher(doctype: str, source_doctype: str, source_name: str, event: str) -> str | None:
-	"""Return the draft/submitted voucher already created for (source, event), if any."""
+def find_voucher(
+	doctype: str, source_doctype: str, source_name: str, event: str, cycle: int = 1
+) -> str | None:
+	"""Return the draft/submitted voucher already created for (source, event, cycle), if any."""
 	names = frappe.get_all(
 		doctype,
 		filters={
 			"treasury_source_doctype": source_doctype,
 			"treasury_source_name": source_name,
 			"treasury_event": event,
+			"treasury_cycle": _validate_cycle(cycle),
 			"docstatus": ["<", 2],
 		},
 		order_by="creation desc",
@@ -88,20 +100,31 @@ def find_voucher(doctype: str, source_doctype: str, source_name: str, event: str
 	return names[0] if names else None
 
 
+def _validate_cycle(cycle: int) -> int:
+	if cint(cycle) < 1:
+		frappe.throw(_("Treasury cycle must be a positive whole number."))
+	return cint(cycle)
+
+
+def _lock_source(source_doctype: str, source_name: str):
+	"""Lock the source row so concurrent calls (e.g. a double click) cannot both create a voucher."""
+	if not frappe.db.get_value(source_doctype, source_name, "name", for_update=True):
+		frappe.throw(_("{0} {1} does not exist").format(_(source_doctype), source_name))
+
+
 def _return_existing(doctype: str, name: str, submit: bool) -> str:
 	doc = frappe.get_doc(doctype, name)
 	if submit and doc.docstatus == 0:
-		doc.flags.ignore_permissions = True
+		doc.flags.ignore_permissions = True  # see module docstring
 		doc.submit()
 	return name
 
 
-def _set_treasury_fields(doc: Document, source_doctype: str, source_name: str, event: str):
-	if not frappe.db.exists(source_doctype, source_name):
-		frappe.throw(_("{0} {1} does not exist").format(_(source_doctype), source_name))
+def _set_treasury_fields(doc: Document, source_doctype: str, source_name: str, event: str, cycle: int):
 	doc.treasury_source_doctype = source_doctype
 	doc.treasury_source_name = source_name
 	doc.treasury_event = event
+	doc.treasury_cycle = cycle
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +150,7 @@ def create_payment_entry(
 	exchange_rate: float | None = None,
 	references: list[dict] | None = None,
 	remarks: str | None = None,
+	cycle: int = 1,
 	submit: bool = True,
 ) -> str:
 	"""Create (or return the existing) Payment Entry whose bank side is `bank_account_head`.
@@ -134,7 +158,9 @@ def create_payment_entry(
 	`amount` is expressed in the currency of `bank_account_head` (the cheque currency) and
 	`exchange_rate` converts that currency to the company currency.
 	"""
-	if existing := find_voucher("Payment Entry", source_doctype, source_name, event):
+	cycle = _validate_cycle(cycle)
+	_lock_source(source_doctype, source_name)
+	if existing := find_voucher("Payment Entry", source_doctype, source_name, event, cycle):
 		return _return_existing("Payment Entry", existing, submit)
 
 	if payment_type not in ("Pay", "Receive"):
@@ -187,15 +213,17 @@ def create_payment_entry(
 	pe.received_amount = target["amount"]
 	pe.target_exchange_rate = target["rate"]
 
-	for ref in _allocate_references(references, amounts.party_amount, amounts.precision):
+	for ref in _allocate_references(
+		references, party_type, party, amounts.party_currency, amounts.party_amount, amounts.precision
+	):
 		pe.append("references", ref)
 
 	if remarks:
 		pe.custom_remarks = 1
 		pe.remarks = remarks
 
-	_set_treasury_fields(pe, source_doctype, source_name, event)
-	pe.flags.ignore_permissions = True
+	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
+	pe.flags.ignore_permissions = True  # see module docstring
 	pe.insert()
 	if submit:
 		pe.submit()
@@ -263,27 +291,33 @@ def _get_payment_amounts(
 	)
 
 
-def _allocate_references(references: list[dict] | None, party_amount: float, precision: int) -> list[dict]:
+def _allocate_references(
+	references: list[dict] | None,
+	party_type: str,
+	party: str,
+	party_currency: str,
+	party_amount: float,
+	precision: int,
+) -> list[dict]:
 	"""Trim requested allocations to the current outstanding and to the payment amount.
 
-	Whatever cannot be allocated stays unallocated (advance) and the user is warned.
+	Amounts are in the party account currency. Whatever cannot be allocated stays unallocated (advance) and the user is warned.
 	"""
 	allocations = []
 	remaining = flt(party_amount, precision)
-	dropped = []
+	short_outstanding, over_payment = [], []
 
 	for ref in references or []:
-		requested = flt(ref.get("allocated_amount"), precision)
 		doctype, name = ref.get("reference_doctype"), ref.get("reference_name")
-		allowed = requested
-		if doctype in INVOICE_DOCTYPES:
-			invoice = frappe.db.get_value(doctype, name, ["docstatus", "outstanding_amount"], as_dict=True)
-			outstanding = flt(invoice.outstanding_amount, precision) if invoice and invoice.docstatus == 1 else 0
-			allowed = min(requested, max(outstanding, 0))
-		allowed = min(allowed, remaining)
+		requested = flt(ref.get("allocated_amount"), precision)
+		outstanding = _get_reference_outstanding(doctype, name, party_type, party, party_currency, precision)
 
+		allowed = min(requested, outstanding)
 		if allowed < requested:
-			dropped.append(name)
+			short_outstanding.append(name)
+		if allowed > remaining:
+			over_payment.append(name)
+			allowed = remaining
 		if allowed <= 0:
 			continue
 
@@ -292,15 +326,69 @@ def _allocate_references(references: list[dict] | None, party_amount: float, pre
 		)
 		remaining = flt(remaining - allowed, precision)
 
-	if dropped:
-		frappe.msgprint(
+	messages = []
+	if short_outstanding:
+		messages.append(
 			_(
 				"The following references are no longer outstanding enough and were reduced or skipped: {0}. The difference is kept as an unallocated advance."
-			).format(", ".join(frappe.bold(d) for d in dropped)),
-			title=_("Allocation Adjusted"),
-			indicator="orange",
+			).format(", ".join(frappe.bold(d) for d in short_outstanding))
 		)
+	if over_payment:
+		messages.append(
+			_(
+				"The following references were reduced or skipped because the payment amount is already fully allocated: {0}."
+			).format(", ".join(frappe.bold(d) for d in over_payment))
+		)
+	if messages:
+		frappe.msgprint("<br>".join(messages), title=_("Allocation Adjusted"), indicator="orange")
 	return allocations
+
+
+def _get_reference_outstanding(
+	doctype: str, name: str, party_type: str, party: str, party_currency: str, precision: int
+) -> float:
+	"""Outstanding of a reference document in the party account currency (0 if not submitted)."""
+	if doctype not in REFERENCE_DOCTYPES:
+		frappe.throw(_("Reference type {0} is not supported.").format(_(doctype)))
+	if frappe.db.get_value(doctype, name, "docstatus") != 1:
+		return 0
+
+	if doctype in INVOICE_DOCTYPES:
+		# ERPNext keeps invoice outstanding_amount in the party account currency (from the Payment Ledger).
+		outstanding = frappe.db.get_value(doctype, name, "outstanding_amount")
+	elif doctype in ORDER_DOCTYPES:
+		outstanding = _get_order_outstanding(doctype, name, party_currency)
+	else:
+		outstanding = _get_ledger_outstanding(doctype, name, party_type, party)
+	return max(flt(outstanding, precision), 0)
+
+
+def _get_order_outstanding(doctype: str, name: str, party_currency: str) -> float:
+	"""Order total not yet covered by advances (as ERPNext's `get_reference_details` computes it)."""
+	fields = ["currency", "grand_total", "rounded_total", "base_grand_total", "base_rounded_total"]
+	order = frappe.db.get_value(doctype, name, [*fields, "advance_paid"], as_dict=True)
+	if order.currency == party_currency:
+		total = flt(order.rounded_total) or flt(order.grand_total)
+	else:
+		total = flt(order.base_rounded_total) or flt(order.base_grand_total)
+	return total - flt(order.advance_paid)
+
+
+def _get_ledger_outstanding(voucher_type: str, voucher_no: str, party_type: str, party: str) -> float:
+	"""Open amount (party account currency) of a voucher for a party, from the Payment Ledger."""
+	ple = frappe.qb.DocType("Payment Ledger Entry")
+	result = (
+		frappe.qb.from_(ple)
+		.select(Sum(ple.amount_in_account_currency))
+		.where(
+			(ple.against_voucher_type == voucher_type)
+			& (ple.against_voucher_no == voucher_no)
+			& (ple.party_type == party_type)
+			& (ple.party == party)
+			& (ple.delinked == 0)
+		)
+	).run()
+	return flt(result[0][0]) if result else 0
 
 
 # ---------------------------------------------------------------------------
@@ -323,16 +411,25 @@ def create_journal_entry(
 	multi_currency: bool = False,
 	voucher_type: str = "Journal Entry",
 	reversal_of: str | None = None,
+	cycle: int = 1,
 	submit: bool = True,
 ) -> str:
-	"""Create (or return the existing) Journal Entry for (source, event).
+	"""Create (or return the existing) Journal Entry for (source, event, cycle).
 
 	`accounts` rows accept the Journal Entry Account fields (account, debit_in_account_currency,
 	credit_in_account_currency, party_type, party, exchange_rate, reference_type, reference_name,
-	cost_center, user_remark).
+	cost_center, user_remark). `clearance_date` requires `submit=True`.
 	"""
-	if existing := find_voucher("Journal Entry", source_doctype, source_name, event):
-		return _return_existing("Journal Entry", existing, submit)
+	if clearance_date and not submit:
+		frappe.throw(_("Clearance Date can only be set on a submitted Journal Entry."))
+
+	cycle = _validate_cycle(cycle)
+	_lock_source(source_doctype, source_name)
+	if existing := find_voucher("Journal Entry", source_doctype, source_name, event, cycle):
+		_return_existing("Journal Entry", existing, submit)
+		if clearance_date and not frappe.db.get_value("Journal Entry", existing, "clearance_date"):
+			_set_clearance_date(existing, clearance_date)
+		return existing
 
 	if not accounts:
 		frappe.throw(_("At least one account row is required."))
@@ -355,16 +452,20 @@ def create_journal_entry(
 		je.append("accounts", row)
 	je.multi_currency = 1 if multi_currency else 0
 
-	_set_treasury_fields(je, source_doctype, source_name, event)
-	je.flags.ignore_permissions = True
+	_set_treasury_fields(je, source_doctype, source_name, event, cycle)
+	je.flags.ignore_permissions = True  # see module docstring
 	je.insert()
 	if submit:
 		je.submit()
 		if clearance_date:
-			# JournalEntry.validate() clears clearance_date, so it can only be set after submit
-			# (the same way the Bank Reconciliation Tool does).
-			frappe.db.set_value("Journal Entry", je.name, "clearance_date", getdate(clearance_date))
+			_set_clearance_date(je.name, clearance_date)
 	return je.name
+
+
+def _set_clearance_date(name: str, clearance_date):
+	# JournalEntry.validate() clears clearance_date, so it can only be set after submit
+	# (the same way the Bank Reconciliation Tool does).
+	frappe.db.set_value("Journal Entry", name, "clearance_date", getdate(clearance_date))
 
 
 # ---------------------------------------------------------------------------
@@ -381,16 +482,18 @@ def cancel_voucher(doctype: str, name: str):
 	previous = frappe.flags.treasury_allow_cancel
 	frappe.flags.treasury_allow_cancel = True
 	try:
-		doc.flags.ignore_permissions = True
+		doc.flags.ignore_permissions = True  # see module docstring
 		if doc.docstatus == 1:
 			doc.cancel()
 		elif doc.docstatus == 0:
-			frappe.delete_doc(doctype, name, ignore_permissions=True)
+			frappe.delete_doc(doctype, name, ignore_permissions=True)  # see module docstring
 	finally:
 		frappe.flags.treasury_allow_cancel = previous
 
 
-def make_reversal(doctype: str, name: str, posting_date, event: str, remarks: str | None = None) -> str:
+def make_reversal(
+	doctype: str, name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
+) -> str:
 	"""Create a Journal Entry that mirrors a submitted voucher (debit <-> credit), linked to the same source."""
 	original = frappe.get_doc(doctype, name)
 	if original.docstatus != 1:
@@ -398,14 +501,20 @@ def make_reversal(doctype: str, name: str, posting_date, event: str, remarks: st
 	if not original.get("treasury_source_name"):
 		frappe.throw(_("{0} {1} is not managed by Treasury.").format(_(doctype), name))
 
+	source_doctype, source_name = original.treasury_source_doctype, original.treasury_source_name
+	cycle = _validate_cycle(cycle)
+	_lock_source(source_doctype, source_name)
+	if existing := find_voucher("Journal Entry", source_doctype, source_name, event, cycle):
+		return _return_existing("Journal Entry", existing, True)
+
 	if doctype == "Journal Entry":
 		rows = _reverse_journal_rows(original)
 	else:
 		rows = _reverse_gl_rows(doctype, name)
 
 	return create_journal_entry(
-		source_doctype=original.treasury_source_doctype,
-		source_name=original.treasury_source_name,
+		source_doctype=source_doctype,
+		source_name=source_name,
 		event=event,
 		company=original.company,
 		posting_date=posting_date,
@@ -415,12 +524,15 @@ def make_reversal(doctype: str, name: str, posting_date, event: str, remarks: st
 		remarks=remarks or _("Reversal of {0} {1}").format(_(doctype), name),
 		multi_currency=bool(original.get("multi_currency")),
 		reversal_of=name if doctype == "Journal Entry" else None,
+		cycle=cycle,
 	)
 
 
-def reverse_journal_entry(name: str, posting_date, event: str, remarks: str | None = None) -> str:
+def reverse_journal_entry(
+	name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
+) -> str:
 	"""Shortcut for `make_reversal("Journal Entry", ...)`."""
-	return make_reversal("Journal Entry", name, posting_date, event, remarks)
+	return make_reversal("Journal Entry", name, posting_date, event, remarks, cycle)
 
 
 def _reverse_journal_rows(je: Document) -> list[dict]:
@@ -477,5 +589,13 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 		}
 		if e.against_voucher_type in INVOICE_DOCTYPES and e.against_voucher:
 			row.update(reference_type=e.against_voucher_type, reference_name=e.against_voucher)
+		elif (
+			e.party_type
+			and voucher_type == "Payment Entry"
+			and e.against_voucher_type in (None, "", "Payment Entry")
+		):
+			# Unallocated (advance) part: the Payment Ledger books it against the Payment Entry itself,
+			# so match the reversal against it too; otherwise both would stay open.
+			row.update(reference_type="Payment Entry", reference_name=e.against_voucher or voucher_no)
 		rows.append(row)
 	return rows

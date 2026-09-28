@@ -17,6 +17,7 @@ OTHER_COMPANY = "_Test Treasury Co 2"
 OTHER_ABBR = "_TTC2"
 BANK = "_Test Treasury Bank"
 SUPPLIER = "_Test Treasury Supplier"
+USD_SUPPLIER = "_Test Treasury Supplier USD"
 CUSTOMER = "_Test Treasury Customer"
 ITEM = "_Test Treasury Service"
 BUYING_PRICE_LIST = "_Test Treasury Buying"
@@ -156,8 +157,7 @@ def ensure_fiscal_year(company: str, date=None):
 			"year_end_date": f"{year}-12-31",
 			"companies": [{"company": company}],
 		}
-	).insert(ignore_permissions=True)
-	frappe.cache().delete_value("fiscal_years")
+	).insert(ignore_permissions=True)  # FiscalYear.on_update clears ERPNext's fiscal year cache itself
 	return doc.name
 
 
@@ -223,6 +223,19 @@ def ensure_parties():
 		SUPPLIER,
 		{"supplier_name": SUPPLIER, "supplier_group": SUPPLIER_GROUP, "supplier_type": "Company"},
 	)
+	# Foreign supplier whose party account is in USD (same currency as the USD bank).
+	usd_payable = ensure_account("Treasury Creditors USD", "Accounts Payable", "Payable", "USD")
+	_ensure(
+		"Supplier",
+		USD_SUPPLIER,
+		{
+			"supplier_name": USD_SUPPLIER,
+			"supplier_group": SUPPLIER_GROUP,
+			"supplier_type": "Company",
+			"default_currency": "USD",
+			"accounts": [{"company": COMPANY, "account": usd_payable}],
+		},
+	)
 	_ensure(
 		"Customer",
 		CUSTOMER,
@@ -286,6 +299,8 @@ def setup_treasury_test_data() -> frappe._dict:
 	return frappe._dict(
 		company=COMPANY,
 		supplier=SUPPLIER,
+		usd_supplier=USD_SUPPLIER,
+		usd_payable=acc("Treasury Creditors USD"),
 		customer=CUSTOMER,
 		item=ITEM,
 		egp=egp,
@@ -397,7 +412,7 @@ def assert_gl_entries(testcase, voucher_type: str, voucher_no: str, expected: li
 	"""Order-independent comparison of non-cancelled GL rows.
 
 	`expected` rows are (account, debit, credit) or (account, debit, credit, party) or
-	(account, debit, credit, party, posting_date). Rows with the same key are summed.
+	(account, debit, credit, party, posting_date). Debit/credit are in the company currency.
 	"""
 	width = max((len(row) for row in expected), default=3)
 
@@ -410,7 +425,10 @@ def assert_gl_entries(testcase, voucher_type: str, voucher_no: str, expected: li
 		return tuple(parts)
 
 	actual = sorted(
-		(key(e.account, e.debit, e.credit, e.party, e.posting_date) for e in get_gl_entries(voucher_type, voucher_no)),
+		(
+			key(e.account, e.debit, e.credit, e.party, e.posting_date)
+			for e in get_gl_entries(voucher_type, voucher_no)
+		),
 		key=str,
 	)
 	wanted = sorted((key(*row) for row in expected), key=str)
@@ -444,3 +462,20 @@ def assert_party_balance(testcase, party_type: str, party: str, date, expected: 
 def get_party_outstanding(voucher_type: str, voucher_no: str) -> float:
 	"""Outstanding amount of an invoice as maintained by the Payment Ledger."""
 	return flt(frappe.db.get_value(voucher_type, voucher_no, "outstanding_amount"))
+
+
+def get_ledger_open_amount(voucher_type: str, voucher_no: str) -> float:
+	"""Open amount booked against a voucher in the Payment Ledger (account currency).
+
+	Works for vouchers without an `outstanding_amount` field, e.g. the unallocated part of a Payment Entry.
+	"""
+	return flt(
+		sum(
+			frappe.get_all(
+				"Payment Ledger Entry",
+				filters={"against_voucher_type": voucher_type, "against_voucher_no": voucher_no, "delinked": 0},
+				pluck="amount_in_account_currency",
+			)
+		),
+		2,
+	)

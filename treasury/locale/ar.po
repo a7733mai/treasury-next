@@ -173,6 +173,9 @@ msgstr "مصدر الخزينة"
 msgid "Treasury Event"
 msgstr "حدث الخزينة"
 
+msgid "Treasury Cycle"
+msgstr "دورة الخزينة"
+
 # Messages
 msgid "Outgoing cheques will be posted to the party as soon as they are created, even if they are never handed over."
 msgstr "سيتم ترحيل الشيكات الصادرة على الطرف بمجرد إنشائها، حتى لو لم يتم تسليمها أبداً."
@@ -195,14 +198,35 @@ msgstr "الصف #{0}: يجب أن يكون الحساب {1} {2} بعملة ال
 msgid "Row #{0}: Bank Account {1} must be a company bank account of {2}."
 msgstr "الصف #{0}: يجب أن يكون الحساب البنكي {1} حساباً بنكياً للشركة {2}."
 
-msgid "Row #{0}: "
-msgstr "الصف #{0}: "
+msgid "Row #{0}: {1} {2} does not belong to company {3}."
+msgstr "الصف #{0}: {1} {2} لا يتبع الشركة {3}."
 
 msgid "{0} {1} does not belong to company {2}."
 msgstr "{0} {1} لا يتبع الشركة {2}."
 
+msgid "Row #{0}: {1} {2} cannot be a group account."
+msgstr "الصف #{0}: {1} {2} لا يمكن أن يكون حساباً رئيسياً (مجموعة)."
+
 msgid "{0} {1} cannot be a group account."
 msgstr "{0} {1} لا يمكن أن يكون حساباً رئيسياً (مجموعة)."
+
+msgid "{0} {1} must have Root Type '{2}'."
+msgstr "يجب أن يكون النوع الرئيسي للحساب {0} {1} هو '{2}'."
+
+msgid "Expense"
+msgstr "مصروفات"
+
+msgid "Row #{0}: {1} {2} must be in the company currency {3}."
+msgstr "الصف #{0}: يجب أن يكون الحساب {1} {2} بعملة الشركة {3}."
+
+msgid "{0} {1} must be in the company currency {2}."
+msgstr "يجب أن يكون الحساب {0} {1} بعملة الشركة {2}."
+
+msgid "Row #{0}: {1} is required when {2} is '{3}'."
+msgstr "الصف #{0}: {1} مطلوب عندما تكون قيمة {2} هي '{3}'."
+
+msgid "Row #{0}: The GL account of Bank Account {1} must have Account Type 'Bank'."
+msgstr "الصف #{0}: يجب أن يكون نوع الحساب في دليل الحسابات المرتبط بالحساب البنكي {1} هو 'بنك'."
 
 msgid "This voucher is managed by {0} {1}. Cancel it from there."
 msgstr "هذا السند تتم إدارته من {0} {1}. قم بإلغائه من هناك."
@@ -243,8 +267,20 @@ msgstr "عملة حساب الطرف {0} يجب أن تكون {1} أو عملة 
 msgid "The following references are no longer outstanding enough and were reduced or skipped: {0}. The difference is kept as an unallocated advance."
 msgstr "المستندات التالية لم يعد رصيدها المستحق كافياً فتم تخفيض التخصيص عليها أو تخطيها: {0}. الفرق مسجل كدفعة مقدمة غير مخصصة."
 
+msgid "The following references were reduced or skipped because the payment amount is already fully allocated: {0}."
+msgstr "المستندات التالية تم تخفيض التخصيص عليها أو تخطيها لأن مبلغ الدفعة تم تخصيصه بالكامل: {0}."
+
 msgid "Allocation Adjusted"
 msgstr "تم تعديل التخصيص"
+
+msgid "Reference type {0} is not supported."
+msgstr "نوع المستند المرجعي {0} غير مدعوم."
+
+msgid "Treasury cycle must be a positive whole number."
+msgstr "يجب أن تكون دورة الخزينة عدداً صحيحاً موجباً."
+
+msgid "Clearance Date can only be set on a submitted Journal Entry."
+msgstr "لا يمكن تحديد تاريخ الصرف إلا على قيد يومية معتمد."
 
 msgid "At least one account row is required."
 msgstr "مطلوب سطر حساب واحد على الأقل."

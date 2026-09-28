@@ -5,6 +5,8 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+import erpnext
+
 # PDC accounts must be of type "Bank" so that Payment Entry accepts them as the bank side,
 # and must sit on the correct side of the balance sheet.
 PDC_ACCOUNT_RULES = {
@@ -39,7 +41,8 @@ class TreasuryCompanySettings(Document):
 	def validate(self):
 		self.warn_outgoing_on_creation()
 		if self.bounce_charges_account:
-			self.validate_account_basics(self.bounce_charges_account, _("Bounce Charges Account"))
+			label = _(self.meta.get_label("bounce_charges_account"))
+			self.validate_expense_account(self.bounce_charges_account, label)
 		self.validate_pdc_accounts()
 
 	def warn_outgoing_on_creation(self):
@@ -64,6 +67,7 @@ class TreasuryCompanySettings(Document):
 			seen.add(row.bank_account)
 			bank_gl_account = self.validate_bank_account(row)
 			bank_currency = frappe.get_cached_value("Account", bank_gl_account, "account_currency")
+			self.validate_under_collection_required(row)
 
 			for fieldname, root_type in PDC_ACCOUNT_RULES.items():
 				account = row.get(fieldname)
@@ -91,9 +95,19 @@ class TreasuryCompanySettings(Document):
 					)
 
 			if row.bank_charges_account:
-				self.validate_account_basics(
-					row.bank_charges_account, _(row.meta.get_label("bank_charges_account")), row.idx
+				label = _(row.meta.get_label("bank_charges_account"))
+				self.validate_expense_account(row.bank_charges_account, label, row.idx)
+
+	def validate_under_collection_required(self, row):
+		if self.incoming_under_collection == "On Deposit" and not row.under_collection_account:
+			frappe.throw(
+				_("Row #{0}: {1} is required when {2} is '{3}'.").format(
+					row.idx,
+					_(row.meta.get_label("under_collection_account")),
+					_(self.meta.get_label("incoming_under_collection")),
+					_(self.incoming_under_collection),
 				)
+			)
 
 	def validate_bank_account(self, row) -> str:
 		bank_account = frappe.db.get_value(
@@ -108,7 +122,39 @@ class TreasuryCompanySettings(Document):
 					row.idx, frappe.bold(row.bank_account), frappe.bold(self.company)
 				)
 			)
+		if (
+			not bank_account.account
+			or frappe.get_cached_value("Account", bank_account.account, "account_type") != "Bank"
+		):
+			frappe.throw(
+				_("Row #{0}: The GL account of Bank Account {1} must have Account Type 'Bank'.").format(
+					row.idx, frappe.bold(row.bank_account)
+				)
+			)
 		return bank_account.account
+
+	def validate_expense_account(self, account: str, label: str, idx: int | None = None):
+		"""Charges accounts: Expense root type, in the company currency."""
+		details = self.validate_account_basics(account, label, idx)
+		if details.root_type != "Expense":
+			self.throw_for_row(
+				idx,
+				_("Row #{0}: {1} {2} must have Root Type '{3}'."),
+				_("{0} {1} must have Root Type '{2}'."),
+				label,
+				frappe.bold(account),
+				_("Expense"),
+			)
+		company_currency = erpnext.get_company_currency(self.company)
+		if details.account_currency != company_currency:
+			self.throw_for_row(
+				idx,
+				_("Row #{0}: {1} {2} must be in the company currency {3}."),
+				_("{0} {1} must be in the company currency {2}."),
+				label,
+				frappe.bold(account),
+				company_currency,
+			)
 
 	def validate_account_basics(self, account: str, label: str, idx: int | None = None) -> frappe._dict:
 		details = frappe.db.get_value(
@@ -117,14 +163,26 @@ class TreasuryCompanySettings(Document):
 			["company", "is_group", "account_type", "root_type", "account_currency"],
 			as_dict=True,
 		)
-		prefix = _("Row #{0}: ").format(idx) if idx else ""
 		if not details or details.company != self.company:
-			frappe.throw(
-				prefix
-				+ _("{0} {1} does not belong to company {2}.").format(
-					label, frappe.bold(account), frappe.bold(self.company)
-				)
+			self.throw_for_row(
+				idx,
+				_("Row #{0}: {1} {2} does not belong to company {3}."),
+				_("{0} {1} does not belong to company {2}."),
+				label,
+				frappe.bold(account),
+				frappe.bold(self.company),
 			)
 		if details.is_group:
-			frappe.throw(prefix + _("{0} {1} cannot be a group account.").format(label, frappe.bold(account)))
+			self.throw_for_row(
+				idx,
+				_("Row #{0}: {1} {2} cannot be a group account."),
+				_("{0} {1} cannot be a group account."),
+				label,
+				frappe.bold(account),
+			)
 		return details
+
+	@staticmethod
+	def throw_for_row(idx: int | None, row_message: str, message: str, *args):
+		"""Throw the whole-sentence message that fits: with the row number (child table) or without."""
+		frappe.throw(row_message.format(idx, *args) if idx else message.format(*args))
