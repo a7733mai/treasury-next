@@ -4,15 +4,20 @@ Both jobs take an optional `as_of` date (default: today) so a run can be reprodu
 
 `post_due_party_postings` posts through `treasury.pdc.lifecycle.post_party(system=True)` — the same rules as
 the "Post Now" action, without the user permission check (a scheduler job has no acting user). Every cheque
-runs in its own savepoint: a failing cheque is rolled back and logged, the others go on. Days on which the
-job did not run are caught up automatically, because every cheque due up to `as_of` that is still not posted
-is posted on its own (effective) due date.
+runs in its own savepoint: a failing cheque is rolled back and logged (once per cheque and day), the others
+go on; each cheque is committed on its own, so a job timeout keeps the cheques already posted. Days on which
+the job did not run are caught up automatically, because every cheque due up to `as_of` that is still not
+posted is posted on its own (effective) due date.
+
+`send_due_alerts` sends every recipient the cheques they may read, in their own language, at most once per
+company and day.
 """
 
 from urllib.parse import quote
 
 import frappe
 from frappe import _
+from frappe.translate import get_user_lang, print_language
 from frappe.utils import add_days, cint, fmt_money, formatdate, getdate, today
 
 from treasury.pdc import lifecycle
@@ -45,7 +50,14 @@ def post_due_party_postings(as_of=None) -> dict:
 				result["posted"].append(name)
 			else:
 				result["failed"].append(name)
+			_commit()
 	return result
+
+
+def _commit():
+	"""Keep each cheque's result even if the job dies later (tests run in one rolled back transaction)."""
+	if not frappe.flags.in_test:
+		frappe.db.commit()  # nosemgrep: allowed in scheduler jobs
 
 
 def _cheque_date_companies() -> dict[str, list[str]]:
@@ -97,14 +109,21 @@ def _post_one(name: str) -> bool:
 	except Exception:
 		frappe.db.rollback(save_point=SAVEPOINT)
 		frappe.clear_messages()
-		frappe.log_error(
-			title=_("PDC scheduled party posting failed for cheque {0}").format(name),
-			reference_doctype=DOCTYPE,
-			reference_name=name,
-		)
+		_log_failure(name)
 		return False
 	frappe.db.release_savepoint(SAVEPOINT)
 	return True
+
+
+def _log_failure(name: str):
+	"""Error Log of a failing cheque, at most once per day (a cheque may fail every day, e.g. closed period)."""
+	title = _("PDC scheduled party posting failed for cheque {0}").format(name)
+	if frappe.db.exists(
+		"Error Log",
+		{"reference_doctype": DOCTYPE, "reference_name": name, "method": title, "creation": [">=", today()]},
+	):
+		return
+	frappe.log_error(title=title, reference_doctype=DOCTYPE, reference_name=name)
 
 
 # ---------------------------------------------------------------------------
@@ -116,19 +135,26 @@ def send_due_alerts(as_of=None) -> dict:
 	"""One digest per company of the open cheques due within the alert days (overdue ones included), sent
 	to the Treasury Managers / Users as a system notification and, when outgoing email is set up, by email.
 
-	Returns {company: {"cheques": [names], "recipients": [users]}} for the companies that had a digest.
+	Each recipient gets only the cheques they may read (role and User Permissions), rendered in their own
+	language, and at most one digest per company and `as_of` day (a second run the same day sends nothing).
+
+	Returns {company: {"cheques": [names], "recipients": [users notified by this run]}} for the companies
+	that had due cheques.
 	"""
 	as_of = getdate(as_of or today())
 	days = cint(frappe.db.get_single_value("Treasury Settings", "default_alert_days"))
 	until = add_days(as_of, days)
 	result = {}
+	users = _alert_users()
 	for company in frappe.get_all("Treasury Company Settings", pluck="company"):
 		cheques = _alert_cheques(company, until)
 		if not cheques:
 			continue
-		recipients = _alert_recipients(company)
-		if recipients:
-			_send_digest(company, cheques, recipients, as_of)
+		recipients = []
+		for user in users:
+			visible = [c for c in cheques if frappe.has_permission(DOCTYPE, "read", doc=c.name, user=user)]
+			if visible and _send_digest(company, visible, user, as_of):
+				recipients.append(user)
 		result[company] = {"cheques": [c.name for c in cheques], "recipients": recipients}
 	return result
 
@@ -160,8 +186,8 @@ def _alert_cheques(company: str, until) -> list[frappe._dict]:
 	return cheques
 
 
-def _alert_recipients(company: str) -> list[str]:
-	"""Enabled system users holding a Treasury role who are not restricted away from `company`."""
+def _alert_users() -> list[str]:
+	"""Enabled system users holding a Treasury role."""
 	has_role = frappe.qb.DocType("Has Role")
 	user = frappe.qb.DocType("User")
 	users = (
@@ -178,14 +204,7 @@ def _alert_recipients(company: str) -> list[str]:
 		)
 		.orderby(user.name)
 	).run(pluck=True)
-	return [u for u in users if _may_see_company(u, company)]
-
-
-def _may_see_company(user: str, company: str) -> bool:
-	allowed = frappe.get_all(
-		"User Permission", filters={"user": user, "allow": "Company"}, pluck="for_value"
-	)
-	return not allowed or company in allowed
+	return users
 
 
 def render_digest(company: str, cheques: list[frappe._dict], as_of) -> str:
@@ -215,33 +234,41 @@ def render_digest(company: str, cheques: list[frappe._dict], as_of) -> str:
 	)
 
 
-def _send_digest(company: str, cheques: list[frappe._dict], recipients: list[str], as_of):
-	subject = _("Cheques due for {0} as of {1}").format(company, formatdate(as_of))
-	message = render_digest(company, cheques, as_of)
-	for user in recipients:
-		frappe.get_doc(
-			{
-				"doctype": "Notification Log",
-				"type": "Alert",
-				"for_user": user,
-				"from_user": "Administrator",
-				"subject": subject,
-				"email_content": message,
-				"document_type": DOCTYPE,
-				"link": "/app/pdc-cheque?company=" + quote(company),
-			}
-		).insert(ignore_permissions=True)
-	_send_email(subject, message, recipients)
+def _send_digest(company: str, cheques: list[frappe._dict], user: str, as_of) -> bool:
+	"""Notify `user` in their language; False if they already got this company's digest for `as_of`."""
+	with print_language(get_user_lang(user)):
+		subject = _("Cheques due for {0} as of {1}").format(company, formatdate(as_of))
+		message = render_digest(company, cheques, as_of)
+	if frappe.db.exists("Notification Log", {"for_user": user, "document_type": DOCTYPE, "subject": subject}):
+		return False
+	frappe.get_doc(
+		{
+			"doctype": "Notification Log",
+			"type": "Alert",
+			"for_user": user,
+			"from_user": "Administrator",
+			"subject": subject,
+			"email_content": message,
+			"document_type": DOCTYPE,
+			"link": "/app/pdc-cheque?company=" + quote(company),
+		}
+	).insert(ignore_permissions=True)
+	_send_email(subject, message, user)
+	return True
 
 
-def _send_email(subject: str, message: str, recipients: list[str]):
+def outgoing_email_enabled() -> bool:
+	return bool(frappe.db.exists("Email Account", {"enable_outgoing": 1, "default_outgoing": 1}))
+
+
+def _send_email(subject: str, message: str, user: str):
 	"""Email the digest only when an outgoing email account is set up; never fail the job because of it."""
-	if not frappe.db.exists("Email Account", {"enable_outgoing": 1, "default_outgoing": 1}):
+	if not outgoing_email_enabled():
 		return
-	emails = [e for e in frappe.get_all("User", filters={"name": ["in", recipients]}, pluck="email") if e]
-	if not emails:
+	email = frappe.db.get_value("User", user, "email")
+	if not email:
 		return
 	try:
-		frappe.sendmail(recipients=emails, subject=subject, message=message)
+		frappe.sendmail(recipients=[email], subject=subject, message=message)
 	except Exception:
 		frappe.log_error(title=_("PDC due alert email could not be sent"))

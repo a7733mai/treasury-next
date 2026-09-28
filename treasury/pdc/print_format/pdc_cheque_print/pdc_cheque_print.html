@@ -13,6 +13,7 @@
 		{{ treasury_amount_in_words(doc.amount, doc.currency) }}
 	</div>
 	<div class="pdc-cheque-figures" style="position: absolute; top: 4cm; {{ 'left' if direction == 'rtl' else 'right' }}: 1cm; font-weight: bold;">
-		{{ doc.get_formatted("amount") }}
+		{#- figures only: no currency symbol on the leaf -#}
+		{{ frappe.utils.fmt_money(doc.amount, doc.precision("amount")) }}
 	</div>
 </div>

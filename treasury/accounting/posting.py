@@ -6,10 +6,19 @@ read-only custom fields `treasury_source_doctype`, `treasury_source_name`, `trea
 starts at 1 and callers increment it when the same event legitimately happens again on one source
 (e.g. a bounced cheque that is re-presented posts `party_posting` again in cycle 2).
 
-Permissions: this service runs with `ignore_permissions` on purpose. The calling controller or whitelisted
-method checks the user's permission on the Treasury source document; Treasury users are not expected to
-hold Payment Entry / Journal Entry permissions themselves.
+Permissions: the calling controller / lifecycle / tool checks the user's permission (and role) on the
+Treasury source document first. The public creators below then build, insert, submit and cancel the ERPNext
+vouchers inside `treasury.utils.context.elevated` (as Administrator): ERPNext checks the session user's own
+permissions on the way (Account in `get_party_account`, the reference documents and the party of a Payment
+Entry, ...), and Treasury users are not expected to hold any accounting permission — the app grants none.
+
+Voucher owner: a voucher created here gets `owner` / `modified_by` = the acting user (`real_user()`, the
+user who ran the Treasury action; Administrator for scheduler jobs) instead of Administrator, so the
+voucher shows who caused it, like the Treasury status log. Its GL / Payment Ledger rows and its Version
+history keep Administrator, the user the voucher was actually saved as.
 """
+
+from functools import wraps
 
 import frappe
 from frappe import _
@@ -19,13 +28,36 @@ from frappe.utils import cint, flt, getdate
 
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
-from erpnext.accounts.party import get_party_account
+from erpnext.accounts.party import get_party_account as erpnext_get_party_account
 from erpnext.setup.utils import get_exchange_rate
+from treasury.utils.context import elevated, real_user
 
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
 INVOICE_DOCTYPES = ("Sales Invoice", "Purchase Invoice")
 ORDER_DOCTYPES = ("Sales Order", "Purchase Order")
 REFERENCE_DOCTYPES = (*INVOICE_DOCTYPES, *ORDER_DOCTYPES, "Journal Entry")
+
+
+def _system_context(fn):
+	"""Run a posting service function inside `elevated` (see module docstring)."""
+
+	@wraps(fn)
+	def wrapper(*args, **kwargs):
+		with elevated():
+			return fn(*args, **kwargs)
+
+	return wrapper
+
+
+def _stamp_user(doctype: str, name: str, owner: bool = False):
+	"""Record the acting user on a voucher saved as Administrator (see module docstring)."""
+	user = real_user()
+	if user == frappe.session.user:
+		return
+	values = {"modified_by": user}
+	if owner:
+		values["owner"] = user
+	frappe.db.set_value(doctype, name, values, update_modified=False)
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +88,12 @@ def get_account_mapping(company: str, bank_account: str) -> frappe._dict:
 		),
 		title=_("Missing Settings"),
 	)
+
+
+@_system_context
+def get_party_account(party_type: str, party: str, company: str) -> str:
+	"""ERPNext's party account of `party` in `company`, independent of the user's Account permission."""
+	return erpnext_get_party_account(party_type, party, company)
 
 
 def get_cheque_exchange_rate(currency: str, company: str, posting_date) -> float:
@@ -128,6 +166,7 @@ def _return_existing(doctype: str, name: str, submit: bool) -> str:
 	if submit and doc.docstatus == 0:
 		doc.flags.ignore_permissions = True  # see module docstring
 		doc.submit()
+		_stamp_user(doctype, name)
 	return name
 
 
@@ -143,6 +182,7 @@ def _set_treasury_fields(doc: Document, source_doctype: str, source_name: str, e
 # ---------------------------------------------------------------------------
 
 
+@_system_context
 def create_payment_entry(
 	*,
 	source_doctype: str,
@@ -238,6 +278,7 @@ def create_payment_entry(
 	pe.insert()
 	if submit:
 		pe.submit()
+	_stamp_user("Payment Entry", pe.name, owner=True)
 	return pe.name
 
 
@@ -418,6 +459,7 @@ def _get_ledger_outstanding(voucher_type: str, voucher_no: str, party_type: str,
 # ---------------------------------------------------------------------------
 
 
+@_system_context
 def create_journal_entry(
 	*,
 	source_doctype: str,
@@ -490,6 +532,7 @@ def create_journal_entry(
 		je.submit()
 		if clearance_date:
 			_set_clearance_date(je.name, clearance_date)
+	_stamp_user("Journal Entry", je.name, owner=True)
 	return je.name
 
 
@@ -541,6 +584,7 @@ def _set_clearance_date(name: str, clearance_date):
 # ---------------------------------------------------------------------------
 
 
+@_system_context
 def cancel_voucher(doctype: str, name: str):
 	"""Cancel (or delete, if still draft) a Treasury-managed voucher, bypassing the voucher guard."""
 	if doctype not in VOUCHER_DOCTYPES:
@@ -553,12 +597,14 @@ def cancel_voucher(doctype: str, name: str):
 		doc.flags.ignore_permissions = True  # see module docstring
 		if doc.docstatus == 1:
 			doc.cancel()
+			_stamp_user(doctype, name)
 		elif doc.docstatus == 0:
 			frappe.delete_doc(doctype, name, ignore_permissions=True)  # see module docstring
 	finally:
 		frappe.flags.treasury_allow_cancel = previous
 
 
+@_system_context
 def make_reversal(
 	doctype: str, name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
 ) -> str:

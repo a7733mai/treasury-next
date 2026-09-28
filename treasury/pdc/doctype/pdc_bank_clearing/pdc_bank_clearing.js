@@ -34,7 +34,7 @@ frappe.ui.form.on("PDC Bank Clearing", {
 	},
 
 	clear_selected_button(frm) {
-		const selected = (frm.doc.matches || []).filter((row) => row.select);
+		const selected = (frm.doc.matches || []).filter((row) => row.selected);
 		if (!selected.length) {
 			frappe.msgprint(__("Select the matches to clear."));
 			return;

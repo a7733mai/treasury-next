@@ -67,14 +67,14 @@ frappe.ui.form.on("PDC Cheque", {
 		frm.add_custom_button(
 			__("Print Receipt"),
 			() => open_print(frm.doctype, frm.doc.name, "PDC Cheque Receipt"),
-			__("Print")
+			__("Print", null, "PDC Cheque")
 		);
 		// the PDC Account Mapping of the bank may name its own cheque layout
 		const cheque_format = (frm.doc.__onload && frm.doc.__onload.cheque_print_format) || "PDC Cheque Print";
 		frm.add_custom_button(
 			__("Print Cheque"),
 			() => open_print(frm.doctype, frm.doc.name, cheque_format),
-			__("Print")
+			__("Print", null, "PDC Cheque")
 		);
 		frm.events.add_cheque_template_button(frm, open_print);
 	},
@@ -84,6 +84,10 @@ frappe.ui.form.on("PDC Cheque", {
 		// party Payment Entry of an outgoing cheque.
 		const doc = frm.doc;
 		if (doc.direction !== "Outgoing" || !doc.party_payment_entry || !doc.bank_account) {
+			return;
+		}
+		// Treasury roles hold no accounting permissions: the lookup needs the user's own read access
+		if (!frappe.model.can_read("Bank Account") || !frappe.model.can_read("Payment Entry")) {
 			return;
 		}
 		frappe.db.get_value("Bank Account", doc.bank_account, "bank").then((r) => {
@@ -96,7 +100,7 @@ frappe.ui.form.on("PDC Cheque", {
 					frm.add_custom_button(
 						__("Print on Cheque Template"),
 						() => open_print("Payment Entry", doc.party_payment_entry, bank),
-						__("Print")
+						__("Print", null, "PDC Cheque")
 					);
 				}
 			});

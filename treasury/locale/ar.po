@@ -390,6 +390,7 @@ msgstr "وارد"
 msgid "Party Type"
 msgstr "نوع الطرف"
 
+msgctxt "PDC Cheque"
 msgid "Party"
 msgstr "الطرف"
 
@@ -968,70 +969,92 @@ msgstr "تعذر إرسال بريد تنبيه استحقاق الشيكات"
 msgid "Cheques of {0} due up to the alert date, as of {1}:"
 msgstr "شيكات {0} المستحقة حتى تاريخ التنبيه، في {1}:"
 
+msgctxt "PDC Cheque"
 msgid "Cheque"
 msgstr "الشيك"
 
+msgctxt "PDC Cheque"
 msgid "Bank"
 msgstr "البنك"
 
-# Phase 1b — amount in words
+# Phase 1b — amount in words (context: treasury.utils.amount_in_words.CONTEXT)
+msgctxt "Amount in words"
 msgid "{0} and {1} {2}"
 msgstr "{0} و{1} {2}"
 
+msgctxt "Amount in words"
 msgid "{0} only"
 msgstr "فقط {0} لا غير"
 
+msgctxt "Amount in words"
 msgid "Egyptian Pound"
 msgstr "جنيه مصري"
 
+msgctxt "Amount in words"
 msgid "US Dollar"
 msgstr "دولار أمريكي"
 
+msgctxt "Amount in words"
 msgid "Euro"
 msgstr "يورو"
 
+msgctxt "Amount in words"
 msgid "Pound Sterling"
 msgstr "جنيه إسترليني"
 
+msgctxt "Amount in words"
 msgid "Saudi Riyal"
 msgstr "ريال سعودي"
 
+msgctxt "Amount in words"
 msgid "UAE Dirham"
 msgstr "درهم إماراتي"
 
+msgctxt "Amount in words"
 msgid "Kuwaiti Dinar"
 msgstr "دينار كويتي"
 
+msgctxt "Amount in words"
 msgid "Qatari Riyal"
 msgstr "ريال قطري"
 
+msgctxt "Amount in words"
 msgid "Bahraini Dinar"
 msgstr "دينار بحريني"
 
+msgctxt "Amount in words"
 msgid "Omani Rial"
 msgstr "ريال عماني"
 
+msgctxt "Amount in words"
 msgid "Jordanian Dinar"
 msgstr "دينار أردني"
 
+msgctxt "Amount in words"
 msgid "Piastre"
 msgstr "قرش"
 
+msgctxt "Amount in words"
 msgid "Cent"
 msgstr "سنت"
 
+msgctxt "Amount in words"
 msgid "Halala"
 msgstr "هللة"
 
+msgctxt "Amount in words"
 msgid "Fils"
 msgstr "فلس"
 
+msgctxt "Amount in words"
 msgid "Baisa"
 msgstr "بيسة"
 
+msgctxt "Amount in words"
 msgid "Dirham"
 msgstr "درهم"
 
+msgctxt "Amount in words"
 msgid "Penny"
 msgstr "بنس"
 
@@ -1060,6 +1083,7 @@ msgstr "المسلِّم"
 msgid "Approved by"
 msgstr "المعتمد"
 
+msgctxt "PDC Cheque"
 msgid "Print"
 msgstr "طباعة"
 
@@ -1086,9 +1110,11 @@ msgstr "تسوية الشيكات مع البنك"
 msgid "PDC Clearing Match"
 msgstr "مطابقة تسوية الشيكات"
 
+msgctxt "PDC Bank Clearing"
 msgid "From Date"
 msgstr "من تاريخ"
 
+msgctxt "PDC Bank Clearing"
 msgid "To Date"
 msgstr "إلى تاريخ"
 
@@ -1107,27 +1133,42 @@ msgstr "صرف المحدد"
 msgid "Suggested Matches"
 msgstr "المطابقات المقترحة"
 
+msgctxt "PDC Bank Clearing"
 msgid "Matches"
 msgstr "المطابقات"
 
-msgid "Select"
-msgstr "اختيار"
+msgctxt "PDC Clearing Match"
+msgid "Selected"
+msgstr "محدد"
 
 msgid "Match Quality"
 msgstr "جودة المطابقة"
 
+msgctxt "PDC Clearing Match"
 msgid "Strong"
 msgstr "قوية"
 
+msgctxt "PDC Clearing Match"
 msgid "Weak"
 msgstr "ضعيفة"
 
+msgctxt "PDC Clearing Match"
 msgid "Bank Transaction"
 msgstr "حركة بنكية"
 
+msgctxt "PDC Clearing Match"
 msgid "Transaction Date"
 msgstr "تاريخ الحركة"
 
+msgctxt "PDC Clearing Match"
+msgid "Cheque"
+msgstr "الشيك"
+
+msgctxt "PDC Clearing Match"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "PDC Clearing Match"
 msgid "Result"
 msgstr "النتيجة"
 
@@ -1140,8 +1181,11 @@ msgstr "الحساب البنكي {0} لا يتبع الشركة {1}."
 msgid "From Date cannot be after To Date."
 msgstr "لا يمكن أن يكون تاريخ البداية بعد تاريخ النهاية."
 
-msgid "Not permitted"
-msgstr "غير مسموح"
+msgid "You are not permitted to use the PDC Bank Clearing tool."
+msgstr "غير مسموح لك باستخدام أداة تسوية الشيكات مع البنك."
+
+msgid "Cheque {0} was cleared with bank transaction date {1}, but Bank Transaction {2} is dated {3}."
+msgstr "تم صرف الشيك {0} بتاريخ حركة بنكية {1}، بينما الحركة البنكية {2} بتاريخ {3}."
 
 msgid "Cleared and reconciled"
 msgstr "تم الصرف والتسوية"

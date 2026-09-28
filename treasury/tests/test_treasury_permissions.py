@@ -1,15 +1,22 @@
 """Treasury roles without any ERPNext accounting role can run the posting actions end to end.
 
-ERPNext checks the session user's own permissions while the posting service builds vouchers (e.g. Account in
-`get_party_account`), so the roles get the read access of `treasury.install.READ_PERMISSIONS` — and no
-more: vouchers are only ever created by the posting service.
+The app grants the Treasury roles no permission on core doctypes: the posting service builds the vouchers
+in an elevated context (treasury.utils.context.elevated) after the lifecycle checked the user's permission
+on the cheque. Also covers the one-time removal of the Custom DocPerm grants of earlier versions.
 """
 
 import frappe
+from frappe.cache_manager import clear_user_cache
+from frappe.permissions import add_permission
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
 
-from treasury.install import PERMISSION_ROLES, READ_PERMISSIONS, grant_permissions
+from treasury.install import (
+	LEGACY_CLEANUP_DONE_KEY,
+	LEGACY_PERMISSION_DOCTYPES,
+	LEGACY_PERMISSION_ROLES,
+	remove_legacy_permissions,
+)
 from treasury.tests.utils import (
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
@@ -26,13 +33,13 @@ from treasury.tests.utils import (
 
 TREASURY_USER = "treasury-perm-user@example.com"
 TREASURY_MANAGER = "treasury-perm-manager@example.com"
+SAVEPOINT = "treasury_legacy_permissions_test"
 
 
 class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		grant_permissions()  # done by after_install / after_migrate; a no-op when already granted
 		ensure_user(TREASURY_USER, ["Treasury User", "Cheque Approver"])
 		ensure_user(TREASURY_MANAGER, ["Treasury Manager"])
 
@@ -44,15 +51,22 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 		doc.reload()
 		self.assertEqual((doc.operational_status, doc.accounting_status), (operational, accounting))
 
-	def test_roles_get_read_access_only(self):
+	def assert_owned_by(self, doctype: str, name: str, user: str):
+		owner, modified_by = frappe.db.get_value(doctype, name, ["owner", "modified_by"])
+		self.assertEqual((owner, modified_by), (user, user), (doctype, name))
+
+	def test_no_custom_docperm_on_core_doctypes(self):
+		# after_migrate removed the legacy grants and reset the copied standard permissions
+		self.assertTrue(frappe.db.get_global(LEGACY_CLEANUP_DONE_KEY))
+		for doctype in LEGACY_PERMISSION_DOCTYPES:
+			self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": doctype}), doctype)
+
+	def test_roles_hold_no_voucher_permission(self):
 		for user in (TREASURY_USER, TREASURY_MANAGER):
-			for doctype, ptypes in READ_PERMISSIONS.items():
-				for ptype in ptypes:
-					self.assertTrue(frappe.has_permission(doctype, ptype, user=user), (user, doctype, ptype))
 			for doctype in ("Payment Entry", "Journal Entry"):
-				for ptype in ("write", "create", "submit", "cancel"):
+				for ptype in ("read", "write", "create", "submit", "cancel"):
 					self.assertFalse(frappe.has_permission(doctype, ptype, user=user), (user, doctype, ptype))
-		self.assertEqual(PERMISSION_ROLES, ("Treasury Manager", "Treasury User"))
+			self.assertFalse(frappe.has_permission("Account", "read", user=user), user)
 
 	def test_treasury_user_delivers_and_clears(self):
 		egp = self.data.egp
@@ -61,6 +75,7 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 
 		with self.set_user(TREASURY_USER):
 			cheque.deliver(handover_date=day(-59))
+			self.assertEqual(frappe.session.user, TREASURY_USER)  # the elevated context was left
 			self.assert_status(cheque, "Delivered", "Party Posted")
 			cheque.clear(clearance_date=day(-25))
 			self.assert_status(cheque, "Cleared", "Bank Posted")
@@ -81,7 +96,11 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 			[(egp.pdc_payable, 1000, 0, None, day(-25)), (egp.bank_gl, 0, 1000, None, day(-25))],
 		)
 		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
+		# the status log and the vouchers record the real user, not Administrator
 		self.assertEqual(cheque.status_log[-1].user, TREASURY_USER)
+		self.assertEqual({row.user for row in cheque.status_log[1:]}, {TREASURY_USER})
+		self.assert_owned_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
+		self.assert_owned_by("Journal Entry", cheque.bank_journal, TREASURY_USER)
 
 	def test_treasury_manager_receives_and_bounces(self):
 		egp = self.data.egp
@@ -114,3 +133,114 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual(get_party_outstanding("Sales Invoice", si.name), 2000)
 		self.assertEqual(getdate(cheque.handover_date), day(-49))
+		self.assert_owned_by("Journal Entry", cheque.reversal_journal, TREASURY_MANAGER)
+
+	def test_treasury_manager_full_incoming_cycle_with_bounce_charges_and_cancellation(self):
+		# deposit (Under Collection), bounce with charges (party account lookup) and voucher cancellation
+		egp = self.data.egp
+		self.use_company_settings(on_bounce="Cancel Payment Entry", bounce_charges_account=egp.bank_charges)
+		cheque = make_pdc_cheque("Incoming", amount=3000, issue_date=day(-50), due_date=day(-20))
+
+		with self.set_user(TREASURY_MANAGER):
+			cheque.receive(receipt_date=day(-49))
+			cheque.deposit(deposit_date=day(-21))
+			self.assert_status(cheque, "Deposited", "Under Collection Posted")
+			cheque.bounce(bounce_date=day(-10), reason="Insufficient funds", charges=75)
+			self.assert_status(cheque, "Bounced", "Reversed")
+			self.assertEqual(frappe.session.user, TREASURY_MANAGER)
+
+		self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "docstatus"), 2)
+		self.assertEqual(frappe.db.get_value("Journal Entry", cheque.under_collection_journal, "docstatus"), 2)
+		self.assertEqual(
+			frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "modified_by"), TREASURY_MANAGER
+		)
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.bounce_charges_journal,
+			[
+				(self.data.receivable, 75, 0, CUSTOMER, day(-10)),
+				(egp.bank_charges, 0, 75, None, day(-10)),
+			],
+		)
+
+	def test_role_check_still_applies(self):
+		# elevation happens only inside the posting service, after the lifecycle's permission / role checks
+		cheque = make_pdc_cheque("Incoming", amount=500, issue_date=day(-50), due_date=day(-20))
+		cheque.receive(receipt_date=day(-49))
+		with self.set_user(TREASURY_USER):
+			self.assertRaises(frappe.PermissionError, cheque.bounce, day(-10), "Stopped")
+		self.assert_status(cheque, "Received", "Party Posted")
+
+		outsider = ensure_user("treasury-perm-outsider@example.com", ["Accounts User"])
+		with self.set_user(outsider):
+			self.assertRaises(frappe.PermissionError, cheque.deposit, day(-21))
+		self.assert_status(cheque, "Received", "Party Posted")
+
+
+class TestLegacyPermissionCleanup(IntegrationTestCase):
+	"""`remove_legacy_permissions` undoes the Custom DocPerm grants of earlier versions."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.savepoint(SAVEPOINT)
+		self.addCleanup(self.restore)
+
+	@staticmethod
+	def restore():
+		frappe.db.rollback(save_point=SAVEPOINT)
+		for doctype in LEGACY_PERMISSION_DOCTYPES:
+			frappe.clear_cache(doctype=doctype)
+		clear_user_cache()
+
+	@staticmethod
+	def legacy_grant(doctype: str, role: str):
+		"""What the legacy version did: copy the standard permissions, then add a read row for the role."""
+		add_permission(doctype, role, 0, "read")
+
+	@staticmethod
+	def treasury_rows(doctype: str) -> list[str]:
+		return frappe.get_all(
+			"Custom DocPerm",
+			filters={"parent": doctype, "role": ["in", LEGACY_PERMISSION_ROLES]},
+			pluck="name",
+		)
+
+	def test_copied_permissions_are_reset_to_standard(self):
+		for role in LEGACY_PERMISSION_ROLES:
+			self.legacy_grant("Mode of Payment", role)
+		self.assertTrue(self.treasury_rows("Mode of Payment"))
+
+		reset = remove_legacy_permissions(force=True)
+
+		self.assertIn("Mode of Payment", reset)
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": "Mode of Payment"}))
+		self.assertTrue(frappe.db.get_global(LEGACY_CLEANUP_DONE_KEY))
+
+	def test_other_customisations_are_kept(self):
+		self.legacy_grant("Bank", "Treasury User")
+		# an administrator's own change on another role of the copied permissions
+		row = frappe.get_all(
+			"Custom DocPerm",
+			filters={"parent": "Bank", "role": ["not in", LEGACY_PERMISSION_ROLES]},
+			fields=["name", "role", "export"],
+			limit=1,
+		)[0]
+		frappe.db.set_value("Custom DocPerm", row.name, "export", 0 if row.export else 1)
+
+		reset = remove_legacy_permissions(force=True)
+
+		self.assertNotIn("Bank", reset)
+		self.assertFalse(self.treasury_rows("Bank"))
+		self.assertTrue(frappe.db.exists("Custom DocPerm", row.name))
+
+	def test_runs_once_and_is_idempotent(self):
+		remove_legacy_permissions(force=True)
+		# a grant made by an administrator after the cleanup is left alone by later migrates
+		self.legacy_grant("Currency", "Treasury Manager")
+		self.assertEqual(remove_legacy_permissions(), [])
+		self.assertTrue(self.treasury_rows("Currency"))
+		# forced again: removes it, and a second forced run finds nothing to do
+		self.assertEqual(remove_legacy_permissions(force=True), ["Currency"])
+		self.assertEqual(remove_legacy_permissions(force=True), [])
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": "Currency"}))

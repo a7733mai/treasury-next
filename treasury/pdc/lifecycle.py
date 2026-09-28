@@ -20,17 +20,15 @@ Status log `event` values (and the from/to statuses) are stored in English, like
 translated when displayed (Select formatter / pdc_cheque.js).
 """
 
-from contextlib import contextmanager
-
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
-from erpnext.accounts.party import get_party_account
 from treasury.accounting import posting
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
+from treasury.utils.context import SYSTEM_USER, elevated, real_user
 
 DOCTYPE = "PDC Cheque"
 OUTGOING = "Outgoing"
@@ -153,11 +151,12 @@ def post_party(name: str, posting_date=None, *, system: bool = False) -> dict:
 	when the cheque was handed over after its due date.
 
 	`system=True` is the internal entry point of the scheduler (treasury.pdc.scheduler): it skips the user
-	permission / role check and runs as Administrator (see `_system_user`), whoever the session user is;
-	every business rule of `_post_party_now` still applies. Never pass it from a whitelisted method.
+	permission / role check and runs as Administrator (`treasury.utils.context.elevated`), who is also
+	recorded as the acting user, whoever the session user is; every business rule of `_post_party_now`
+	still applies. Never pass it from a whitelisted method.
 	"""
 	if system:
-		with _system_user():
+		with elevated(actor=SYSTEM_USER):
 			return _post_party_now(name, posting_date, system=True)
 	return _post_party_now(name, posting_date)
 
@@ -604,7 +603,7 @@ def _post_bounce_charges(doc, posting_date, charges):
 			title=_("Missing Settings"),
 		)
 	company_currency = erpnext.get_company_currency(doc.company)
-	party_account = get_party_account(doc.party_type, doc.party, doc.company)
+	party_account = posting.get_party_account(doc.party_type, doc.party, doc.company)
 	if get_account_currency(party_account) != company_currency:
 		frappe.throw(
 			_("Bounce charges can only be charged to a party account in the company currency {0}.").format(
@@ -690,7 +689,8 @@ def _cancel_voucher(doctype: str, name: str):
 def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write", system: bool = False):
 	"""Lock the cheque row, reload it and check permissions.
 
-	`system`: internal service call (scheduler, run inside `_system_user`) — no user permission / role check.
+	`system`: internal service call (scheduler, run inside `elevated`) — no user permission / role check.
+	The vouchers themselves are built by the posting service in an elevated context, *after* this check.
 	"""
 	if not name or not frappe.db.get_value(DOCTYPE, name, "name", for_update=True):
 		frappe.throw(_("{0} {1} does not exist").format(_(DOCTYPE), name), frappe.DoesNotExistError)
@@ -705,29 +705,6 @@ def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write"
 			title=_("Not Permitted"),
 		)
 	return doc
-
-
-@contextmanager
-def _system_user():
-	"""Run a system (scheduler) action as Administrator and restore the session afterwards.
-
-	ERPNext checks the session user's own permissions while the vouchers are built (e.g. Account in
-	`get_party_account`), so a system action must not depend on who happens to be logged in. The status log
-	records Administrator as the user of the system action.
-	"""
-	session = frappe.local.session
-	if session.user == "Administrator":
-		yield
-		return
-	user, sid, data, form_dict = session.user, session.sid, session.data, frappe.local.form_dict
-	frappe.set_user("Administrator")
-	try:
-		yield
-	finally:
-		# frappe.set_user also resets the sid, session data and form_dict of the request
-		frappe.set_user(user)
-		session.sid, session.data = sid, data
-		frappe.local.form_dict = form_dict
 
 
 def _save(doc) -> dict:
@@ -806,7 +783,7 @@ def _log(doc, event: str, operational=None, accounting=None, voucher=None, remar
 		"status_log",
 		{
 			"datetime": now_datetime(),
-			"user": frappe.session.user,
+			"user": real_user(),
 			"event": event,
 			"from_operational": doc.operational_status,
 			"to_operational": operational or doc.operational_status,

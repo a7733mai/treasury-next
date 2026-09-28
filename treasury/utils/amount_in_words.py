@@ -10,6 +10,10 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
+# Translation context of the pieces below (msgctxt in ar.po), so that they never override the Frappe /
+# ERPNext translation of the same words elsewhere.
+CONTEXT = "Amount in words"
+
 # Display names of common currencies (the Currency DocType only holds the code); translated in ar.po.
 CURRENCY_NAMES = {
 	"EGP": "Egyptian Pound",
@@ -45,12 +49,14 @@ def treasury_amount_in_words(amount, currency: str | None = None, lang: str | No
 		main, fraction = main + 1, 0
 
 	currency_name = CURRENCY_NAMES.get(currency, currency or "")
-	currency_name = _(currency_name, lang=lang) if currency_name else ""
+	currency_name = _(currency_name, lang=lang, context=CONTEXT) if currency_name else ""
 	text = f"{number_in_words(main, lang)} {currency_name}".strip()
 	if fraction:
-		fraction_label = _(fraction_name, lang=lang) if fraction_name else ""
-		text = _("{0} and {1} {2}", lang=lang).format(text, number_in_words(fraction, lang), fraction_label)
-	return _("{0} only", lang=lang).format(text.strip())
+		fraction_label = _(fraction_name, lang=lang, context=CONTEXT) if fraction_name else ""
+		text = _("{0} and {1} {2}", lang=lang, context=CONTEXT).format(
+			text, number_in_words(fraction, lang), fraction_label
+		)
+	return _("{0} only", lang=lang, context=CONTEXT).format(text.strip())
 
 
 def number_in_words(number: int, lang: str = "en") -> str:

@@ -9,9 +9,13 @@ from treasury.tests.utils import (
 	COMPANY,
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
+	OTHER_ABBR,
+	OTHER_COMPANY,
 	TreasuryTestMixin,
+	add_user_permission,
 	assert_gl_entries,
 	day,
+	ensure_company,
 	ensure_user,
 	get_voucher_count,
 	make_pdc_cheque,
@@ -66,7 +70,7 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 	def select_only(tool, *cheques):
 		names = {c.name for c in cheques}
 		for row in tool.matches:
-			row.select = 1 if row.cheque in names else 0
+			row.selected = 1 if row.cheque in names else 0
 
 	def delivered(self, amount, due=-30):
 		cheque = make_pdc_cheque(amount=amount, issue_date=day(due - 30), due_date=day(due))
@@ -106,14 +110,56 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		tool.get_suggestions()
 
 		row = self.row_for(tool, strong)
-		self.assertEqual((row.bank_transaction, row.match_quality, row.select), (bt_strong.name, "Strong", 1))
+		self.assertEqual((row.bank_transaction, row.match_quality, row.selected), (bt_strong.name, "Strong", 1))
 		self.assertEqual(flt(row.amount), 1301.25)
 		self.assertEqual(getdate(row.transaction_date), day(-10))
 		row = self.row_for(tool, weak)
-		self.assertEqual((row.bank_transaction, row.match_quality, row.select), (bt_weak.name, "Weak", 0))
+		self.assertEqual((row.bank_transaction, row.match_quality, row.selected), (bt_weak.name, "Weak", 0))
 		self.assertIsNone(self.row_for(tool, too_far))
 		transactions = [r.bank_transaction for r in tool.matches]
 		self.assertEqual(len(transactions), len(set(transactions)))
+
+	def test_transaction_before_the_handover_is_never_suggested(self):
+		cheque = self.delivered(1311.25)  # handed over on day(-59)
+		# the cheque number matches, but the bank cannot have paid a cheque it was not yet given
+		make_bank_transaction(
+			self.data.egp.bank_account, day(-65), withdrawal=1311.25, reference_number=cheque.cheque_no
+		)
+
+		tool = self.tool()
+		tool.get_suggestions()
+
+		self.assertIsNone(self.row_for(tool, cheque))
+
+	def test_user_restricted_to_another_company_gets_no_suggestions(self):
+		ensure_company(OTHER_COMPANY, OTHER_ABBR)
+		cheque = self.delivered(1321.25)
+		make_bank_transaction(
+			self.data.egp.bank_account, day(-28), withdrawal=1321.25, reference_number=cheque.cheque_no
+		)
+		user = ensure_user("treasury-clearing-other-co@example.com", ["Treasury User", "Accounts User"])
+		add_user_permission(user, "Company", OTHER_COMPANY)
+
+		tool = self.tool()
+		with self.set_user(user):
+			self.assertRaises(frappe.PermissionError, tool.get_suggestions)
+			# nor through the other company with this company's bank account
+			tool.company = OTHER_COMPANY
+			self.assertRaises(frappe.PermissionError, tool.get_suggestions)
+		self.assertFalse(tool.matches)
+
+	def test_user_restricted_to_the_company_gets_suggestions(self):
+		cheque = self.delivered(1331.25)
+		make_bank_transaction(
+			self.data.egp.bank_account, day(-28), withdrawal=1331.25, reference_number=cheque.cheque_no
+		)
+		user = ensure_user("treasury-clearing-own-co@example.com", ["Treasury User", "Accounts User"])
+		add_user_permission(user, "Company", COMPANY)
+
+		tool = self.tool()
+		with self.set_user(user):
+			tool.get_suggestions()
+		self.assertEqual(self.row_for(tool, cheque).match_quality, "Strong")
 
 	# ------------------------------------------------------------------ clearing
 
@@ -148,7 +194,7 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		# the same row again: skipped, nothing new
 		vouchers = get_voucher_count(DOCTYPE, cheque.name)
 		row = self.row_for(tool, cheque)
-		row.select = 1
+		row.selected = 1
 		result = tool.clear_selected()
 		self.assertEqual(result["cleared"], [])
 		self.assertEqual([d["cheque"] for d in result["skipped"]], [cheque.name])
@@ -203,6 +249,29 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(getdate(cheque.bank_posting_date), day(-27))
 		self.assert_reconciled(bt, cheque.bank_journal)
 
+	def test_cleared_with_another_bank_transaction_date_is_skipped(self):
+		self.use_company_settings(outgoing_bank_posting="Manual")
+		egp = self.data.egp
+		cheque = self.delivered(1616.5)
+		cheque.clear(clearance_date=day(-29), bank_transaction_date=day(-29))
+		bt = make_bank_transaction(
+			egp.bank_account, day(-27), withdrawal=1616.5, reference_number=cheque.cheque_no
+		)
+
+		tool = self.tool()
+		tool.get_suggestions()
+		self.select_only(tool, cheque)
+		result = tool.clear_selected()
+
+		# posting it would date the bank JE / cheque on day(-29) but reconcile it on day(-27)
+		self.assertEqual(result["cleared"], [])
+		self.assertEqual([d["cheque"] for d in result["skipped"]], [cheque.name])
+		cheque.reload()
+		self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Cleared", "Party Posted"))
+		self.assertEqual(getdate(cheque.bank_transaction_date), day(-29))
+		bt.reload()
+		self.assertEqual(flt(bt.unallocated_amount), 1616.5)
+
 	def test_rows_of_another_bank_or_currency_are_skipped(self):
 		usd = self.data.usd
 		cheque = self.delivered(1707.5)
@@ -219,7 +288,7 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		# a tampered row pairing the EGP cheque with the USD bank transaction
 		tool.append(
 			"matches",
-			{"select": 1, "bank_transaction": usd_bt.name, "cheque": cheque.name, "amount": 1707.5},
+			{"selected": 1, "bank_transaction": usd_bt.name, "cheque": cheque.name, "amount": 1707.5},
 		)
 		result = tool.clear_selected()
 
@@ -243,7 +312,7 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		tool.get_suggestions()
 		self.select_only(tool, good)
 		# a bank transaction dated before the handover cannot clear the cheque (lifecycle date order)
-		tool.append("matches", {"select": 1, "bank_transaction": early_bt.name, "cheque": early.name})
+		tool.append("matches", {"selected": 1, "bank_transaction": early_bt.name, "cheque": early.name})
 		result = tool.clear_selected()
 
 		self.assertEqual(result["cleared"], [good.name])
@@ -268,6 +337,34 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 			frappe.set_user("Administrator")
 		cheque.reload()
 		self.assertEqual(cheque.operational_status, "Delivered")
+
+	def test_cheque_the_user_may_not_write_is_skipped(self):
+		allowed = self.delivered(1919.5)
+		denied = self.delivered(1920.5)
+		for cheque in (allowed, denied):
+			make_bank_transaction(
+				self.data.egp.bank_account, day(-28), withdrawal=cheque.amount, reference_number=cheque.cheque_no
+			)
+		tool = self.tool()
+		tool.get_suggestions()
+		self.select_only(tool, allowed, denied)
+		# Treasury role, but restricted to one cheque by a User Permission
+		user = ensure_user("treasury-clearing-one-cheque@example.com", ["Treasury User", "Accounts User"])
+		add_user_permission(user, DOCTYPE, allowed.name)
+
+		with self.set_user(user):
+			result = tool.clear_selected()
+
+		self.assertEqual(result["cleared"], [allowed.name])
+		self.assertEqual([d["cheque"] for d in result["skipped"]], [denied.name])
+		denied.reload()
+		self.assertEqual((denied.operational_status, denied.accounting_status), ("Delivered", "Party Posted"))
+		self.assertEqual(get_voucher_count(DOCTYPE, denied.name), 1)
+		allowed.reload()
+		self.assertEqual(allowed.accounting_status, "Bank Posted")
+		# the vouchers record the user who cleared the cheque, although they were saved as Administrator
+		self.assertEqual(frappe.db.get_value("Journal Entry", allowed.bank_journal, "owner"), user)
+		self.assertEqual(allowed.status_log[-1].user, user)
 
 
 class TestClearWithBankAccount(TreasuryTestMixin, IntegrationTestCase):

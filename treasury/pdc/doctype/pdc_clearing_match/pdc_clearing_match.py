@@ -26,7 +26,7 @@ class PDCClearingMatch(Document):
 		parenttype: DF.Data
 		party: DF.Data | None
 		result: DF.SmallText | None
-		select: DF.Check
+		selected: DF.Check
 		transaction_date: DF.Date | None
 	# end: auto-generated types
 

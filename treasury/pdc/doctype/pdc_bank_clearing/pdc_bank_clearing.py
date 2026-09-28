@@ -14,9 +14,10 @@ import re
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_days, cint, flt, getdate, strip_html
+from frappe.utils import add_days, cint, flt, formatdate, getdate, strip_html
 
 from treasury.pdc import lifecycle
+from treasury.utils.context import elevated
 
 CHEQUE = "PDC Cheque"
 BANK_TRANSACTION = "Bank Transaction"
@@ -27,6 +28,9 @@ WEAK = "Weak"
 # Cheques that can still be cleared by the bank (Cleared = cleared without bank posting, `Manual` mode).
 CLEARABLE = {lifecycle.OUTGOING: ("Delivered",), lifecycle.INCOMING: ("Received", "Deposited")}
 OPEN_TRANSACTION_STATUSES = ("Pending", "Unreconciled")
+# A bank transaction dated before any of these cannot clear the cheque (lifecycle date order), so it is
+# never suggested; the lifecycle still enforces the full rule (voucher dates included) when clearing.
+EARLIEST_BANK_DATE_FIELDS = ("issue_date", "handover_date", "deposit_date", "party_posting_date")
 
 
 class PDCBankClearing(Document):
@@ -57,6 +61,8 @@ class PDCBankClearing(Document):
 		transaction and every cheque is suggested at most once."""
 		self.check_access("read")
 		self.validate_filters()
+		# Bank Transactions are read without the user's (usual lack of) permission on them, but only those of
+		# a bank account the user may read (validate_filters); the cheques are the ones the user may read.
 		transactions = self.get_open_transactions()
 		cheques = self.get_open_cheques()
 
@@ -78,7 +84,7 @@ class PDCBankClearing(Document):
 			self.append(
 				"matches",
 				{
-					"select": 1 if quality == STRONG else 0,
+					"selected": 1 if quality == STRONG else 0,
 					"match_quality": quality,
 					"bank_transaction": bt.name,
 					"transaction_date": bt.date,
@@ -96,6 +102,9 @@ class PDCBankClearing(Document):
 	def validate_filters(self):
 		if not self.company or not self.bank_account:
 			frappe.throw(_("Company and Bank Account are required."))
+		# role permissions and User Permissions of the user (e.g. restricted to another company)
+		frappe.has_permission("Company", "read", doc=self.company, throw=True)
+		frappe.has_permission("Bank Account", "read", doc=self.bank_account, throw=True)
 		company = frappe.db.get_value("Bank Account", self.bank_account, "company")
 		if company != self.company:
 			frappe.throw(
@@ -136,6 +145,7 @@ class PDCBankClearing(Document):
 		)
 
 	def get_open_cheques(self) -> list[frappe._dict]:
+		"""Open cheques of the bank account that the user may read."""
 		fields = [
 			"name",
 			"direction",
@@ -147,10 +157,11 @@ class PDCBankClearing(Document):
 			"effective_due_date",
 			"operational_status",
 			"accounting_status",
+			*EARLIEST_BANK_DATE_FIELDS,
 		]
 		cheques = []
 		for direction, statuses in CLEARABLE.items():
-			cheques += frappe.get_all(
+			cheques += frappe.get_list(
 				CHEQUE,
 				filters={
 					"company": self.company,
@@ -159,9 +170,10 @@ class PDCBankClearing(Document):
 					"operational_status": ["in", statuses],
 				},
 				fields=fields,
+				limit_page_length=0,
 			)
 		# cleared without bank posting (`Manual` bank posting mode)
-		cheques += frappe.get_all(
+		cheques += frappe.get_list(
 			CHEQUE,
 			filters={
 				"company": self.company,
@@ -170,6 +182,7 @@ class PDCBankClearing(Document):
 				"accounting_status": ["not in", (lifecycle.BANK_POSTED, lifecycle.REVERSED)],
 			},
 			fields=fields,
+			limit_page_length=0,
 		)
 		return cheques
 
@@ -190,7 +203,7 @@ class PDCBankClearing(Document):
 
 		result = {"cleared": [], "skipped": []}
 		for row in self.matches:
-			if not cint(row.select):
+			if not cint(row.selected):
 				continue
 			reason = self.clear_row(row)
 			if reason:
@@ -198,7 +211,7 @@ class PDCBankClearing(Document):
 				result["skipped"].append({"cheque": row.cheque, "reason": reason})
 			else:
 				row.result = _("Cleared and reconciled")
-				row.select = 0
+				row.selected = 0
 				result["cleared"].append(row.cheque)
 
 		frappe.clear_messages()
@@ -211,7 +224,7 @@ class PDCBankClearing(Document):
 
 	def check_access(self, ptype: str):
 		if not frappe.has_permission(self.doctype, ptype):
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
+			frappe.throw(_("You are not permitted to use the PDC Bank Clearing tool."), frappe.PermissionError)
 
 	def clear_row(self, row) -> str | None:
 		"""Clear and reconcile one match in its own savepoint. Returns the reason it was skipped, if so."""
@@ -222,7 +235,8 @@ class PDCBankClearing(Document):
 			self.reconcile(row)
 		except Exception as e:
 			frappe.db.rollback(save_point=SAVEPOINT)
-			if not isinstance(e, frappe.ValidationError):
+			# expected: business rules and the user's permission on the cheque; anything else is logged
+			if not isinstance(e, frappe.ValidationError | frappe.PermissionError):
 				frappe.log_error(title=_("PDC Bank Clearing failed for cheque {0}").format(row.cheque))
 			return strip_html(str(e)) or _("Could not be cleared.")
 		frappe.db.release_savepoint(SAVEPOINT)
@@ -231,7 +245,7 @@ class PDCBankClearing(Document):
 	def validate_row(self, row):
 		if not row.cheque or not row.bank_transaction:
 			frappe.throw(_("The cheque or the bank transaction no longer exists."))
-		cheque_fields = ["company", "bank_account", "currency", "amount", "direction"]
+		cheque_fields = ["company", "bank_account", "currency", "amount", "direction", "bank_transaction_date"]
 		cheque = frappe.db.get_value(
 			CHEQUE, row.cheque, [*cheque_fields, "operational_status", "accounting_status"], as_dict=True
 		)
@@ -268,6 +282,19 @@ class PDCBankClearing(Document):
 					row.bank_transaction, row.cheque
 				)
 			)
+		if cheque.bank_transaction_date and getdate(cheque.bank_transaction_date) != getdate(bt.date):
+			# a cheque cleared (Manual mode) with its own bank transaction date: the bank JE, the cheque and
+			# the reconciled clearance date would disagree
+			frappe.throw(
+				_(
+					"Cheque {0} was cleared with bank transaction date {1}, but Bank Transaction {2} is dated {3}."
+				).format(
+					row.cheque,
+					formatdate(cheque.bank_transaction_date),
+					row.bank_transaction,
+					formatdate(bt.date),
+				)
+			)
 		row.transaction_date = bt.date
 
 	def clear_cheque(self, row):
@@ -288,16 +315,17 @@ class PDCBankClearing(Document):
 		journal = frappe.db.get_value(CHEQUE, row.cheque, "bank_journal")
 		if not journal:
 			frappe.throw(_("Cheque {0} has no bank Journal Entry to reconcile.").format(row.cheque))
-		transaction = frappe.get_doc(BANK_TRANSACTION, row.bank_transaction)
-		transaction.add_payment_entries([{"payment_doctype": "Journal Entry", "payment_name": journal}])
-		transaction.validate_duplicate_references()
-		transaction.allocate_payment_entries()
-		transaction.update_allocated_amount()
-		transaction.set_status()
-		# the user's right to clear the cheque was checked above; Treasury users need not hold Bank
-		# Transaction permissions (like the vouchers of treasury.accounting.posting)
-		transaction.flags.ignore_permissions = True
-		transaction.save()
+		# the user's right to clear the cheque was checked by the lifecycle just before; Treasury users need
+		# not hold Bank Transaction / voucher permissions (like the vouchers of treasury.accounting.posting)
+		with elevated():
+			transaction = frappe.get_doc(BANK_TRANSACTION, row.bank_transaction)
+			transaction.add_payment_entries([{"payment_doctype": "Journal Entry", "payment_name": journal}])
+			transaction.validate_duplicate_references()
+			transaction.allocate_payment_entries()
+			transaction.update_allocated_amount()
+			transaction.set_status()
+			transaction.flags.ignore_permissions = True
+			transaction.save()
 
 	@staticmethod
 	def summary_message(result: dict) -> str:
@@ -318,9 +346,13 @@ class PDCBankClearing(Document):
 
 def match_quality(bt, cheque, tolerance_days: int) -> str | None:
 	"""Strong: same amount and the cheque number appears in the reference number / description.
-	Weak: same amount, on the right side (withdrawal for outgoing), within `tolerance_days` of the due date."""
+	Weak: same amount, on the right side (withdrawal for outgoing), within `tolerance_days` of the due date.
+	Never a transaction dated before the cheque's issue / handover / deposit / party posting date."""
 	side = flt(bt.withdrawal) if cheque.direction == lifecycle.OUTGOING else flt(bt.deposit)
 	if side <= 0 or (bt.currency and cheque.currency and bt.currency != cheque.currency):
+		return None
+	earliest = [getdate(cheque.get(f)) for f in EARLIEST_BANK_DATE_FIELDS if cheque.get(f)]
+	if earliest and getdate(bt.date) < max(earliest):
 		return None
 	precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount")
 	if flt(bt.unallocated_amount, precision) != flt(cheque.amount, precision):

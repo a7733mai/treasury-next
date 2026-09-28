@@ -436,6 +436,20 @@ def ensure_user(email: str, roles: list[str]) -> str:
 	return email
 
 
+def add_user_permission(user: str, allow: str, for_value: str, applicable_for: str | None = None):
+	"""A User Permission restricting `user` to `for_value` of `allow` (all doctypes unless `applicable_for`)."""
+	filters = {"user": user, "allow": allow, "for_value": for_value}
+	if not frappe.db.exists("User Permission", filters):
+		frappe.get_doc(
+			{
+				"doctype": "User Permission",
+				**filters,
+				"apply_to_all_doctypes": 0 if applicable_for else 1,
+				"applicable_for": applicable_for,
+			}
+		).insert(ignore_permissions=True)
+
+
 # ---------------------------------------------------------------------------
 # Invoice factories
 # ---------------------------------------------------------------------------

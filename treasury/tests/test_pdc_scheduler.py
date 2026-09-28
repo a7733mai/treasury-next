@@ -1,6 +1,5 @@
 """Daily PDC jobs: `On Cheque Date` party postings and due alerts (PLAN.md §4 Scheduler, §12)."""
 
-import importlib.util
 from unittest.mock import patch
 
 import frappe
@@ -28,6 +27,7 @@ MANAGER = "treasury-sched-manager@example.com"
 USER = "treasury-sched-user@example.com"
 OUTSIDER = "treasury-sched-outsider@example.com"
 RESTRICTED = "treasury-sched-restricted@example.com"
+ARABIC_USER = "treasury-sched-ar@example.com"
 
 
 class TestPDCScheduledPosting(TreasuryTestMixin, IntegrationTestCase):
@@ -202,15 +202,29 @@ class TestPDCScheduledPosting(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(cheque.status_log[-1].user, "Administrator")
 
 	def test_default_date_is_today(self):
-		if not importlib.util.find_spec("freezegun"):
-			self.skipTest("freezegun is not installed")
-		from frappe.tests.classes.context_managers import freeze_time
+		due = self.delivered(due=-1)
+		not_due = self.delivered(due=1)
+		with patch.object(scheduler, "today", return_value=str(day(0))):
+			result = scheduler.post_due_party_postings()
+		self.assertIn(due.name, result["posted"])
+		self.assertNotIn(not_due.name, result["posted"] + result["failed"])
+		self.assertEqual(self.status(due), ("Delivered", "Party Posted"))
+		self.assertEqual(self.party_posting_date(due), day(-1))
+		self.assertEqual(self.status(not_due), ("Delivered", "Not Posted"))
 
-		cheque = self.delivered(due=-1)
-		with freeze_time(day(0)):
-			scheduler.post_due_party_postings()
-		self.assertEqual(self.status(cheque), ("Delivered", "Party Posted"))
-		self.assertEqual(self.party_posting_date(cheque), day(-1))
+	def test_a_failing_cheque_is_logged_once_a_day(self):
+		bad = self.delivered(due=-2)
+
+		def fail(doc, posting_date):
+			frappe.throw("Simulated posting failure")
+
+		with patch.object(lifecycle, "_post_party", side_effect=fail):
+			scheduler.post_due_party_postings(as_of=day(0))
+			scheduler.post_due_party_postings(as_of=day(0))
+
+		self.assertEqual(
+			frappe.db.count("Error Log", {"reference_doctype": DOCTYPE, "reference_name": bad.name}), 1
+		)
 
 
 class TestPDCDueAlerts(TreasuryTestMixin, IntegrationTestCase):
@@ -221,6 +235,17 @@ class TestPDCDueAlerts(TreasuryTestMixin, IntegrationTestCase):
 		ensure_user(USER, ["Treasury User"])
 		ensure_user(OUTSIDER, ["Accounts User"])
 		ensure_user(RESTRICTED, ["Treasury User"])
+		if not frappe.db.exists("User", ARABIC_USER):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": ARABIC_USER,
+					"first_name": "treasury-sched-ar",
+					"language": "ar",
+					"send_welcome_email": 0,
+					"roles": [{"role": "Treasury User"}],
+				}
+			).insert(ignore_permissions=True)
 		ensure_company(OTHER_COMPANY, OTHER_ABBR)
 		if not frappe.db.exists("User Permission", {"user": RESTRICTED, "allow": "Company"}):
 			frappe.get_doc(
@@ -312,6 +337,83 @@ class TestPDCDueAlerts(TreasuryTestMixin, IntegrationTestCase):
 		self.assertIn("Overdue", overdue_row.split("</tr>")[0])
 		soon_row = html[html.index(soon.cheque_no) :]
 		self.assertNotIn("Overdue", soon_row.split("</tr>")[0])
+
+	# Each test below uses its own as-of date: a recipient gets one digest per company and as-of date, and
+	# the Notification Logs of the other tests of this class are still there.
+
+	def test_second_run_the_same_day_sends_nothing(self):
+		make_pdc_cheque(amount=1414, issue_date=day(-30), due_date=day(-1))
+
+		first = scheduler.send_due_alerts(as_of=day(-1))
+		second = scheduler.send_due_alerts(as_of=day(-1))
+
+		self.assertIn(MANAGER, first[COMPANY]["recipients"])
+		self.assertEqual(second[COMPANY]["recipients"], [])
+		subject = frappe.get_all(
+			"Notification Log",
+			filters={"for_user": MANAGER, "document_type": DOCTYPE},
+			pluck="subject",
+			order_by="creation desc",
+			limit=1,
+		)[0]
+		self.assertEqual(
+			frappe.db.count(
+				"Notification Log", {"for_user": MANAGER, "document_type": DOCTYPE, "subject": subject}
+			),
+			1,
+		)
+
+	def test_digest_is_rendered_in_the_recipient_language(self):
+		make_pdc_cheque(amount=1515, issue_date=day(-30), due_date=day(-2))
+		languages = []
+		real_render = scheduler.render_digest
+
+		def spy(*args, **kwargs):
+			languages.append(frappe.local.lang)
+			return real_render(*args, **kwargs)
+
+		lang = frappe.local.lang
+		with patch.object(scheduler, "render_digest", side_effect=spy):
+			result = scheduler.send_due_alerts(as_of=day(-2))
+
+		self.assertIn(ARABIC_USER, result[COMPANY]["recipients"])
+		self.assertIn("ar", languages)
+		self.assertEqual(frappe.local.lang, lang)
+
+	def test_no_email_without_an_outgoing_email_account(self):
+		make_pdc_cheque(amount=1616, issue_date=day(-30), due_date=day(-3))
+		for account in frappe.get_all("Email Account", filters={"enable_outgoing": 1}, pluck="name"):
+			frappe.db.set_value("Email Account", account, "enable_outgoing", 0)
+			self.addCleanup(frappe.db.set_value, "Email Account", account, "enable_outgoing", 1)
+		self.assertFalse(scheduler.outgoing_email_enabled())
+
+		with patch("frappe.sendmail") as sendmail:
+			result = scheduler.send_due_alerts(as_of=day(-3))
+
+		sendmail.assert_not_called()
+		self.assertIn(MANAGER, result[COMPANY]["recipients"])  # the system notification is still sent
+
+	def test_email_is_sent_when_outgoing_email_is_set_up(self):
+		make_pdc_cheque(amount=1717, issue_date=day(-30), due_date=day(-4))
+		with (
+			patch.object(scheduler, "outgoing_email_enabled", return_value=True),
+			patch("frappe.sendmail") as sendmail,
+		):
+			result = scheduler.send_due_alerts(as_of=day(-4))
+
+		emailed = [email for call in sendmail.call_args_list for email in call.kwargs["recipients"]]
+		self.assertEqual(sorted(emailed), sorted(result[COMPANY]["recipients"]))
+		self.assertIn(MANAGER, emailed)
+
+	def test_a_failing_email_does_not_fail_the_job(self):
+		make_pdc_cheque(amount=1818, issue_date=day(-30), due_date=day(-5))
+		with (
+			patch.object(scheduler, "outgoing_email_enabled", return_value=True),
+			patch("frappe.sendmail", side_effect=Exception("SMTP down")),
+		):
+			result = scheduler.send_due_alerts(as_of=day(-5))
+
+		self.assertIn(MANAGER, result[COMPANY]["recipients"])
 
 	def test_no_digest_without_due_cheques(self):
 		frappe.db.set_single_value("Treasury Settings", "default_alert_days", 0)
