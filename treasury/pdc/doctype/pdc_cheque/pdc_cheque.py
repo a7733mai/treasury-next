@@ -111,6 +111,8 @@ class PDCCheque(Document):
 		if self.direction == "Outgoing" and self.cheque_book and not self.cheque_no:
 			self.validate_cheque_book()
 			self.cheque_no = allocate_next_cheque_no(self.cheque_book)
+			# the book may have become Exhausted by this very allocation
+			self.flags.cheque_no_allocated = True
 		lifecycle.log_creation(self)
 
 	def after_insert(self):
@@ -205,7 +207,7 @@ class PDCCheque(Document):
 					frappe.bold(self.cheque_book), frappe.bold(self.bank_account)
 				)
 			)
-		if self.is_new() and book.status != "Active":
+		if self.is_new() and book.status != "Active" and not self.flags.cheque_no_allocated:
 			frappe.throw(
 				_("Cheque Book {0} is {1}.").format(frappe.bold(self.cheque_book), _(book.status))
 			)
