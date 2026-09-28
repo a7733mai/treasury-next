@@ -32,6 +32,7 @@ class PDCStatusLog(Document):
 			"Reversed",
 			"Re-presented",
 			"Replaced",
+			"Replacement Created",
 			"Cancelled",
 			"Returned",
 		]

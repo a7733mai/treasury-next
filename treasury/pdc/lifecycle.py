@@ -330,8 +330,8 @@ def replace(name: str, new_cheque_values: dict | str | None = None) -> dict:
 
 	new = _make_replacement(doc, values, date)
 	doc.replaced_by = new.name
-	doc.status_log[-1].voucher_type = DOCTYPE
-	doc.status_log[-1].voucher_no = new.name
+	# saved log rows are immutable (validate_protected_fields), so the new cheque gets its own row
+	_log(doc, "Replacement Created", voucher=(DOCTYPE, new.name), remarks=values.reason)
 	result = _save(doc)
 
 	if was_handed_over:

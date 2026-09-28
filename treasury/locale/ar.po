@@ -592,6 +592,9 @@ msgstr "تم عكس السند"
 msgid "Re-presented"
 msgstr "أعيد تقديمه"
 
+msgid "Replacement Created"
+msgstr "تم إنشاء البديل"
+
 # Child table fields
 msgid "Reference Type"
 msgstr "نوع المرجع"

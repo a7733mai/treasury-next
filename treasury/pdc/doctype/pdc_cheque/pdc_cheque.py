@@ -134,9 +134,14 @@ class PDCCheque(Document):
 		if not self.is_new():
 			self.set_onload("vouchers", posting.get_linked_vouchers(self.doctype, self.name))
 
-	def before_insert(self):
+	def insert(self, *args, **kwargs):
+		# Frappe validates links before `before_insert`, so a client-sent voucher link would fail link
+		# validation (or pass it, if real) before it could be discarded: reset first.
 		if not self.flags.treasury_lifecycle:
 			self.reset_protected_fields()
+		return super().insert(*args, **kwargs)
+
+	def before_insert(self):
 		self.naming_series = NAMING_SERIES.get(self.direction, NAMING_SERIES["Outgoing"])
 		self.effective_due_date = self.original_due_date
 		if self.direction == "Outgoing" and self.cheque_book and not self.cheque_no:
@@ -273,12 +278,16 @@ class PDCCheque(Document):
 		posting.get_account_mapping(self.company, self.bank_account)
 
 	def set_currency_and_rate(self):
-		"""The cheque currency is the currency of the bank GL account."""
+		"""The cheque currency is the currency of the bank GL account (company currency until a bank is set).
+
+		`currency` is read-only: whatever it holds without a bank account (e.g. the user/site default currency
+		Frappe fills into Link Currency fields on a new doc) is not a user choice and is overwritten.
+		"""
 		company_currency = erpnext.get_company_currency(self.company)
 		if self.bank_account:
 			bank_gl = frappe.db.get_value("Bank Account", self.bank_account, "account")
 			self.currency = get_account_currency(bank_gl)
-		elif not self.currency:
+		else:
 			self.currency = company_currency
 		if self.currency == company_currency:
 			self.exchange_rate = 1

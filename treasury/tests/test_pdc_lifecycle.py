@@ -851,6 +851,7 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 			],
 		)
 		cheque.clear(clearance_date=day(-18))
+		self.assert_status(cheque, "Cleared", "Bank Posted")  # reloads the cheque
 		assert_gl_entries(
 			self,
 			"Journal Entry",
