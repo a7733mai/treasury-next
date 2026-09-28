@@ -188,12 +188,18 @@ class TestPDCScheduledPosting(TreasuryTestMixin, IntegrationTestCase):
 		frappe.set_user(user)
 		try:
 			self.assertRaises(frappe.PermissionError, lifecycle.post_party, cheque.name)
+			# runs as Administrator whoever the session user is, and restores the session user
 			lifecycle.post_party(cheque.name, system=True)
+			self.assertEqual(frappe.session.user, user)
 			# business rules still apply to the system entry point
 			self.assertRaises(frappe.ValidationError, lifecycle.post_party, cheque.name, system=True)
+			self.assertEqual(frappe.session.user, user)
 		finally:
 			frappe.set_user("Administrator")
 		self.assertEqual(self.status(cheque), ("Delivered", "Party Posted"))
+		cheque.reload()
+		self.assertEqual(cheque.status_log[-1].event, "Party Posted")
+		self.assertEqual(cheque.status_log[-1].user, "Administrator")
 
 	def test_default_date_is_today(self):
 		if not importlib.util.find_spec("freezegun"):
