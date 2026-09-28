@@ -64,7 +64,7 @@ def get_account_mapping(company: str, bank_account: str) -> frappe._dict:
 
 
 def get_linked_vouchers(source_doctype: str, source_name: str) -> list[dict]:
-	"""All non-cancelled and cancelled vouchers created for a Treasury source, oldest first."""
+	"""All vouchers (any docstatus) created for a Treasury source, oldest first."""
 	vouchers = []
 	for doctype in VOUCHER_DOCTYPES:
 		rows = frappe.get_all(
@@ -302,28 +302,39 @@ def _allocate_references(
 	"""Trim requested allocations to the current outstanding and to the payment amount.
 
 	Amounts are in the party account currency. Whatever cannot be allocated stays unallocated (advance) and the user is warned.
+	A document listed more than once is merged into one row (ERPNext rejects duplicate references), and its
+	combined allocation never exceeds its outstanding.
 	"""
-	allocations = []
+	allocations: dict[tuple[str, str], dict] = {}
 	remaining = flt(party_amount, precision)
 	short_outstanding, over_payment = [], []
 
 	for ref in references or []:
 		doctype, name = ref.get("reference_doctype"), ref.get("reference_name")
+		key = (doctype, name)
 		requested = flt(ref.get("allocated_amount"), precision)
 		outstanding = _get_reference_outstanding(doctype, name, party_type, party, party_currency, precision)
+		if key in allocations:
+			outstanding = max(flt(outstanding - allocations[key]["allocated_amount"], precision), 0)
 
 		allowed = min(requested, outstanding)
-		if allowed < requested:
+		if allowed < requested and name not in short_outstanding:
 			short_outstanding.append(name)
 		if allowed > remaining:
-			over_payment.append(name)
+			if name not in over_payment:
+				over_payment.append(name)
 			allowed = remaining
 		if allowed <= 0:
 			continue
 
-		allocations.append(
-			{"reference_doctype": doctype, "reference_name": name, "allocated_amount": allowed}
-		)
+		if key in allocations:
+			allocations[key]["allocated_amount"] = flt(allocations[key]["allocated_amount"] + allowed, precision)
+		else:
+			allocations[key] = {
+				"reference_doctype": doctype,
+				"reference_name": name,
+				"allocated_amount": allowed,
+			}
 		remaining = flt(remaining - allowed, precision)
 
 	messages = []
@@ -341,7 +352,7 @@ def _allocate_references(
 		)
 	if messages:
 		frappe.msgprint("<br>".join(messages), title=_("Allocation Adjusted"), indicator="orange")
-	return allocations
+	return list(allocations.values())
 
 
 def _get_reference_outstanding(
@@ -576,6 +587,15 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 
 	rows = []
 	for e in entries:
+		if e.against_voucher_type == "Journal Entry":
+			# ERPNext's Journal Entry validation rejects a reference back to a Journal Entry on this row
+			# (journal_entry.py validate_against_jv), so the reversal could not settle it.
+			frappe.throw(
+				_(
+					"{0} {1} is allocated against Journal Entry {2} and cannot be reversed by a Journal Entry. Cancel it instead."
+				).format(_(voucher_type), voucher_no, frappe.bold(e.against_voucher)),
+				title=_("Reversal Not Possible"),
+			)
 		amount_in_account_currency = flt(e.debit_in_account_currency) or flt(e.credit_in_account_currency)
 		amount = flt(e.debit) or flt(e.credit)
 		row = {

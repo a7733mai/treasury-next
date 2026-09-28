@@ -101,6 +101,7 @@ def get_voucher_fields(insert_after: str) -> list[dict]:
 			"fieldname": "treasury_cycle",
 			"fieldtype": "Int",
 			"label": "Treasury Cycle",
+			"default": "1",
 			"read_only": 1,
 			"no_copy": 1,
 			"insert_after": "treasury_event",

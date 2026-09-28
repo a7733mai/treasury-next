@@ -273,6 +273,12 @@ msgstr "المستندات التالية تم تخفيض التخصيص علي�
 msgid "Allocation Adjusted"
 msgstr "تم تعديل التخصيص"
 
+msgid "{0} {1} is allocated against Journal Entry {2} and cannot be reversed by a Journal Entry. Cancel it instead."
+msgstr "{0} {1} مخصص مقابل قيد اليومية {2} ولا يمكن عكسه بقيد يومية. قم بإلغائه بدلاً من ذلك."
+
+msgid "Reversal Not Possible"
+msgstr "لا يمكن العكس"
+
 msgid "Reference type {0} is not supported."
 msgstr "نوع المستند المرجعي {0} غير مدعوم."
 

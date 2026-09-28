@@ -455,7 +455,9 @@ def get_party_balance(party_type: str, party: str, date=None, company: str = COM
 	)
 
 
-def assert_party_balance(testcase, party_type: str, party: str, date, expected: float, company: str = COMPANY):
+def assert_party_balance(
+	testcase, party_type: str, party: str, date, expected: float, company: str = COMPANY
+):
 	testcase.assertEqual(flt(expected, 2), flt(get_party_balance(party_type, party, date, company), 2), party)
 
 

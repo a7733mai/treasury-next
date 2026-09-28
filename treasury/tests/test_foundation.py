@@ -211,6 +211,23 @@ class TestFoundation(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(flt(pe.unallocated_amount), 0)
 		self.assertEqual(get_party_outstanding("Purchase Invoice", second.name), 200)
 
+	def test_same_reference_listed_twice_is_merged_and_capped(self):
+		pi = make_purchase_invoice(600)
+		pe_name = self.pay(
+			"dup_ref_pay",
+			amount=1000,
+			references=[
+				{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 400}
+				for _ in range(2)
+			],
+		)
+		pe = frappe.get_doc("Payment Entry", pe_name)
+		self.assertEqual(
+			[(r.reference_name, flt(r.allocated_amount)) for r in pe.references], [(pi.name, 600)]
+		)
+		self.assertEqual(flt(pe.unallocated_amount), 400)
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
+
 	def test_reference_to_journal_entry_uses_ledger_outstanding(self):
 		je_name = self.make_supplier_journal_entry(300)
 		self.assertEqual(get_ledger_open_amount("Journal Entry", je_name), 300)
@@ -425,6 +442,33 @@ class TestFoundation(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 400)
 		self.assertEqual(get_ledger_open_amount("Payment Entry", pe_name), 0)
 		self.assertEqual(get_ledger_open_amount("Journal Entry", reversal), 0)
+
+	def test_reversal_of_payment_entry_against_journal_entry_is_rejected(self):
+		je_name = self.make_supplier_journal_entry(300)
+		pe_name = self.pay(
+			"rev_je_ref_original",
+			amount=300,
+			references=[
+				{"reference_doctype": "Journal Entry", "reference_name": je_name, "allocated_amount": 300}
+			],
+		)
+		self.assertRaises(
+			frappe.ValidationError,
+			posting.make_reversal,
+			"Payment Entry",
+			pe_name,
+			today(),
+			"rev_je_ref_reversal",
+		)
+		self.assertEqual(frappe.db.count("Journal Entry", {"treasury_event": "rev_je_ref_reversal"}), 0)
+
+		# cancelling is the supported way out and reopens the Journal Entry
+		posting.cancel_voucher("Payment Entry", pe_name)
+		self.assertEqual(get_ledger_open_amount("Journal Entry", je_name), 300)
+
+	def test_new_vouchers_default_to_cycle_one(self):
+		je = frappe.new_doc("Journal Entry")
+		self.assertEqual(je.treasury_cycle, 1)
 
 	def test_linked_vouchers(self):
 		pe_name = self.pay("linked_pay")
