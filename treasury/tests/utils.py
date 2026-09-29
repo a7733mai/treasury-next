@@ -678,6 +678,7 @@ def ensure_instrument_accounts() -> frappe._dict:
 		lc_margin_usd=ensure_account("Treasury LC Margins USD", "Current Assets", currency="USD"),
 		lg_liability=ensure_account("Treasury LG Claims Funded EGP", "Current Liabilities"),
 		discounted=ensure_account("Treasury Discounted Cheques EGP", "Current Liabilities"),
+		discounted_usd=ensure_account("Treasury Discounted Cheques USD", "Current Liabilities", currency="USD"),
 		claims_expense=ensure_account("Treasury LG Claims Expense", "Indirect Expenses"),
 		discount_expense=ensure_account("Treasury Discount Expense", "Indirect Expenses"),
 		lc_charges=ensure_account("Treasury LC Charges", "Indirect Expenses"),

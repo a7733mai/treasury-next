@@ -4338,3 +4338,37 @@ msgstr "اختر شيكاً واحداً على الأقل."
 
 msgid "Paid at Maturity (Discounted)"
 msgstr "سُدِّد في الاستحقاق (مخصوم)"
+
+# Phase 5b review fixes
+msgid "Clearance Date can only be set on a submitted Payment Entry."
+msgstr "لا يمكن تحديد تاريخ الصرف إلا على سند دفع معتمد."
+
+msgid "The Claim Account cannot be a Bank or Cash account."
+msgstr "لا يمكن أن يكون حساب التسييل حساب بنك أو نقدية."
+
+msgid "The Claim Account cannot be the margin account or the liability account of the guarantee."
+msgstr "لا يمكن أن يكون حساب التسييل هو حساب التأمين النقدي أو حساب الالتزام الخاص بخطاب الضمان."
+
+msgid "The status of the cheques of a Cheque Discounting changes only when they are settled or bounced."
+msgstr "لا تتغير حالة شيكات مستند خصم الشيكات إلا عند سدادها أو ارتدادها."
+
+msgid "Cheque {0} is due on {1}: a discounted cheque cannot be settled before its due date."
+msgstr "الشيك {0} مستحق في {1}: لا يمكن سداد شيك مخصوم قبل تاريخ استحقاقه."
+
+msgid "The tolerance increase"
+msgstr "الزيادة ضمن نسبة التجاوز"
+
+msgid "Unused amount {0} released from the facility"
+msgstr "تم تحرير المبلغ غير المستخدم {0} من التسهيل"
+
+msgid "Set Commission Manually"
+msgstr "إدخال العمولة يدوياً"
+
+msgid "Unchecked: the commission is recomputed on every save as the sub-limit's Commission Rate x the total."
+msgstr "عند عدم التحديد: يُعاد حساب العمولة عند كل حفظ = نسبة عمولة الحد الفرعي × الإجمالي."
+
+msgid "Unused Amount"
+msgstr "المبلغ غير المستخدم"
+
+msgid "The part of the credit amount not drawn at the settlement (credit amount less the settled amount): it no longer counts against the facility."
+msgstr "الجزء غير المسحوب من مبلغ الاعتماد عند السداد (مبلغ الاعتماد ناقص المبلغ المسدد): لم يعد محسوباً على التسهيل."

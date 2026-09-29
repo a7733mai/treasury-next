@@ -253,11 +253,23 @@ class TestLetterOfGuarantee(LGTestCase):
 		self.assertRaises(frappe.ValidationError, lg.repay_claim)  # nothing owed
 
 	def test_claim_above_the_open_amount_and_the_liability_account(self):
-		facility, _bank = self.facility()
+		facility, bank = self.facility()
 		lg = make_letter_of_guarantee(facility)
 		self.assertRaises(
 			frappe.ValidationError, lg.claim, amount=100_001, counter_account=self.inst.claims_expense
 		)
+		# the claim is not debited to a bank / cash account nor to the guarantee's own margin / liability
+		for account in (bank.bank_gl, self.inst.lg_margin, self.inst.lg_liability):
+			with self.subTest(account=account):
+				self.assertRaises(
+					frappe.ValidationError,
+					lg.claim,
+					amount=5_000,
+					counter_account=account,
+					claim_date="2025-04-01",
+				)
+		lg.reload()
+		self.assertEqual(lg.status, "Issued")
 		# no liability account on the sub-limit: a claim beyond the margin cannot be booked
 		other, _bank = self.facility()
 		frappe.db.set_value(

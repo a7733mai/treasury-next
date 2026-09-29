@@ -413,6 +413,13 @@ def settle_discounted(name: str, settlement_date=None, remarks: str | None = Non
 	_require_status(doc, ("Discounted",), "Cleared")
 	date = _date(settlement_date)
 	_validate_clearance_date(doc, date, _latest_date(doc, "handover_date", "discount_date"))
+	if date < getdate(doc.effective_due_date):
+		# the bank collects the cheque from the drawer at maturity, not before
+		frappe.throw(
+			_("Cheque {0} is due on {1}: a discounted cheque cannot be settled before its due date.").format(
+				frappe.bold(doc.name), formatdate(doc.effective_due_date)
+			)
+		)
 	from treasury.bank_facilities import discounting
 
 	journal = discounting.post_settlement(doc, date)

@@ -8,15 +8,19 @@ Actions (whitelisted methods of the controller; Treasury Manager, write permissi
   Cr Bank). An increase is checked against the available limit; the cash margin follows the new amount (top-up
   Dr Margin / Cr Bank, or release Dr Bank / Cr Margin).
 - Receive Documents: the documents amount (up to the amount plus the tolerance) becomes the open amount;
-  documents charges Dr Charges / Cr Bank.
+  documents charges Dr Charges / Cr Bank. Documents above the open amount (within the tolerance) are checked
+  against the available limit, like an amendment increase.
 - Accept (Usance): the maturity date (default: acceptance + usance days) — the expected outflow of the Bank
   Position Forecast (`get_flows`: documents amount less the margin held, on the LC's bank account).
 - Settle (Sight: after the documents; Usance: after the acceptance): the whole margin held returns to the
   bank (Dr Bank / Cr Margin, at the settlement rate) and a Payment Entry pays the supplier from the bank
   (optionally allocated to a Purchase Invoice). ERPNext's Payment Entry allocates the invoice and books the
   exchange gain / loss of a foreign currency invoice; a Journal Entry would not (a Journal Entry row that
-  references an invoice is forced to the invoice's rate). Financing the settlement by the bank (an import
-  loan) is out of scope: settle, then record a Facility Drawdown for the loan.
+  references an invoice is forced to the invoice's rate). Both vouchers are cleared on the settlement date
+  (the bank statement shows one net debit, amount less margin: see the README). The credit closes: the
+  amount not drawn (credit amount less settled amount) is recorded as the Unused Amount and no longer counts
+  against the facility; the margin held was already returned in full. Financing the settlement by the bank
+  (an import loan) is out of scope: settle, then record a Facility Drawdown for the loan.
 - Release Margin (Expired): the margin of an expired, unused credit returns to the bank.
 - Expiry (daily job): Opened / Amended credits past their effective expiry date become Expired (no
   accounting). Credits with documents received never expire: they are settled.
@@ -210,6 +214,12 @@ def receive_documents(
 	charges = flt(charges, precision)
 	if charges < 0:
 		frappe.throw(_("The charges cannot be negative."))
+	increase = flt(amount - flt(doc.open_amount), precision)
+	if increase > 0:
+		# documents within the tolerance above the credit amount: the bank's commitment grows
+		facility = instruments.lock_facility(doc.facility)
+		instruments.validate_facility_open(facility, date, _(DOCTYPE))
+		instruments.check_available(facility, LIMIT_TYPE, increase, doc.currency, _("The tolerance increase"))
 	journal = None
 	if charges:
 		journal = instruments.post_bank_expense(
@@ -297,15 +307,22 @@ def settle(
 		exchange_rate=rate,
 		references=references,
 		remarks=_("Settlement of {0} {1}").format(_(DOCTYPE), doc.name),
+		clearance_date=date,
 	)
+	# the credit closes with the settlement: what was not drawn is no longer committed by the bank
+	unused = max(flt(flt(doc.current_amount) - amount, precision), 0)
 	doc.settlement_date = date
 	doc.settled_amount = amount
+	doc.unused_amount = unused
 	doc.payment_entry = payment_entry
 	doc.margin_held = 0
 	doc.open_amount = 0
 	if margin_journal:
 		instruments.log(doc, "Margin Released", None, date, ("Journal Entry", margin_journal))
-	instruments.log(doc, "Settled", SETTLED, date, ("Payment Entry", payment_entry), remarks)
+	note = _("Unused amount {0} released from the facility").format(unused) if unused else None
+	if remarks:
+		note = f"{note}: {remarks}" if note else remarks
+	instruments.log(doc, "Settled", SETTLED, date, ("Payment Entry", payment_entry), note)
 	return instruments.save(doc)
 
 

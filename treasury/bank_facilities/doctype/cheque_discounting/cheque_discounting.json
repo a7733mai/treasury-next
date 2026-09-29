@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 0,
  "autoname": "naming_series:",
- "creation": "2026-10-20 09:00:00.000000",
+ "creation": "2026-09-29 09:00:00.000000",
  "description": "A batch of received customer cheques discounted at the bank under a Bank Facility: the bank credits the net proceeds now and collects the cheques at maturity (with recourse on the company if one bounces).",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -20,6 +20,7 @@
   "terms_section",
   "discount_rate",
   "day_count",
+  "set_commission_manually",
   "commission",
   "column_break_terms",
   "liability_account",
@@ -147,12 +148,20 @@
    "options": "\nActual/365\nActual/360"
   },
   {
+   "default": "0",
+   "description": "Unchecked: the commission is recomputed on every save as the sub-limit's Commission Rate x the total.",
+   "fieldname": "set_commission_manually",
+   "fieldtype": "Check",
+   "label": "Set Commission Manually"
+  },
+  {
    "description": "Bank commission of the batch (default: the sub-limit's Commission Rate x the total).",
    "fieldname": "commission",
    "fieldtype": "Currency",
    "label": "Commission",
    "non_negative": 1,
-   "options": "currency"
+   "options": "currency",
+   "read_only_depends_on": "eval:!doc.set_commission_manually"
   },
   {
    "fieldname": "column_break_terms",
@@ -298,7 +307,7 @@
    "link_fieldname": "cheque_discounting"
   }
  ],
- "modified": "2026-10-20 09:00:00.000000",
+ "modified": "2026-09-29 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Cheque Discounting",
@@ -306,8 +315,6 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "amend": 1,
-   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -317,7 +324,6 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
-   "submit": 1,
    "write": 1
   },
   {

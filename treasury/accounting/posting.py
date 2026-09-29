@@ -203,16 +203,24 @@ def create_payment_entry(
 	remarks: str | None = None,
 	cycle: int = 1,
 	submit: bool = True,
+	clearance_date=None,
 ) -> str:
 	"""Create (or return the existing) Payment Entry whose bank side is `bank_account_head`.
 
 	`amount` is expressed in the currency of `bank_account_head` (the cheque currency) and
-	`exchange_rate` converts that currency to the company currency.
+	`exchange_rate` converts that currency to the company currency. `clearance_date` (the bank already
+	moved the money) requires `submit=True`.
 	"""
+	if clearance_date and not submit:
+		frappe.throw(_("Clearance Date can only be set on a submitted Payment Entry."))
+
 	cycle = _validate_cycle(cycle)
 	_lock_source(source_doctype, source_name)
 	if existing := find_voucher("Payment Entry", source_doctype, source_name, event, cycle):
-		return _return_existing("Payment Entry", existing, submit)
+		_return_existing("Payment Entry", existing, submit)
+		if clearance_date and not frappe.db.get_value("Payment Entry", existing, "clearance_date"):
+			_set_clearance_date(existing, clearance_date, "Payment Entry")
+		return existing
 
 	if payment_type not in ("Pay", "Receive"):
 		frappe.throw(_("Payment Type must be Pay or Receive."))
@@ -278,6 +286,8 @@ def create_payment_entry(
 	pe.insert()
 	if submit:
 		pe.submit()
+		if clearance_date:
+			_set_clearance_date(pe.name, clearance_date, "Payment Entry")
 	_stamp_user("Payment Entry", pe.name, owner=True)
 	return pe.name
 
@@ -581,10 +591,10 @@ def _exchange_difference_row(company: str, accounts: list[dict]) -> dict | None:
 	return row
 
 
-def _set_clearance_date(name: str, clearance_date):
+def _set_clearance_date(name: str, clearance_date, doctype: str = "Journal Entry"):
 	# JournalEntry.validate() clears clearance_date, so it can only be set after submit
-	# (the same way the Bank Reconciliation Tool does).
-	frappe.db.set_value("Journal Entry", name, "clearance_date", getdate(clearance_date))
+	# (the same way the Bank Reconciliation Tool does); a Payment Entry is cleared the same way.
+	frappe.db.set_value(doctype, name, "clearance_date", getdate(clearance_date))
 
 
 # ---------------------------------------------------------------------------

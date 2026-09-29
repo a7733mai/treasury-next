@@ -7,15 +7,22 @@ cheque then goes through the PDC lifecycle action `discount`: operational status
 unchanged — the cheque stays in PDC Receivable until the drawer pays.
 
 Discount charges: per cheque, amount x rate / 100 x days from the discount date to the cheque's effective due
-date / 365 (Actual/365) or 360 (Actual/360), rounded per cheque; the batch charges are their sum.
+date / 365 (Actual/365) or 360 (Actual/360), rounded per cheque; the batch charges are their sum. The
+commission is the sub-limit's Commission Rate x the total, recomputed on every save unless "Set Commission
+Manually" is checked.
 
 Per cheque afterwards (PDC lifecycle, vouchers sourced to the cheque):
-- `settle_discounted` (the drawer paid the bank at maturity; from the batch's "Settle Cheques" or the cheque):
-  Dr Discounted Liability / Cr PDC Receivable; the cheque is Cleared / Bank Posted (`bank_journal`).
+- `settle_discounted` (the drawer paid the bank at maturity; from the batch's "Settle Cheques" or the cheque;
+  not before the cheque's effective due date): Dr Discounted Liability / Cr PDC Receivable; the cheque is
+  Cleared / Bank Posted (`bank_journal`).
 - `bounce` (recourse): Dr Discounted Liability / Cr Bank (the bank debits the company), then the party
   posting is undone as for any bounce (Treasury Company Settings `on_bounce`).
-The batch item records the outcome (Settled / Bounced, date, Journal Entry) and the batch status follows:
-Discounted → Partially Settled → Settled (every cheque paid or bounced).
+The batch item records the outcome (Settled / Bounced, date, Journal Entry; written only by `close_item`,
+never editable on the submitted batch) and the batch status follows: Discounted → Partially Settled →
+Settled (every cheque paid or bounced).
+
+Permissions: only a Treasury Manager submits / cancels a batch (its submit and cancel run the Treasury
+Manager actions `discount` / `undiscount` on the cheques); System Manager may prepare drafts only.
 
 Cancel: only while no cheque is settled or bounced; the cheques go back to Received (`undiscount`) and the
 batch Journal Entry is cancelled.
@@ -43,6 +50,8 @@ DISCOUNTED = "Discounted"
 PARTIALLY_SETTLED = "Partially Settled"
 SETTLED = "Settled"
 CANCELLED = "Cancelled"
+# Batches with cheques still discounted (not paid or bounced yet): they count against the facility.
+OPEN_STATUSES = (DISCOUNTED, PARTIALLY_SETTLED)
 
 ITEM_DISCOUNTED = "Discounted"
 ITEM_SETTLED = "Settled"

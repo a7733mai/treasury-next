@@ -51,6 +51,7 @@ class ChequeDiscounting(Document):
 		net_proceeds: DF.Currency
 		outstanding_amount: DF.Currency
 		remarks: DF.SmallText | None
+		set_commission_manually: DF.Check
 		status: DF.Literal["Draft", "Discounted", "Partially Settled", "Settled", "Cancelled"]
 		status_log: DF.Table[BankInstrumentStatusLog]
 		total_amount: DF.Currency
@@ -95,8 +96,16 @@ class ChequeDiscounting(Document):
 	def before_update_after_submit(self):
 		instruments.validate_protected_fields(self, ("status", *LIFECYCLE_FIELDS))
 		before = self.get_doc_before_save()
-		if before and _items_key(before) != _items_key(self):
+		if not before:
+			return
+		if _items_key(before) != _items_key(self):
 			frappe.throw(_("The cheques of a submitted Cheque Discounting cannot be changed."), title=_("Not Allowed"))
+		if _items_outcome(before) != _items_outcome(self):
+			# written only by discounting.close_item, directly in the database
+			frappe.throw(
+				_("The status of the cheques of a Cheque Discounting changes only when they are settled or bounced."),
+				title=_("Not Allowed"),
+			)
 
 	def before_cancel(self):
 		discounting.validate_cancel(self)
@@ -167,7 +176,8 @@ class ChequeDiscounting(Document):
 			)
 		self.total_amount = flt(sum(flt(row.amount) for row in self.items), precision)
 		self.discount_charges = flt(sum(flt(row.discount_charges) for row in self.items), precision)
-		if self.get("commission") in (None, ""):
+		if not self.set_commission_manually:
+			# follows the total when cheques are added or removed later
 			self.commission = flt(self.total_amount * flt(limit.commission_rate) / 100, precision)
 		self.commission = flt(self.commission, precision)
 		if self.commission < 0:
@@ -197,6 +207,12 @@ class ChequeDiscounting(Document):
 
 def _items_key(doc) -> list[tuple]:
 	return [(row.pdc_cheque, flt(row.amount, 9), flt(row.discount_charges, 9)) for row in doc.items]
+
+
+def _items_outcome(doc) -> list[tuple]:
+	return [
+		(row.pdc_cheque, row.status, *(str(row.get(f) or "") for f in ITEM_LIFECYCLE_FIELDS)) for row in doc.items
+	]
 
 
 def on_doctype_update():

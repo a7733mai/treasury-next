@@ -327,7 +327,8 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   (lower open amount; the margin held is released pro rata Dr Bank / Cr Margin), *Release* (the whole
   remaining margin back: Dr Bank / Cr Margin; status Released), *Claim (Liquidation)* (amount ≤ open amount,
   debited to an account the user chooses — an expense / claim account, or the beneficiary's party account
-  with the party; one Journal Entry: Dr that account; Cr Margin for the whole margin held — used first —;
+  with the party; never a Bank / Cash account nor the guarantee's own margin or liability account; one
+  Journal Entry: Dr that account; Cr Margin for the whole margin held — used first —;
   Cr the **Liability Account of the LG sub-limit** for what the bank paid beyond the margin; Dr Bank for any
   margin left over. Status Claimed.), *Repay Claim* (Dr Liability / Cr Bank). The bank-funded part of a claim
   counts in the LG utilisation (GL balance of that liability account on the LG's vouchers) until repaid; the
@@ -354,6 +355,15 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   forces a Journal Entry row that references an invoice to the invoice's exchange rate. Result: supplier
   cleared at the invoice rate, bank at the settlement rate, margin at its historical rate, the differences
   on Exchange Gain / Loss. Economically this equals "margin first, bank for the rest".
+- **Bank reconciliation of a settlement**: both vouchers are marked cleared on the settlement date (the
+  margin release Journal Entry and the Payment Entry). The bank statement usually shows **one net debit**
+  (amount − margin), while the ledger shows the release credit and the full payment debit: match the
+  statement line against both vouchers together (or leave them as cleared by Treasury); they net exactly to
+  the statement amount at the settlement rate.
+- The credit closes with its settlement. A settlement below the credit amount records the difference as
+  **Unused Amount** (also noted on the status log): it no longer counts against the facility and involves no
+  accounting (the margin held was already returned in full). Documents above the open amount (within the
+  tolerance) are checked against the available limit like an amendment increase.
 - **Import loans are manual**: settlement is always paid from the bank account. When the bank finances the
   settlement, record a *Facility Drawdown* for the loan (the LC does not create it).
 - Forecast: an accepted Usance credit is an expected outflow on its maturity date (documents amount less the
@@ -368,8 +378,14 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   Posted** (in PDC Receivable — not deposited, not under collection), due after the discount date, in the
   facility currency. Discount rate (default: the sub-limit rate), day count (default: the sub-limit's).
   **Charges per cheque = amount × rate / 100 × days to its effective due date / 365 (Actual/365) or 360
-  (Actual/360)**, rounded per cheque; commission (default: the sub-limit commission rate × total); net
+  (Actual/360)**, rounded per cheque; commission = the sub-limit commission rate × total, recomputed on every
+  save (so it follows added / removed cheques) unless *Set Commission Manually* is checked; net
   proceeds = total − charges − commission; expense account default: the facility's Interest Expense Account.
+- **Permissions**: a Treasury User or System Manager may prepare a draft batch; only a **Treasury Manager**
+  submits or cancels it (submit / cancel run the Treasury Manager cheque actions `discount` / `undiscount`),
+  and settles its cheques. System Manager therefore has no submit / cancel right on Cheque Discounting. (On
+  LG / LC, System Manager keeps submit / cancel — the issue and its cancellation touch no other document —
+  but every action after submit requires the Treasury Manager role.)
 - **Submit**: limit check (facility lock), then one Journal Entry **Dr Bank (net) + Dr Discount Expense
   (charges + commission) / Cr Discounted Liability (total)**, and each cheque → PDC action `discount`:
   operational status **Discounted**, accounting status unchanged (still Party Posted, in PDC Receivable);
@@ -380,7 +396,9 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   PDC Receivable**; the cheque becomes **Cleared / Bank Posted** and its *Bank Journal* is this entry (the
   voucher that took it out of PDC Receivable; the bank itself credited the company at the discount, so there
   is no bank row and nothing to reconcile). Settling is always a user action (no daily job): whether the
-  drawer paid is only known from the bank.
+  drawer paid is only known from the bank. It cannot be dated before the cheque's effective due date.
+- The outcome columns of a batch row (status, closed date, closing Journal Entry) are written only by these
+  cheque actions; they cannot be edited on the submitted batch.
 - **Bounce of a discounted cheque** (recourse): Journal Entry **Dr Discounted Liability / Cr Bank** (the bank
   debits the company; cleared on the bounce date), then the party posting is undone exactly like any bounce
   according to *On Bounce* (reversal Journal Entry, or cancel of the Payment Entry): the customer owes the

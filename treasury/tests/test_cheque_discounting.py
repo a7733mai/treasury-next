@@ -1,6 +1,8 @@
 """Cheque Discounting (Phase 5b, PLAN.md §8 and §4 "Discounted"): discount GL with day-count charges, cheques
 Discounted and out of the forecast inflows, settlement at maturity, bounce with recourse under both
-`on_bounce` settings, cancel, utilisation, limits, validations and the Discounted Cheques report.
+`on_bounce` settings, cancel, utilisation, limits, validations and the Discounted Cheques report; settlement
+not before the due date, the commission default, the Projected Party Statement, protected batch rows, a USD
+batch and the permissions (Treasury User / System Manager).
 
 Fixed dates in 2025. Every test creates its own facility on its own bank account (`make_own_bank`) and its own
 incoming cheques on the standard EGP bank (PDC Receivable EGP), received on 1 Mar 2025 (party posted on
@@ -26,6 +28,9 @@ from treasury.bank_facilities.report.facility_utilisation.facility_utilisation i
 from treasury.bank_facilities.utilisation import get_utilisation
 from treasury.pdc import lifecycle
 from treasury.pdc.report.bank_position_forecast.bank_position_forecast import BankPositionForecast
+from treasury.pdc.report.projected_party_statement.projected_party_statement import (
+	execute as projected_party_statement,
+)
 from treasury.tests.utils import (
 	COMPANY,
 	CUSTOMER,
@@ -35,6 +40,7 @@ from treasury.tests.utils import (
 	bank_account_name,
 	ensure_facility_accounts,
 	ensure_instrument_accounts,
+	ensure_user,
 	get_account_balance,
 	get_voucher_count,
 	make_bank_facility,
@@ -46,6 +52,8 @@ from treasury.tests.utils import (
 D = getdate
 LIMIT = "Cheque Discounting"
 CHEQUE = "PDC Cheque"
+USER = "treasury-chd-user@example.com"
+SYSTEM_MANAGER = "treasury-chd-sysmanager@example.com"
 
 
 class DiscountingTestCase(TreasuryTestMixin, IntegrationTestCase):
@@ -141,7 +149,12 @@ class TestChequeDiscounting(DiscountingTestCase):
 	def test_explicit_terms_actual_360(self):
 		s = self.scenario()
 		batch = make_cheque_discounting(
-			s.facility, [s.a, s.b], discount_rate=10, day_count="Actual/360", commission=0
+			s.facility,
+			[s.a, s.b],
+			discount_rate=10,
+			day_count="Actual/360",
+			set_commission_manually=1,
+			commission=0,
 		)
 		batch.reload()
 		# A: 50,000 x 10% x 91 / 360 ; B: 30,000 x 10% x 61 / 360
@@ -364,3 +377,167 @@ class TestChequeDiscounting(DiscountingTestCase):
 		_columns, data, _m, _c, _s = utilisation_report({"company": COMPANY, "facility": s.facility.name})
 		row = next(r for r in data if r.get("limit_type") == LIMIT)
 		self.assertEqual((row.utilised, row.available), (50_000, 150_000))
+
+	def test_settle_not_before_the_due_date(self):
+		s = self.scenario()
+		batch = make_cheque_discounting(s.facility, [s.a, s.b])
+		# B is due on 31 May, A on 30 Jun: the bank collects them at maturity
+		self.assertRaises(frappe.ValidationError, s.b.settle_discounted, settlement_date="2025-05-30")
+		self.assertRaises(
+			frappe.ValidationError, batch.settle_cheques, cheques=[s.a.name], settlement_date="2025-05-31"
+		)
+		self.assert_cheque(s.a, "Discounted", "Party Posted")
+		self.assert_cheque(s.b, "Discounted", "Party Posted")
+		s.b.settle_discounted(settlement_date="2025-05-31")
+		self.assert_cheque(s.b, "Cleared", "Bank Posted")
+
+	def test_commission_follows_the_total_unless_set_manually(self):
+		s = self.scenario()
+		draft = make_cheque_discounting(s.facility, [s.a], submit=False)
+		self.assertEqual(draft.commission, 250)  # 0.5% of 50,000
+		draft.append("items", {"pdc_cheque": s.b.name})
+		draft.save()
+		self.assertEqual((draft.total_amount, draft.commission), (80_000, 400))
+		draft.remove(draft.items[0])
+		draft.save()
+		self.assertEqual((draft.total_amount, draft.commission), (30_000, 150))
+
+		manual = make_cheque_discounting(
+			s.facility, [s.a], submit=False, set_commission_manually=1, commission=100
+		)
+		manual.append("items", {"pdc_cheque": s.b.name})
+		manual.save()
+		self.assertEqual((manual.total_amount, manual.commission), (80_000, 100))
+
+	def test_projected_party_statement_keeps_discounted_cheques_uncleared(self):
+		def posted_not_cleared():
+			filters = {
+				"company": COMPANY,
+				"party_type": "Customer",
+				"party": CUSTOMER,
+				"from_date": "2025-01-01",
+				"to_date": "2025-12-31",
+			}
+			with patch("treasury.pdc.report_utils.today", return_value="2025-04-15"):
+				_columns, _data, _m, _c, summary = projected_party_statement(filters)
+			return next(c["value"] for c in summary if c["label"] == "Cheques Posted, Not Cleared")
+
+		s = self.scenario()
+		before = posted_not_cleared()
+		batch = make_cheque_discounting(s.facility, [s.a, s.b])
+		# still in PDC Receivable until the drawers pay the bank: still posted, not cleared
+		self.assertEqual(posted_not_cleared(), before)
+		batch.settle_cheques(settlement_date="2025-05-31")  # B paid
+		self.assertEqual(flt(posted_not_cleared() - before, 2), 30_000)  # incoming: counted negative
+
+	def test_rows_change_only_through_the_cheque_actions(self):
+		s = self.scenario()
+		batch = make_cheque_discounting(s.facility, [s.a, s.b])
+		for fieldname, value in (
+			("status", "Settled"),
+			("closed_date", D("2025-04-01")),
+			("closing_journal", batch.journal_entry),
+		):
+			with self.subTest(fieldname=fieldname):
+				doc = frappe.get_doc("Cheque Discounting", batch.name)
+				doc.items[0].set(fieldname, value)
+				self.assertRaises(frappe.ValidationError, doc.save)
+		self.assertEqual(
+			frappe.get_all(
+				"Cheque Discounting Item", filters={"parent": batch.name}, pluck="status", distinct=True
+			),
+			["Discounted"],
+		)
+		self.assertEqual(self.used(s.facility), 80_000)
+		# the actions write them; an unchanged save of the batch afterwards is accepted
+		batch.settle_cheques(settlement_date="2025-05-31")
+		batch.reload()
+		batch.save()
+		self.assertEqual(self.used(s.facility), 50_000)
+		# a settled row cannot be reopened by hand (which would also allow cancelling the batch)
+		batch.reload()
+		row = next(r for r in batch.items if r.pdc_cheque == s.b.name)
+		row.status, row.closed_date, row.closing_journal = "Discounted", None, None
+		self.assertRaises(frappe.ValidationError, batch.save)
+
+	def test_usd_batch_and_settlement(self):
+		bank = make_own_bank("USD")
+		facility = make_bank_facility(
+			currency="USD",
+			total_limit=100_000,
+			limits=[
+				{
+					"limit_type": LIMIT,
+					"limit_amount": 50_000,
+					"interest_rate": 12,
+					"commission_rate": 0.5,
+					"liability_account": self.inst.discounted_usd,
+				}
+			],
+			bank_account=bank.bank_account,
+		)
+		cheque = self.cheque(1_000, "2025-06-30", currency="USD", exchange_rate=50)  # carried at 50
+		gain_loss = frappe.get_cached_value("Company", COMPANY, "exchange_gain_loss_account")
+		batch = make_cheque_discounting(facility, [cheque], exchange_rate=52)
+		batch.reload()
+		# 1,000 x 12% x 91 / 365 = 29.92 ; commission 5 ; net 965.08 (USD), booked at 52
+		self.assertEqual(
+			(batch.currency, batch.discount_charges, batch.commission, batch.net_proceeds),
+			("USD", 29.92, 5, 965.08),
+		)
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			batch.journal_entry,
+			[
+				(bank.bank_gl, 50_184.16, 0),
+				(self.inst.discount_expense, 1_815.84, 0),
+				(self.inst.discounted_usd, 0, 52_000),
+			],
+		)
+		self.assertEqual(self.used(facility), 1_000)
+
+		cheque.settle_discounted(settlement_date="2025-06-30")
+		cheque.reload()
+		# the liability at the batch rate 52 against the receivable carried at 50: a gain of 2,000
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			cheque.bank_journal,
+			[
+				(self.inst.discounted_usd, 52_000, 0),
+				(self.data.usd.pdc_receivable, 0, 50_000),
+				(gain_loss, 0, 2_000),
+			],
+		)
+		self.assertEqual(get_account_balance(self.inst.discounted_usd, "2025-12-31"), 0)
+		self.assertEqual(self.used(facility), 0)
+
+
+class TestDiscountingPermissions(DiscountingTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		ensure_user(USER, ["Treasury User"])
+		ensure_user(SYSTEM_MANAGER, ["System Manager"])
+
+	def test_only_a_treasury_manager_discounts_and_settles(self):
+		s = self.scenario()
+		for user in (USER, SYSTEM_MANAGER):
+			with self.subTest(user=user), self.set_user(user):
+				draft = make_cheque_discounting(s.facility, [s.a], submit=False)  # prepared as a draft
+				self.assertRaises(frappe.PermissionError, draft.submit)
+		self.assert_cheque(s.a, "Received", "Party Posted")
+
+		batch = make_cheque_discounting(s.facility, [s.b])
+		count = get_voucher_count(CHEQUE, s.b.name)
+		with self.set_user(USER):
+			doc = frappe.get_doc("Cheque Discounting", batch.name)
+			self.assertRaises(frappe.PermissionError, doc.settle_cheques, settlement_date="2025-05-31")
+			cheque = frappe.get_doc(CHEQUE, s.b.name)
+			self.assertRaises(frappe.PermissionError, cheque.settle_discounted, settlement_date="2025-05-31")
+		with self.set_user(SYSTEM_MANAGER):
+			self.assertRaises(frappe.PermissionError, frappe.get_doc("Cheque Discounting", batch.name).cancel)
+		self.assert_cheque(s.b, "Discounted", "Party Posted")
+		self.assertEqual(get_voucher_count(CHEQUE, s.b.name), count)
+		self.assertEqual(frappe.db.get_value("Cheque Discounting", batch.name, "docstatus"), 1)

@@ -15,6 +15,7 @@ from frappe import _
 from frappe.utils import add_days, flt, getdate
 
 import erpnext
+from treasury.bank_facilities import discounting, lc, lg
 from treasury.bank_facilities.facility import OPEN_STATUSES
 from treasury.bank_facilities.report_utils import (
 	FACILITY,
@@ -72,19 +73,9 @@ def _facility_total(company: str, scope: str) -> dict:
 
 INSTRUMENT_SCOPES = {
 	# scope: (doctype, open statuses, amount field, report)
-	"open_lgs": ("Letter of Guarantee", ("Issued", "Extended", "Reduced"), "open_amount", "LG Register"),
-	"open_lcs": (
-		"Letter of Credit",
-		("Opened", "Amended", "Documents Received", "Accepted"),
-		"open_amount",
-		"LC Register",
-	),
-	"discounted": (
-		"Cheque Discounting",
-		("Discounted", "Partially Settled"),
-		"outstanding_amount",
-		"Discounted Cheques",
-	),
+	"open_lgs": (lg.DOCTYPE, lg.OPEN_STATUSES, "open_amount", "LG Register"),
+	"open_lcs": (lc.DOCTYPE, lc.OPEN_STATUSES, "open_amount", "LC Register"),
+	"discounted": (discounting.DOCTYPE, discounting.OPEN_STATUSES, "outstanding_amount", "Discounted Cheques"),
 }
 
 

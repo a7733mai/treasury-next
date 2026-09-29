@@ -158,6 +158,11 @@ class TestLetterOfCredit(LCTestCase):
 			(credit.status, credit.open_amount, credit.margin_held, credit.settled_amount),
 			("Settled", 0, 0, 118_000),
 		)
+		# 2,000 of the amended 120,000 was not drawn: recorded, and no longer counted against the facility
+		self.assertEqual(credit.unused_amount, 2_000)
+		self.assertIn("2000", credit.status_log[-1].remarks)
+		# the bank moved the money on the settlement date: cleared like the margin release
+		self.assertEqual(frappe.db.get_value("Payment Entry", credit.payment_entry, "clearance_date"), date)
 		assert_gl_entries(
 			self,
 			"Journal Entry",
@@ -213,6 +218,56 @@ class TestLetterOfCredit(LCTestCase):
 		facility, _bank = self.facility(lc_limit=150_000)
 		make_letter_of_credit(facility, amount=100_000)
 		self.assertRaises(frappe.ValidationError, make_letter_of_credit, facility, amount=60_000)
+
+	def test_documents_above_the_amount_within_the_tolerance_are_checked_against_the_limit(self):
+		facility, _bank = self.facility(lc_limit=105_000)
+		credit = make_letter_of_credit(facility, tolerance_percent=10)
+		# 110,000 is within the tolerance but 10,000 more than the 5,000 still available
+		self.assertRaises(
+			frappe.ValidationError,
+			credit.receive_documents,
+			documents_date="2025-04-01",
+			documents_amount=110_000,
+		)
+		credit.reload()
+		self.assertEqual((credit.status, credit.open_amount), ("Opened", 100_000))
+		credit.receive_documents(documents_date="2025-04-01", documents_amount=105_000)
+		credit.reload()
+		self.assertEqual((credit.status, credit.open_amount), ("Documents Received", 105_000))
+		self.assertEqual(self.used(facility), 105_000)
+		credit.settle(settlement_date="2025-04-10")
+		credit.reload()
+		# drawn above the credit amount: nothing unused
+		self.assertEqual((credit.settled_amount, credit.unused_amount), (105_000, 0))
+
+	def test_usd_credit_settled_to_a_supplier_with_a_company_currency_account(self):
+		facility, bank = self.facility(
+			currency="USD", total=100_000, lc_limit=50_000, margin=10, commission=0
+		)
+		credit = make_letter_of_credit(
+			facility, amount=1_000, margin_account=self.inst.lc_margin_usd, exchange_rate=50
+		)  # SUPPLIER: payable in EGP
+		credit.receive_documents(documents_date="2025-03-01")
+		pi = make_purchase_invoice(52_000, posting_date="2025-02-15")
+		credit.settle(settlement_date="2025-03-10", exchange_rate=52, purchase_invoice=pi.name)
+		credit.reload()
+		# the allocation is converted to the supplier's EGP account at the settlement rate: 1,000 x 52
+		self.assertEqual(
+			frappe.get_all(
+				"Payment Entry Reference",
+				filters={"parent": credit.payment_entry},
+				fields=["reference_name", "allocated_amount"],
+			),
+			[{"reference_name": pi.name, "allocated_amount": 52_000}],
+		)
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			credit.payment_entry,
+			[(self.data.payable, 52_000, 0, SUPPLIER), (bank.bank_gl, 0, 52_000, None)],
+		)
+		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
+		self.assertEqual(get_account_balance(bank.bank_gl, "2025-12-31"), -1_000)  # in USD
 
 	def test_usance_acceptance_is_forecast_until_settled(self):
 		facility, bank = self.facility()

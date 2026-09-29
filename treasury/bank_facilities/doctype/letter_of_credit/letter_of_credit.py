@@ -20,6 +20,7 @@ LIFECYCLE_FIELDS = (
 	"maturity_date",
 	"settlement_date",
 	"settled_amount",
+	"unused_amount",
 	"payment_entry",
 	"margin_held",
 )
@@ -82,6 +83,7 @@ class LetterofCredit(Document):
 		supplier: DF.Link
 		supplier_name: DF.Data | None
 		tolerance_percent: DF.Percent
+		unused_amount: DF.Currency
 		usance_days: DF.Int
 	# end: auto-generated types
 

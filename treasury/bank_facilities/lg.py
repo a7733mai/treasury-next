@@ -322,23 +322,35 @@ def expire(name: str, as_of) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _claim_liability_account(doc) -> str:
+def _limit_liability_account(doc) -> str | None:
 	facility = frappe.get_doc("Bank Facility", doc.facility)
 	limit = instruments.get_limit(facility, LIMIT_TYPE)
-	if not limit or not limit.liability_account:
+	return limit.liability_account if limit else None
+
+
+def _claim_liability_account(doc) -> str:
+	liability_account = _limit_liability_account(doc)
+	if not liability_account:
 		frappe.throw(
 			_(
 				"Set the Liability Account of the {0} sub-limit of Bank Facility {1}: the bank-funded part of a claim is booked on it."
 			).format(_(LIMIT_TYPE, context="Bank Facility"), frappe.bold(doc.facility)),
 			title=_("Missing Settings"),
 		)
-	return limit.liability_account
+	return liability_account
 
 
 def _counter_row(doc, account: str, amount: float, rate: float, party_type=None, party=None) -> dict:
 	"""Debit of the claim account: in the guarantee currency, or converted when it is in the company currency."""
 	company_currency = erpnext.get_company_currency(doc.company)
 	details = instruments.validate_account(doc.company, account, _("Claim Account"), None, None, allow_party=True)
+	if details.account_type in ("Bank", "Cash"):
+		# the claim is paid by the margin and the bank facility, never from a bank / cash balance
+		frappe.throw(_("The Claim Account cannot be a Bank or Cash account."))
+	if account in (doc.margin_account, _limit_liability_account(doc)):
+		frappe.throw(
+			_("The Claim Account cannot be the margin account or the liability account of the guarantee.")
+		)
 	if details.account_currency not in (doc.currency, company_currency):
 		frappe.throw(
 			_("The Claim Account must be in {0} or in the company currency {1}.").format(
