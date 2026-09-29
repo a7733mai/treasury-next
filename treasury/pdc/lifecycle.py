@@ -11,7 +11,8 @@ creates nothing. Underneath, every voucher is created idempotently by the postin
 gets its own vouchers while the history of earlier cycles is kept.
 
 Only this module may change the statuses, lifecycle dates, voucher links and history tables of a cheque:
-it saves with `flags.treasury_lifecycle`, and the controller rejects any other change to them.
+it saves with `flags.treasury_lifecycle`, and the controller rejects any other change to them. After every
+action on a cheque created by a Cheque Batch, the batch's derived status is refreshed (`batch_status`).
 
 Date order: an event or voucher may not be dated before the cheque's latest event / voucher date
 (`_latest_date`), so no PDC or Under Collection account is ever credited before it was debited.
@@ -27,6 +28,7 @@ from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
+from treasury.pdc.batch_status import update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
 
@@ -739,6 +741,8 @@ def _save(doc) -> dict:
 	doc.flags.treasury_lifecycle = True
 	doc.flags.ignore_permissions = True
 	doc.save()
+	if doc.get("cheque_batch"):
+		update_batch_status(doc.cheque_batch)
 	return {
 		"name": doc.name,
 		"operational_status": doc.operational_status,
@@ -861,7 +865,18 @@ def _apply_postponement(doc, new_due_date, reason: str | None, contact_person: s
 
 def _make_replacement(doc, values: frappe._dict, date):
 	new = frappe.new_doc(DOCTYPE)
-	for fieldname in ("direction", "company", "party_type", "party", "bank_account", "drawer_bank", "remarks"):
+	# the replacement stands for the same installment of the cheque's batch, if any
+	for fieldname in (
+		"direction",
+		"company",
+		"party_type",
+		"party",
+		"bank_account",
+		"drawer_bank",
+		"remarks",
+		"cheque_batch",
+		"cheque_batch_row",
+	):
 		new.set(fieldname, doc.get(fieldname))
 	new.cheque_no = values.cheque_no
 	if values.cheque_book:

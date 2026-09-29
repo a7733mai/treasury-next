@@ -7,7 +7,8 @@
 (bank posting still to come), so its figures drill down here. The drill-down dates the cheques like the
 forecast does: `date_based_on` = "Forecast Date" (report_utils.forecast_date), filtered in Python since it
 is the effective due date or, for cleared cheques not bank posted yet, the bank's date. `currency`
-(hidden) keeps the cheques of one currency (the forecast's Bank Currency view).
+(hidden) keeps the cheques of one currency (the forecast's Bank Currency view). `cheque_batch` keeps the
+cheques of one Cheque Batch (its "Cheques in PDC Register" button).
 """
 
 import frappe
@@ -85,6 +86,8 @@ def get_filters(filters: frappe._dict, company: str) -> list:
 		conditions.append(["bank_account", "=", filters.bank_account])
 	if filters.currency:
 		conditions.append(["currency", "=", filters.currency])
+	if filters.cheque_batch:
+		conditions.append(["cheque_batch", "=", filters.cheque_batch])
 	if cint(filters.postponed_only):
 		conditions.append(["is_postponed", "=", 1])
 

@@ -27,7 +27,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Cheques",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -41,6 +41,17 @@
    "link_to": "PDC Cheque",
    "link_type": "DocType",
    "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cheque Batch",
+   "link_count": 0,
+   "link_to": "Cheque Batch",
+   "link_type": "DocType",
+   "onboard": 0,
    "type": "Link"
   },
   {
@@ -172,7 +183,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-30 09:00:00.000000",
+ "modified": "2026-10-01 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",

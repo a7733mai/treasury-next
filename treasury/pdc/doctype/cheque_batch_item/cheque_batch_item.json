@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "creation": "2026-10-01 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "cheque_no",
+  "due_date",
+  "amount",
+  "drawer_bank",
+  "column_break_cheque",
+  "pdc_cheque",
+  "remarks",
+  "allocation_section",
+  "reference_doctype",
+  "reference_name",
+  "column_break_allocation",
+  "allocated_amount"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "description": "Leave empty on an outgoing batch with a cheque book: the next leaf is allocated on submit.",
+   "fieldname": "cheque_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Cheque No"
+  },
+  {
+   "columns": 2,
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:parent.direction=='Incoming'",
+   "fieldname": "drawer_bank",
+   "fieldtype": "Data",
+   "label": "Drawer Bank"
+  },
+  {
+   "fieldname": "column_break_cheque",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "pdc_cheque",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "PDC Cheque",
+   "no_copy": 1,
+   "options": "PDC Cheque",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "description": "One invoice / order per cheque. Leave empty to post the cheque as an advance.",
+   "fieldname": "allocation_section",
+   "fieldtype": "Section Break",
+   "label": "Allocation"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Type",
+   "options": "DocType"
+  },
+  {
+   "columns": 2,
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Reference Name",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "column_break_allocation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "allocated_amount",
+   "fieldtype": "Currency",
+   "label": "Allocated Amount"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-01 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Cheque Batch Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

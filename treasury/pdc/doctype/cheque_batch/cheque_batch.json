@@ -1,0 +1,413 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-01 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "direction",
+  "company",
+  "party_type",
+  "party",
+  "party_name",
+  "purpose",
+  "column_break_main",
+  "bank_account",
+  "cheque_book",
+  "currency",
+  "posting_mode",
+  "status",
+  "dates_section",
+  "issue_date",
+  "handover_date",
+  "column_break_dates",
+  "allocation_method",
+  "total_amount",
+  "cheque_count",
+  "generator_section",
+  "gen_count",
+  "gen_frequency",
+  "gen_interval_days",
+  "gen_first_due_date",
+  "gen_month_end",
+  "column_break_generator",
+  "gen_amount_mode",
+  "gen_amount",
+  "gen_total",
+  "gen_first_cheque_no",
+  "gen_drawer_bank",
+  "cheques_section",
+  "cheques",
+  "dashboard_section",
+  "cheques_html",
+  "more_info_section",
+  "remarks",
+  "column_break_more",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "no_copy": 1,
+   "options": "CHB-OUT-.YYYY.-.####\nCHB-IN-.YYYY.-.####",
+   "print_hide": 1
+  },
+  {
+   "default": "Outgoing",
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Direction",
+   "options": "Outgoing\nIncoming",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "label": "Party Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "in_standard_filter": 1,
+   "label": "Party",
+   "options": "party_type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Party Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purpose",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Purpose",
+   "options": "\nRent\nInstallments\nSupplier Settlement\nCustomer Settlement\nOther"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Optional on an incoming batch: the bank the cheques will be deposited to.",
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "options": "Bank Account"
+  },
+  {
+   "depends_on": "eval:doc.direction=='Outgoing'",
+   "description": "Rows without a cheque number take the next leaves of the book on submit.",
+   "fieldname": "cheque_book",
+   "fieldtype": "Link",
+   "label": "Cheque Book",
+   "options": "Cheque Book"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "description": "When the cheques are posted to the party (Treasury Company Settings).",
+   "fieldname": "posting_mode",
+   "fieldtype": "Select",
+   "label": "Party Posting",
+   "no_copy": 1,
+   "options": "\nOn Handover\nOn Receipt\nOn Cheque Date\nOn Creation\nManual",
+   "read_only": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Draft\nSubmitted\nPartially Delivered\nDelivered\nPartially Received\nReceived\nPartially Cleared\nCleared\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "dates_section",
+   "fieldtype": "Section Break",
+   "label": "Dates and Allocation"
+  },
+  {
+   "default": "Today",
+   "fieldname": "issue_date",
+   "fieldtype": "Date",
+   "label": "Issue Date",
+   "reqd": 1
+  },
+  {
+   "description": "Optional. If set, every cheque is delivered / received on this date when the batch is submitted (and posted according to the Party Posting mode).",
+   "fieldname": "handover_date",
+   "fieldtype": "Date",
+   "label": "Handover / Receipt Date"
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "allocation_method",
+   "fieldtype": "Select",
+   "label": "Allocation Method",
+   "options": "Manual\nFIFO Invoices\nAdvance (no allocation)"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cheque_count",
+   "fieldtype": "Int",
+   "label": "Number of Cheques",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.docstatus==0",
+   "description": "Describe the installments, then click Generate Cheques: the rows below are replaced.",
+   "fieldname": "generator_section",
+   "fieldtype": "Section Break",
+   "label": "Installment Generator"
+  },
+  {
+   "fieldname": "gen_count",
+   "fieldtype": "Int",
+   "label": "Number of Cheques to Generate",
+   "no_copy": 1,
+   "non_negative": 1
+  },
+  {
+   "default": "Monthly",
+   "fieldname": "gen_frequency",
+   "fieldtype": "Select",
+   "label": "Frequency",
+   "options": "Monthly\nEvery 2 Months\nQuarterly\nSemi-Annually\nYearly\nWeekly\nCustom Days"
+  },
+  {
+   "depends_on": "eval:doc.gen_frequency=='Custom Days'",
+   "fieldname": "gen_interval_days",
+   "fieldtype": "Int",
+   "label": "Interval (Days)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "gen_first_due_date",
+   "fieldtype": "Date",
+   "label": "First Due Date",
+   "no_copy": 1
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:!['Weekly', 'Custom Days'].includes(doc.gen_frequency)",
+   "description": "If the first due date is the last day of its month, every due date is the last day of its month (e.g. 30 Apr, 31 May, 30 Jun).",
+   "fieldname": "gen_month_end",
+   "fieldtype": "Check",
+   "label": "Keep Month End"
+  },
+  {
+   "fieldname": "column_break_generator",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Per Cheque",
+   "fieldname": "gen_amount_mode",
+   "fieldtype": "Select",
+   "label": "Amount Mode",
+   "options": "Per Cheque\nSplit Total"
+  },
+  {
+   "depends_on": "eval:doc.gen_amount_mode=='Per Cheque'",
+   "fieldname": "gen_amount",
+   "fieldtype": "Currency",
+   "label": "Amount per Cheque",
+   "options": "currency"
+  },
+  {
+   "depends_on": "eval:doc.gen_amount_mode=='Split Total'",
+   "description": "Split evenly; the last cheque absorbs the rounding difference.",
+   "fieldname": "gen_total",
+   "fieldtype": "Currency",
+   "label": "Total Amount to Split",
+   "options": "currency"
+  },
+  {
+   "depends_on": "eval:doc.direction=='Incoming' || !doc.cheque_book",
+   "description": "The following cheques are numbered from it, keeping its zero padding.",
+   "fieldname": "gen_first_cheque_no",
+   "fieldtype": "Data",
+   "label": "First Cheque No",
+   "no_copy": 1
+  },
+  {
+   "depends_on": "eval:doc.direction=='Incoming'",
+   "fieldname": "gen_drawer_bank",
+   "fieldtype": "Data",
+   "label": "Drawer Bank"
+  },
+  {
+   "fieldname": "cheques_section",
+   "fieldtype": "Section Break",
+   "label": "Cheques"
+  },
+  {
+   "fieldname": "cheques",
+   "fieldtype": "Table",
+   "label": "Cheques",
+   "options": "Cheque Batch Item"
+  },
+  {
+   "depends_on": "eval:doc.docstatus>0",
+   "fieldname": "dashboard_section",
+   "fieldtype": "Section Break",
+   "label": "Cheque Status"
+  },
+  {
+   "fieldname": "cheques_html",
+   "fieldtype": "HTML",
+   "label": "Cheque Status"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Information"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "column_break_more",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cheque Batch",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "PDC Cheque",
+   "link_fieldname": "cheque_batch"
+  }
+ ],
+ "modified": "2026-10-01 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Cheque Batch",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Cheque Approver"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "party_name,total_amount",
+ "show_title_field_in_link": 0,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "party_name",
+ "track_changes": 1
+}

@@ -27,6 +27,7 @@ IGNORE_TEST_RECORD_DEPENDENCIES = [
 	"Company",
 	"Account",
 	"Bank Account",
+	"Cheque Batch",
 	"Cheque Book",
 	"Currency",
 	"DocType",

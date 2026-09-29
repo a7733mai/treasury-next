@@ -1,0 +1,105 @@
+{%- set incoming = doc.direction == "Incoming" -%}
+{%- set direction = treasury_print_direction() -%}
+<div class="pdc-receipt" dir="{{ direction }}" style="text-align: {{ 'right' if direction == 'rtl' else 'left' }};">
+	<style>
+		.pdc-receipt table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+		.pdc-receipt th, .pdc-receipt td { border: 1px solid #999; padding: 4px 6px; vertical-align: top; }
+		.pdc-receipt th { background: #f5f5f5; }
+		.pdc-receipt .pdc-label { width: 30%; font-weight: bold; background: #f5f5f5; }
+		.pdc-receipt .pdc-title { text-align: center; margin: 8px 0 16px; }
+		.pdc-receipt .pdc-print-date { text-align: center; margin-bottom: 12px; }
+		.pdc-receipt .pdc-number { text-align: {{ 'left' if direction == 'rtl' else 'right' }}; white-space: nowrap; }
+		.pdc-receipt .pdc-total td { font-weight: bold; }
+		.pdc-receipt .pdc-signatures td { border: none; text-align: center; padding-top: 48px; width: 33%; }
+	</style>
+
+	{% if letter_head and not no_letterhead %}
+	<div class="letter-head">{{ letter_head }}</div>
+	{% else %}
+	<h3 style="text-align: center;">{{ doc.company | e }}</h3>
+	{% endif %}
+
+	<h2 class="pdc-title">
+		{{ _("Cheques Receipt") if incoming else _("Cheques Delivery Voucher") }}
+		<br><small>{{ doc.name | e }}</small>
+	</h2>
+
+	<div class="pdc-print-date">
+		<strong>{{ _("Print Date") }}:</strong> <span class="pdc-print-date-value">{{ treasury_print_date() }}</span>
+	</div>
+
+	<table>
+		<tr>
+			<td class="pdc-label">{{ _(doc.party_type) }}</td>
+			<td>{{ (doc.party_name or doc.party) | e }}</td>
+		</tr>
+		{% if doc.purpose %}
+		<tr>
+			<td class="pdc-label">{{ _("Purpose", context="Cheque Batch") }}</td>
+			<td>{{ _(doc.purpose) }}</td>
+		</tr>
+		{% endif %}
+		{% if doc.bank_account %}
+		<tr>
+			<td class="pdc-label">{{ _("Bank Account") }}</td>
+			<td>{{ doc.bank_account | e }}</td>
+		</tr>
+		{% endif %}
+		<tr>
+			<td class="pdc-label">{{ _("Issue Date") }}</td>
+			<td>{{ frappe.utils.formatdate(doc.issue_date) }}</td>
+		</tr>
+		{% if doc.handover_date %}
+		<tr>
+			<td class="pdc-label">{{ _("Receipt Date") if incoming else _("Handover Date") }}</td>
+			<td>{{ frappe.utils.formatdate(doc.handover_date) }}</td>
+		</tr>
+		{% endif %}
+	</table>
+
+	<table class="pdc-cheques">
+		<thead>
+			<tr>
+				<th>#</th>
+				<th>{{ _("Cheque No") }}</th>
+				<th>{{ _("Due Date") }}</th>
+				<th>{{ _("Bank", context="PDC Cheque") }}</th>
+				<th>{{ _("Amount") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in doc.cheques %}
+			<tr>
+				<td>{{ row.idx }}</td>
+				<td class="pdc-cheque-no">{{ (row.cheque_no or "") | e }}</td>
+				<td>{{ frappe.utils.formatdate(row.due_date) }}</td>
+				<td>{{ ((row.drawer_bank if incoming else doc.bank_account) or "") | e }}</td>
+				<td class="pdc-number">{{ row.get_formatted("amount", doc) }}</td>
+			</tr>
+			{% endfor %}
+			<tr class="pdc-total">
+				<td colspan="4">{{ _("Total", context="Cheque Batch") }} ({{ doc.cheques | length }})</td>
+				<td class="pdc-number">{{ doc.get_formatted("total_amount") }}</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<table>
+		<tr>
+			<td class="pdc-label">{{ _("Amount in Words") }}</td>
+			<td class="pdc-amount-words">{{ treasury_amount_in_words(doc.total_amount, doc.currency) }}</td>
+		</tr>
+	</table>
+
+	{% if doc.remarks %}
+	<p><strong>{{ _("Remarks") }}:</strong> {{ doc.remarks | e }}</p>
+	{% endif %}
+
+	<table class="pdc-signatures">
+		<tr>
+			<td>{{ _("Received by") }}<br>________________</td>
+			<td>{{ _("Delivered by") }}<br>________________</td>
+			<td>{{ _("Approved by") }}<br>________________</td>
+		</tr>
+	</table>
+</div>

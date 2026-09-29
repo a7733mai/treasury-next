@@ -26,6 +26,9 @@ LOCKED_FIELDS = ("direction", "company", "party_type", "party", "bank_account", 
 LOCKED_AMOUNT_FIELDS = ("amount", "exchange_rate")
 # Dates that cannot change once the cheque left the Created status (the due date then moves only by Postpone).
 LOCKED_DATE_FIELDS = ("issue_date", "original_due_date")
+# Link to the Cheque Batch that created the cheque: set only on insert by treasury.pdc.batch (flag
+# `treasury_cheque_batch`) or carried to a replacement by the lifecycle, never changed afterwards.
+BATCH_FIELDS = ("cheque_batch", "cheque_batch_row")
 # Written only by treasury.pdc.lifecycle, which saves with `flags.treasury_lifecycle`. `read_only` in the
 # DocType only affects the form, so a REST / client save must be rejected here (see validate_protected_fields).
 PROTECTED_FIELDS = (
@@ -50,6 +53,7 @@ PROTECTED_FIELDS = (
 	"bounce_charges_journal",
 	"replaced_by",
 	"replaces",
+	*BATCH_FIELDS,
 )
 # Append-only history tables, appended to only by the lifecycle.
 PROTECTED_TABLES = ("status_log", "postponements")
@@ -83,6 +87,8 @@ class PDCCheque(Document):
 		bank_posting_date: DF.Date | None
 		bank_transaction_date: DF.Date | None
 		bounce_charges_journal: DF.Link | None
+		cheque_batch: DF.Link | None
+		cheque_batch_row: DF.Data | None
 		cheque_book: DF.Link | None
 		cheque_image: DF.AttachImage | None
 		cheque_no: DF.Data | None
@@ -199,9 +205,13 @@ class PDCCheque(Document):
 	# ------------------------------------------------------------------ validation
 
 	def reset_protected_fields(self):
-		"""A new cheque starts clean, whatever the client sent (lifecycle.log_creation sets the statuses)."""
+		"""A new cheque starts clean, whatever the client sent (lifecycle.log_creation sets the statuses).
+
+		Only a cheque inserted by a Cheque Batch keeps its batch link (a flag, which a client cannot send)."""
+		keep = BATCH_FIELDS if self.flags.treasury_cheque_batch else ()
 		for fieldname in PROTECTED_FIELDS:
-			self.set(fieldname, None)
+			if fieldname not in keep:
+				self.set(fieldname, None)
 		self.bank_charges = 0
 		for table in PROTECTED_TABLES:
 			self.set(table, [])

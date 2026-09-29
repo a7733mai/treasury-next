@@ -17,6 +17,8 @@
   "cheque_book",
   "cheque_no",
   "drawer_bank",
+  "cheque_batch",
+  "cheque_batch_row",
   "amount_section",
   "amount",
   "currency",
@@ -150,6 +152,25 @@
    "fieldname": "drawer_bank",
    "fieldtype": "Data",
    "label": "Drawer Bank"
+  },
+  {
+   "depends_on": "eval:doc.cheque_batch",
+   "fieldname": "cheque_batch",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Cheque Batch",
+   "no_copy": 1,
+   "options": "Cheque Batch",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "cheque_batch_row",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Cheque Batch Row",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "amount_section",
@@ -474,7 +495,7 @@
  ],
  "image_field": "cheque_image",
  "links": [],
- "modified": "2026-09-30 09:00:00.000000",
+ "modified": "2026-10-01 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "PDC Cheque",

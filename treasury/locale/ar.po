@@ -1577,3 +1577,357 @@ msgstr "المستخدم"
 msgctxt "Treasury Report"
 msgid "Remaining"
 msgstr "المتبقي"
+
+# Phase 3 — Cheque Batch: DocTypes, print format
+msgid "Cheque Batch"
+msgstr "سند شيكات متعدد"
+
+msgid "Cheque Batch Item"
+msgstr "شيك في سند الشيكات"
+
+msgid "Cheque Batch Receipt"
+msgstr "إيصال سند الشيكات"
+
+msgid "Cheque Batch Row"
+msgstr "سطر سند الشيكات"
+
+# Phase 3 — Cheque Batch fields (generic words with the context "Cheque Batch")
+msgctxt "Cheque Batch"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "Cheque Batch"
+msgid "Purpose"
+msgstr "الغرض"
+
+msgid "Party Posting"
+msgstr "ترحيل الطرف"
+
+msgid "When the cheques are posted to the party (Treasury Company Settings)."
+msgstr "متى يتم ترحيل الشيكات على الطرف (حسب إعدادات الخزينة للشركة)."
+
+msgid "Optional on an incoming batch: the bank the cheques will be deposited to."
+msgstr "اختياري في السند الوارد: البنك الذي سيتم إيداع الشيكات فيه."
+
+msgid "Rows without a cheque number take the next leaves of the book on submit."
+msgstr "السطور التي بدون رقم شيك تأخذ الأوراق التالية من الدفتر عند الاعتماد."
+
+msgid "Dates and Allocation"
+msgstr "التواريخ والتخصيص"
+
+msgid "Optional. If set, every cheque is delivered / received on this date when the batch is submitted (and posted according to the Party Posting mode)."
+msgstr "اختياري. إذا تم تحديده، يتم تسليم / استلام كل الشيكات في هذا التاريخ عند اعتماد السند (وترحيلها حسب طريقة ترحيل الطرف)."
+
+msgid "Allocation Method"
+msgstr "طريقة التخصيص"
+
+msgid "Total Amount"
+msgstr "إجمالي المبلغ"
+
+msgid "Number of Cheques"
+msgstr "عدد الشيكات"
+
+msgid "Installment Generator"
+msgstr "مولّد الأقساط"
+
+msgid "Describe the installments, then click Generate Cheques: the rows below are replaced."
+msgstr "حدد بيانات الأقساط ثم اضغط \"توليد الشيكات\": سيتم استبدال السطور بالأسفل."
+
+msgid "Number of Cheques to Generate"
+msgstr "عدد الشيكات المطلوب توليدها"
+
+msgctxt "Cheque Batch"
+msgid "Frequency"
+msgstr "التكرار"
+
+msgid "Interval (Days)"
+msgstr "الفاصل (أيام)"
+
+msgid "First Due Date"
+msgstr "تاريخ أول استحقاق"
+
+msgid "Keep Month End"
+msgstr "الالتزام بآخر الشهر"
+
+msgid "If the first due date is the last day of its month, every due date is the last day of its month (e.g. 30 Apr, 31 May, 30 Jun)."
+msgstr "إذا كان أول تاريخ استحقاق هو آخر يوم في الشهر، تكون كل تواريخ الاستحقاق في آخر يوم من شهرها (مثل 30 أبريل، 31 مايو، 30 يونيو)."
+
+msgid "Amount Mode"
+msgstr "طريقة المبلغ"
+
+msgid "Amount per Cheque"
+msgstr "مبلغ الشيك الواحد"
+
+msgid "Total Amount to Split"
+msgstr "الإجمالي المطلوب تقسيمه"
+
+msgid "Split evenly; the last cheque absorbs the rounding difference."
+msgstr "يُقسم بالتساوي، ويتحمل آخر شيك فرق التقريب."
+
+msgid "First Cheque No"
+msgstr "رقم أول شيك"
+
+msgid "The following cheques are numbered from it, keeping its zero padding."
+msgstr "يتم ترقيم الشيكات التالية بعده مع الحفاظ على الأصفار في بدايته."
+
+msgid "Cheque Status"
+msgstr "حالة الشيكات"
+
+msgctxt "Cheque Batch"
+msgid "Amended From"
+msgstr "معدّل من"
+
+msgid "Leave empty on an outgoing batch with a cheque book: the next leaf is allocated on submit."
+msgstr "اتركه فارغاً في السند الصادر بدفتر شيكات: يتم أخذ الورقة التالية عند الاعتماد."
+
+msgid "One invoice / order per cheque. Leave empty to post the cheque as an advance."
+msgstr "فاتورة / أمر واحد لكل شيك. اتركه فارغاً لترحيل الشيك كدفعة مقدمة."
+
+# Phase 3 — Cheque Batch select options and statuses
+msgctxt "Cheque Batch"
+msgid "Rent"
+msgstr "إيجار"
+
+msgid "Installments"
+msgstr "أقساط"
+
+msgid "Supplier Settlement"
+msgstr "سداد مورد"
+
+msgid "Customer Settlement"
+msgstr "تحصيل من عميل"
+
+msgctxt "Cheque Batch"
+msgid "Other"
+msgstr "أخرى"
+
+msgid "FIFO Invoices"
+msgstr "الفواتير الأقدم أولاً (FIFO)"
+
+msgid "Advance (no allocation)"
+msgstr "دفعة مقدمة (بدون تخصيص)"
+
+msgctxt "Cheque Batch"
+msgid "Monthly"
+msgstr "شهري"
+
+msgid "Every 2 Months"
+msgstr "كل شهرين"
+
+msgctxt "Cheque Batch"
+msgid "Quarterly"
+msgstr "ربع سنوي"
+
+msgid "Semi-Annually"
+msgstr "نصف سنوي"
+
+msgctxt "Cheque Batch"
+msgid "Yearly"
+msgstr "سنوي"
+
+msgctxt "Cheque Batch"
+msgid "Weekly"
+msgstr "أسبوعي"
+
+msgid "Custom Days"
+msgstr "عدد أيام مخصص"
+
+msgid "Per Cheque"
+msgstr "لكل شيك"
+
+msgid "Split Total"
+msgstr "تقسيم الإجمالي"
+
+msgctxt "Cheque Batch"
+msgid "Partially Delivered"
+msgstr "مسلّم جزئياً"
+
+msgctxt "Cheque Batch"
+msgid "Partially Received"
+msgstr "مستلم جزئياً"
+
+msgctxt "Cheque Batch"
+msgid "Partially Cleared"
+msgstr "مصروف جزئياً"
+
+# Phase 3 — Cheque Batch print format
+msgid "Cheques Receipt"
+msgstr "إيصال استلام شيكات"
+
+msgid "Cheques Delivery Voucher"
+msgstr "سند تسليم شيكات"
+
+msgctxt "Cheque Batch"
+msgid "Total"
+msgstr "الإجمالي"
+
+# Phase 3 — Cheque Batch messages (treasury.pdc.batch, cheque_batch.py)
+msgid "Interval (Days) must be greater than zero."
+msgstr "يجب أن يكون الفاصل (أيام) أكبر من صفر."
+
+msgid "Invalid Frequency: {0}"
+msgstr "تكرار غير صحيح: {0}"
+
+msgid "Amount per Cheque must be greater than zero."
+msgstr "يجب أن يكون مبلغ الشيك الواحد أكبر من صفر."
+
+msgid "Invalid Amount Mode: {0}"
+msgstr "طريقة مبلغ غير صحيحة: {0}"
+
+msgid "Total Amount to Split must be greater than zero."
+msgstr "يجب أن يكون الإجمالي المطلوب تقسيمه أكبر من صفر."
+
+msgid "The total {0} is too small to be split into {1} cheques."
+msgstr "الإجمالي {0} أصغر من أن يُقسم على {1} شيك."
+
+msgid "First Cheque No is required to number the cheques."
+msgstr "رقم أول شيك مطلوب لترقيم الشيكات."
+
+msgid "First Cheque No {0} must end with digits."
+msgstr "يجب أن ينتهي رقم أول شيك {0} بأرقام."
+
+msgid "Number of Cheques must be greater than zero."
+msgstr "يجب أن يكون عدد الشيكات أكبر من صفر."
+
+msgid "A batch can hold at most {0} cheques."
+msgstr "لا يمكن أن يحتوي السند على أكثر من {0} شيك."
+
+msgid "First Due Date is required."
+msgstr "تاريخ أول استحقاق مطلوب."
+
+msgid "The Handover / Receipt Date cannot be before the Issue Date."
+msgstr "لا يمكن أن يكون تاريخ التسليم / الاستلام قبل تاريخ التحرير."
+
+msgid "Add at least one cheque (use Generate Cheques to create the rows)."
+msgstr "أضف شيكاً واحداً على الأقل (استخدم \"توليد الشيكات\" لإنشاء السطور)."
+
+msgid "Row #{0}: Amount must be greater than zero."
+msgstr "الصف #{0}: يجب أن يكون المبلغ أكبر من صفر."
+
+msgid "Row #{0}: Due Date is required."
+msgstr "الصف #{0}: تاريخ الاستحقاق مطلوب."
+
+msgid "Row #{0}: Cheque No {1} is already used in row #{2}."
+msgstr "الصف #{0}: رقم الشيك {1} مستخدم بالفعل في الصف #{2}."
+
+msgid "Cheque Book {0} has only {1} free leaves; this batch needs {2}."
+msgstr "دفتر الشيكات {0} به {1} ورقة متاحة فقط؛ وهذا السند يحتاج {2}."
+
+msgid "Row #{0}: the Allocation Method is {1}; remove the reference."
+msgstr "الصف #{0}: طريقة التخصيص هي {1}؛ احذف المرجع."
+
+msgid "Row #{0}: Reference Type and Reference Name are both required."
+msgstr "الصف #{0}: نوع المرجع واسم المرجع مطلوبان معاً."
+
+msgid "Row #{0}: the Allocated Amount cannot be greater than the cheque amount."
+msgstr "الصف #{0}: لا يمكن أن يكون المبلغ المخصص أكبر من مبلغ الشيك."
+
+msgid "{0} {1}: {2} is allocated in this batch, but only {3} is still outstanding (other not posted cheques already allocate {4})."
+msgstr "{0} {1}: تم تخصيص {2} في هذا السند، بينما المستحق المتبقي {3} فقط (شيكات أخرى غير مرحّلة تخصص عليه {4})."
+
+msgid "Over Allocation"
+msgstr "تخصيص زائد"
+
+msgid "Row #{0}: {1}"
+msgstr "الصف #{0}: {1}"
+
+msgid "FIFO allocation of {0} cheques needs a {1} as the party."
+msgstr "التخصيص على الأقدم أولاً للشيكات من نوع {0} يتطلب أن يكون الطرف {1}."
+
+msgid "Generate or add the cheques first."
+msgstr "قم بتوليد الشيكات أو إضافتها أولاً."
+
+msgid "FIFO allocation needs the party account in the cheque currency {0} (it is in {1}). Allocate the rows manually."
+msgstr "التخصيص على الأقدم أولاً يتطلب أن يكون حساب الطرف بعملة الشيك {0} (وهو بعملة {1}). قم بتخصيص السطور يدوياً."
+
+msgid "You need permission to create PDC Cheques to submit a Cheque Batch."
+msgstr "تحتاج صلاحية إنشاء الشيكات الآجلة لاعتماد سند الشيكات."
+
+msgid "Cheque Batch {0}"
+msgstr "سند الشيكات {0}"
+
+msgid "Cheque Batch {0} cannot be cancelled because these cheques are handed over or posted: {1}. Bounce, return, replace or cancel each of them first."
+msgstr "لا يمكن إلغاء سند الشيكات {0} لأن هذه الشيكات تم تسليمها أو ترحيلها: {1}. سجّل ارتداد أو إرجاع أو استبدال أو إلغاء كل منها أولاً."
+
+msgid "Cancellation Not Allowed"
+msgstr "الإلغاء غير مسموح"
+
+msgid "Cheque Batch {0} cancelled"
+msgstr "تم إلغاء سند الشيكات {0}"
+
+msgid "Submit the Cheque Batch first."
+msgstr "قم باعتماد سند الشيكات أولاً."
+
+msgid "Only a draft Cheque Batch can be changed."
+msgstr "لا يمكن تعديل سند الشيكات إلا وهو مسودة."
+
+# Phase 3 — Cheque Batch form (cheque_batch.js, cheque_batch_list.js)
+msgid "Cheques in PDC Register"
+msgstr "الشيكات في سجل الشيكات الآجلة"
+
+msgid "Generate Cheques"
+msgstr "توليد الشيكات"
+
+msgid "Cheque numbers {0} to {1} will be taken from the cheque book on submit."
+msgstr "سيتم أخذ أرقام الشيكات من {0} إلى {1} من دفتر الشيكات عند الاعتماد."
+
+msgid "Replace the {0} existing rows?"
+msgstr "استبدال السطور الحالية ({0})؟"
+
+msgid "Allocate FIFO"
+msgstr "تخصيص الأقدم أولاً"
+
+msgid "FIFO Allocation"
+msgstr "التخصيص على الأقدم أولاً"
+
+msgctxt "Cheque Batch"
+msgid "Invoice"
+msgstr "الفاتورة"
+
+msgctxt "Cheque Batch"
+msgid "Outstanding"
+msgstr "المستحق"
+
+msgid "No outstanding invoices."
+msgstr "لا توجد فواتير مستحقة."
+
+msgctxt "Cheque Batch"
+msgid "Allocated"
+msgstr "المخصص"
+
+msgid "Unallocated (advance)"
+msgstr "غير مخصص (دفعة مقدمة)"
+
+msgid "Deliver All"
+msgstr "تسليم الكل"
+
+msgid "Receive All"
+msgstr "استلام الكل"
+
+msgid "Print Batch Receipt"
+msgstr "طباعة إيصال السند"
+
+msgid "Print All Cheques"
+msgstr "طباعة كل الشيكات"
+
+msgid "No cheques to print."
+msgstr "لا توجد شيكات للطباعة."
+
+msgctxt "Cheque Batch"
+msgid "Result"
+msgstr "النتيجة"
+
+msgctxt "Cheque Batch"
+msgid "Succeeded"
+msgstr "نجح"
+
+msgctxt "Cheque Batch"
+msgid "Failed"
+msgstr "فشل"
+
+msgctxt "Cheque Batch"
+msgid "Skipped"
+msgstr "تم تخطيه"
+
+msgid "No cheques yet."
+msgstr "لا توجد شيكات بعد."

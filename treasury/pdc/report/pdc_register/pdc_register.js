@@ -113,6 +113,15 @@ frappe.query_reports["PDC Register"] = {
 			default: "Effective Due Date",
 		},
 		{
+			fieldname: "cheque_batch",
+			label: __("Cheque Batch"),
+			fieldtype: "Link",
+			options: "Cheque Batch",
+			get_query: function () {
+				return { filters: { company: frappe.query_report.get_filter_value("company") } };
+			},
+		},
+		{
 			// set by the Bank Position Forecast drill-down in its Bank Currency view
 			fieldname: "currency",
 			label: __("Currency"),

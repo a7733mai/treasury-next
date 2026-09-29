@@ -407,6 +407,14 @@ def _allocate_references(
 	return list(allocations.values())
 
 
+def get_reference_outstanding(
+	doctype: str, name: str, party_type: str, party: str, party_currency: str, precision: int
+) -> float:
+	"""Outstanding of a reference document in the party account currency, as the Payment Entry allocation
+	will see it (used to validate allocations before any voucher exists, e.g. Cheque Batch)."""
+	return _get_reference_outstanding(doctype, name, party_type, party, party_currency, precision)
+
+
 def _get_reference_outstanding(
 	doctype: str, name: str, party_type: str, party: str, party_currency: str, precision: int
 ) -> float:

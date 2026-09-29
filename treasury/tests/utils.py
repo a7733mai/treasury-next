@@ -264,6 +264,13 @@ def ensure_parties():
 	)
 
 
+def ensure_supplier(name: str) -> str:
+	"""An extra EGP supplier (default payable account), e.g. for scenarios that need a party of their own."""
+	return _ensure(
+		"Supplier", name, {"supplier_name": name, "supplier_group": SUPPLIER_GROUP, "supplier_type": "Company"}
+	)
+
+
 def mapping_row(bank: frappe._dict) -> dict:
 	return {
 		"bank_account": bank.bank_account,
