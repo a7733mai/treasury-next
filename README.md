@@ -214,10 +214,13 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   currency, total limit, dates and the existing sub-limits (type, amount, liability account) change only
   through Renew (new sub-limits may be added). Accounts: Default Bank Account (a company account at this
   bank, in the facility currency), Interest / Commission Expense (company currency), Accrued Interest
-  (liability, facility currency). Optional collateral notes and linked Security Cheques (no accounting).
+  (liability, facility currency; it must differ from every sub-limit's liability account and cannot change
+  while the facility has a submitted drawdown). Optional collateral notes and linked Security Cheques (no
+  accounting).
 - **Sub-limits** (*Bank Facility Limit*): Overdraft, Short / Long Term Loan, Letter of Guarantee, Letter of
   Credit, Cheque Discounting, Murabaha, Tawarruq, Other; rate type (fixed / variable reference + margin, the
-  all-in rate is entered), day count (Actual/365, Actual/360), commission and cash margin. Each sub-limit is
+  all-in rate is entered; **a variable rate is informational only — nothing is repriced** when the reference
+  rate moves: enter the new rate on new drawdowns), day count (Actual/365, Actual/360), commission and cash margin. Each sub-limit is
   at most the total limit; together they may exceed it (lines share the total). Loans / Murabaha / Tawarruq
   / Other need a liability account in the facility currency.
 - **Utilisation** (`treasury.bank_facilities.utilisation.get_utilisation(facility, limit_type, as_on)`) is
@@ -237,10 +240,17 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   outstanding principal per period, annuity installment P·r / (1 − (1 + r)^−n) with r = rate × months / 12,
   a Murabaha profit spread straight-line, every amount rounded and the last row absorbing the rounding
   (principal always adds up to the amount), month-end dates kept on month ends (shared helper
-  `treasury.utils.dates`). Rows may be edited before submit as long as the principal adds up. Submit checks
-  the facility is Active and the date inside its period, and the available amount of the sub-limit and of
-  the total, then posts Dr Bank / Cr Liability (and Dr Fees / Cr Bank for the upfront fees). Cancel is
-  refused while repayments are submitted and cancels its vouchers (accruals included).
+  `treasury.utils.dates`). **Annuity**: the installment uses the nominal periodic rate while each row's
+  interest uses the day count, so the rows' principal differs slightly from a textbook annuity and the last
+  row (repaying whatever is left) can differ noticeably from the others — more so with Actual/360 (31-day
+  months cost more than rate / 12). Rows may be edited before submit as long as the principal adds up.
+  Changing a term (amount, dates, rate, day count, profit, tenor, frequency, method, grace) requires a new
+  schedule: the form clears it (rebuilt on save) and the server refuses a changed term with an unchanged
+  schedule. Submit checks the facility is Active and the date inside its period, and the available amount of
+  the sub-limit and of the total, then posts Dr Bank / Cr Liability (and Dr Fees / Cr Bank for the upfront
+  fees). Cancel is refused while repayments are submitted and cancels its vouchers (accruals included).
+  System fields (vouchers, last accrual date, repayment status, the rows' paid amounts) are reset on save and
+  on submit, whatever the client sends.
 - **Facility Repayment** (submittable): principal + interest / profit (empty: the next unpaid installment),
   optional penalty (+ account), allocation *Oldest First* or *Selected Row*. Posts Dr Liability (principal)
   + Dr Accrued Interest (the part already accrued, cleared first) + Dr Interest Expense (the rest) + Dr
@@ -249,8 +259,18 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   date is recorded as a paid prepayment row and the later untouched installments are rescheduled by
   **reducing the installment amount** (the tenor is kept; interest recomputed on the reduced principal with
   the day count; a Murabaha profit is not recomputed). Reducing the tenor instead is not implemented. A
-  repayment cannot be back-dated before a submitted one; only the latest one can be cancelled, which restores
-  the schedule exactly (snapshot) and cancels its Journal Entry.
+  repayment cannot be back-dated before a submitted one; only the last **submitted** one (highest *Submission
+  No*, stamped at submit under the drawdown lock — drafts may be submitted in any order) can be cancelled,
+  which restores the schedule exactly (snapshot) and cancels its Journal Entry.
+- **Bank clearance**: the drawdown, fees and repayment Journal Entries are cleared on their posting date
+  (`clearance_date` set, as the bank moved the money on that day), so they do not wait in the Bank
+  Reconciliation Tool. Accrual Journal Entries have no bank row.
+- **Concurrency**: drawdown submits lock the facility row, repayment submits / cancels and the accrual job
+  lock the drawdown row. Every change the checks depend on moves a stamp on that row (the facility's
+  utilisation stamp / status / modified; the drawdown's `schedule_version` / last accrual date), and the
+  stamp read before the lock is compared with the locking read: if another transaction committed meanwhile
+  the user is asked to try again instead of checking the limit or allocating on stale rows. (Overdraft
+  utilisation moves with any bank posting and is not covered by this check.)
 - **Interest accrual** (Treasury Company Settings *Accrue Facility Interest Monthly*, default off): the
   daily job posts, per drawdown and month end, Dr Interest Expense / Cr Accrued Interest for the interest
   earned up to the month end (day by day within each schedule period) less what was already accrued or

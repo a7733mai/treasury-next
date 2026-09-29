@@ -18,8 +18,14 @@ is recomputed on the new outstanding principal with the drawdown's day count, fr
 whole current period is charged on the reduced principal). A Murabaha profit (fixed profit amount) is not
 recomputed: only the principal is spread again.
 
-Cancel: only the latest submitted repayment of a drawdown may be cancelled; the schedule is restored from the
-snapshot the repayment took before changing it, and its prepayment row is removed.
+Cancel: only the last submitted repayment of a drawdown may be cancelled (the highest `submission_seq`, stamped
+at submit under the drawdown lock: submission order, not creation order, since drafts may be submitted in any
+order); the schedule is restored from the snapshot the repayment took before changing it, and its prepayment
+row is removed.
+
+Concurrency: submit and cancel lock the drawdown row (`lock_drawdown`) and every schedule change increments
+the drawdown's `schedule_version`, so a repayment never acts on schedule rows read before another repayment
+committed.
 """
 
 import json
@@ -63,7 +69,8 @@ def unpaid_interest(row) -> float:
 
 def row_status(row, as_of=None) -> str:
 	"""Paid / Overdue / Partially Paid / Pending of a schedule row on `as_of` (default today)."""
-	if flt(row.paid_principal) + flt(row.paid_interest) >= flt(row.total) - 0.005:
+	precision = frappe.get_precision(SCHEDULE, "total") or 2
+	if flt(flt(row.paid_principal) + flt(row.paid_interest), precision) >= flt(row.total, precision):
 		return PAID
 	if getdate(row.due_date) < getdate(as_of or today()):
 		return OVERDUE
@@ -117,9 +124,11 @@ def allocate(drawdown, repayment) -> frappe._dict:
 	if repayment.allocation_mode == SELECTED_ROW:
 		row = next((r for r in rows if cint(r.installment_no) == cint(repayment.installment_no)), None)
 		if not row:
-			frappe.throw(_("Installment {0} does not exist on drawdown {1}.").format(
-				repayment.installment_no, frappe.bold(drawdown.name)
-			))
+			frappe.throw(
+				_("Installment {0} does not exist on drawdown {1}.").format(
+					repayment.installment_no, frappe.bold(drawdown.name)
+				)
+			)
 		interest = take(row, "interest", interest, unpaid_interest(row))
 		principal = take(row, "principal", principal, unpaid_principal(row))
 	else:
@@ -216,18 +225,56 @@ def apply_repayment(drawdown, repayment, journal: str):
 		)
 	_set_outstanding_after(drawdown)
 	_save_rows(drawdown)
+	_bump_schedule_version(drawdown.name)
 	refresh_repayment_status(drawdown.name)
 
 
+def _bump_schedule_version(drawdown_name: str):
+	version = cint(frappe.db.get_value(DRAWDOWN, drawdown_name, "schedule_version"))
+	frappe.db.set_value(DRAWDOWN, drawdown_name, "schedule_version", version + 1, update_modified=False)
+
+
+def lock_drawdown(drawdown_name: str):
+	"""Lock the drawdown row (serialises its repayments and accruals) and make sure the data read so far is
+	current.
+
+	Under REPEATABLE READ the rows read before the lock (schedule, repayments, accruals) come from the
+	transaction's snapshot, which may predate a repayment or accrual committed meanwhile. Every such change
+	moves `schedule_version` or `last_accrual_date` of the drawdown, so comparing the snapshot values with the
+	locking (current) read detects it; the user is asked to try again instead of acting on stale rows."""
+	fields = ["schedule_version", "last_accrual_date"]
+	seen = frappe.db.get_value(DRAWDOWN, drawdown_name, fields, as_dict=True)
+	current = frappe.db.get_value(DRAWDOWN, drawdown_name, fields, as_dict=True, for_update=True)
+	if seen != current:
+		frappe.throw(
+			_("Facility Drawdown {0} was changed by another transaction. Please try again.").format(
+				frappe.bold(drawdown_name)
+			),
+			title=_("Concurrent Update"),
+		)
+
+
+def next_submission_seq(drawdown_name: str) -> int:
+	"""The submission number of a repayment being submitted (call under the drawdown lock)."""
+	last = frappe.get_all(
+		"Facility Repayment",
+		filters={"drawdown": drawdown_name, "docstatus": ["in", [1, 2]]},
+		order_by="submission_seq desc",
+		limit=1,
+		pluck="submission_seq",
+	)
+	return cint(last[0] if last else 0) + 1
+
+
 def check_no_later_repayment(drawdown_name: str, repayment):
-	"""Only the latest submitted repayment of a drawdown may be cancelled."""
+	"""Only the last submitted repayment of a drawdown (highest submission number) may be cancelled."""
 	later = frappe.get_all(
 		"Facility Repayment",
 		filters={
 			"drawdown": drawdown_name,
 			"docstatus": 1,
 			"name": ["!=", repayment.name],
-			"creation": [">", repayment.creation],
+			"submission_seq": [">", cint(repayment.submission_seq)],
 		},
 		pluck="name",
 	)
@@ -253,6 +300,7 @@ def undo_repayment(drawdown, repayment):
 			for fieldname in SNAPSHOT_FIELDS:
 				row.set(fieldname, saved[row.name].get(fieldname))
 	_save_rows(drawdown)
+	_bump_schedule_version(drawdown.name)
 	refresh_repayment_status(drawdown.name)
 
 

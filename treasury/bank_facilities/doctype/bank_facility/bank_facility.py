@@ -208,11 +208,32 @@ class BankFacility(Document):
 					self.get(fieldname), _(self.meta.get_label(fieldname)), "Expense", company_currency
 				)
 		if self.accrued_interest_account:
-			self.validate_account(
-				self.accrued_interest_account,
-				_(self.meta.get_label("accrued_interest_account")),
-				"Liability",
-				self.currency,
+			label = _(self.meta.get_label("accrued_interest_account"))
+			self.validate_account(self.accrued_interest_account, label, "Liability", self.currency)
+			# accruals are sourced to the drawdowns: on a liability account they would count as principal
+			for row in self.limits:
+				if row.liability_account == self.accrued_interest_account:
+					frappe.throw(
+						_("Row #{0}: The Liability Account cannot be the {1} {2}.").format(
+							row.idx, label, frappe.bold(self.accrued_interest_account)
+						)
+					)
+		self.validate_accrued_interest_account_unchanged()
+
+	def validate_accrued_interest_account_unchanged(self):
+		"""The accrued interest of submitted drawdowns sits on this account (accruals credit it, repayments clear
+		it): it cannot move to another account while a drawdown is submitted."""
+		if self.is_new():
+			return
+		before = self.get_doc_before_save()
+		if not before or (before.accrued_interest_account or None) == (self.accrued_interest_account or None):
+			return
+		if frappe.db.exists("Facility Drawdown", {"facility": self.name, "docstatus": 1}):
+			frappe.throw(
+				_("{0} cannot be changed while Bank Facility {1} has submitted drawdowns.").format(
+					_(self.meta.get_label("accrued_interest_account")), frappe.bold(self.name)
+				),
+				title=_("Not Allowed"),
 			)
 
 	def validate_account(self, account: str, label: str, root_type: str, currency: str):

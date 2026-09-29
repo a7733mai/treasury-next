@@ -9,8 +9,9 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import getdate
+from frappe.utils import flt, getdate
 
+from treasury.accounting import posting
 from treasury.bank_facilities import interest, scheduler
 from treasury.tests.utils import (
 	COMPANY,
@@ -127,6 +128,60 @@ class TestInterestAccrual(FacilityJobTestCase):
 		# February: what was earned and not yet recognised (the expensed part counts as recognised)
 		posted = interest.accrue_drawdown(drawdown.name, "2025-03-01")
 		self.assertEqual(frappe.db.get_value("Journal Entry", posted[0], "total_debit"), 470.14)
+
+	def test_accruals_are_read_by_source_not_by_the_current_account(self):
+		"""The account is locked once drawn (see test_bank_facility); should it still differ (e.g. changed in the
+		database), the accruals already posted keep counting: nothing is accrued twice."""
+		drawdown = self.loan()
+		interest.accrue_drawdown(drawdown.name, "2025-02-01")
+		frappe.db.set_value(
+			"Bank Facility", drawdown.facility, "accrued_interest_account", self.accounts.loan_egp_2
+		)
+		drawdown.reload()
+		self.assertEqual(interest.posted_accruals(drawdown, "2025-01-31"), 631.23)
+		self.assertEqual(interest.accrued_balance(drawdown, "2025-02-01"), 631.23)
+		interest.accrue_drawdown(drawdown.name, "2025-03-01")
+		# February as in test_catch_up_missed_months, not the whole interest to date again
+		self.assertEqual(
+			[(j.posting_date, j.total_debit) for j in accrual_journals(drawdown.name)],
+			[(D("2025-01-31"), 631.23), (D("2025-02-28"), 1061.92)],
+		)
+
+	def test_usd_accrual_cleared_at_another_rate(self):
+		facility = make_bank_facility(currency="USD", total_limit=100000)
+		drawdown = self.loan(facility=facility, amount=10000)
+		# installment 1: 10,000 x 12% x 31 / 365 = 101.92, of which 16 of 31 days by 31 Jan = 52.60
+		self.assertEqual(drawdown.repayment_schedule[0].interest, 101.92)
+		posted = interest.accrue_drawdown(drawdown.name, "2025-02-01")
+		rate = posting.get_cheque_exchange_rate("USD", COMPANY, "2025-01-31")
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			posted[0],
+			[
+				(self.accounts.interest, flt(52.60 * rate, 2), 0),
+				(self.accounts.accrued_usd, 0, flt(52.60 * rate, 2)),
+			],
+		)
+		self.assertEqual(interest.posted_accruals(drawdown, "2025-01-31"), 52.60)  # facility currency
+
+		repayment = make_repayment(drawdown, "2025-02-15", exchange_rate=52)
+		self.assertEqual((repayment.principal_paid, repayment.interest_paid), (833.33, 101.92))
+		self.assertEqual((repayment.accrued_interest_cleared, repayment.interest_expensed), (52.60, 49.32))
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			repayment.journal_entry,
+			[
+				(self.accounts.loan_usd, 43333.16, 0),  # 833.33 x 52
+				(self.accounts.accrued_usd, 2735.20, 0),  # 52.60 x 52
+				(self.accounts.interest, 2564.64, 0),  # 49.32 x 52
+				(self.data.usd.bank_gl, 0, 48633.00),  # 935.25 x 52
+			],
+		)
+		drawdown.reload()
+		# cleared in the facility currency; the rate difference on the accrued account is left to revaluation
+		self.assertEqual(interest.accrued_balance(drawdown, "2025-02-15"), 0)
 
 	def test_job_isolation_and_setting(self):
 		good = self.loan()

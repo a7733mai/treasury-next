@@ -46,6 +46,7 @@
   "fees_journal_entry",
   "column_break_accounting",
   "last_accrual_date",
+  "schedule_version",
   "more_info_section",
   "remarks",
   "amended_from"
@@ -328,6 +329,17 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "description": "Incremented by every repayment submitted or cancelled (concurrency check of the repayments).",
+   "fieldname": "schedule_version",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Schedule Version",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
    "collapsible": 1,
    "fieldname": "more_info_section",
    "fieldtype": "Section Break",
@@ -356,7 +368,7 @@
    "link_fieldname": "drawdown"
   }
  ],
- "modified": "2026-10-12 09:00:00.000000",
+ "modified": "2026-10-13 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Facility Drawdown",

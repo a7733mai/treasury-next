@@ -8,6 +8,10 @@ interest account; one voucher converts all of them at one exchange rate. Expense
 penalty) are in the company currency and get the converted amount; the cents a per-row rounding may leave are
 booked on the company's Exchange Gain / Loss account (`balance_exchange_difference`). Differences between the
 drawdown rate and the repayment rate stay on the liability account, for ERPNext's Exchange Rate Revaluation.
+
+Bank clearance: the bank itself credits the drawdown and debits the fees and repayments on the document's
+date, so these Journal Entries carry `clearance_date` = their posting date (like the cleared cheques of the
+other modules) and do not wait in the Bank Reconciliation Tool. Accruals have no bank row.
 """
 
 import frappe
@@ -83,6 +87,7 @@ def post_drawdown(doc) -> tuple[str, str | None]:
 		],
 		cheque_no=doc.name,
 		cheque_date=doc.drawdown_date,
+		clearance_date=doc.drawdown_date,
 		remarks=remarks,
 	)
 	fees_journal = None
@@ -99,6 +104,7 @@ def post_drawdown(doc) -> tuple[str, str | None]:
 			],
 			cheque_no=doc.name,
 			cheque_date=doc.drawdown_date,
+			clearance_date=doc.drawdown_date,
 			remarks=_("Upfront fees of drawdown {0}").format(doc.name),
 			balance_exchange_difference=True,
 		)
@@ -139,6 +145,7 @@ def post_repayment(doc, drawdown, facility) -> str:
 		accounts=accounts,
 		cheque_no=doc.name,
 		cheque_date=doc.repayment_date,
+		clearance_date=doc.repayment_date,
 		remarks=_("Repayment {0} of drawdown {1}").format(doc.name, doc.drawdown),
 		balance_exchange_difference=True,
 	)

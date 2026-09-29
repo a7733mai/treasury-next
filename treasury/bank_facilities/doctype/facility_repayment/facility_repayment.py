@@ -21,6 +21,7 @@ SYSTEM_FIELDS = (
 	"prepayment_amount",
 	"accrued_interest_cleared",
 	"interest_expensed",
+	"submission_seq",
 )
 
 
@@ -61,15 +62,18 @@ class FacilityRepayment(Document):
 		remarks: DF.SmallText | None
 		repayment_date: DF.Date
 		schedule_snapshot: DF.LongText | None
+		submission_seq: DF.Int
 		total_paid: DF.Currency
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ hooks
 
 	def validate(self):
-		if self.docstatus == 0:
+		# on submit too: the submitted document comes from the client (it is recomputed in before_submit)
+		if self.docstatus == 0 or getattr(self, "_action", None) == "submit":
 			for fieldname in SYSTEM_FIELDS:
 				self.set(fieldname, None)
+			self.submission_seq = 0
 		drawdown = self.get_drawdown()
 		self.set_drawdown_details(drawdown)
 		self.validate_date(drawdown)
@@ -82,11 +86,12 @@ class FacilityRepayment(Document):
 
 	def before_submit(self):
 		# serialise the repayments of one drawdown: allocate on the schedule as it is now, under the lock
-		frappe.db.get_value(DRAWDOWN, self.drawdown, "name", for_update=True)
+		repayment.lock_drawdown(self.drawdown)
 		drawdown = self.get_drawdown()
 		self.validate_date(drawdown)
 		self.allocate(drawdown)
 		self.schedule_snapshot = repayment.snapshot(drawdown)
+		self.submission_seq = repayment.next_submission_seq(self.drawdown)
 
 	def on_submit(self):
 		drawdown = self.get_drawdown()
@@ -97,8 +102,8 @@ class FacilityRepayment(Document):
 		refresh_utilisation(drawdown.facility)
 
 	def before_cancel(self):
-		# only the latest repayment of a drawdown may be cancelled (its schedule snapshot is the current one)
-		frappe.db.get_value(DRAWDOWN, self.drawdown, "name", for_update=True)
+		# only the last submitted repayment of a drawdown may be cancelled (its schedule snapshot is the current one)
+		repayment.lock_drawdown(self.drawdown)
 		repayment.check_no_later_repayment(self.drawdown, self)
 
 	def on_cancel(self):

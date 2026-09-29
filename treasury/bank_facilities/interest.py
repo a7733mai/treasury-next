@@ -47,14 +47,38 @@ def earned_interest(drawdown, upto) -> float:
 	return flt(total, precision)
 
 
+def accrual_accounts(drawdown) -> list[str]:
+	"""The accrued interest accounts of the drawdown: the ones its accrual Journal Entries credited (whatever the
+	facility's account is now) and the facility's current one."""
+	gle = frappe.qb.DocType("GL Entry")
+	je = frappe.qb.DocType("Journal Entry")
+	credited = (
+		frappe.qb.from_(gle)
+		.join(je)
+		.on(je.name == gle.voucher_no)
+		.select(gle.account)
+		.distinct()
+		.where(
+			(gle.voucher_type == "Journal Entry")
+			& (gle.is_cancelled == 0)
+			& (gle.credit_in_account_currency > 0)
+			& (je.treasury_source_doctype == DRAWDOWN)
+			& (je.treasury_source_name == drawdown.name)
+			& (je.treasury_event.like(f"{accounting.EVENT_ACCRUAL_PREFIX}%"))
+		)
+		.run(pluck=True)
+	)
+	current = frappe.db.get_value("Bank Facility", drawdown.facility, "accrued_interest_account")
+	return sorted(set(credited) | ({current} if current else set()))
+
+
 def posted_accruals(drawdown, upto=None) -> float:
-	"""Accrued interest credited by the accrual Journal Entries of the drawdown up to `upto`."""
-	account = frappe.db.get_value("Bank Facility", drawdown.facility, "accrued_interest_account")
-	if not account:
-		return 0.0
+	"""Accrued interest credited by the accrual Journal Entries of the drawdown up to `upto` (read by source and
+	event, on the accounts they credited)."""
+	accounts = accrual_accounts(drawdown)
 	balances = get_source_balances(
 		[(DRAWDOWN, drawdown.name)],
-		[account],
+		accounts,
 		upto,
 		credit_minus_debit=True,
 		event_prefix=accounting.EVENT_ACCRUAL_PREFIX,
@@ -74,14 +98,14 @@ def expensed_by_repayments(drawdown_name: str, upto) -> float:
 
 def accrued_balance(drawdown, upto) -> float:
 	"""Accrued interest of the drawdown not yet cleared by its repayments, up to `upto` (facility currency)."""
-	account = frappe.db.get_value("Bank Facility", drawdown.facility, "accrued_interest_account")
-	if not account:
+	accounts = accrual_accounts(drawdown)
+	if not accounts:
 		return 0.0
 	sources = [(DRAWDOWN, drawdown.name)] + [
 		(REPAYMENT, name)
 		for name in frappe.get_all(REPAYMENT, filters={"drawdown": drawdown.name, "docstatus": 1}, pluck="name")
 	]
-	balances = get_source_balances(sources, [account], upto, credit_minus_debit=True)
+	balances = get_source_balances(sources, accounts, upto, credit_minus_debit=True)
 	return max(flt(sum(balances.values()), drawdown.precision("amount")), 0.0)
 
 

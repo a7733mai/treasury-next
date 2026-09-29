@@ -5,13 +5,15 @@ utilisation it checks (computed from the ledger through the Treasury source link
 need a bank GL balance of their own use `make_own_bank`.
 """
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, getdate
 
 from treasury.bank_facilities import accounting, schedule
 from treasury.bank_facilities import facility as lifecycle
-from treasury.bank_facilities.repayment import refresh_repayment_status, row_status
+from treasury.bank_facilities.repayment import lock_drawdown, refresh_repayment_status, row_status
 from treasury.bank_facilities.utilisation import get_utilisation
 from treasury.tests.utils import (
 	TreasuryTestMixin,
@@ -149,6 +151,24 @@ class TestRepaymentSchedule(IntegrationTestCase):
 		rows = self.build(day_count="Actual/360")
 		self.assertEqual(rows[0].interest, flt(14400 * 28 / 360, 2))
 
+	def test_annuity_last_row_actual_360(self):
+		"""The installment uses the nominal monthly rate (1%), the rows' interest Actual/360 (more than 1% in a
+		31-day month): the rows repay less principal and the last row, repaying the rest, is larger."""
+		rows = self.build(method=schedule.ANNUITY, day_count="Actual/360")
+		outstanding, previous, expected = 120000, D("2025-01-31"), []
+		for index, due_date in enumerate(month_ends_2025()):
+			interest = flt(flt(outstanding) * 12 / 100 * (due_date - previous).days / 360, 2)
+			principal = outstanding if index == 11 else flt(10661.85 - interest, 2)
+			expected.append((due_date, principal, interest))
+			outstanding, previous = flt(outstanding - principal, 2), due_date
+		self.assertEqual([(r.due_date, r.principal, r.interest) for r in rows], expected)
+		self.assertEqual({r.total for r in rows[:-1]}, {10661.85})
+		last = rows[-1]
+		self.assertEqual(last.interest, flt(last.principal * 12 / 100 * 31 / 360, 2))
+		self.assertEqual(last.total, flt(last.principal + last.interest, 2))
+		self.assertGreater(last.total, 10661.85)
+		self.assertEqual(flt(sum(r.principal for r in rows), 2), 120000)
+
 
 # ---------------------------------------------------------------------------
 # Bank Facility
@@ -193,6 +213,8 @@ class TestBankFacility(FacilityTestCase):
 			dict(start_date="2025-06-01", expiry_date="2025-05-01"),
 			# an expense account as accrued interest account
 			dict(accrued_interest_account=self.accounts.interest),
+			# the accrued interest account is a sub-limit's liability account
+			dict(accrued_interest_account=loan),
 		]
 		for values in cases:
 			with self.subTest(values=values):
@@ -274,6 +296,27 @@ class TestBankFacility(FacilityTestCase):
 		new = make_bank_facility(activate=False, status="Active")
 		self.assertEqual(new.status, "Draft")
 
+	def test_accrued_interest_account_locked_once_drawn(self):
+		facility = make_bank_facility()
+		# no drawdown yet: the account may still change
+		facility.accrued_interest_account = self.accounts.loan_egp_2
+		facility.save()
+		facility.accrued_interest_account = self.accounts.accrued_egp
+		facility.save()
+		drawdown = make_drawdown(facility)
+		facility.reload()
+		facility.accrued_interest_account = self.accounts.loan_egp_2
+		self.assertRaises(frappe.ValidationError, facility.save)
+		facility.reload()
+		facility.accrued_interest_account = None
+		self.assertRaises(frappe.ValidationError, facility.save)
+		# once the drawdown is cancelled it is free again
+		drawdown.reload()
+		drawdown.cancel()
+		facility.reload()
+		facility.accrued_interest_account = self.accounts.loan_egp_2
+		facility.save()
+
 	def test_close_requires_nothing_outstanding(self):
 		facility = make_bank_facility()
 		drawdown = make_drawdown(facility, amount=1200, tenor_months=1)
@@ -335,6 +378,9 @@ class TestFacilityDrawdown(FacilityTestCase):
 			drawdown.fees_journal_entry,
 			[(self.accounts.fees, 1000, 0, None, date), (self.egp_bank_gl, 0, 1000, None, date)],
 		)
+		# the bank moved the money on the drawdown date: cleared, not left for bank reconciliation
+		for journal in (drawdown.journal_entry, drawdown.fees_journal_entry):
+			self.assertEqual(frappe.db.get_value("Journal Entry", journal, "clearance_date"), date)
 		utilisation = get_utilisation(facility.name)
 		self.assertEqual((utilisation.utilised, utilisation.available), (100000, 900000))
 		self.assertEqual(utilisation.limits[0].available, 900000)
@@ -415,6 +461,82 @@ class TestFacilityDrawdown(FacilityTestCase):
 		drawdown.submit()
 		self.assertRaises(frappe.ValidationError, drawdown.generate_schedule)
 
+	def test_term_change_requires_a_new_schedule(self):
+		facility = make_bank_facility()
+		drawdown = make_drawdown(facility, submit=False)
+		self.assertEqual(drawdown.repayment_schedule[0].interest, 1104.66)
+		for fieldname, value in (
+			("interest_rate", 20),
+			("tenor_months", 6),
+			("day_count", "Actual/360"),
+			("first_repayment_date", D("2025-03-31")),
+		):
+			with self.subTest(fieldname=fieldname):
+				drawdown.reload()
+				drawdown.set(fieldname, value)
+				self.assertRaises(frappe.ValidationError, drawdown.save)
+		# the form clears the schedule on a term change: an empty schedule is rebuilt from the new terms
+		drawdown.reload()
+		drawdown.interest_rate = 20
+		drawdown.set("repayment_schedule", [])
+		drawdown.save()
+		self.assertEqual(drawdown.repayment_schedule[0].interest, 1841.10)  # 120,000 x 20% x 28 / 365
+		# a term changed on submit is refused as well
+		drawdown.interest_rate = 15
+		self.assertRaises(frappe.ValidationError, drawdown.submit)
+		drawdown.reload()
+		drawdown.submit()
+		self.assertEqual(drawdown.total_interest, flt(sum(r.interest for r in drawdown.repayment_schedule), 2))
+
+	def test_system_fields_sent_on_submit_are_ignored(self):
+		facility = make_bank_facility()
+		drawdown = make_drawdown(facility, submit=False)
+		drawdown.last_accrual_date = D("2025-06-30")
+		drawdown.repayment_status = "Repaid"
+		drawdown.schedule_version = 7
+		row = drawdown.repayment_schedule[0]
+		row.paid_principal, row.paid_interest, row.status, row.is_prepayment = 10000, 1104.66, "Paid", 1
+		drawdown.submit()
+		stored = frappe.db.get_value(
+			"Facility Drawdown",
+			drawdown.name,
+			["last_accrual_date", "repayment_status", "schedule_version"],
+			as_dict=True,
+		)
+		self.assertEqual(
+			(stored.last_accrual_date, stored.repayment_status, stored.schedule_version), (None, "Open", 0)
+		)
+		row = frappe.get_all(
+			"Facility Repayment Schedule",
+			filters={"parent": drawdown.name, "installment_no": 1},
+			fields=["paid_principal", "paid_interest", "status", "is_prepayment"],
+		)[0]
+		self.assertEqual(
+			(row.paid_principal, row.paid_interest, row.status, row.is_prepayment), (0, 0, "Pending", 0)
+		)
+
+		# the repayment's computed fields as well
+		repayment = make_repayment(drawdown, "2025-02-28", submit=False)
+		repayment.submission_seq = 99
+		repayment.accrued_interest_cleared = 1104.66
+		repayment.prepayment_amount = 5000
+		repayment.submit()
+		stored = frappe.db.get_value(
+			"Facility Repayment",
+			repayment.name,
+			["submission_seq", "accrued_interest_cleared", "interest_expensed", "prepayment_amount"],
+			as_dict=True,
+		)
+		self.assertEqual(
+			(
+				stored.submission_seq,
+				stored.accrued_interest_cleared,
+				stored.interest_expensed,
+				stored.prepayment_amount,
+			),
+			(1, 0, 1104.66, 0),
+		)
+
 	def test_usd_facility_on_usd_bank(self):
 		facility = make_bank_facility(currency="USD", total_limit=100000)
 		drawdown = make_drawdown(
@@ -482,6 +604,7 @@ class TestFacilityRepayment(FacilityTestCase):
 				(self.egp_bank_gl, 0, 11104.66, None, date),
 			],
 		)
+		self.assertEqual(frappe.db.get_value("Journal Entry", repayment.journal_entry, "clearance_date"), date)
 		first = self.rows(drawdown)[0]
 		self.assertEqual((first.paid_principal, first.paid_interest, first.status), (10000, 1104.66, "Paid"))
 		self.assertEqual(first.payment_journal, repayment.journal_entry)
@@ -604,6 +727,66 @@ class TestFacilityRepayment(FacilityTestCase):
 		self.assertEqual(self.rows(drawdown)[0].paid_principal, 0)
 		drawdown.reload()
 		drawdown.cancel()
+
+	def test_cancel_order_follows_submission_not_creation(self):
+		_facility, drawdown = self.make_loan()
+		# drafts prepared in advance, submitted in the reverse order, on the same date
+		created_first = make_repayment(
+			drawdown, "2025-02-28", submit=False, principal_paid=10000, interest_paid=0
+		)
+		created_second = make_repayment(
+			drawdown, "2025-02-28", submit=False, principal_paid=5000, interest_paid=0
+		)
+		created_second.submit()
+		created_first.submit()
+		self.assertEqual((created_second.submission_seq, created_first.submission_seq), (1, 2))
+		rows = self.rows(drawdown)
+		self.assertEqual((rows[0].paid_principal, rows[1].paid_principal), (10000, 5000))
+
+		# the one submitted first cannot be cancelled while the later one is submitted
+		self.assertRaises(frappe.ValidationError, created_second.cancel)
+		rows = self.rows(drawdown)
+		self.assertEqual((rows[0].paid_principal, rows[1].paid_principal), (10000, 5000))
+
+		created_first.cancel()
+		rows = self.rows(drawdown)
+		self.assertEqual((rows[0].paid_principal, rows[1].paid_principal), (5000, 0))
+		self.assertEqual(rows[0].repayment, created_second.name)
+		created_second.reload()
+		created_second.cancel()
+		rows = self.rows(drawdown)
+		self.assertEqual({(r.paid_principal, r.paid_interest) for r in rows}, {(0, 0)})
+		self.assertEqual(get_utilisation(drawdown.facility).utilised, 120000)
+
+		# a later submission gets the next number, cancelled ones included
+		third = make_repayment(drawdown, "2025-02-28")
+		self.assertEqual(third.submission_seq, 3)
+		self.assertEqual(frappe.db.get_value("Facility Drawdown", drawdown.name, "schedule_version"), 5)
+
+	def test_stale_reads_are_detected_under_the_lock(self):
+		"""What was read before the lock (snapshot) differs from the locking read: another transaction
+		committed a repayment / accrual (drawdown) or a drawdown / action (facility) meanwhile."""
+		original = frappe.db.get_value
+
+		def reads(snapshot, current):
+			"""The two reads of the check return `snapshot` then `current`; other reads are real."""
+			queue = [snapshot, current]
+			return lambda *args, **kwargs: queue.pop(0) if queue else original(*args, **kwargs)
+
+		facility, drawdown = self.make_loan()
+		stale = reads(
+			frappe._dict(schedule_version=1, last_accrual_date=None),
+			frappe._dict(schedule_version=2, last_accrual_date=None),
+		)
+		with patch.object(frappe.db, "get_value", side_effect=stale):
+			self.assertRaises(frappe.ValidationError, lock_drawdown, drawdown.name)
+		lock_drawdown(drawdown.name)  # consistent: no error
+
+		draft = make_drawdown(facility, amount=1000, submit=False)
+		stale = reads(frappe._dict(modified=1, status="Active"), frappe._dict(modified=2, status="Active"))
+		with patch.object(frappe.db, "get_value", side_effect=stale):
+			self.assertRaises(frappe.ValidationError, draft.lock_facility)
+		draft.lock_facility()
 
 	def test_full_repayment_marks_the_drawdown_repaid(self):
 		_facility, drawdown = self.make_loan(amount=2400, tenor_months=2)

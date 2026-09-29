@@ -3174,6 +3174,40 @@ msgstr "ألغِ أولاً عمليات السداد اللاحقة للسحب 
 msgid "The prepayment exceeds the principal of the unpaid installments due after the repayment date."
 msgstr "السداد المعجل يتجاوز أصل الأقساط غير المدفوعة المستحقة بعد تاريخ السداد."
 
+# Messages (Phase 5a fix round: submission order, concurrency, stale schedule, accrued interest account)
+msgid "Facility Drawdown {0} was changed by another transaction. Please try again."
+msgstr "تم تعديل سحب التسهيل {0} بواسطة عملية أخرى. يرجى المحاولة مرة أخرى."
+
+msgid "Bank Facility {0} was changed by another transaction. Please try again."
+msgstr "تم تعديل التسهيل البنكي {0} بواسطة عملية أخرى. يرجى المحاولة مرة أخرى."
+
+msgid "Concurrent Update"
+msgstr "تعديل متزامن"
+
+msgid "{0} changed: regenerate the repayment schedule (Generate Schedule) before saving."
+msgstr "تم تغيير {0}: أعد إنشاء جدول السداد (إنشاء الجدول) قبل الحفظ."
+
+msgid "Regenerate the Schedule"
+msgstr "أعد إنشاء الجدول"
+
+msgid "Row #{0}: The Liability Account cannot be the {1} {2}."
+msgstr "السطر #{0}: لا يمكن أن يكون حساب الالتزام هو {1} {2}."
+
+msgid "{0} cannot be changed while Bank Facility {1} has submitted drawdowns."
+msgstr "لا يمكن تغيير {0} ما دام للتسهيل البنكي {1} سحوبات معتمدة."
+
+msgid "Schedule Version"
+msgstr "إصدار الجدول"
+
+msgid "Incremented by every repayment submitted or cancelled (concurrency check of the repayments)."
+msgstr "يزداد مع كل سداد يُعتمد أو يُلغى (للتحقق من التعديلات المتزامنة على السداد)."
+
+msgid "Submission No"
+msgstr "رقم الاعتماد"
+
+msgid "Order in which the repayments of the drawdown were submitted; only the last one may be cancelled."
+msgstr "ترتيب اعتماد عمليات سداد السحب؛ لا يمكن إلغاء إلا آخرها."
+
 # Messages (drawdown / repayment controllers)
 msgid "Limit Type must be one of: {0}."
 msgstr "يجب أن يكون نوع الحد أحد: {0}."

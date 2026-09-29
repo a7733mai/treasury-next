@@ -68,3 +68,32 @@ frappe.ui.form.on("Facility Drawdown", {
 		frm.set_value("day_count", null);
 	},
 });
+
+// A term change makes the schedule stale: clear it, the server rebuilds an empty schedule on save (and refuses
+// a changed term with an unchanged schedule).
+const TERM_FIELDS = [
+	"amount",
+	"drawdown_date",
+	"interest_rate",
+	"day_count",
+	"profit_amount",
+	"tenor_months",
+	"repayment_frequency",
+	"repayment_method",
+	"first_repayment_date",
+	"grace_months",
+];
+frappe.ui.form.on(
+	"Facility Drawdown",
+	Object.fromEntries(
+		TERM_FIELDS.map((fieldname) => [
+			fieldname,
+			(frm) => {
+				if (frm.doc.docstatus === 0 && (frm.doc.repayment_schedule || []).length) {
+					frm.clear_table("repayment_schedule");
+					frm.refresh_field("repayment_schedule");
+				}
+			},
+		])
+	)
+);
