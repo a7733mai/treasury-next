@@ -135,6 +135,10 @@ bench install-app treasury
     guarantee may be extended) stay editable.
   - *Expired* (list / form indicator, virtual `is_expired` field): expiry date passed and still held /
     given. It is not a status.
+- **Currency.** Outgoing: the currency of the bank account's GL account (read-only). Incoming: the company
+  currency unless the user chooses another one before the first action. The user / site default currency
+  Frappe fills into every new `currency` field is never kept: the form sets the company currency when the
+  company changes, and a cheque inserted through the API without a currency gets the company currency.
 - **Open / Blank cheques** carry no amount (the Amount must stay empty). Creating one (or turning a cheque
   into one), receiving or issuing it needs the **Treasury Manager** role.
 - **Roles.** Treasury Users create and handle security cheques (receive, issue, custody, return, cancel);
@@ -148,7 +152,8 @@ bench install-app treasury
 - **Encash → PDC Cheque** (Treasury Manager): allowed for a Customer / Supplier party only (Employee and
   Other are refused for now). The user gives the encashment date, the amount (required for Open / Blank; a
   Fixed cheque is encashed for its own amount), the due date (default: the encashment date) and, for an
-  incoming cheque, the bank account it is deposited to (in the cheque currency).
+  incoming cheque, the bank account it is deposited to — it must be in the security cheque's currency (the
+  dialog offers only those; a bank in another currency is refused before anything is created).
   - Incoming: a PDC Cheque (Incoming, same party, cheque no and drawer bank) is created and **received**
     on the encashment date, so it is posted per Treasury Company Settings like any cheque (e.g. `On
     Receipt`: Payment Entry at once; `On Cheque Date`: by the daily job). Invoice / order references may
@@ -170,7 +175,8 @@ bench install-app treasury
   *Security Cheques by Custody*, *Expired Security Cheques Not Returned*; number cards *Security Held*
   (incoming Received + In Custody), *Security Given* (outgoing Issued), *Security Cheques Expiring in 30
   Days* (today to today + 30) and *Expired Security Cheques Not Returned*. Amounts are in the company
-  currency; reports and cards read with the user's permissions and User Permissions.
+  currency (a cheque in another currency is converted at today's rate; company currency cheques are never
+  converted); reports and cards read with the user's permissions and User Permissions.
 - **Print.** *Security Cheque Receipt*: receipt (incoming) / handover acknowledgment (outgoing) with the
   print date (today), party, cheque, amount or "Open / Blank", purpose, reference, expiry, custody location
   and signatures; right-to-left in Arabic.

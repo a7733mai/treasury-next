@@ -16,6 +16,7 @@ from frappe.utils import flt, formatdate, getdate, nowdate
 
 from treasury.pdc.doctype.cheque_book.cheque_book import cancel_leaf
 from treasury.pdc.report.cheque_book_usage.cheque_book_usage import execute as cheque_book_usage
+from treasury.security_cheques.doctype.security_cheque.security_cheque import deposit_bank_accounts
 from treasury.tests.utils import (
 	COMPANY,
 	CUSTOMER,
@@ -131,6 +132,24 @@ class TestSecurityCheque(SecurityChequeTestCase):
 		)
 		undated = make_security_cheque(cheque_date=None, expiry_date=day(30))
 		self.assertFalse(undated.cheque_date)
+
+	def test_incoming_currency_on_insert(self):
+		# no currency given: the company currency, not the user / site default Frappe injects on insert
+		cheque = make_security_cheque(amount=100)
+		self.assertEqual(frappe.db.get_value(DOCTYPE, cheque.name, "currency"), "EGP")
+		# a currency deliberately chosen is kept
+		fields = ("direction", "company", "party_type", "party", "purpose", "drawer_bank", "amount_type")
+		chosen = frappe.get_doc(
+			{
+				"doctype": DOCTYPE,
+				**{f: cheque.get(f) for f in fields},
+				"issue_date": cheque.issue_date,
+				"cheque_no": unique_cheque_no(),
+				"amount": 100,
+				"currency": "USD",
+			}
+		).insert()
+		self.assertEqual(frappe.db.get_value(DOCTYPE, chosen.name, "currency"), "USD")
 
 	def test_incoming_currency_is_editable_before_the_first_action(self):
 		cheque = make_security_cheque(amount=100)
@@ -615,6 +634,10 @@ class TestSecurityChequeEncashment(SecurityChequeTestCase):
 
 	def test_encash_needs_a_deposit_bank_in_the_cheque_currency(self):
 		security = self.received(1000)
+		# the encash dialog offers only the company banks in the cheque currency
+		offered = deposit_bank_accounts(security.name)
+		self.assertIn(bank_account_name("EGP"), offered)
+		self.assertNotIn(bank_account_name("USD"), offered)
 		before = ledger_counts()
 		self.assertRaises(frappe.ValidationError, security.encash, day(-5))  # no bank account
 		# a USD bank for an EGP cheque: the PDC Cheque is rolled back with everything else

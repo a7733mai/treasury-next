@@ -148,6 +148,9 @@ class SecurityCheque(Document):
 		# Frappe validates links before `before_insert`: reset whatever the client sent first.
 		if not self.flags.treasury_lifecycle:
 			self.reset_protected_fields()
+		# Frappe's `_set_defaults` fills the user / site default currency into the empty `currency` field
+		# during insert: remember whether the caller chose one (see set_currency)
+		self.flags.currency_given = bool(self.currency)
 		return super().insert(*args, **kwargs)
 
 	def before_insert(self):
@@ -253,11 +256,16 @@ class SecurityCheque(Document):
 			frappe.throw(_("Bank Account {0} has no GL account.").format(frappe.bold(self.bank_account)))
 
 	def set_currency(self):
-		"""Outgoing: the currency of the bank GL account. Incoming: the company currency unless chosen."""
+		"""Outgoing: the currency of the bank GL account (read-only). Incoming: the company currency unless chosen.
+
+		A new incoming cheque inserted without a currency gets the company currency, never the user / site
+		default currency Frappe injects into Link fields named `currency` (`frappe.model.create_new`); the form
+		sets the company currency itself when the company changes (security_cheque.js).
+		"""
 		if self.direction == lifecycle.OUTGOING:
 			bank_gl = frappe.db.get_value("Bank Account", self.bank_account, "account")
 			self.currency = get_account_currency(bank_gl)
-		elif not self.currency:
+		elif not self.currency or (self.is_new() and not self.flags.currency_given):
 			self.currency = erpnext.get_company_currency(self.company)
 
 	def validate_amount(self):
@@ -443,6 +451,19 @@ def reference_doctypes() -> list[str]:
 	"""The document types a security cheque may reference (for the form's Reference Type filter)."""
 	frappe.has_permission("Security Cheque", "read", throw=True)
 	return get_reference_doctypes()
+
+
+@frappe.whitelist()
+def deposit_bank_accounts(security_cheque: str) -> list[str]:
+	"""Company bank accounts in the currency of the security cheque (the encashment's deposit bank)."""
+	doc = frappe.get_doc("Security Cheque", security_cheque)
+	doc.check_permission("read")
+	bank_accounts = frappe.get_list(
+		"Bank Account",
+		filters={"company": doc.company, "is_company_account": 1, "account": ["is", "set"]},
+		pluck="name",
+	)
+	return [name for name in bank_accounts if lifecycle.bank_account_currency(name) == doc.currency]
 
 
 def on_doctype_update():

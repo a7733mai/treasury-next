@@ -25,6 +25,33 @@ frappe.ui.form.on("Security Cheque", {
 	onload(frm) {
 		if (frm.is_new() && !frm.doc.company) {
 			frm.set_value("company", frappe.defaults.get_user_default("Company"));
+		} else if (frm.is_new()) {
+			// replace the user / site default currency Frappe puts in every new `currency` field
+			frm.events.set_currency(frm);
+		}
+	},
+
+	company(frm) {
+		if (frm.is_new()) {
+			frm.events.set_currency(frm);
+		}
+	},
+
+	set_currency(frm) {
+		// mirrors SecurityCheque.set_currency: outgoing = bank GL currency, incoming = company currency
+		if (frm.doc.direction === "Outgoing") {
+			if (!frm.doc.bank_account) {
+				return;
+			}
+			frappe.db
+				.get_value("Bank Account", frm.doc.bank_account, "account")
+				.then((r) => r.message && r.message.account)
+				.then((account) => account && frappe.db.get_value("Account", account, "account_currency"))
+				.then((r) => r && r.message && frm.set_value("currency", r.message.account_currency));
+		} else if (frm.doc.company) {
+			frappe.db
+				.get_value("Company", frm.doc.company, "default_currency")
+				.then((r) => r.message && frm.set_value("currency", r.message.default_currency));
 		}
 	},
 
@@ -53,6 +80,7 @@ frappe.ui.form.on("Security Cheque", {
 		} else {
 			frm.set_value("drawer_bank", "");
 		}
+		frm.events.set_currency(frm);
 	},
 
 	party_type(frm) {
@@ -62,6 +90,7 @@ frappe.ui.form.on("Security Cheque", {
 
 	bank_account(frm) {
 		frm.set_value("cheque_book", "");
+		frm.events.set_currency(frm);
 	},
 
 	amount_type(frm) {
@@ -215,6 +244,19 @@ function sec_action(frm, method, label, fields) {
 }
 
 function sec_encash(frm) {
+	if (frm.doc.direction !== "Incoming") {
+		sec_encash_prompt(frm, []);
+		return;
+	}
+	// the deposit bank must be in the currency of the security cheque
+	frappe
+		.xcall("treasury.security_cheques.doctype.security_cheque.security_cheque.deposit_bank_accounts", {
+			security_cheque: frm.doc.name,
+		})
+		.then((bank_accounts) => sec_encash_prompt(frm, bank_accounts || []));
+}
+
+function sec_encash_prompt(frm, bank_accounts) {
 	const doc = frm.doc;
 	const incoming = doc.direction === "Incoming";
 	frappe.prompt(
@@ -250,7 +292,8 @@ function sec_encash(frm) {
 				options: "Bank Account",
 				reqd: incoming ? 1 : 0,
 				hidden: incoming ? 0 : 1,
-				get_query: () => ({ filters: { company: doc.company, is_company_account: 1 } }),
+				description: __("Bank accounts in {0}", [doc.currency]),
+				get_query: () => ({ filters: { name: ["in", bank_accounts] } }),
 			},
 			{
 				fieldname: "reference_doctype",

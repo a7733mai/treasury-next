@@ -2434,6 +2434,9 @@ msgstr "يتم إنشاء شيك آجل للتسييل ويُرحَّل حسب �
 msgid "Deposit to Bank Account"
 msgstr "الإيداع في الحساب البنكي"
 
+msgid "Bank accounts in {0}"
+msgstr "الحسابات البنكية بعملة {0}"
+
 msgid "Settle Invoice Type"
 msgstr "نوع الفاتورة المراد سدادها"
 

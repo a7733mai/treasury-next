@@ -24,6 +24,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, formatdate, getdate, now_datetime, today
 
+from erpnext.accounts.doctype.account.account import get_account_currency
+
 from treasury.pdc import lifecycle as pdc_lifecycle
 from treasury.utils.context import real_user
 
@@ -263,6 +265,13 @@ def _make_pdc_cheque(doc, amount: float, date, due_date, bank_account, reference
 	if doc.direction == INCOMING:
 		if not bank_account:
 			frappe.throw(_("Select the Bank Account the cheque is deposited to."))
+		bank_currency = bank_account_currency(bank_account)
+		if bank_currency != doc.currency:
+			frappe.throw(
+				_("Security cheque {0} is in {1}, but Bank Account {2} is in {3}.").format(
+					frappe.bold(doc.name), doc.currency, frappe.bold(bank_account), bank_currency or "-"
+				)
+			)
 	elif bank_account and bank_account != doc.bank_account:
 		frappe.throw(
 			_("An outgoing security cheque is paid from its own Bank Account {0}.").format(
@@ -298,6 +307,12 @@ def _make_pdc_cheque(doc, amount: float, date, due_date, bank_account, reference
 			)
 		)
 	return cheque
+
+
+def bank_account_currency(bank_account: str) -> str | None:
+	"""The currency of the GL account of a Bank Account (the currency a PDC Cheque on it gets)."""
+	bank_gl = frappe.db.get_value("Bank Account", bank_account, "account")
+	return get_account_currency(bank_gl) if bank_gl else None
 
 
 def _parse_references(references) -> list[dict]:
