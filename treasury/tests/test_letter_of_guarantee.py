@@ -129,7 +129,7 @@ class TestLetterOfGuarantee(LGTestCase):
 		facility, bank = self.facility()
 		lg = make_letter_of_guarantee(facility)
 
-		lg.extend(new_expiry_date="2026-06-30", extension_date="2025-05-01", extra_commission=500)
+		lg.extend_validity(new_expiry_date="2026-06-30", extension_date="2025-05-01", extra_commission=500)
 		lg.reload()
 		self.assertEqual(
 			(lg.status, D(lg.effective_expiry_date), D(lg.expiry_date)),
@@ -142,7 +142,7 @@ class TestLetterOfGuarantee(LGTestCase):
 			lg.status_log[-1].voucher_no,
 			[(self.accounts.commission, 500, 0, None, date), (bank.bank_gl, 0, 500, None, date)],
 		)
-		self.assertRaises(frappe.ValidationError, lg.extend, new_expiry_date="2026-01-31")  # not later
+		self.assertRaises(frappe.ValidationError, lg.extend_validity, new_expiry_date="2026-01-31")  # not later
 
 		lg.reduce(new_amount=60_000, reduction_date="2025-06-01")
 		lg.reload()
@@ -329,7 +329,7 @@ class TestLetterOfGuarantee(LGTestCase):
 	def test_cancel_undoes_every_voucher(self):
 		facility, bank = self.facility()
 		lg = make_letter_of_guarantee(facility)
-		lg.extend(new_expiry_date="2026-03-31", extension_date="2025-04-01", extra_commission=100)
+		lg.extend_validity(new_expiry_date="2026-03-31", extension_date="2025-04-01", extra_commission=100)
 		lg.reload()
 		lg.cancel()
 		lg.reload()

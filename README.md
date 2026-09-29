@@ -348,9 +348,12 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
 - **Settlement accounting** (two vouchers): the whole margin held returns to the bank (Dr Bank / Cr Margin
   at the settlement rate), and a standard **Payment Entry** pays the supplier from the bank (optionally
   allocated to one of the supplier's Purchase Invoices). ERPNext's Payment Entry allocates the invoice and
-  books the exchange gain / loss of a foreign currency invoice itself; a single Journal Entry was not used
-  because ERPNext forces a Journal Entry row that references an invoice to the invoice's exchange rate.
-  Economically this equals "margin first, bank for the rest".
+  books the exchange gain / loss of a foreign currency invoice itself (a separate system "Exchange Gain Or
+  Loss" Journal Entry linked to the Payment Entry; it carries company currency amounts only, so read the
+  Exchange Gain / Loss balance in the company currency); a single Journal Entry was not used because ERPNext
+  forces a Journal Entry row that references an invoice to the invoice's exchange rate. Result: supplier
+  cleared at the invoice rate, bank at the settlement rate, margin at its historical rate, the differences
+  on Exchange Gain / Loss. Economically this equals "margin first, bank for the rest".
 - **Import loans are manual**: settlement is always paid from the bank account. When the bank finances the
   settlement, record a *Facility Drawdown* for the loan (the LC does not create it).
 - Forecast: an accepted Usance credit is an expected outflow on its maturity date (documents amount less the

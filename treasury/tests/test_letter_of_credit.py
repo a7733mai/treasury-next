@@ -9,6 +9,7 @@ total 1,000,000; Letter of Credit sub-limit 500,000 with a 20% cash margin and a
 from unittest.mock import patch
 
 import frappe
+from erpnext.accounts.utils import get_balance_on
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, flt, getdate
 
@@ -41,6 +42,10 @@ D = getdate
 DOCTYPE = "Letter of Credit"
 LIMIT = "Letter of Credit"
 USER = "treasury-lc-user@example.com"
+
+
+def company_currency_balance(account: str, date) -> float:
+	return flt(get_balance_on(account=account, date=date, in_account_currency=False, ignore_account_permission=True))
 
 
 class LCTestCase(TreasuryTestMixin, IntegrationTestCase):
@@ -279,7 +284,7 @@ class TestLetterOfCredit(LCTestCase):
 		)
 		credit.receive_documents(documents_date="2025-03-01")
 		pi = make_usd_purchase_invoice(1_000, posting_date="2025-02-15")  # 50,000 at 50
-		loss_before = get_account_balance(gain_loss, "2025-12-31")
+		loss_before = company_currency_balance(gain_loss, "2025-12-31")
 
 		credit.settle(settlement_date="2025-03-10", exchange_rate=52, purchase_invoice=pi.name)
 		credit.reload()
@@ -298,8 +303,31 @@ class TestLetterOfCredit(LCTestCase):
 			[(usd_payable, 52_000, 0, USD_SUPPLIER), (bank.bank_gl, 0, 52_000, None)],
 		)
 		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
-		# ERPNext books the invoice's loss (1,000 x (52 - 50)); the margin gained 200
-		self.assertEqual(flt(get_account_balance(gain_loss, "2025-12-31") - loss_before, 2), 1_800)
+		# ERPNext books the invoice's loss (1,000 x (52 - 50)) in its own "Exchange Gain Or Loss" Journal Entry
+		# linked to the Payment Entry: the supplier account is cleared at the invoice rate (50,000 credited at
+		# the invoice, 52,000 debited by the payment, 2,000 credited back here).
+		exchange_journals = frappe.get_all(
+			"Journal Entry",
+			filters=[
+				["voucher_type", "=", "Exchange Gain Or Loss"],
+				["docstatus", "=", 1],
+				["Journal Entry Account", "reference_type", "=", "Payment Entry"],
+				["Journal Entry Account", "reference_name", "=", credit.payment_entry],
+			],
+			pluck="name",
+			distinct=True,
+		)
+		self.assertEqual(len(exchange_journals), 1)
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			exchange_journals[0],
+			[(usd_payable, 0, 2_000, USD_SUPPLIER), (gain_loss, 2_000, 0, None)],
+		)
+		# Net: the invoice lost 2,000 and the margin gained 200. That journal fills only the company currency
+		# debit/credit (its `*_in_account_currency` stay 0, see JournalEntry.set_amounts_in_company_currency),
+		# so the balance is read in the company currency.
+		self.assertEqual(flt(company_currency_balance(gain_loss, "2025-12-31") - loss_before, 2), 1_800)
 		self.assertEqual(get_account_balance(bank.bank_gl, "2025-12-31"), -1_000)  # in USD
 
 	def test_expiry_and_margin_release(self):

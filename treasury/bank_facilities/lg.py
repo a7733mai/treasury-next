@@ -101,7 +101,7 @@ def cancel(doc):
 # ---------------------------------------------------------------------------
 
 
-def extend(name: str, new_expiry_date, extension_date=None, extra_commission=0, remarks=None) -> dict:
+def extend_validity(name: str, new_expiry_date, extension_date=None, extra_commission=0, remarks=None) -> dict:
 	doc = instruments.begin(DOCTYPE, name)
 	instruments.require_status(doc, (*OPEN_STATUSES, EXPIRED))
 	date = instruments.action_date(extension_date)

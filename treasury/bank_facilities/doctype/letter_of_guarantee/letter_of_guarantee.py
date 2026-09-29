@@ -179,10 +179,11 @@ class LetterofGuarantee(Document):
 
 	# ------------------------------------------------------------------ actions (bank_facilities.lg)
 	# POST only: they change data, and Frappe checks the CSRF token only on POST requests.
+	# Never name an action after a Document attribute (e.g. `extend`, used by Document.__init__ for child tables).
 
 	@frappe.whitelist(methods=["POST"])
-	def extend(self, new_expiry_date=None, extension_date=None, extra_commission=0, remarks=None):
-		return lg.extend(self.name, new_expiry_date, extension_date, flt(extra_commission), remarks)
+	def extend_validity(self, new_expiry_date=None, extension_date=None, extra_commission=0, remarks=None):
+		return lg.extend_validity(self.name, new_expiry_date, extension_date, flt(extra_commission), remarks)
 
 	@frappe.whitelist(methods=["POST"])
 	def reduce(self, new_amount=None, reduction_date=None, exchange_rate=None, remarks=None):

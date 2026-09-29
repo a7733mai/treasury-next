@@ -62,7 +62,7 @@ frappe.ui.form.on("Letter of Guarantee", {
 		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
 
 		if ([...LG_OPEN, "Expired"].includes(status)) {
-			treasury_instrument_action(frm, "extend", __("Extend", null, "Letter of Guarantee"), [
+			treasury_instrument_action(frm, "extend_validity", __("Extend", null, "Letter of Guarantee"), [
 				{
 					fieldname: "new_expiry_date",
 					label: __("New Expiry Date"),
