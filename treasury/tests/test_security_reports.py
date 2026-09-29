@@ -153,7 +153,9 @@ class TestSecurityChequeRegister(SecurityReportTestCase):
 		)
 		self.assertEqual([(r.is_total, r.cheque_count) for r in data], [(1, 0)])
 		self.assertRaises(
-			frappe.ValidationError, security_register, {**filters, "expiry_from": day(5), "expiry_to": day(1)}
+			frappe.ValidationError,
+			security_register,
+			{"company": COMPANY, "expiry_from": day(5), "expiry_to": day(1)},
 		)
 
 
