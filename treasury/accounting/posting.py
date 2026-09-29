@@ -136,12 +136,14 @@ def get_linked_vouchers(source_doctype: str, source_name: str) -> list[dict]:
 
 def get_voucher_rows(source_doctype: str, source_names: list[str]) -> list[dict]:
 	"""All vouchers (any docstatus) of several sources of one doctype, oldest first, with the details a
-	voucher summary shows; `amount` is the paid amount of a Payment Entry, the total debit of a Journal Entry."""
+	voucher summary shows; `amount` is the paid amount of a Payment Entry (in `currency`, its paid-from account
+	currency), the total debit of a Journal Entry (company currency, `currency` None)."""
 	if not source_names:
 		return []
 	common = [
 		"name",
 		"docstatus",
+		"company",
 		"posting_date",
 		"treasury_event",
 		"treasury_cycle",
@@ -150,7 +152,13 @@ def get_voucher_rows(source_doctype: str, source_names: list[str]) -> list[dict]
 		"creation",
 	]
 	specific = {
-		"Payment Entry": ["reference_no", "payment_type", "mode_of_payment", "paid_amount as amount"],
+		"Payment Entry": [
+			"reference_no",
+			"payment_type",
+			"mode_of_payment",
+			"paid_amount as amount",
+			"paid_from_account_currency as currency",
+		],
 		"Journal Entry": ["cheque_no as reference_no", "total_debit as amount"],
 	}
 	rows = []
@@ -164,6 +172,7 @@ def get_voucher_rows(source_doctype: str, source_names: list[str]) -> list[dict]
 			row.doctype = doctype
 			row.setdefault("payment_type", None)
 			row.setdefault("mode_of_payment", None)
+			row.setdefault("currency", None)
 			rows.append(row)
 	rows.sort(key=lambda d: d.creation)
 	return rows

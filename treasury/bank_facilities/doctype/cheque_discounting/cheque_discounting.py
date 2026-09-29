@@ -9,6 +9,7 @@ from frappe.utils import flt
 from treasury.bank_facilities import discounting, instruments
 from treasury.bank_facilities.utilisation import refresh_utilisation
 from treasury.pdc import lifecycle
+from treasury.utils import voucher_summary
 
 # Written only by treasury.bank_facilities.discounting (on submit / cancel, or per cheque).
 LIFECYCLE_FIELDS = ("outstanding_amount", "journal_entry")
@@ -56,9 +57,14 @@ class ChequeDiscounting(Document):
 		status_log: DF.Table[BankInstrumentStatusLog]
 		total_amount: DF.Currency
 		total_charges: DF.Currency
+		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ hooks
+
+	def onload(self):
+		if not self.is_new():
+			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 
 	def insert(self, *args, **kwargs):
 		# a new batch starts with an empty log, whatever the client sent (before_insert writes the first row)

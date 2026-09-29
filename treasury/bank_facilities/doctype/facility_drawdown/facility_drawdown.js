@@ -14,6 +14,8 @@ frappe.ui.form.on("Facility Drawdown", {
 	},
 
 	refresh(frm) {
+		// server-rendered, escaped summary (treasury.utils.voucher_summary)
+		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
 		if (frm.doc.docstatus === 0 && !frm.is_new()) {
 			frm.add_custom_button(__("Generate Schedule"), () => frm.events.generate_schedule(frm));
 		}

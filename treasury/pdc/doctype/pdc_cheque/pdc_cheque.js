@@ -3,12 +3,25 @@
 
 // Business rules live in treasury/pdc/lifecycle.py; the buttons below only mirror them for convenience.
 const PDC_SETTLED = ["Cleared", "Bounced", "Returned", "Endorsed", "Discounted", "Replaced", "Cancelled"];
+// Accounting details copied to every voucher (PDCCheque ACCOUNTING_FIELDS): locked once the cheque is posted.
+const PDC_ACCOUNTING_FIELDS = ["cost_center", "project", "mode_of_payment", "party_bank_account", "contact_person"];
+const PDC_PAYEE_ROLES = ["Treasury Manager", "Treasury User", "System Manager"];
+
+// mirrors pdc_cheque.reference_rules: invoices / orders only for a supplier's outgoing or a customer's
+// incoming cheque; any cheque may settle a Journal Entry of its party
+function pdc_reference_types(direction, party_type) {
+	if (direction === "Outgoing" && party_type === "Supplier") {
+		return ["Purchase Invoice", "Purchase Order", "Journal Entry"];
+	}
+	if (direction === "Incoming" && party_type === "Customer") {
+		return ["Sales Invoice", "Sales Order", "Journal Entry"];
+	}
+	return ["Journal Entry"];
+}
 
 frappe.ui.form.on("PDC Cheque", {
 	setup(frm) {
-		frm.set_query("party_type", () => ({
-			filters: { name: ["in", ["Customer", "Supplier"]] },
-		}));
+		// any Party Type (Customer, Supplier, Employee, Shareholder ...)
 		frm.set_query("bank_account", () => ({
 			filters: { company: frm.doc.company, is_company_account: 1 },
 		}));
@@ -16,15 +29,9 @@ frappe.ui.form.on("PDC Cheque", {
 			filters: { company: frm.doc.company, bank_account: frm.doc.bank_account, status: "Active" },
 		}));
 		frm.set_query("reference_doctype", "references", () => ({
-			filters: {
-				name: [
-					"in",
-					frm.doc.direction === "Incoming"
-						? ["Sales Invoice", "Sales Order", "Journal Entry"]
-						: ["Purchase Invoice", "Purchase Order", "Journal Entry"],
-				],
-			},
+			filters: { name: ["in", pdc_reference_types(frm.doc.direction, frm.doc.party_type)] },
 		}));
+		pdc_setup_accounting_queries(frm);
 		frm.set_query("reference_name", "references", (doc, cdt, cdn) => {
 			const row = locals[cdt][cdn];
 			const filters = { docstatus: 1, company: frm.doc.company };
@@ -49,10 +56,13 @@ frappe.ui.form.on("PDC Cheque", {
 
 	refresh(frm) {
 		frm.events.set_labels(frm);
+		frm.events.set_party_label(frm);
 		frm.events.lock_identity_fields(frm);
 		frm.events.translate_status_log(frm);
 		frm.events.render_vouchers(frm);
+		frm.events.set_payment_entry_headline(frm);
 		frm.events.set_indicator(frm);
+		pdc_toggle_new_payee(frm);
 		if (!frm.is_new()) {
 			frm.events.add_actions(frm);
 			frm.events.add_print_buttons(frm);
@@ -109,7 +119,10 @@ frappe.ui.form.on("PDC Cheque", {
 
 	direction(frm) {
 		frm.events.set_labels(frm);
-		frm.set_value("party_type", frm.doc.direction === "Incoming" ? "Customer" : "Supplier");
+		// an Employee / Shareholder ... the user picked is kept; only the Customer / Supplier default follows
+		if (!frm.doc.party_type || ["Customer", "Supplier"].includes(frm.doc.party_type)) {
+			frm.set_value("party_type", frm.doc.direction === "Incoming" ? "Customer" : "Supplier");
+		}
 		if (frm.doc.direction === "Incoming") {
 			frm.set_value("cheque_book", "");
 		}
@@ -117,6 +130,25 @@ frappe.ui.form.on("PDC Cheque", {
 
 	party_type(frm) {
 		frm.set_value("party", "");
+		frm.events.set_party_label(frm);
+		frm.toggle_display("contact_person", frm.doc.party_type !== "Employee");
+		pdc_toggle_new_payee(frm);
+	},
+
+	party(frm) {
+		// the server defaults them again for the new party on save
+		frm.set_value("party_bank_account", "");
+		frm.set_value("contact_person", "");
+		pdc_toggle_new_payee(frm);
+	},
+
+	set_party_label(frm) {
+		frm.set_df_property(
+			"party",
+			"label",
+			frm.doc.party_type ? __(frm.doc.party_type) : __("Party", null, "Treasury")
+		);
+		frm.toggle_display("contact_person", frm.doc.party_type !== "Employee");
 	},
 
 	bank_account(frm) {
@@ -161,6 +193,11 @@ frappe.ui.form.on("PDC Cheque", {
 				locked || (batch_locked && fieldname !== "exchange_rate") ? 1 : 0
 			)
 		);
+		// mirrors the server lock: the vouchers carry the accounting details and dimensions
+		const posted = !frm.is_new() && frm.doc.accounting_status !== "Not Posted";
+		[...PDC_ACCOUNTING_FIELDS, ...pdc_dimension_fields(frm)].forEach((fieldname) =>
+			frm.set_df_property(fieldname, "read_only", posted ? 1 : 0)
+		);
 	},
 
 	translate_status_log(frm) {
@@ -192,34 +229,39 @@ frappe.ui.form.on("PDC Cheque", {
 	},
 
 	render_vouchers(frm) {
-		const wrapper = frm.get_field("vouchers_html").$wrapper;
-		const vouchers = (frm.doc.__onload && frm.doc.__onload.vouchers) || [];
-		if (!vouchers.length) {
-			wrapper.html(`<p class="text-muted">${__("No vouchers yet.")}</p>`);
+		// server-rendered, escaped summary (treasury.utils.voucher_summary)
+		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
+	},
+
+	set_payment_entry_headline(frm) {
+		// the paper-filing key: the submitted Payment Entries of the current cycle, at a glance
+		const entries = (!frm.is_new() && frm.doc.__onload && frm.doc.__onload.payment_entries) || [];
+		if (!entries.length) {
 			return;
 		}
-		const status = { 0: __("Draft"), 1: __("Submitted"), 2: __("Cancelled") };
-		const rows = vouchers
-			.map((v) => {
-				const route = `/app/${frappe.router.slug(v.doctype)}/${encodeURIComponent(v.name)}`;
-				return `<tr>
-					<td>${__(v.doctype)}</td>
-					<td><a href="${route}">${frappe.utils.escape_html(v.name)}</a></td>
-					<td>${frappe.utils.escape_html(v.treasury_event || "")}</td>
-					<td>${v.treasury_cycle || 1}</td>
-					<td>${frappe.datetime.str_to_user(v.posting_date)}</td>
-					<td>${status[v.docstatus] || ""}</td>
-				</tr>`;
+		const esc = frappe.utils.escape_html;
+		const items = entries
+			.map((pe) => {
+				const route = `/app/payment-entry/${encodeURIComponent(pe.name)}`;
+				let text = `<a href="${route}"><b><bdi>${esc(pe.name)}</bdi></b></a> ${esc(pe.event_label || "")} ${esc(
+					frappe.datetime.str_to_user(pe.posting_date)
+				)}`;
+				if (pe.clearance_date) {
+					text += ` • ${esc(__("Cleared {0}", [frappe.datetime.str_to_user(pe.clearance_date)]))}`;
+				}
+				return text;
 			})
-			.join("");
-		wrapper.html(`<table class="table table-bordered table-sm">
-			<thead><tr>
-				<th>${__("Voucher Type")}</th><th>${__("Voucher No")}</th><th>${__("Event")}</th>
-				<th>${__("Cycle")}</th><th>${__("Posting Date", null, "Treasury")}</th>
-				<th>${__("Status", null, "Treasury")}</th>
-			</tr></thead>
-			<tbody>${rows}</tbody>
-		</table>`);
+			.join(" · ");
+		const $headline = frm.dashboard.set_headline(
+			// `items` is escaped above; the message itself is our own translation
+			`<div>${__("Payment Entries: {0}", [items])}
+				&nbsp; <a class="treasury-copy-pe">⧉ ${esc(__("Copy", null, "Treasury Voucher"))}</a></div>`,
+			"blue"
+		);
+		$headline &&
+			$headline.find(".treasury-copy-pe").on("click", () => {
+				frappe.utils.copy_to_clipboard(entries.map((pe) => pe.name).join(", "));
+			});
 	},
 
 	add_actions(frm) {
@@ -372,6 +414,112 @@ frappe.ui.form.on("PDC Cheque", {
 		}
 	},
 });
+
+function pdc_setup_accounting_queries(frm) {
+	frm.set_query("cost_center", () => ({ filters: { company: frm.doc.company, is_group: 0 } }));
+	frm.set_query("project", () => ({ filters: { company: frm.doc.company } }));
+	frm.set_query("mode_of_payment", () => ({ filters: { enabled: 1 } }));
+	frm.set_query("party_bank_account", () => ({
+		filters: { party_type: frm.doc.party_type, party: frm.doc.party, is_company_account: 0 },
+	}));
+	frm.set_query("contact_person", () => ({
+		query: "frappe.contacts.doctype.contact.contact.contact_query",
+		filters: { link_doctype: frm.doc.party_type, link_name: frm.doc.party },
+	}));
+	// ERPNext's own helper: dimension queries by company and the company's default dimensions
+	if (window.erpnext && erpnext.accounts && erpnext.accounts.dimensions) {
+		erpnext.accounts.dimensions.setup_dimension_filters(frm, frm.doctype);
+	}
+}
+
+function pdc_dimension_fields(frm) {
+	// the accounting dimension fields ERPNext adds between `accounting_dimensions_section` and the next section
+	const fieldnames = [];
+	let inside = false;
+	for (const df of frm.meta.fields || []) {
+		if (df.fieldname === "accounting_dimensions_section") {
+			inside = true;
+		} else if (inside && df.fieldtype === "Section Break") {
+			break;
+		} else if (inside && df.fieldtype === "Link") {
+			fieldnames.push(df.fieldname);
+		}
+	}
+	return fieldnames;
+}
+
+function pdc_toggle_new_payee(frm) {
+	// "+ New Payee" under the party field: a Supplier created from a name only (treasury.utils.party.create_payee)
+	const field = frm.fields_dict.party;
+	if (!field) {
+		return;
+	}
+	const help = field.$wrapper.find(".help-box");
+	const editable =
+		frm.doc.docstatus === 0 &&
+		(frm.is_new() || frm.doc.operational_status === "Created") &&
+		!(frm.doc.__onload && frm.doc.__onload.batch_locked);
+	const show =
+		editable &&
+		!frm.doc.party &&
+		(!frm.doc.party_type || frm.doc.party_type === "Supplier") &&
+		frappe.user.has_role(PDC_PAYEE_ROLES);
+	if (!show) {
+		help.html("").addClass("hide");
+		return;
+	}
+	help.html(`<a class="treasury-new-payee">+ ${frappe.utils.escape_html(__("New Payee"))}</a>`).removeClass("hide");
+	help.find(".treasury-new-payee").on("click", () => pdc_new_payee(frm));
+}
+
+function pdc_new_payee(frm) {
+	const typed = frm.doc.party ? "" : (frm.fields_dict.party.$input && frm.fields_dict.party.$input.val()) || "";
+	const dialog = new frappe.ui.Dialog({
+		title: __("New Payee"),
+		size: "small",
+		fields: [
+			{
+				fieldname: "supplier_name",
+				label: __("Payee Name"),
+				fieldtype: "Data",
+				length: 140,
+				reqd: 1,
+				default: typed.trim(),
+			},
+			{
+				fieldname: "help",
+				fieldtype: "HTML",
+				options: `<p class="text-muted small">${frappe.utils.escape_html(
+					__(
+						"A Supplier is created in the group set in Treasury Settings (Payees). Only the name is needed; the accountant can complete it later."
+					)
+				)}</p>`,
+			},
+		],
+		primary_action_label: __("Create and Select"),
+		primary_action(values) {
+			frappe
+				.xcall("treasury.utils.party.create_payee", { supplier_name: values.supplier_name })
+				.then((r) => {
+					dialog.hide();
+					// the party_type handler clears the party: set the party once it ran
+					const set_type =
+						frm.doc.party_type === r.party_type ? Promise.resolve() : frm.set_value("party_type", r.party_type);
+					return Promise.resolve(set_type)
+						.then(() => frm.set_value("party", r.party))
+						.then(() => {
+							frappe.show_alert({
+								message: r.created
+									? __("Payee {0} created.", [frappe.utils.escape_html(r.party_name)])
+									: __("Existing supplier {0} selected.", [frappe.utils.escape_html(r.party_name)]),
+								indicator: r.created ? "green" : "blue",
+							});
+						});
+				});
+		},
+	});
+	dialog.show();
+}
 
 function pdc_action(frm, method, label, fields) {
 	frm.add_custom_button(

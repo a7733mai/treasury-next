@@ -12,6 +12,7 @@ from treasury.accounting import posting
 from treasury.bank_facilities import accounting, repayment
 from treasury.bank_facilities.interest import accrued_balance
 from treasury.bank_facilities.utilisation import refresh_utilisation
+from treasury.utils import voucher_summary
 
 DRAWDOWN = "Facility Drawdown"
 # Computed by the controller / posting service; never taken from the client.
@@ -64,9 +65,14 @@ class FacilityRepayment(Document):
 		schedule_snapshot: DF.LongText | None
 		submission_seq: DF.Int
 		total_paid: DF.Currency
+		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ hooks
+
+	def onload(self):
+		if not self.is_new():
+			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 
 	def validate(self):
 		# on submit too: the submitted document comes from the client (it is recomputed in before_submit)

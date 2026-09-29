@@ -18,6 +18,7 @@ from treasury.bank_facilities.utilisation import (
 	get_utilisation,
 	refresh_utilisation,
 )
+from treasury.utils import voucher_summary
 
 FACILITY = "Bank Facility"
 # Filled by the posting / accrual services; never taken from the client.
@@ -87,6 +88,7 @@ class FacilityDrawdown(Document):
 		total_payable: DF.Currency
 		total_principal: DF.Currency
 		upfront_fees: DF.Currency
+		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ virtual / helpers
@@ -103,6 +105,8 @@ class FacilityDrawdown(Document):
 	# ------------------------------------------------------------------ hooks
 
 	def onload(self):
+		if not self.is_new():
+			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 		if self.docstatus == 1:
 			outstanding = get_drawdown_outstanding(
 				[{"name": self.name, "liability_account": self.liability_account}]

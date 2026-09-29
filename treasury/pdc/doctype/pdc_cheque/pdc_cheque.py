@@ -14,6 +14,7 @@ from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
 from treasury.utils.party import get_party_name, validate_party_type
+from treasury.utils import voucher_summary
 from treasury.utils.protected_fields import changed_fields, changed_tables
 
 NAMING_SERIES = {"Outgoing": "PDC-OUT-.YYYY.-.#####", "Incoming": "PDC-IN-.YYYY.-.#####"}
@@ -183,7 +184,11 @@ class PDCCheque(Document):
 
 	def onload(self):
 		if not self.is_new():
-			self.set_onload("vouchers", posting.get_linked_vouchers(self.doctype, self.name))
+			cycle = self.cycle or 1
+			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name], cycle=cycle))
+			self.set_onload(
+				"payment_entries", voucher_summary.payment_entries(self.doctype, [self.name], cycle=cycle)
+			)
 			self.set_onload("cheque_print_format", self.get_cheque_print_format())
 			self.set_onload("batch_locked", self.is_batch_locked())
 

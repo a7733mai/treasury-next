@@ -25,3 +25,16 @@ def treasury_batch_receipt(doc) -> dict:
 	if getattr(doc, "doctype", None) != "Cheque Batch":
 		return {"cheques": [], "total": 0, "count": 0}
 	return get_receipt_cheques(doc)
+
+
+def treasury_payment_entries(doc) -> list[dict]:
+	"""The submitted Payment Entries of the current cycle of a PDC Cheque, for its receipt: the numbers the
+	paper is filed under. [{name, posting_date, event_label}]; [] for any other document."""
+	from treasury.utils.voucher_summary import payment_entries
+
+	if getattr(doc, "doctype", None) != "PDC Cheque" or not getattr(doc, "name", None):
+		return []
+	return [
+		{"name": pe["name"], "posting_date": pe["posting_date"], "event_label": pe["event_label"]}
+		for pe in payment_entries("PDC Cheque", [doc.name], cycle=doc.get("cycle") or 1)
+	]

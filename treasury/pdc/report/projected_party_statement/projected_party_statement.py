@@ -32,6 +32,8 @@ from treasury.pdc.report_utils import (
 	AmountConverter,
 	get_cheques,
 	get_precision,
+	payment_entries_by_cheque,
+	payment_entry_column,
 	report_today,
 	validate_company,
 	validate_date_range,
@@ -93,6 +95,7 @@ class ProjectedPartyStatement:
 
 		projected = balance
 		unposted = self.get_unposted_cheques()
+		payment_entries = payment_entries_by_cheque([c.name for c in unposted])
 		for cheque in unposted:
 			if getdate(cheque.effective_due_date) > self.to_date:
 				continue  # in the exposure summary only
@@ -102,18 +105,18 @@ class ProjectedPartyStatement:
 			description = _("{0} cheque {1} ({2})").format(
 				_(cheque.direction), cheque.cheque_no, _(cheque.operational_status)
 			)
-			data.append(
-				self.make_row(
-					PROJECTED,
-					description,
-					date=cheque.effective_due_date,
-					voucher_type=DOCTYPE,
-					voucher_no=cheque.name,
-					debit=debit,
-					credit=credit,
-					projected=projected,
-				)
+			row = self.make_row(
+				PROJECTED,
+				description,
+				date=cheque.effective_due_date,
+				voucher_type=DOCTYPE,
+				voucher_no=cheque.name,
+				debit=debit,
+				credit=credit,
+				projected=projected,
 			)
+			row.payment_entry = payment_entries.get(cheque.name, "")
+			data.append(row)
 		data.append(self.make_row(PROJECTED_CLOSING, _("Projected Closing Balance"), projected=projected))
 
 		summary = self.get_summary(balance, sum(self.signed_amount(c) for c in unposted))
@@ -271,6 +274,7 @@ class ProjectedPartyStatement:
 				"options": "voucher_type",
 				"width": 170,
 			},
+			payment_entry_column(),
 			{
 				"fieldname": "description",
 				"label": _("Description", context=CTX),

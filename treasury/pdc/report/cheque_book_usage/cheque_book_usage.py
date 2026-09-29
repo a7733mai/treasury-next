@@ -13,7 +13,14 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
-from treasury.pdc.report_utils import CTX, OUTGOING, column, validate_company
+from treasury.pdc.report_utils import (
+	CTX,
+	OUTGOING,
+	column,
+	payment_entries_by_cheque,
+	payment_entry_column,
+	validate_company,
+)
 
 BOOK_DOCTYPE = "Cheque Book"
 STATUSES = ("Active", "Exhausted", "Closed")
@@ -39,11 +46,32 @@ def execute(filters=None):
 
 	used_by_bank = {bank: get_used_leaves(bank) for bank in {b.bank_account for b in books}}
 	cancelled_by_book = get_cancelled_leaves([b.name for b in books])
+	payment_entries = get_book_payment_entries([b.name for b in books])
 	data = [
 		make_row(book, used_by_bank[book.bank_account], cancelled_by_book.get(book.name, set()))
 		for book in books
 	]
+	for row in data:
+		row.payment_entry = payment_entries.get(row.cheque_book, "")
 	return get_columns(), data
+
+
+def get_book_payment_entries(books: list[str]) -> dict[str, str]:
+	"""{book: comma separated submitted Payment Entries (current cycle) of its cheques, in leaf order}."""
+	if not books:
+		return {}
+	cheques = frappe.get_all(
+		"PDC Cheque",
+		filters={"cheque_book": ["in", books]},
+		fields=["name", "cheque_book"],
+		order_by="cheque_no asc, creation asc",
+	)
+	by_cheque = payment_entries_by_cheque([c.name for c in cheques])
+	result: dict[str, list[str]] = {}
+	for cheque in cheques:
+		if by_cheque.get(cheque.name):
+			result.setdefault(cheque.cheque_book, []).append(by_cheque[cheque.name])
+	return {book: ", ".join(entries) for book, entries in result.items()}
 
 
 def get_used_leaves(bank_account: str) -> set[int]:
@@ -118,4 +146,5 @@ def get_columns() -> list[dict]:
 		column("next_no", _("Next No"), width=100),
 		column("status", _("Status", context="Treasury"), width=90),
 		column("used_percent", _("% Used"), "Percent", 90),
+		payment_entry_column(),
 	]

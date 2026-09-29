@@ -145,6 +145,12 @@ frappe.query_reports["Security Cheque Register"] = {
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {
+		// every Payment Entry of the comma list is a link (export and print keep the plain list)
+		if (column.fieldname === "payment_entry" && data && value) {
+			return value.split(",").map((n) => n.trim()).filter(Boolean)
+				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><bdi>${frappe.utils.escape_html(n)}</bdi></a>`)
+				.join(", ");
+		}
 		if (data && ["status", "direction", "purpose", "amount_type"].includes(column.fieldname)) {
 			const context = column.fieldname === "direction" ? null : "Security Cheque";
 			value = value ? __(value, null, context) : value;

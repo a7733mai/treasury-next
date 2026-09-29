@@ -55,6 +55,22 @@ class TreasuryCompanySettings(Document):
 
 	def onload(self):
 		self.set_onload("unregistered_series", payment_modes.unregistered_series(self))
+		# for the form: the confirmation names the default series, the Generate dialog previews the names
+		series = payment_modes.payment_entry_series()
+		self.set_onload("pe_default_series", series[0] if series else None)
+		banks = [row.bank_account for row in self.get("pdc_accounts") if row.bank_account]
+		accounts = (
+			frappe.get_all("Bank Account", filters={"name": ["in", banks]}, fields=["name", "bank", "account_name"])
+			if banks
+			else []
+		)
+		self.set_onload(
+			"bank_accounts",
+			{
+				d.name: {"bank": d.bank or d.account_name or d.name, "account": d.account_name or d.name}
+				for d in accounts
+			},
+		)
 
 	def validate(self):
 		self.warn_outgoing_on_creation()

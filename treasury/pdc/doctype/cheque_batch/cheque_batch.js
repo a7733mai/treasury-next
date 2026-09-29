@@ -19,11 +19,24 @@ const CHEQUE_BATCH_STATUS_COLORS = {
 	Cancelled: "darkgrey",
 };
 
+const CHEQUE_BATCH_RELEASED = ["Cancelled", "Replaced"];
+const CHEQUE_BATCH_PAYEE_ROLES = ["Treasury Manager", "Treasury User", "System Manager"];
+
+// mirrors pdc_cheque.reference_rules (invoices / orders only for a supplier's outgoing or a customer's
+// incoming batch; any batch may settle Journal Entries of its party)
+function cheque_batch_reference_types(direction, party_type) {
+	if (direction === "Outgoing" && party_type === "Supplier") {
+		return ["Purchase Invoice", "Purchase Order", "Journal Entry"];
+	}
+	if (direction === "Incoming" && party_type === "Customer") {
+		return ["Sales Invoice", "Sales Order", "Journal Entry"];
+	}
+	return ["Journal Entry"];
+}
+
 frappe.ui.form.on("Cheque Batch", {
 	setup(frm) {
-		frm.set_query("party_type", () => ({
-			filters: { name: ["in", ["Customer", "Supplier"]] },
-		}));
+		// any Party Type (Customer, Supplier, Employee, Shareholder ...)
 		frm.set_query("bank_account", () => ({
 			filters: { company: frm.doc.company, is_company_account: 1 },
 		}));
@@ -31,15 +44,22 @@ frappe.ui.form.on("Cheque Batch", {
 			filters: { company: frm.doc.company, bank_account: frm.doc.bank_account, status: "Active" },
 		}));
 		frm.set_query("reference_doctype", "cheques", () => ({
-			filters: {
-				name: [
-					"in",
-					frm.doc.direction === "Incoming"
-						? ["Sales Invoice", "Sales Order", "Journal Entry"]
-						: ["Purchase Invoice", "Purchase Order", "Journal Entry"],
-				],
-			},
+			filters: { name: ["in", cheque_batch_reference_types(frm.doc.direction, frm.doc.party_type)] },
 		}));
+		frm.set_query("cost_center", () => ({ filters: { company: frm.doc.company, is_group: 0 } }));
+		frm.set_query("project", () => ({ filters: { company: frm.doc.company } }));
+		frm.set_query("mode_of_payment", () => ({ filters: { enabled: 1 } }));
+		frm.set_query("party_bank_account", () => ({
+			filters: { party_type: frm.doc.party_type, party: frm.doc.party, is_company_account: 0 },
+		}));
+		frm.set_query("contact_person", () => ({
+			query: "frappe.contacts.doctype.contact.contact.contact_query",
+			filters: { link_doctype: frm.doc.party_type, link_name: frm.doc.party },
+		}));
+		// ERPNext's own helper: dimension queries by company and the company's default dimensions
+		if (window.erpnext && erpnext.accounts && erpnext.accounts.dimensions) {
+			erpnext.accounts.dimensions.setup_dimension_filters(frm, frm.doctype);
+		}
 		frm.set_query("reference_name", "cheques", (doc, cdt, cdn) => {
 			const row = locals[cdt][cdn];
 			const filters = { docstatus: 1, company: frm.doc.company };
@@ -67,7 +87,10 @@ frappe.ui.form.on("Cheque Batch", {
 
 	refresh(frm) {
 		frm.events.set_labels(frm);
+		frm.events.set_party_label(frm);
 		frm.events.render_dashboard(frm);
+		frm.events.render_payment_entries(frm);
+		cheque_batch_toggle_new_payee(frm);
 		if (frm.doc.docstatus === 0) {
 			frm.events.add_draft_buttons(frm);
 			if (!frm.doc.posting_mode) {
@@ -88,7 +111,10 @@ frappe.ui.form.on("Cheque Batch", {
 	},
 
 	direction(frm) {
-		frm.set_value("party_type", frm.doc.direction === "Incoming" ? "Customer" : "Supplier");
+		// an Employee / Shareholder ... the user picked is kept; only the Customer / Supplier default follows
+		if (!frm.doc.party_type || ["Customer", "Supplier"].includes(frm.doc.party_type)) {
+			frm.set_value("party_type", frm.doc.direction === "Incoming" ? "Customer" : "Supplier");
+		}
 		if (frm.doc.direction === "Incoming") {
 			frm.set_value("cheque_book", "");
 		}
@@ -102,6 +128,24 @@ frappe.ui.form.on("Cheque Batch", {
 
 	party_type(frm) {
 		frm.set_value("party", "");
+		frm.events.set_party_label(frm);
+		cheque_batch_toggle_new_payee(frm);
+	},
+
+	party(frm) {
+		// the server defaults them again for the new party on save
+		frm.set_value("party_bank_account", "");
+		frm.set_value("contact_person", "");
+		cheque_batch_toggle_new_payee(frm);
+	},
+
+	set_party_label(frm) {
+		frm.set_df_property(
+			"party",
+			"label",
+			frm.doc.party_type ? __(frm.doc.party_type) : __("Party", null, "Treasury")
+		);
+		frm.toggle_display("contact_person", frm.doc.party_type !== "Employee");
 	},
 
 	bank_account(frm) {
@@ -325,4 +369,138 @@ frappe.ui.form.on("Cheque Batch", {
 			<tbody>${rows}</tbody>
 		</table>`);
 	},
+
+	render_payment_entries(frm) {
+		// the Payment Entry of every live cheque: the numbers the batch's papers are filed under
+		const field = frm.get_field("payment_entries_html");
+		if (!field || frm.doc.docstatus !== 1) {
+			return;
+		}
+		const cheques = ((frm.doc.__onload && frm.doc.__onload.cheques) || []).filter(
+			(c) => !CHEQUE_BATCH_RELEASED.includes(c.operational_status)
+		);
+		if (!cheques.length) {
+			field.$wrapper.html("");
+			return;
+		}
+		const esc = frappe.utils.escape_html;
+		const posted = cheques.filter((c) => c.party_payment_entry);
+		frm.dashboard.set_headline(
+			esc(
+				__("Payment Entries: {0}", [
+					__("{0} of {1} cheques posted", [posted.length, cheques.length]),
+				])
+			),
+			posted.length === cheques.length ? "green" : "blue"
+		);
+		const pe_link = (name) =>
+			name
+				? `<a href="/app/payment-entry/${encodeURIComponent(name)}"><b><bdi>${esc(name)}</bdi></b></a>`
+				: `<span class="text-muted">—</span>`;
+		// no Under Collection column when no cheque has one (outgoing batches)
+		const with_uc = cheques.some((c) => c.under_collection_payment_entry);
+		const rows = cheques
+			.map(
+				(c) => `<tr>
+					<td><a href="/app/pdc-cheque/${encodeURIComponent(c.name)}"><bdi>${esc(c.cheque_no || c.name)}</bdi></a></td>
+					<td style="white-space: nowrap">${esc(frappe.datetime.str_to_user(c.effective_due_date))}</td>
+					<td>${pe_link(c.party_payment_entry)}</td>
+					${with_uc ? `<td>${pe_link(c.under_collection_payment_entry)}</td>` : ""}
+					<td>${pe_link(c.bank_payment_entry)}</td>
+				</tr>`
+			)
+			.join("");
+		const names = cheques
+			.flatMap((c) => [c.party_payment_entry, c.under_collection_payment_entry, c.bank_payment_entry])
+			.filter(Boolean);
+		field.$wrapper.html(`<div class="table-responsive"><table class="table table-bordered table-sm">
+			<thead class="bg-light"><tr>
+				<th>${esc(__("Cheque No"))}</th>
+				<th>${esc(__("Due Date", null, "Treasury"))}</th>
+				<th>${esc(__("Party Posting", null, "Treasury Voucher"))}</th>
+				${with_uc ? `<th>${esc(__("Under Collection", null, "Treasury Voucher"))}</th>` : ""}
+				<th>${esc(__("Bank Settlement", null, "Treasury Voucher"))}</th>
+			</tr></thead>
+			<tbody>${rows}</tbody>
+		</table></div>
+		<p class="text-muted small">${esc(
+			__("{0} of {1} cheques posted to party", [posted.length, cheques.length])
+		)}${
+			names.length
+				? ` · <a class="treasury-copy-pe">${esc(__("Copy all PE numbers"))}</a>`
+				: ""
+		}</p>`);
+		field.$wrapper.find(".treasury-copy-pe").on("click", () => {
+			frappe.utils.copy_to_clipboard(names.join(", "));
+		});
+	},
 });
+
+function cheque_batch_toggle_new_payee(frm) {
+	// "+ New Payee" under the party field of a draft batch (treasury.utils.party.create_payee)
+	const field = frm.fields_dict.party;
+	if (!field) {
+		return;
+	}
+	const help = field.$wrapper.find(".help-box");
+	const show =
+		frm.doc.docstatus === 0 &&
+		!frm.doc.party &&
+		(!frm.doc.party_type || frm.doc.party_type === "Supplier") &&
+		frappe.user.has_role(CHEQUE_BATCH_PAYEE_ROLES);
+	if (!show) {
+		help.html("").addClass("hide");
+		return;
+	}
+	help.html(`<a class="treasury-new-payee">+ ${frappe.utils.escape_html(__("New Payee"))}</a>`).removeClass("hide");
+	help.find(".treasury-new-payee").on("click", () => cheque_batch_new_payee(frm));
+}
+
+function cheque_batch_new_payee(frm) {
+	const typed = frm.doc.party ? "" : (frm.fields_dict.party.$input && frm.fields_dict.party.$input.val()) || "";
+	const dialog = new frappe.ui.Dialog({
+		title: __("New Payee"),
+		size: "small",
+		fields: [
+			{
+				fieldname: "supplier_name",
+				label: __("Payee Name"),
+				fieldtype: "Data",
+				length: 140,
+				reqd: 1,
+				default: typed.trim(),
+			},
+			{
+				fieldname: "help",
+				fieldtype: "HTML",
+				options: `<p class="text-muted small">${frappe.utils.escape_html(
+					__(
+						"A Supplier is created in the group set in Treasury Settings (Payees). Only the name is needed; the accountant can complete it later."
+					)
+				)}</p>`,
+			},
+		],
+		primary_action_label: __("Create and Select"),
+		primary_action(values) {
+			frappe
+				.xcall("treasury.utils.party.create_payee", { supplier_name: values.supplier_name })
+				.then((r) => {
+					dialog.hide();
+					// the party_type handler clears the party: set the party once it ran
+					const set_type =
+						frm.doc.party_type === r.party_type ? Promise.resolve() : frm.set_value("party_type", r.party_type);
+					return Promise.resolve(set_type)
+						.then(() => frm.set_value("party", r.party))
+						.then(() => {
+							frappe.show_alert({
+								message: r.created
+									? __("Payee {0} created.", [frappe.utils.escape_html(r.party_name)])
+									: __("Existing supplier {0} selected.", [frappe.utils.escape_html(r.party_name)]),
+								indicator: r.created ? "green" : "blue",
+							});
+						});
+				});
+		},
+	});
+	dialog.show();
+}

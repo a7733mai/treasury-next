@@ -39,6 +39,12 @@ frappe.query_reports["Cheque Book Usage"] = {
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {
+		// every Payment Entry of the comma list is a link (export and print keep the plain list)
+		if (column.fieldname === "payment_entry" && data && value) {
+			return value.split(",").map((n) => n.trim()).filter(Boolean)
+				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><bdi>${frappe.utils.escape_html(n)}</bdi></a>`)
+				.join(", ");
+		}
 		if (data && column.fieldname === "status") {
 			value = value ? __(value) : value;
 		}

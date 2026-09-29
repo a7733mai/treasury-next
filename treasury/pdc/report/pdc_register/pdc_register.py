@@ -23,6 +23,7 @@ from treasury.pdc.report_utils import (
 	CTX,
 	INCOMING,
 	OUTGOING,
+	PAYMENT_ENTRY_FIELDS,
 	VOUCHER_FIELDS,
 	AmountConverter,
 	as_list,
@@ -33,6 +34,8 @@ from treasury.pdc.report_utils import (
 	get_cheques,
 	get_linked_vouchers,
 	get_precision,
+	payment_entries_by_cheque,
+	payment_entry_column,
 	report_today,
 	validate_company,
 	validate_date_range,
@@ -90,6 +93,21 @@ def get_filters(filters: frappe._dict, company: str) -> list:
 		conditions.append(["cheque_batch", "=", filters.cheque_batch])
 	if cint(filters.postponed_only):
 		conditions.append(["is_postponed", "=", 1])
+	if filters.payment_entry:
+		# the cheque of a filed paper Payment Entry: any of its Payment Entry links (this cycle's), or the
+		# source of the Payment Entry (an earlier cycle's)
+		names = frappe.get_all(
+			"PDC Cheque",
+			filters={"company": company},
+			or_filters=[[f, "=", filters.payment_entry] for f in PAYMENT_ENTRY_FIELDS],
+			pluck="name",
+		)
+		source = frappe.db.get_value(
+			"Payment Entry", filters.payment_entry, ["treasury_source_doctype", "treasury_source_name"]
+		)
+		if source and source[0] == "PDC Cheque" and source[1]:
+			names.append(source[1])
+		conditions.append(["name", "in", names or [""]])
 
 	date_field = DATE_FIELDS.get(filters.date_based_on or "Effective Due Date")
 	if not date_field:
@@ -128,6 +146,7 @@ def get_rows(filters: frappe._dict, company: str) -> list[frappe._dict]:
 	converter = AmountConverter(company)
 	today = report_today()
 	precision = get_precision()
+	payment_entries = payment_entries_by_cheque([c.name for c in cheques])
 	rows = []
 	for cheque in cheques:
 		is_open = cheque.operational_status not in FINAL_STATUSES
@@ -152,6 +171,7 @@ def get_rows(filters: frappe._dict, company: str) -> list[frappe._dict]:
 				days_to_due=date_diff(cheque.effective_due_date, today) if is_open else None,
 				operational_status=cheque.operational_status,
 				accounting_status=cheque.accounting_status,
+				payment_entry=payment_entries.get(cheque.name, ""),
 				postponement_count=cint(cheque.postponement_count),
 				vouchers=get_linked_vouchers(cheque),
 				indent=0,
@@ -229,6 +249,7 @@ def get_columns(group_field: str | None) -> list[dict]:
 		column("days_to_due", _("Days to Due"), "Int", 90),
 		column("operational_status", _("Operational Status")),
 		column("accounting_status", _("Accounting Status"), width=130),
+		payment_entry_column(),
 		column("postponement_count", _("Postponement Count"), "Int", 90),
 		column("vouchers", _("Linked Vouchers"), width=260),
 		column(

@@ -15,7 +15,7 @@ from frappe.utils import cint, date_diff, flt
 
 from treasury.bank_facilities import lc
 from treasury.bank_facilities.report_utils import CompanyConverter, report_today
-from treasury.pdc.report_utils import CTX, column, get_precision, validate_company
+from treasury.pdc.report_utils import CTX, column, get_precision, payment_entry_column, validate_company
 
 FIELDS = [
 	"name",
@@ -55,9 +55,18 @@ def execute(filters=None):
 		if filters.get(fieldname):
 			conditions[fieldname] = filters.get(fieldname)
 	rows = frappe.get_list(lc.DOCTYPE, filters=conditions, fields=FIELDS, order_by="issue_date asc, name asc")
+	# the settlement Payment Entry, while submitted (the paper-filing number)
+	submitted = set(
+		frappe.get_all(
+			"Payment Entry",
+			filters={"name": ["in", [r.payment_entry for r in rows if r.payment_entry] or [""]], "docstatus": 1},
+			pluck="name",
+		)
+	)
 
 	data = []
 	for row in rows:
+		row.payment_entry = row.payment_entry if row.payment_entry in submitted else ""
 		is_open = row.status in lc.OPEN_STATUSES
 		if cint(filters.open_only) and not (is_open or (row.status == lc.EXPIRED and flt(row.margin_held))):
 			continue
@@ -121,7 +130,7 @@ def get_columns() -> list[dict]:
 		column("maturity_date", _("Maturity Date"), "Date", 100),
 		column("days_to_maturity", _("Days to Maturity"), "Int", 90),
 		column("status_label", _("Status", context="Treasury"), width=130),
-		column("payment_entry", _("Payment Entry"), "Link", 150, options="Payment Entry"),
+		payment_entry_column(),
 		money("open_company", _("Open (Company Currency)"), "company_currency", 150),
 		money("margin_company", _("Margin (Company Currency)"), "company_currency", 150),
 		column(

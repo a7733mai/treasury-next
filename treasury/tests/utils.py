@@ -44,7 +44,16 @@ BANK_SETUP = {
 # IGNORE_TEST_RECORD_DEPENDENCIES only to that module's own doctype: a link not ignored there is walked
 # with ERPNext's test modules (Cost Center -> Company -> ... -> Payment Gateway, a doctype of the payments
 # app, which is not installed). The doctype test modules add these to their list.
-PHASE_7A_TEST_RECORD_IGNORES = ["Party Type", "Cost Center", "Project", "Mode of Payment", "Contact", "Branch"]
+# Department: accounting dimension fields present on the test site are walked too.
+PHASE_7A_TEST_RECORD_IGNORES = [
+	"Party Type",
+	"Cost Center",
+	"Project",
+	"Mode of Payment",
+	"Contact",
+	"Branch",
+	"Department",
+]
 
 
 def acc(name: str, abbr: str = ABBR) -> str:

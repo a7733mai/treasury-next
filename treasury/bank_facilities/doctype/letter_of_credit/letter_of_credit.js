@@ -34,6 +34,8 @@ frappe.ui.form.on("Letter of Credit", {
 	},
 
 	refresh(frm) {
+		// server-rendered, escaped summary (treasury.utils.voucher_summary)
+		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
 		lc_translate_log(frm);
 		if (frm.is_new() || frm.doc.docstatus === 0) {
 			return;

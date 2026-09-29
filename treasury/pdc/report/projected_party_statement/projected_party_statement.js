@@ -12,13 +12,11 @@ frappe.query_reports["Projected Party Statement"] = {
 			reqd: 1,
 		},
 		{
+			// any Party Type: a cheque may be of an Employee, a Shareholder ...
 			fieldname: "party_type",
 			label: __("Party Type"),
-			fieldtype: "Select",
-			options: [
-				{ value: "Supplier", label: __("Supplier") },
-				{ value: "Customer", label: __("Customer") },
-			],
+			fieldtype: "Link",
+			options: "Party Type",
 			default: "Supplier",
 			reqd: 1,
 			on_change: function () {
@@ -57,6 +55,12 @@ frappe.query_reports["Projected Party Statement"] = {
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {
+		// every Payment Entry of the comma list is a link (export and print keep the plain list)
+		if (column.fieldname === "payment_entry" && data && value) {
+			return value.split(",").map((n) => n.trim()).filter(Boolean)
+				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><bdi>${frappe.utils.escape_html(n)}</bdi></a>`)
+				.join(", ");
+		}
 		let formatted = default_formatter(value, row, column, data);
 		if (!data) return formatted;
 		if (column.fieldname === "voucher_type" && value) {

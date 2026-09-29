@@ -10,6 +10,7 @@ from frappe.utils import flt, getdate, today
 
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
 from treasury.security_cheques import lifecycle
+from treasury.utils import voucher_summary
 from treasury.utils.protected_fields import changed_fields, changed_tables
 
 NAMING_SERIES = {"Incoming": "SEC-IN-.YYYY.-.#####", "Outgoing": "SEC-OUT-.YYYY.-.#####"}
@@ -130,6 +131,7 @@ class SecurityCheque(Document):
 			"Created", "Received", "In Custody", "Issued", "Returned", "Encashed", "Lost", "Cancelled"
 		]
 		status_log: DF.Table[SecurityChequeStatusLog]
+		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ virtual fields
@@ -147,6 +149,13 @@ class SecurityCheque(Document):
 
 	def onload(self):
 		self.set_onload("reference_doctypes", get_reference_doctypes())
+		if not self.is_new():
+			# a security cheque never posts itself: the vouchers are those of the PDC Cheque it was encashed
+			# into, and of the cheques that replaced that one
+			self.set_onload(
+				"voucher_summary",
+				voucher_summary.render_cheques(voucher_summary.cheque_chain(self.converted_pdc_cheque)),
+			)
 
 	def insert(self, *args, **kwargs):
 		# Frappe validates links before `before_insert`: reset whatever the client sent first.

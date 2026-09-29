@@ -8,6 +8,7 @@ from frappe.utils import cint, flt, getdate
 
 from treasury.bank_facilities import instruments, lc
 from treasury.bank_facilities.utilisation import refresh_utilisation
+from treasury.utils import voucher_summary
 
 # Written only by treasury.bank_facilities.lc (on submit, or by the actions with `treasury_lifecycle`).
 LIFECYCLE_FIELDS = (
@@ -85,9 +86,14 @@ class LetterofCredit(Document):
 		tolerance_percent: DF.Percent
 		unused_amount: DF.Currency
 		usance_days: DF.Int
+		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ hooks
+
+	def onload(self):
+		if not self.is_new():
+			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 
 	def insert(self, *args, **kwargs):
 		# a new credit starts with an empty log, whatever the client sent (before_insert writes the first row)

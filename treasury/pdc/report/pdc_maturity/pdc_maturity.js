@@ -57,6 +57,12 @@ frappe.query_reports["PDC Maturity"] = {
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {
+		// every Payment Entry of the comma list is a link (export and print keep the plain list)
+		if (column.fieldname === "payment_entry" && data && value) {
+			return value.split(",").map((n) => n.trim()).filter(Boolean)
+				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><bdi>${frappe.utils.escape_html(n)}</bdi></a>`)
+				.join(", ");
+		}
 		let formatted = default_formatter(value, row, column, data);
 		if (!data) return formatted;
 		if (data.is_total) {

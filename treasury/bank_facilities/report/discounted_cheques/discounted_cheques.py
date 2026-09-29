@@ -15,7 +15,15 @@ from frappe.utils import date_diff, flt, getdate
 
 from treasury.bank_facilities import discounting
 from treasury.bank_facilities.report_utils import CompanyConverter, report_today
-from treasury.pdc.report_utils import CTX, column, get_precision, validate_company, validate_date_range
+from treasury.pdc.report_utils import (
+	CTX,
+	column,
+	get_precision,
+	payment_entries_by_cheque,
+	payment_entry_column,
+	validate_company,
+	validate_date_range,
+)
 
 
 def execute(filters=None):
@@ -42,6 +50,7 @@ def execute(filters=None):
 		)
 	}
 	rows = get_items(list(batches), filters)
+	payment_entries = payment_entries_by_cheque([r.pdc_cheque for r in rows])
 
 	data, parents = [], {}
 	for item in rows:
@@ -85,6 +94,7 @@ def execute(filters=None):
 			outstanding=outstanding,
 			outstanding_company=converter.convert(outstanding, batch.currency),
 			status_label=_(item.status, context=discounting.ITEM_DOCTYPE),
+			payment_entry=payment_entries.get(item.pdc_cheque, ""),
 			closed_date=item.closed_date,
 			closing_journal=item.closing_journal,
 			currency=batch.currency,
@@ -184,6 +194,7 @@ def get_columns() -> list[dict]:
 		money("outstanding", _("Outstanding", context=CTX)),
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 		column("status_label", _("Status", context="Treasury"), width=110),
+		payment_entry_column(),
 		column("closed_date", _("Closed Date"), "Date", 100),
 		column("closing_journal", _("Closing Journal Entry"), "Link", 150, options="Journal Entry"),
 		money("outstanding_company", _("Outstanding (Company Currency)"), "company_currency", 150),

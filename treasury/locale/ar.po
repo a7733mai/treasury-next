@@ -6839,3 +6839,288 @@ msgstr "في وضع سند الدفع تتم تسوية الشيك بسعره ا
 
 msgid "Cheque {0} has no bank voucher to reconcile."
 msgstr "الشيك {0} ليس له سند بنكي لتسويته."
+
+# ---------------------------------------------------------------------------
+# Phase 7a-2 — voucher visibility: voucher summary, reports, prints, form scripts
+# ---------------------------------------------------------------------------
+
+# Field / section labels (vouchers_html, vouchers_section on every Treasury document)
+msgid "Payment Entries and Vouchers"
+msgstr "سندات الدفع والقيود"
+
+msgid "Voucher Links"
+msgstr "روابط السندات"
+
+# Voucher summary (treasury.utils.voucher_summary, templates/includes/treasury_vouchers.html; context
+# voucher_summary.VOUCHER_CTX)
+msgctxt "Treasury Voucher"
+msgid "Voucher"
+msgstr "السند"
+
+msgctxt "Treasury Voucher"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Treasury Voucher"
+msgid "Mode of Payment"
+msgstr "طريقة الدفع"
+
+msgctxt "Treasury Voucher"
+msgid "Clearance Date"
+msgstr "تاريخ الصرف"
+
+msgctxt "Treasury Voucher"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Treasury Voucher"
+msgid "Submitted"
+msgstr "معتمد"
+
+msgctxt "Treasury Voucher"
+msgid "Cancelled"
+msgstr "ملغى"
+
+msgctxt "Treasury Voucher"
+msgid "Payment Entry"
+msgstr "سند الدفع"
+
+msgctxt "Treasury Voucher"
+msgid "Journal Entry"
+msgstr "قيد يومية"
+
+msgctxt "Treasury Voucher"
+msgid "Pay"
+msgstr "صرف"
+
+msgctxt "Treasury Voucher"
+msgid "Receive"
+msgstr "قبض"
+
+msgctxt "Treasury Voucher"
+msgid "Internal Transfer"
+msgstr "تحويل داخلي"
+
+msgctxt "Treasury Voucher"
+msgid "Party Posting"
+msgstr "ترحيل الطرف"
+
+msgctxt "Treasury Voucher"
+msgid "Under Collection"
+msgstr "تحت التحصيل"
+
+msgctxt "Treasury Voucher"
+msgid "Bank Settlement"
+msgstr "التسوية البنكية"
+
+msgctxt "Treasury Voucher"
+msgid "Bank Charges"
+msgstr "المصاريف البنكية"
+
+msgctxt "Treasury Voucher"
+msgid "Bounce Charges"
+msgstr "مصاريف الارتداد"
+
+msgctxt "Treasury Voucher"
+msgid "Discount Settlement"
+msgstr "تسوية الخصم"
+
+msgctxt "Treasury Voucher"
+msgid "Discount Recourse"
+msgstr "الرجوع على الشركة في الخصم"
+
+msgctxt "Treasury Voucher"
+msgid "Drawdown"
+msgstr "السحب"
+
+msgctxt "Treasury Voucher"
+msgid "Upfront Fees"
+msgstr "الرسوم المقدمة"
+
+msgctxt "Treasury Voucher"
+msgid "Repayment"
+msgstr "السداد"
+
+msgctxt "Treasury Voucher"
+msgid "Discounting"
+msgstr "خصم الشيكات"
+
+msgctxt "Treasury Voucher"
+msgid "Cash Margin"
+msgstr "التأمين النقدي"
+
+msgctxt "Treasury Voucher"
+msgid "Commission"
+msgstr "العمولة"
+
+msgctxt "Treasury Voucher"
+msgid "Extension Commission"
+msgstr "عمولة التمديد"
+
+msgctxt "Treasury Voucher"
+msgid "Margin Release"
+msgstr "الإفراج عن التأمين"
+
+msgctxt "Treasury Voucher"
+msgid "Claim"
+msgstr "التسييل"
+
+msgctxt "Treasury Voucher"
+msgid "Claim Repayment"
+msgstr "سداد التسييل"
+
+msgctxt "Treasury Voucher"
+msgid "Margin Top-up"
+msgstr "زيادة التأمين"
+
+msgctxt "Treasury Voucher"
+msgid "Amendment Charges"
+msgstr "مصاريف التعديل"
+
+msgctxt "Treasury Voucher"
+msgid "Document Charges"
+msgstr "مصاريف المستندات"
+
+msgctxt "Treasury Voucher"
+msgid "Settlement"
+msgstr "السداد النهائي"
+
+msgctxt "Treasury Voucher"
+msgid "Interest Accrual {0}"
+msgstr "استحقاق الفوائد {0}"
+
+msgctxt "Treasury Voucher"
+msgid "Copy"
+msgstr "نسخ"
+
+msgid "Reversal of {0}"
+msgstr "عكس {0}"
+
+msgid "Cycle {0}"
+msgstr "الدورة {0}"
+
+msgid "No Payment Entries or vouchers yet."
+msgstr "لا توجد سندات دفع أو قيود بعد."
+
+msgid "Vouchers of the PDC Cheque {0}"
+msgstr "سندات الشيك الآجل {0}"
+
+# Reports and prints ("Payment Entry" column / filter, receipts)
+msgctxt "Treasury Report"
+msgid "Payment Entry"
+msgstr "سند الدفع"
+
+msgid "Payment Entry No."
+msgstr "رقم سند الدفع"
+
+# PDC Cheque / Cheque Batch forms
+msgid "Payment Entries: {0}"
+msgstr "سندات الدفع: {0}"
+
+msgid "Cleared {0}"
+msgstr "صُرف في {0}"
+
+msgid "New Payee"
+msgstr "مستفيد جديد"
+
+msgid "Payee Name"
+msgstr "اسم المستفيد"
+
+msgid "Create and Select"
+msgstr "إنشاء واختيار"
+
+msgid "A Supplier is created in the group set in Treasury Settings (Payees). Only the name is needed; the accountant can complete it later."
+msgstr "يُنشأ مورد في المجموعة المحددة في إعدادات الخزينة (المستفيدون). يكفي الاسم فقط، ويمكن للمحاسب استكمال بياناته لاحقاً."
+
+msgid "Payee {0} created."
+msgstr "تم إنشاء المستفيد {0}."
+
+msgid "Existing supplier {0} selected."
+msgstr "تم اختيار المورد الموجود {0}."
+
+msgid "{0} of {1} cheques posted"
+msgstr "تم ترحيل {0} من {1} شيك"
+
+msgid "{0} of {1} cheques posted to party"
+msgstr "تم ترحيل {0} من {1} شيك على الطرف"
+
+msgid "Copy all PE numbers"
+msgstr "نسخ جميع أرقام سندات الدفع"
+
+# Treasury Company Settings form
+msgid "One Payment Entry per bank event; bank charges inside the same entry. Foreign-currency cheques settle at their carrying rate."
+msgstr "سند دفع واحد لكل حركة بنكية، والمصاريف البنكية ضمن نفس السند. تُسوّى الشيكات بالعملة الأجنبية بسعرها الدفتري."
+
+msgid "Version 1.0 behaviour: journal entries, charges in a separate entry, exchange difference booked at clearance."
+msgstr "سلوك الإصدار 1.0: قيود يومية، والمصاريف في قيد مستقل، وفرق العملة يُسجل عند الصرف."
+
+msgid "From now on, deposits and bank settlements are posted as Payment Entries. Cheques already posted keep their vouchers."
+msgstr "من الآن فصاعداً تُرحّل الإيداعات والتسويات البنكية كسندات دفع. تحتفظ الشيكات المرحّلة سابقاً بسنداتها."
+
+msgid "From now on, deposits and bank settlements are posted as Journal Entries (version 1.0 behaviour). Cheques already posted keep their vouchers."
+msgstr "من الآن فصاعداً تُرحّل الإيداعات والتسويات البنكية كقيود يومية (سلوك الإصدار 1.0). تحتفظ الشيكات المرحّلة سابقاً بسنداتها."
+
+msgid "Not a Payment Entry series yet"
+msgstr "ليست سلسلة سند دفع بعد"
+
+msgid "{0} Payment Entry series are not registered yet: {1}"
+msgstr "{0} من سلاسل سند الدفع غير مسجلة بعد: {1}"
+
+msgid "Posting a cheque on these banks will fail until they are added to Payment Entry."
+msgstr "سيفشل ترحيل الشيكات على هذه البنوك حتى تتم إضافتها إلى سند الدفع."
+
+msgid "Add Series to Payment Entry"
+msgstr "إضافة السلاسل إلى سند الدفع"
+
+msgid "Ask a System Manager to click \"Add Series to Payment Entry\"."
+msgstr "اطلب من مدير النظام الضغط على \"إضافة السلاسل إلى سند الدفع\"."
+
+msgid "Generate Modes of Payment"
+msgstr "إنشاء طرق الدفع"
+
+msgctxt "Treasury Company Settings"
+msgid "Methods"
+msgstr "الطرق"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Accounts"
+msgstr "الحسابات البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "Generate"
+msgstr "إنشاء"
+
+msgctxt "Treasury Company Settings"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Treasury Company Settings"
+msgid "Skipped"
+msgstr "تم التخطي"
+
+msgid "Linked to this company"
+msgstr "تم الربط بهذه الشركة"
+
+msgid "Select at least one method and one bank account."
+msgstr "اختر طريقة واحدة وحساباً بنكياً واحداً على الأقل."
+
+msgid "Generating Modes of Payment…"
+msgstr "جارٍ إنشاء طرق الدفع…"
+
+msgid "Example: {0}"
+msgstr "مثال: {0}"
+
+msgid "Existing Modes of Payment and map rows are never changed."
+msgstr "لا يتم تعديل طرق الدفع أو صفوف الربط الموجودة."
+
+msgid "All Modes of Payment already exist."
+msgstr "جميع طرق الدفع موجودة بالفعل."
+
+msgid "These series will be added to the Series list of Payment Entry for all companies and users:"
+msgstr "ستُضاف هذه السلاسل إلى قائمة سلاسل ترقيم سند الدفع لجميع الشركات والمستخدمين:"
+
+msgid "The current default series ({0}) stays first and stays the default. You can remove them later in Document Naming Settings."
+msgstr "تبقى السلسلة الافتراضية الحالية ({0}) في المقدمة وتظل الافتراضية. يمكنك حذفها لاحقاً من إعدادات تسمية المستندات."
+
+msgid "Added {0} series to Payment Entry."
+msgstr "تمت إضافة {0} سلسلة إلى سند الدفع."

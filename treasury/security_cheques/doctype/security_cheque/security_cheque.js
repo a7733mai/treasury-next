@@ -57,6 +57,8 @@ frappe.ui.form.on("Security Cheque", {
 	},
 
 	refresh(frm) {
+		// server-rendered, escaped summary of the PDC Cheque(s) of the encashment (treasury.utils.voucher_summary)
+		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
 		frm.events.lock_identity_fields(frm);
 		frm.events.translate_logs(frm);
 		frm.events.set_indicator(frm);
@@ -247,7 +249,10 @@ frappe.ui.form.on("Security Cheque", {
 			]);
 			if (is_manager) {
 				sec_action(frm, "mark_lost", __("Mark as Lost"), [date("lost_date", __("Lost Date")), reason]);
-				frm.add_custom_button(__("Encash"), () => sec_encash(frm), __("Actions"));
+				// only a party's cheque becomes a PDC Cheque (the server rejects "Other")
+				if (doc.party_type !== "Other") {
+					frm.add_custom_button(__("Encash"), () => sec_encash(frm), __("Actions"));
+				}
 			}
 		}
 	},
@@ -286,6 +291,13 @@ function sec_encash(frm) {
 function sec_encash_prompt(frm, bank_accounts) {
 	const doc = frm.doc;
 	const incoming = doc.direction === "Incoming";
+	// invoices / orders only for a customer's incoming or a supplier's outgoing cheque (PDC reference rules)
+	const invoice_types =
+		incoming && doc.party_type === "Customer"
+			? ["Sales Invoice", "Sales Order"]
+			: !incoming && doc.party_type === "Supplier"
+			? ["Purchase Invoice", "Purchase Order"]
+			: [];
 	frappe.prompt(
 		[
 			{
@@ -331,10 +343,8 @@ function sec_encash_prompt(frm, bank_accounts) {
 				fieldname: "reference_doctype",
 				label: __("Settle Invoice Type"),
 				fieldtype: "Select",
-				options: [
-					"",
-					...(incoming ? ["Sales Invoice", "Sales Order"] : ["Purchase Invoice", "Purchase Order"]),
-				],
+				options: ["", ...invoice_types],
+				hidden: invoice_types.length ? 0 : 1,
 				description: __("Optional. Without an invoice the amount is posted as an advance of the party."),
 			},
 			{

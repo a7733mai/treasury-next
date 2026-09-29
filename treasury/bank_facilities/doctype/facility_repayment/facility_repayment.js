@@ -23,6 +23,8 @@ frappe.ui.form.on("Facility Repayment", {
 	},
 
 	refresh(frm) {
+		// server-rendered, escaped summary (treasury.utils.voucher_summary)
+		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
 		if (frm.doc.docstatus === 0 && frm.doc.prepayment) {
 			frm.set_intro(
 				__(

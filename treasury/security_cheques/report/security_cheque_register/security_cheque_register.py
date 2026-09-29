@@ -14,6 +14,8 @@ from frappe.utils import flt, getdate
 from treasury.pdc.report_utils import (
 	column,
 	get_precision,
+	payment_entries_by_cheque,
+	payment_entry_column,
 	report_today,
 	validate_company,
 	validate_date_range,
@@ -39,7 +41,20 @@ def execute(filters=None):
 	converter = AmountConverter(company)
 	today = report_today()
 	rows = [make_row(c, converter, today) for c in get_security_cheques(get_filters(filters, company))]
+	set_payment_entries(rows)
 	return get_columns(), rows + total_rows(rows, converter.company_currency)
+
+
+def set_payment_entries(rows: list[frappe._dict]):
+	"""The submitted Payment Entries (current cycle) of the PDC Cheque each security cheque was encashed into;
+	only for the cheques the user may read."""
+	converted = [r.converted_pdc_cheque for r in rows if r.converted_pdc_cheque]
+	readable = (
+		frappe.get_list("PDC Cheque", filters={"name": ["in", converted]}, pluck="name") if converted else []
+	)
+	payment_entries = payment_entries_by_cheque(readable)
+	for row in rows:
+		row.payment_entry = payment_entries.get(row.converted_pdc_cheque, "")
 
 
 def get_filters(filters: frappe._dict, company: str) -> list:
@@ -112,5 +127,6 @@ def get_columns() -> list[dict]:
 			options="reference_doctype",
 		),
 		column("converted_pdc_cheque", _("Converted PDC Cheque"), "Link", 150, options="PDC Cheque"),
+		payment_entry_column(),
 		company_currency_column(),
 	]

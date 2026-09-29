@@ -33,6 +33,8 @@ frappe.ui.form.on("Letter of Guarantee", {
 	},
 
 	refresh(frm) {
+		// server-rendered, escaped summary (treasury.utils.voucher_summary)
+		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
 		treasury_instrument_translate_log(frm, "Letter of Guarantee");
 		if (frm.doc.docstatus === 0 || frm.is_new()) {
 			return;

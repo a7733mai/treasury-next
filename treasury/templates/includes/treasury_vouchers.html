@@ -1,0 +1,51 @@
+{#- Payment Entries and vouchers of a Treasury document (treasury.utils.voucher_summary).
+    Context: `rows` (one table) or `sections` [{cheque, rows}] (one table per PDC Cheque).
+    Frappe's Jinja does not autoescape: every value is escaped with |e. -#}
+{%- macro voucher_table(rows) -%}
+{%- if rows -%}
+<div class="table-responsive">
+<table class="table table-bordered table-sm treasury-vouchers">
+	<thead class="bg-light">
+		<tr>
+			<th>{{ _("Voucher", context="Treasury Voucher") | e }}</th>
+			<th>{{ _("Event", context="Treasury Voucher") | e }}</th>
+			<th style="white-space: nowrap">{{ _("Date", context="Treasury") | e }}</th>
+			<th>{{ _("Mode of Payment", context="Treasury Voucher") | e }}</th>
+			<th style="text-align: end">{{ _("Amount", context="Treasury") | e }}</th>
+			<th style="white-space: nowrap">{{ _("Clearance Date", context="Treasury Voucher") | e }}</th>
+			<th style="text-align: center">{{ _("Status", context="Treasury") | e }}</th>
+		</tr>
+	</thead>
+	<tbody>
+		{%- for row in rows %}
+		<tr{% if row.muted %} class="text-muted"{% endif %}>
+			<td>
+				<a href="{{ row.route | e }}"><b{% if row.cancelled %} style="text-decoration: line-through"{% endif %}><bdi>{{ row.name | e }}</bdi></b></a>
+				<div class="small text-muted">{{ row.kind | e }}</div>
+			</td>
+			<td>{{ row.event | e }}{% if row.cycle %} <span class="text-muted">· {{ row.cycle | e }}</span>{% endif %}</td>
+			<td style="white-space: nowrap">{{ row.posting_date | e }}</td>
+			<td>{{ (row.mode_of_payment or "—") | e }}</td>
+			<td style="text-align: end; white-space: nowrap"><bdi>{{ row.amount | e }}</bdi></td>
+			<td style="white-space: nowrap">{{ (row.clearance_date or "—") | e }}</td>
+			<td style="text-align: center"><span class="indicator-pill {{ row.status_colour | e }}">{{ row.status | e }}</span></td>
+		</tr>
+		{%- endfor %}
+	</tbody>
+</table>
+</div>
+{%- else -%}
+<p class="text-muted">{{ _("No Payment Entries or vouchers yet.") | e }}</p>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- if sections is defined -%}
+	{%- for section in sections %}
+<p class="text-muted small">{{ _("Vouchers of the PDC Cheque {0}").format('<a href="/app/pdc-cheque/' ~ (section.cheque | urlencode | e) ~ '"><bdi>' ~ (section.cheque | e) ~ '</bdi></a>') }}</p>
+{{ voucher_table(section.rows) }}
+	{%- else %}
+{{ voucher_table([]) }}
+	{%- endfor %}
+{%- else -%}
+{{ voucher_table(rows) }}
+{%- endif -%}

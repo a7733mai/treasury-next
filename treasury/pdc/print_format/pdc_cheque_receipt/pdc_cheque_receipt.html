@@ -9,6 +9,9 @@
 		.pdc-receipt .pdc-print-date { text-align: center; margin-bottom: 12px; }
 		.pdc-receipt .pdc-signatures td { border: none; text-align: center; padding-top: 48px; width: 33%; }
 		.pdc-receipt .pdc-amount { font-size: 1.2em; font-weight: bold; }
+		.pdc-receipt .pdc-pe td { border: 2px solid #333; }
+		.pdc-receipt .pdc-pe-no { font-size: 1.25em; font-weight: bold; letter-spacing: .5px; }
+		.pdc-receipt .pdc-pe-no small { font-size: .7em; font-weight: normal; letter-spacing: 0; }
 	</style>
 
 	{% if letter_head and not no_letterhead %}
@@ -26,9 +29,21 @@
 		<strong>{{ _("Print Date") }}:</strong> <span class="pdc-print-date-value">{{ treasury_print_date() }}</span>
 	</div>
 
+	{#- the paper-filing key: the submitted Payment Entries of the cheque's current cycle -#}
+	<table class="pdc-pe">
+		<tr>
+			<td class="pdc-label">{{ _("Payment Entry No.") }}</td>
+			<td class="pdc-pe-no">
+				{%- for pe in treasury_payment_entries(doc) %}
+				<bdi>{{ pe.name | e }}</bdi> <small>({{ pe.event_label | e }} · {{ frappe.utils.formatdate(pe.posting_date) }})</small>{% if not loop.last %}<br>{% endif %}
+				{%- else %}—{% endfor %}
+			</td>
+		</tr>
+	</table>
+
 	<table>
 		<tr>
-			<td class="pdc-label">{{ _("Customer") if incoming else _("Supplier") }}</td>
+			<td class="pdc-label">{{ _(doc.party_type) if doc.party_type else _("Party", context="Treasury") }}</td>
 			<td>{{ (doc.party_name or doc.party) | e }}</td>
 		</tr>
 		<tr>

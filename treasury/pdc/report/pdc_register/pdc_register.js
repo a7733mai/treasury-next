@@ -59,14 +59,11 @@ frappe.query_reports["PDC Register"] = {
 			],
 		},
 		{
+			// any Party Type: a cheque may be of an Employee, a Shareholder ...
 			fieldname: "party_type",
 			label: __("Party Type"),
-			fieldtype: "Select",
-			options: [
-				{ value: "", label: "" },
-				{ value: "Customer", label: __("Customer") },
-				{ value: "Supplier", label: __("Supplier") },
-			],
+			fieldtype: "Link",
+			options: "Party Type",
 			on_change: function () {
 				frappe.query_report.set_filter_value("party", "");
 			},
@@ -122,6 +119,13 @@ frappe.query_reports["PDC Register"] = {
 			},
 		},
 		{
+			// the cheque of a filed paper Payment Entry
+			fieldname: "payment_entry",
+			label: __("Payment Entry", null, "Treasury Report"),
+			fieldtype: "Link",
+			options: "Payment Entry",
+		},
+		{
 			// set by the Bank Position Forecast drill-down in its Bank Currency view
 			fieldname: "currency",
 			label: __("Currency"),
@@ -169,6 +173,12 @@ frappe.query_reports["PDC Register"] = {
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {
+		// every Payment Entry of the comma list is a link (export and print keep the plain list)
+		if (column.fieldname === "payment_entry" && data && value) {
+			return value.split(",").map((n) => n.trim()).filter(Boolean)
+				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><bdi>${frappe.utils.escape_html(n)}</bdi></a>`)
+				.join(", ");
+		}
 		if (data && ["operational_status", "accounting_status", "direction"].includes(column.fieldname)) {
 			value = value ? __(value) : value;
 		}

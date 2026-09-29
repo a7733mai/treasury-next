@@ -8,6 +8,7 @@ from frappe.utils import flt, getdate
 
 from treasury.bank_facilities import instruments, lg
 from treasury.bank_facilities.utilisation import refresh_utilisation
+from treasury.utils import voucher_summary
 
 # Written only by treasury.bank_facilities.lg (on submit, or by the actions with `treasury_lifecycle`).
 LIFECYCLE_FIELDS = (
@@ -79,9 +80,14 @@ class LetterofGuarantee(Document):
 			"Draft", "Issued", "Extended", "Reduced", "Released", "Claimed", "Expired", "Cancelled"
 		]
 		status_log: DF.Table[BankInstrumentStatusLog]
+		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
 	# ------------------------------------------------------------------ hooks
+
+	def onload(self):
+		if not self.is_new():
+			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 
 	def insert(self, *args, **kwargs):
 		# a new guarantee starts with an empty log, whatever the client sent (before_insert writes the first row)

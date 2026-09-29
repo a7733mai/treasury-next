@@ -14,7 +14,7 @@ from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.core.doctype.user_permission.user_permission import get_user_permissions
 from frappe.query_builder.functions import Sum
-from frappe.utils import flt, getdate, today
+from frappe.utils import cint, flt, getdate, today
 
 from treasury.accounting import posting
 from treasury.utils.party import validate_party_type
@@ -85,6 +85,13 @@ CHEQUE_FIELDS = [
 ]
 
 
+# Payment Entry links of the current cycle on a cheque (the paper-filing numbers).
+PAYMENT_ENTRY_FIELDS = [
+	"party_payment_entry",
+	"under_collection_payment_entry",
+	"bank_payment_entry",
+	"reversal_payment_entry",
+]
 # Voucher links of the current cycle on a cheque.
 VOUCHER_FIELDS = [
 	"party_payment_entry",
@@ -341,3 +348,41 @@ def _gl_amount_fields(gle, in_account_currency: bool):
 def get_linked_vouchers(row) -> str:
 	"""Comma separated vouchers linked on a cheque row (the current cycle; fields VOUCHER_FIELDS)."""
 	return ", ".join(row.get(f) for f in VOUCHER_FIELDS if row.get(f))
+
+
+def get_payment_entries(row) -> str:
+	"""Comma separated Payment Entries linked on a cheque row (fields PAYMENT_ENTRY_FIELDS, any docstatus);
+	the reports use `payment_entries_by_cheque`, which keeps the submitted ones only."""
+	return ", ".join(row.get(f) for f in PAYMENT_ENTRY_FIELDS if row.get(f))
+
+
+def payment_entries_by_cheque(cheque_names) -> dict[str, str]:
+	"""{cheque: comma separated submitted Payment Entries of its current cycle, oldest first} (the "Payment
+	Entry" report column: the numbers the cheque's papers are filed under). Two queries for any number of
+	cheques; the caller already read the cheques with the user's permissions."""
+	names = list(dict.fromkeys(n for n in cheque_names or () if n))
+	if not names:
+		return {}
+	cycles = {
+		d.name: cint(d.cycle) or 1
+		for d in frappe.get_all(DOCTYPE, filters={"name": ["in", names]}, fields=["name", "cycle"])
+	}
+	result = {}
+	for pe in frappe.get_all(
+		"Payment Entry",
+		filters={
+			"treasury_source_doctype": DOCTYPE,
+			"treasury_source_name": ["in", names],
+			"docstatus": 1,
+		},
+		fields=["name", "treasury_source_name", "treasury_cycle"],
+		order_by="creation asc, name asc",
+	):
+		if (cint(pe.treasury_cycle) or 1) == cycles.get(pe.treasury_source_name):
+			result.setdefault(pe.treasury_source_name, []).append(pe.name)
+	return {cheque: ", ".join(entries) for cheque, entries in result.items()}
+
+
+def payment_entry_column(width: int = 200) -> dict:
+	"""The "Payment Entry" column (Data: several numbers; the report scripts turn each into a link)."""
+	return column("payment_entry", _("Payment Entry", context=CTX), "Data", width)

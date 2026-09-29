@@ -25,6 +25,8 @@ from treasury.pdc.report_utils import (
 	column,
 	get_cheques,
 	get_precision,
+	payment_entries_by_cheque,
+	payment_entry_column,
 	report_today,
 	validate_company,
 	validate_date_range,
@@ -56,13 +58,19 @@ def execute(filters=None):
 	if view == BOUNCED:
 		rows = get_bounced_rows(conditions, from_date, to_date)
 		company_currency = erpnext.get_company_currency(company)
+		payment_entries = payment_entries_by_cheque([r.cheque for r in rows])
 		for row in rows:
 			row.company_currency = company_currency
+			row.payment_entry = payment_entries.get(row.cheque, "")
 		return get_bounced_columns(), rows
 
 	conditions["postponement_count"] = [">", 0]
 	cheques = {c.name: c for c in get_cheques(conditions)}
-	return get_postponed_columns(), get_postponed_rows(cheques, from_date, to_date)
+	rows = get_postponed_rows(cheques, from_date, to_date)
+	payment_entries = payment_entries_by_cheque([r.cheque for r in rows])
+	for row in rows:
+		row.payment_entry = payment_entries.get(row.cheque, "")
+	return get_postponed_columns(), rows
 
 
 def get_child_rows(doctype: str, parentfield: str, cheque_names: list[str], fields: list[str], **filters):
@@ -196,6 +204,7 @@ def get_bounced_columns() -> list[dict]:
 		column("charges", _("Bounce Charges"), "Currency", 120, options="company_currency"),
 		column("represented", _("Re-presented"), "Check", 100),
 		column("operational_status", _("Operational Status"), width=120),
+		payment_entry_column(),
 		column(
 			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
 		),
@@ -260,4 +269,5 @@ def get_postponed_columns() -> list[dict]:
 		column("contact_person", _("Contact Person"), width=140),
 		column("approved_by", _("Approved By"), "Link", 140, options="User"),
 		column("party_postponements", _("Party Postponements"), "Int", 110),
+		payment_entry_column(),
 	]

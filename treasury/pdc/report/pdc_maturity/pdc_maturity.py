@@ -20,6 +20,8 @@ from treasury.pdc.report_utils import (
 	AmountConverter,
 	get_cheques,
 	get_precision,
+	payment_entries_by_cheque,
+	payment_entry_column,
 	report_today,
 	validate_company,
 )
@@ -53,13 +55,18 @@ def execute(filters=None):
 
 	converter = AmountConverter(company, as_on)
 	groups: dict[str, frappe._dict] = {}
-	for cheque in get_cheques(conditions):
+	cheques = get_cheques(conditions)
+	payment_entries = payment_entries_by_cheque([c.name for c in cheques])
+	for cheque in cheques:
 		key, label = group_key(cheque, group_by)
 		row = groups.setdefault(key, new_row(key, label, converter.company_currency))
 		amount = converter.company_amount(cheque)
 		row[bucket_of(date_diff(cheque.effective_due_date, as_on))] += amount
 		row.total += amount
 		row.cheque_count += 1
+		if payment_entries.get(cheque.name):
+			# the group's cheques, in due date order
+			row.payment_entry = ", ".join(filter(None, (row.payment_entry, payment_entries[cheque.name])))
 
 	precision = get_precision()
 	data = [
@@ -85,7 +92,9 @@ def group_key(cheque, group_by: str) -> tuple[str, str]:
 
 
 def new_row(key: str, label: str, currency: str) -> frappe._dict:
-	row = frappe._dict(group_key=key, group_label=label, currency=currency, total=0.0, cheque_count=0)
+	row = frappe._dict(
+		group_key=key, group_label=label, currency=currency, total=0.0, cheque_count=0, payment_entry=""
+	)
 	for fieldname, _low, _high in BUCKETS:
 		row[fieldname] = 0.0
 	return row
@@ -144,6 +153,7 @@ def get_columns(group_by: str) -> list[dict]:
 			"width": 130,
 		},
 		{"fieldname": "cheque_count", "label": _("Cheques"), "fieldtype": "Int", "width": 80},
+		payment_entry_column(),
 		{
 			"fieldname": "currency",
 			"label": _("Currency"),
