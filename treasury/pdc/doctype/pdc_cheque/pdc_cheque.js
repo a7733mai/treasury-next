@@ -337,7 +337,11 @@ frappe.ui.form.on("PDC Cheque", {
 
 		if (!PDC_SETTLED.includes(status) && can_postpone) {
 			pdc_action(frm, "postpone", __("Postpone"), [
-				date("new_due_date", __("New Due Date")),
+				// propose one month after the current due date, not today
+				{
+					...date("new_due_date", __("New Due Date")),
+					default: frappe.datetime.add_months(doc.effective_due_date, 1),
+				},
 				reason,
 				{ fieldname: "contact_person", label: __("Contact Person"), fieldtype: "Data" },
 			]);
@@ -375,7 +379,7 @@ function pdc_action(frm, method, label, fields) {
 			frappe.prompt(
 				fields,
 				(values) => {
-					frm.call({ method, args: values, freeze: true }).then(() => frm.reload_doc());
+					frm.call({ doc: frm.doc, method, args: values, freeze: true }).then(() => frm.reload_doc());
 				},
 				label,
 				label
@@ -414,7 +418,7 @@ function pdc_replace(frm) {
 			{ fieldname: "reason", label: __("Reason"), fieldtype: "Small Text", reqd: 1 },
 		],
 		(values) => {
-			frm.call({ method: "replace", args: { new_cheque_values: values }, freeze: true }).then((r) => {
+			frm.call({ doc: frm.doc, method: "replace", args: { new_cheque_values: values }, freeze: true }).then((r) => {
 				if (r.message && r.message.replaced_by) {
 					frappe.set_route("Form", "PDC Cheque", r.message.replaced_by);
 				} else {

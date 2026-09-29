@@ -101,6 +101,7 @@ frappe.ui.form.on("Cheque Discounting", {
 							return;
 						}
 						frm.call({
+							doc: frm.doc,
 							method: "settle_cheques",
 							args: { cheques, settlement_date: values.settlement_date },
 							freeze: true,

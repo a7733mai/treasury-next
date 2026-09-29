@@ -180,7 +180,7 @@ function lc_action(frm, method, label, fields) {
 			frappe.prompt(
 				fields,
 				(values) => {
-					frm.call({ method, args: values, freeze: true }).then(() => frm.reload_doc());
+					frm.call({ doc: frm.doc, method, args: values, freeze: true }).then(() => frm.reload_doc());
 				},
 				label,
 				label

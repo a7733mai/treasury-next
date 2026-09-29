@@ -33,14 +33,14 @@ frappe.ui.form.on("Facility Drawdown", {
 				);
 			}
 			frm.add_custom_button(__("Refresh Status"), () => {
-				frm.call({ method: "refresh_status", freeze: true }).then(() => frm.reload_doc());
+				frm.call({ doc: frm.doc, method: "refresh_status", freeze: true }).then(() => frm.reload_doc());
 			});
 		}
 	},
 
 	generate_schedule(frm) {
 		const run = () =>
-			frm.call({ method: "generate_schedule", doc: frm.doc, freeze: true }).then((r) => {
+			frm.call({ doc: frm.doc, method: "generate_schedule", doc: frm.doc, freeze: true }).then((r) => {
 				if (r.message) {
 					frappe.model.sync(r.message);
 					frm.refresh();

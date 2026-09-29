@@ -101,7 +101,7 @@ frappe.ui.form.on("Bank Facility", {
 		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
 
 		frm.add_custom_button(__("Refresh Utilisation"), () => {
-			frm.call({ method: "refresh_utilisation", freeze: true }).then(() => frm.reload_doc());
+			frm.call({ doc: frm.doc, method: "refresh_utilisation", freeze: true }).then(() => frm.reload_doc());
 		});
 		if (["Active", "Suspended"].includes(status) && frappe.model.can_create("Facility Drawdown")) {
 			frm.add_custom_button(
@@ -166,7 +166,7 @@ frappe.ui.form.on("Bank Facility", {
 								new_limits,
 								remarks: values.remarks,
 							};
-							frm.call({ method: "renew", args, freeze: true }).then(() => frm.reload_doc());
+							frm.call({ doc: frm.doc, method: "renew", args, freeze: true }).then(() => frm.reload_doc());
 						},
 						__("Renew"),
 						__("Renew")
@@ -186,7 +186,7 @@ function facility_action(frm, method, label, fields) {
 			frappe.prompt(
 				fields,
 				(values) => {
-					frm.call({ method, args: values, freeze: true }).then(() => frm.reload_doc());
+					frm.call({ doc: frm.doc, method, args: values, freeze: true }).then(() => frm.reload_doc());
 				},
 				label,
 				label

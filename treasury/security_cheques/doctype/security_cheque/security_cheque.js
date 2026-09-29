@@ -260,7 +260,7 @@ function sec_action(frm, method, label, fields) {
 			frappe.prompt(
 				fields,
 				(values) => {
-					frm.call({ method, args: values, freeze: true }).then(() => frm.reload_doc());
+					frm.call({ doc: frm.doc, method, args: values, freeze: true }).then(() => frm.reload_doc());
 				},
 				label,
 				label
@@ -364,7 +364,7 @@ function sec_encash_prompt(frm, bank_accounts) {
 				];
 			}
 			frappe.confirm(__("Encash this security cheque? This cannot be undone."), () => {
-				frm.call({ method: "encash", args, freeze: true }).then((r) => {
+				frm.call({ doc: frm.doc, method: "encash", args, freeze: true }).then((r) => {
 					if (r.message && r.message.pdc_cheque) {
 						frappe.set_route("Form", "PDC Cheque", r.message.pdc_cheque);
 					} else {
