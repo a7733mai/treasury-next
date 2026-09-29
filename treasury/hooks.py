@@ -6,6 +6,7 @@ app_description = (
 )
 app_email = "ahmed3mageed@gmail.com"
 app_license = "mit"
+app_logo_url = "/assets/treasury/icons/desktop_icons/solid/treasury.svg"
 
 # Apps
 # ------------------
