@@ -174,6 +174,10 @@ scheduler_events = {
 	],
 }
 
+# Extra expected cash flows for the Bank Position Forecast report (dotted paths; see
+# treasury.pdc.forecast_sources). Bank Facilities will register its flows here.
+treasury_forecast_sources = []
+
 # scheduler_events = {
 # 	"all": [
 # 		"treasury.tasks.all"
