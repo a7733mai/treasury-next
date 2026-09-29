@@ -19,8 +19,8 @@ Expected flows dated before today are overdue: with "Include Overdue" they are s
 counted as expected today (placed just before the period containing today, i.e. first when From Date is
 today or later); otherwise they are left out. When From Date is after today, the flows expected from today
 to the day before From Date are not in the (GL) opening either: they are shown in a "Brought Forward" row
-before the first period. Other modules add flows through `treasury_forecast_sources`
-(treasury.pdc.forecast_sources).
+before the first period. Other modules add flows through `treasury_forecast_sources` and summary cards
+through `treasury_forecast_summary_sources` (treasury.pdc.forecast_sources).
 
 With no Bank Account selected, every cheque of the company is counted (cheques without a bank account under
 "Unassigned Bank"), while the opening / actual columns cover the company bank accounts with a GL account.
@@ -202,16 +202,18 @@ class BankPositionForecast:
 				)
 		return flows
 
-	def get_hook_flows(self) -> list[frappe._dict]:
-		hook_filters = frappe._dict(
+	def get_hook_filters(self) -> frappe._dict:
+		return frappe._dict(
 			company=self.company,
 			bank_accounts=sorted(self.bank_names),
 			from_date=self.from_date,
 			to_date=self.to_date,
 			currency_view=BANK_CURRENCY if self.bank_view else COMPANY_CURRENCY,
 		)
+
+	def get_hook_flows(self) -> list[frappe._dict]:
 		flows = []
-		for flow in forecast_sources.get_additional_flows(hook_filters):
+		for flow in forecast_sources.get_additional_flows(self.get_hook_filters()):
 			flow = frappe._dict(flow)
 			if flow.direction not in (IN, OUT) or not flow.date or not self.accepts_bank(flow.bank_account):
 				continue
@@ -442,6 +444,12 @@ class BankPositionForecast:
 				"indicator": indicator,
 			}
 
+		hook_filters = self.get_hook_filters()
+		hook_filters.update(currency=self.currency, today=self.today)
+		extra = [
+			card(flt(item.get("value"), self.precision), item.get("label"), item.get("indicator") or "Blue")
+			for item in forecast_sources.get_additional_summary(hook_filters)
+		]
 		return [
 			card(values.current_balance, _("Current Actual Balance"), "Blue"),
 			card(values.total_expected_in, _("Total Expected In"), "Green"),
@@ -456,4 +464,5 @@ class BankPositionForecast:
 				_("Projected Closing on {0}").format(formatdate(self.to_date)),
 				"Red" if values.closing < 0 else "Green",
 			),
+			*extra,
 		]

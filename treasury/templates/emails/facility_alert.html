@@ -1,0 +1,63 @@
+<div>
+	<p>{{ _("Bank facility installments due up to the alert date and facilities expiring soon for {0}, as of {1}:").format(company | e, as_of) }}</p>
+	{% for group in groups %}
+	<h4>{{ group.title }}</h4>
+	<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+		<thead>
+			<tr>
+				<th>{{ _("Facility Drawdown") }}</th>
+				<th>{{ _("Bank Facility") }}</th>
+				<th>{{ _("Bank") }}</th>
+				<th>{{ _("Installment No") }}</th>
+				<th>{{ _("Due Date") }}</th>
+				<th>{{ _("Principal") }}</th>
+				<th>{{ _("Interest / Profit") }}</th>
+				<th>{{ _("Unpaid") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in group.rows %}
+			<tr>
+				<td>{{ row.drawdown | e }}</td>
+				<td>{{ row.facility | e }}</td>
+				<td>{{ (row.bank or "") | e }}</td>
+				<td style="text-align: right;">{{ row.installment_no }}</td>
+				<td>{{ row.due }}</td>
+				<td style="text-align: right;">{{ row.principal_formatted }}</td>
+				<td style="text-align: right;">{{ row.interest_formatted }}</td>
+				<td style="text-align: right;">{{ row.unpaid_formatted }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% endfor %}
+	{% if facilities %}
+	<h4>{{ _("Facilities Expiring Soon") }}</h4>
+	<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+		<thead>
+			<tr>
+				<th>{{ _("Bank Facility") }}</th>
+				<th>{{ _("Facility Name") }}</th>
+				<th>{{ _("Bank") }}</th>
+				<th>{{ _("Total Limit") }}</th>
+				<th>{{ _("Expiry Date") }}</th>
+				<th>{{ _("Days to Expiry") }}</th>
+				<th>{{ _("Status") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in facilities %}
+			<tr>
+				<td>{{ row.name | e }}</td>
+				<td>{{ row.facility_name | e }}</td>
+				<td>{{ (row.bank or "") | e }}</td>
+				<td style="text-align: right;">{{ row.limit_formatted }}</td>
+				<td>{{ row.expiry }}</td>
+				<td style="text-align: right;">{{ row.days_to_expiry }}</td>
+				<td>{{ _(row.status, context="Bank Facility") }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% endif %}
+</div>

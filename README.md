@@ -199,6 +199,82 @@ bench install-app treasury
   Other parties, alerts before the end of the linked contract, approval workflow for open / blank cheques
   and memo (off-balance-sheet) accounts are follow-ups.
 
+### Bank Facilities
+
+Credit facilities with banks: the agreement and its sub-limits, drawdowns with their repayment schedules,
+repayments and interest. Everything is our own DocTypes; the Lending app is **not** used or required.
+All accounting goes through `treasury.accounting.posting` as standard Journal Entries linked back to the
+drawdown / repayment (`treasury_source_*`), idempotent per source, event and month.
+
+- **Bank Facility** (not submittable; statuses by actions only — Treasury Manager): Draft → *Activate* →
+  Active ⇄ *Suspend* (reason required) / *Reactivate* → *Close* (only with nothing utilised and no unpaid
+  installment); *Renew* moves the expiry date and optionally the total / sub-limit amounts, and makes an
+  Expired facility Active again. The daily job sets Active / Suspended facilities past their expiry date to
+  Expired. Every action appends a status log row with the event date. Once activated, company, bank,
+  currency, total limit, dates and the existing sub-limits (type, amount, liability account) change only
+  through Renew (new sub-limits may be added). Accounts: Default Bank Account (a company account at this
+  bank, in the facility currency), Interest / Commission Expense (company currency), Accrued Interest
+  (liability, facility currency). Optional collateral notes and linked Security Cheques (no accounting).
+- **Sub-limits** (*Bank Facility Limit*): Overdraft, Short / Long Term Loan, Letter of Guarantee, Letter of
+  Credit, Cheque Discounting, Murabaha, Tawarruq, Other; rate type (fixed / variable reference + margin, the
+  all-in rate is entered), day count (Actual/365, Actual/360), commission and cash margin. Each sub-limit is
+  at most the total limit; together they may exceed it (lines share the total). Loans / Murabaha / Tawarruq
+  / Other need a liability account in the facility currency.
+- **Utilisation** (`treasury.bank_facilities.utilisation.get_utilisation(facility, limit_type, as_on)`) is
+  computed from the ledger, never from stored numbers: loans = the balance of each drawdown's liability
+  account on the Journal Entries linked to the drawdown or its repayments (other postings on the same
+  account never count); Overdraft = max(0, − GL balance of the Default Bank Account's GL account). Available
+  = min(sub-limit − its utilisation, total limit − total utilisation). Other documents (Letters of Guarantee
+  / Credit, Cheque Discounting — Phase 5b) add utilisation through the hook
+  `treasury_facility_utilisation_sources` (functions `(facility_doc, as_on) -> [{"limit_type", "amount"}]`).
+  The *Utilised* / *Available* fields on the facility are display only (refreshed after every action and
+  daily); reports, cards and the drawdown limit check use the API.
+- **Facility Drawdown** (submittable): limit type (not Overdraft), amount, bank account credited (default:
+  the facility's), terms (rate defaults to the sub-limit's; or a fixed Murabaha profit amount), tenor,
+  frequency (Monthly / Quarterly / Semi-Annually / Annually / Bullet), method (Equal Principal / Equal
+  Installment (annuity) / Bullet), first repayment date (default one period after the drawdown), grace months
+  (interest only), upfront fees. *Generate Schedule* (draft only) builds the rows: day-count interest on the
+  outstanding principal per period, annuity installment P·r / (1 − (1 + r)^−n) with r = rate × months / 12,
+  a Murabaha profit spread straight-line, every amount rounded and the last row absorbing the rounding
+  (principal always adds up to the amount), month-end dates kept on month ends (shared helper
+  `treasury.utils.dates`). Rows may be edited before submit as long as the principal adds up. Submit checks
+  the facility is Active and the date inside its period, and the available amount of the sub-limit and of
+  the total, then posts Dr Bank / Cr Liability (and Dr Fees / Cr Bank for the upfront fees). Cancel is
+  refused while repayments are submitted and cancels its vouchers (accruals included).
+- **Facility Repayment** (submittable): principal + interest / profit (empty: the next unpaid installment),
+  optional penalty (+ account), allocation *Oldest First* or *Selected Row*. Posts Dr Liability (principal)
+  + Dr Accrued Interest (the part already accrued, cleared first) + Dr Interest Expense (the rest) + Dr
+  Penalty / Cr Bank, then records the paid amounts on the schedule rows (Pending / Partially Paid / Overdue /
+  Paid; Overdue refreshed daily). **Prepayment**: principal beyond the installments due up to the repayment
+  date is recorded as a paid prepayment row and the later untouched installments are rescheduled by
+  **reducing the installment amount** (the tenor is kept; interest recomputed on the reduced principal with
+  the day count; a Murabaha profit is not recomputed). Reducing the tenor instead is not implemented. A
+  repayment cannot be back-dated before a submitted one; only the latest one can be cancelled, which restores
+  the schedule exactly (snapshot) and cancels its Journal Entry.
+- **Interest accrual** (Treasury Company Settings *Accrue Facility Interest Monthly*, default off): the
+  daily job posts, per drawdown and month end, Dr Interest Expense / Cr Accrued Interest for the interest
+  earned up to the month end (day by day within each schedule period) less what was already accrued or
+  expensed by repayments — idempotent (event `interest_accrual:YYYY-MM`), catches up missed months, one
+  drawdown at a time (a failing one is rolled back and logged once a day, the others go on).
+- **Overdraft interest is not accrued**: the bank charges it on the statement; book it from the bank
+  statement (it does not appear in Cost of Financing, which reads facility-linked vouchers only).
+- **Forecast**: the unpaid part of every installment is an outflow on its due date from the drawdown's bank
+  account in the Bank Position Forecast (hook `treasury_forecast_sources`); paid installments disappear, a
+  partly paid one shows the rest. The summary gets an *Available Overdraft* card for the selected banks
+  through the new hook `treasury_forecast_summary_sources` (`(filters) -> [{"label", "value"}]`).
+- **Reports and cards** (Bank Facilities section of the Treasury workspace): *Facility Utilisation* (bank →
+  facility → sub-limit: limit, utilised, available, % used, expiry, days to expiry, company currency
+  totals), *Facility Repayment Schedule Report* (upcoming / overdue installments with the principal /
+  interest split and status), *Cost of Financing* (interest, commission, fees and penalties per facility
+  and month / quarter / year, from the GL); number cards *Total Facility Limits*, *Total Facility Utilised*,
+  *Installments Due in 30 Days* (sum) and *Overdue Facility Installments* (count). Company currency
+  amounts use today's rate; everything is read with the user's permissions and User Permissions.
+- **Alerts**: a daily digest per company and recipient (Treasury Manager / User) of the unpaid installments
+  due within *Facility Alert Days* (Treasury Settings, default 7; overdue ones included) and of the
+  facilities expiring within 30 days, as a notification and, if outgoing email is set up, by email.
+- **Out of scope (Phase 5b)**: Letters of Guarantee, Letters of Credit and Cheque Discounting documents
+  (the sub-limits and the utilisation hook are ready for them).
+
 ### Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:

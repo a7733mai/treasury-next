@@ -168,6 +168,8 @@ doc_events = {
 # ---------------
 
 # `daily_long`: the posting job may submit many Payment Entries (catch-up after days without a run).
+# Bank facilities: expiry / schedule statuses / utilisation first, then the month-end interest accruals
+# (idempotent per drawdown and month, catches up missed months), then the alert digest.
 scheduler_events = {
 	"daily": [
 		"treasury.security_cheques.scheduler.send_security_expiry_alerts",
@@ -175,12 +177,20 @@ scheduler_events = {
 	"daily_long": [
 		"treasury.pdc.scheduler.post_due_party_postings",
 		"treasury.pdc.scheduler.send_due_alerts",
+		"treasury.bank_facilities.scheduler.refresh_facilities",
+		"treasury.bank_facilities.interest.post_interest_accruals",
+		"treasury.bank_facilities.scheduler.send_facility_alerts",
 	],
 }
 
-# Extra expected cash flows for the Bank Position Forecast report (dotted paths; see
-# treasury.pdc.forecast_sources). Bank Facilities will register its flows here.
-treasury_forecast_sources = []
+# Extra expected cash flows and summary cards for the Bank Position Forecast report (dotted paths; see
+# treasury.pdc.forecast_sources).
+treasury_forecast_sources = ["treasury.bank_facilities.forecast.get_flows"]
+treasury_forecast_summary_sources = ["treasury.bank_facilities.forecast.get_summary"]
+
+# Utilisation of Bank Facility sub-limits from other documents (Letters of Guarantee / Credit, Cheque
+# Discounting — Phase 5b); see treasury.bank_facilities.utilisation.
+treasury_facility_utilisation_sources = []
 
 # scheduler_events = {
 # 	"all": [

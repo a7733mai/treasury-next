@@ -551,6 +551,126 @@ def make_security_cheque(
 
 
 # ---------------------------------------------------------------------------
+# Bank facility helpers
+# ---------------------------------------------------------------------------
+
+
+def ensure_facility_accounts() -> frappe._dict:
+	"""Liability (loans, accrued interest) accounts per currency and the expense accounts of the facilities."""
+	return frappe._dict(
+		loan_egp=ensure_account("Treasury Bank Loans EGP", "Current Liabilities"),
+		loan_egp_2=ensure_account("Treasury Bank Loans EGP 2", "Current Liabilities"),
+		loan_usd=ensure_account("Treasury Bank Loans USD", "Current Liabilities", currency="USD"),
+		accrued_egp=ensure_account("Treasury Accrued Interest EGP", "Current Liabilities"),
+		accrued_usd=ensure_account("Treasury Accrued Interest USD", "Current Liabilities", currency="USD"),
+		interest=ensure_account("Treasury Interest Expense", "Indirect Expenses"),
+		commission=ensure_account("Treasury Bank Commission", "Indirect Expenses"),
+		fees=ensure_account("Treasury Facility Fees", "Indirect Expenses"),
+		penalty=ensure_account("Treasury Facility Penalties", "Indirect Expenses"),
+	)
+
+
+def make_own_bank(currency: str = "EGP") -> frappe._dict:
+	"""A fresh company bank account (own GL account) at BANK, so its GL balance belongs to one test only."""
+	tag = frappe.generate_hash(length=6)
+	cur = None if currency == "EGP" else currency
+	bank_gl = ensure_account(f"Fac Bank {currency} {tag}", "Bank Accounts", "Bank", cur)
+	return frappe._dict(
+		currency=currency, bank_gl=bank_gl, bank_account=ensure_bank_account(f"Fac {currency} {tag}", bank_gl)
+	)
+
+
+def make_bank_facility(
+	currency: str = "EGP",
+	total_limit: float = 1_000_000,
+	limits: list[dict] | None = None,
+	bank_account: str | None = None,
+	start_date="2025-01-01",
+	expiry_date="2026-12-31",
+	activate: bool = True,
+	accrued: bool = True,
+	**values,
+):
+	"""A Bank Facility (Active unless `activate` is False) with a Short Term Loan sub-limit by default."""
+	accounts = ensure_facility_accounts()
+	loan = accounts.loan_egp if currency == "EGP" else accounts.loan_usd
+	if limits is None:
+		limits = [{"limit_type": "Short Term Loan", "limit_amount": total_limit, "interest_rate": 12}]
+	for row in limits:
+		if row["limit_type"] != "Overdraft" and "liability_account" not in row:
+			row["liability_account"] = loan
+	doc = frappe.get_doc(
+		{
+			"doctype": "Bank Facility",
+			"facility_name": f"Facility {frappe.generate_hash(length=6)}",
+			"company": COMPANY,
+			"bank": BANK,
+			"currency": currency,
+			"total_limit": total_limit,
+			"start_date": getdate(start_date),
+			"expiry_date": getdate(expiry_date),
+			"default_bank_account": bank_account or bank_account_name(currency),
+			"interest_expense_account": accounts.interest,
+			"commission_expense_account": accounts.commission,
+			"accrued_interest_account": (accounts.accrued_egp if currency == "EGP" else accounts.accrued_usd)
+			if accrued
+			else None,
+			"limits": limits,
+			**values,
+		}
+	).insert()
+	if activate:
+		doc.activate(activation_date=doc.start_date)
+		doc.reload()
+	return doc
+
+
+def make_drawdown(
+	facility,
+	amount: float = 120_000,
+	drawdown_date="2025-01-31",
+	tenor_months: int = 12,
+	frequency: str = "Monthly",
+	method: str = "Equal Principal",
+	submit: bool = True,
+	limit_type: str = "Short Term Loan",
+	**values,
+):
+	facility_name = facility if isinstance(facility, str) else facility.name
+	doc = frappe.get_doc(
+		{
+			"doctype": "Facility Drawdown",
+			"facility": facility_name,
+			"limit_type": limit_type,
+			"drawdown_date": getdate(drawdown_date),
+			"amount": amount,
+			"tenor_months": tenor_months,
+			"repayment_frequency": frequency,
+			"repayment_method": method,
+			**values,
+		}
+	).insert()
+	if submit:
+		doc.submit()
+	return doc
+
+
+def make_repayment(drawdown, repayment_date, submit: bool = True, **values):
+	drawdown_name = drawdown if isinstance(drawdown, str) else drawdown.name
+	doc = frappe.get_doc(
+		{
+			"doctype": "Facility Repayment",
+			"drawdown": drawdown_name,
+			"repayment_date": getdate(repayment_date),
+			**values,
+		}
+	).insert()
+	if submit:
+		doc.submit()
+	return doc
+
+
+# ---------------------------------------------------------------------------
 # Invoice factories
 # ---------------------------------------------------------------------------
 

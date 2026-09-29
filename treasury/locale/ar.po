@@ -2491,3 +2491,870 @@ msgstr "اختياري. بدون فاتورة يُرحَّل المبلغ كدف
 
 msgid "Encash this security cheque? This cannot be undone."
 msgstr "تسييل شيك الضمان هذا؟ لا يمكن التراجع عن ذلك."
+
+# ---------------------------------------------------------------------------
+# Bank Facilities (Phase 5a)
+# ---------------------------------------------------------------------------
+
+# DocTypes, reports, number cards, workspace
+msgid "Bank Facility"
+msgstr "تسهيل بنكي"
+
+msgid "Bank Facility Limit"
+msgstr "حد فرعي للتسهيل البنكي"
+
+msgid "Bank Facility Security Cheque"
+msgstr "شيك ضمان التسهيل البنكي"
+
+msgid "Bank Facility Status Log"
+msgstr "سجل حالات التسهيل البنكي"
+
+msgid "Facility Drawdown"
+msgstr "سحب من التسهيل"
+
+msgid "Facility Repayment"
+msgstr "سداد تسهيل"
+
+msgid "Facility Repayment Schedule"
+msgstr "جدول سداد التسهيل"
+
+msgid "Facility Repayment Allocation"
+msgstr "توزيع سداد التسهيل"
+
+msgid "Facility Utilisation"
+msgstr "استخدام التسهيلات البنكية"
+
+msgid "Facility Repayment Schedule Report"
+msgstr "تقرير جدول سداد التسهيلات"
+
+msgid "Cost of Financing"
+msgstr "تكلفة التمويل"
+
+msgid "Total Facility Limits"
+msgstr "إجمالي حدود التسهيلات"
+
+msgid "Total Facility Utilised"
+msgstr "إجمالي المستخدم من التسهيلات"
+
+msgid "Installments Due in 30 Days"
+msgstr "أقساط مستحقة خلال 30 يوماً"
+
+msgid "Overdue Facility Installments"
+msgstr "أقساط تسهيلات متأخرة"
+
+msgid "New Facility Drawdown"
+msgstr "سحب جديد من تسهيل"
+
+msgid "New Facility Repayment"
+msgstr "سداد تسهيل جديد"
+
+# Settings
+msgid "Facility Alert Days"
+msgstr "أيام تنبيه التسهيلات"
+
+msgid "Number of days before the due date to send facility installment alerts (overdue installments are always included; facilities expiring within 30 days are listed too)."
+msgstr "عدد الأيام قبل تاريخ الاستحقاق لإرسال تنبيهات أقساط التسهيلات (تُدرج الأقساط المتأخرة دائماً، وكذلك التسهيلات التي تنتهي خلال 30 يوماً)."
+
+msgid "Accrue Facility Interest Monthly"
+msgstr "استحقاق فوائد التسهيلات شهرياً"
+
+msgid "Post a month-end Journal Entry per facility drawdown for the interest / profit earned since the last accrual (Dr Interest Expense / Cr the facility's Accrued Interest Account). Repayments clear the accrued interest first."
+msgstr "ترحيل قيد يومية في نهاية كل شهر لكل سحب من تسهيل بالفائدة / الربح المستحق منذ آخر استحقاق (مدين مصروف الفوائد / دائن حساب الفوائد المستحقة للتسهيل). تسدد الدفعات الفوائد المستحقة أولاً."
+
+# Bank Facility
+msgid "A credit facility agreement with a bank: total limit, sub-limits per type (overdraft, loans, LG, LC, discounting, Murabaha / Tawarruq), rates, dates and collateral."
+msgstr "اتفاقية تسهيل ائتماني مع بنك: الحد الإجمالي والحدود الفرعية حسب النوع (سحب على المكشوف، قروض، خطابات ضمان، اعتمادات مستندية، خصم، مرابحة / تورق) والأسعار والتواريخ والضمانات."
+
+msgid "Facility Name"
+msgstr "اسم التسهيل"
+
+msgid "Contract No"
+msgstr "رقم العقد"
+
+msgid "The currency of the facility: its limits, the liability accounts and the default bank account are in it."
+msgstr "عملة التسهيل: حدوده وحسابات الالتزامات والحساب البنكي الافتراضي بهذه العملة."
+
+msgid "Total Limit"
+msgstr "الحد الإجمالي"
+
+msgid "Display only (see the Facility Utilisation report for the ledger figures)."
+msgstr "للعرض فقط (راجع تقرير استخدام التسهيلات البنكية للأرقام من دفتر الأستاذ)."
+
+msgid "Total Utilised"
+msgstr "إجمالي المستخدم"
+
+msgid "Total Available"
+msgstr "إجمالي المتاح"
+
+msgid "Utilisation Refreshed On"
+msgstr "تاريخ تحديث الاستخدام"
+
+msgid "Start Date"
+msgstr "تاريخ البدء"
+
+msgid "Renewal Date"
+msgstr "تاريخ التجديد"
+
+msgid "The date of the last renewal (set by the Renew action)."
+msgstr "تاريخ آخر تجديد (يُحدَّد بإجراء التجديد)."
+
+msgid "Sub-Limits"
+msgstr "الحدود الفرعية"
+
+msgid "Each sub-limit may not exceed the total limit; together they may (the bank lets the lines share the total limit)."
+msgstr "لا يجوز أن يتجاوز أي حد فرعي الحد الإجمالي، ويجوز أن يتجاوزه مجموعها (يسمح البنك بتقاسم الحد الإجمالي بين الخطوط)."
+
+msgid "A company bank account at this bank, in the facility currency. Drawdowns are credited to it by default; an Overdraft limit is used through its negative balance."
+msgstr "حساب بنكي للشركة لدى هذا البنك بعملة التسهيل. تُضاف إليه المسحوبات افتراضياً، ويُستخدم حد السحب على المكشوف من خلال رصيده السالب."
+
+msgid "Default Bank Account"
+msgstr "الحساب البنكي الافتراضي"
+
+msgid "Interest Expense Account"
+msgstr "حساب مصروف الفوائد"
+
+msgid "Commission Expense Account"
+msgstr "حساب مصروف العمولات"
+
+msgid "Accrued Interest Account"
+msgstr "حساب الفوائد المستحقة"
+
+msgid "Liability account (facility currency) credited by the monthly interest accrual (Treasury Company Settings) and cleared by repayments."
+msgstr "حساب التزامات (بعملة التسهيل) يُقيَّد دائناً بالاستحقاق الشهري للفوائد (إعدادات الخزينة للشركة) ويُسوّى بالسداد."
+
+msgid "Collateral"
+msgstr "الضمانات"
+
+msgid "Collateral Notes"
+msgstr "ملاحظات الضمانات"
+
+msgid "Suspended"
+msgstr "موقوف"
+
+msgctxt "Bank Facility"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Bank Facility"
+msgid "Active"
+msgstr "ساري"
+
+msgctxt "Bank Facility"
+msgid "Suspended"
+msgstr "موقوف"
+
+msgctxt "Bank Facility"
+msgid "Expired"
+msgstr "منتهي"
+
+msgctxt "Bank Facility"
+msgid "Closed"
+msgstr "مغلق"
+
+# Sub-limits
+msgid "Limit Type"
+msgstr "نوع الحد"
+
+msgid "Limit Amount"
+msgstr "مبلغ الحد"
+
+msgid "Liability Account"
+msgstr "حساب الالتزام"
+
+msgid "Liability account credited by drawdowns under this limit, in the facility currency. Required for loans, Murabaha, Tawarruq and Other; an Overdraft is used through the facility's bank account."
+msgstr "حساب الالتزام الذي يُقيَّد دائناً بالمسحوبات تحت هذا الحد بعملة التسهيل. مطلوب للقروض والمرابحة والتورق والأنواع الأخرى، أما السحب على المكشوف فيُستخدم من خلال الحساب البنكي للتسهيل."
+
+msgid "Rate Type"
+msgstr "نوع السعر"
+
+msgid "Variable (reference + margin)"
+msgstr "متغير (سعر مرجعي + هامش)"
+
+msgid "Interest / Profit Rate (% p.a.)"
+msgstr "سعر الفائدة / الربح (% سنوياً)"
+
+msgid "All-in rate per annum (for a variable rate: the current reference rate plus the margin)."
+msgstr "السعر الشامل سنوياً (للسعر المتغير: السعر المرجعي الحالي مضافاً إليه الهامش)."
+
+msgid "Reference Rate"
+msgstr "السعر المرجعي"
+
+msgid "E.g. CBE corridor, SAIBOR 3M."
+msgstr "مثل: سعر الكوريدور للبنك المركزي المصري، سايبور 3 أشهر."
+
+msgid "Margin (% p.a.)"
+msgstr "الهامش (% سنوياً)"
+
+msgid "Day Count"
+msgstr "أساس حساب الأيام"
+
+msgid "Actual/365"
+msgstr "فعلي/365"
+
+msgid "Actual/360"
+msgstr "فعلي/360"
+
+msgid "Commission Rate (%)"
+msgstr "نسبة العمولة (%)"
+
+msgid "Cash Margin (%)"
+msgstr "الغطاء النقدي (%)"
+
+msgid "Utilisation"
+msgstr "الاستخدام"
+
+msgid "Display only, refreshed after every facility action and daily. Reports compute the utilisation from the ledger."
+msgstr "للعرض فقط، يُحدَّث بعد كل إجراء على التسهيل ويومياً. تحسب التقارير الاستخدام من دفتر الأستاذ."
+
+msgid "Utilised"
+msgstr "المستخدم"
+
+msgid "Available"
+msgstr "المتاح"
+
+msgid "Overdraft"
+msgstr "سحب على المكشوف"
+
+msgid "Short Term Loan"
+msgstr "قرض قصير الأجل"
+
+msgid "Long Term Loan"
+msgstr "قرض طويل الأجل"
+
+msgid "Letter of Guarantee"
+msgstr "خطاب ضمان"
+
+msgid "Letter of Credit"
+msgstr "اعتماد مستندي"
+
+msgid "Cheque Discounting"
+msgstr "خصم الشيكات"
+
+msgid "Murabaha"
+msgstr "مرابحة"
+
+msgid "Tawarruq"
+msgstr "تورق"
+
+msgctxt "Bank Facility"
+msgid "Overdraft"
+msgstr "سحب على المكشوف"
+
+msgctxt "Bank Facility"
+msgid "Short Term Loan"
+msgstr "قرض قصير الأجل"
+
+msgctxt "Bank Facility"
+msgid "Long Term Loan"
+msgstr "قرض طويل الأجل"
+
+msgctxt "Bank Facility"
+msgid "Letter of Guarantee"
+msgstr "خطاب ضمان"
+
+msgctxt "Bank Facility"
+msgid "Letter of Credit"
+msgstr "اعتماد مستندي"
+
+msgctxt "Bank Facility"
+msgid "Cheque Discounting"
+msgstr "خصم الشيكات"
+
+msgctxt "Bank Facility"
+msgid "Murabaha"
+msgstr "مرابحة"
+
+msgctxt "Bank Facility"
+msgid "Tawarruq"
+msgstr "تورق"
+
+msgctxt "Bank Facility"
+msgid "Other"
+msgstr "أخرى"
+
+# Status log
+msgid "The date of the event as entered by the user (e.g. the activation or renewal date)."
+msgstr "تاريخ الحدث كما أدخله المستخدم (مثل تاريخ التفعيل أو التجديد)."
+
+msgid "Activated"
+msgstr "تم التفعيل"
+
+msgid "Reactivated"
+msgstr "أعيد التفعيل"
+
+msgid "Renewed"
+msgstr "تم التجديد"
+
+# Facility Drawdown
+msgid "A drawing under a Bank Facility (loan, Murabaha, Tawarruq ...): the principal credited to the bank account, its repayment schedule and fees."
+msgstr "سحب بموجب تسهيل بنكي (قرض، مرابحة، تورق ...): أصل المبلغ المضاف إلى الحساب البنكي وجدول سداده ورسومه."
+
+msgid "Drawdown Date"
+msgstr "تاريخ السحب"
+
+msgid "Facility currency to company currency, on the drawdown date."
+msgstr "من عملة التسهيل إلى عملة الشركة في تاريخ السحب."
+
+msgid "The company bank account credited with the principal (default: the facility's bank account), in the facility currency."
+msgstr "الحساب البنكي للشركة الذي يُضاف إليه أصل المبلغ (افتراضياً: الحساب البنكي للتسهيل) بعملة التسهيل."
+
+msgid "Repayment Status"
+msgstr "حالة السداد"
+
+msgid "Repaid"
+msgstr "مُسدَّد"
+
+msgid "Terms"
+msgstr "الشروط"
+
+msgid "All-in rate per annum (default: the sub-limit's rate). Ignored when a Profit Amount is entered."
+msgstr "السعر الشامل سنوياً (افتراضياً: سعر الحد الفرعي). يُتجاهل عند إدخال مبلغ ربح."
+
+msgid "Profit Amount"
+msgstr "مبلغ الربح"
+
+msgid "Murabaha: a fixed profit instead of a rate, spread evenly over the installments."
+msgstr "المرابحة: ربح ثابت بدلاً من سعر، يُوزَّع بالتساوي على الأقساط."
+
+msgid "Tenor (Months)"
+msgstr "المدة (بالأشهر)"
+
+msgid "Repayment Frequency"
+msgstr "دورية السداد"
+
+msgid "Repayment Method"
+msgstr "طريقة السداد"
+
+msgid "Equal Principal"
+msgstr "أصل متساوٍ"
+
+msgid "Equal Installment (annuity)"
+msgstr "قسط متساوٍ (دفعات ثابتة)"
+
+msgid "Bullet"
+msgstr "دفعة واحدة في نهاية المدة"
+
+msgid "First Repayment Date"
+msgstr "تاريخ أول سداد"
+
+msgid "Default: one period after the drawdown date."
+msgstr "افتراضياً: فترة واحدة بعد تاريخ السحب."
+
+msgid "Grace (Months)"
+msgstr "فترة السماح (بالأشهر)"
+
+msgid "Interest-only months at the start (a multiple of the months of a period)."
+msgstr "أشهر في البداية تُسدَّد فيها الفائدة فقط (من مضاعفات أشهر الفترة)."
+
+msgid "Fees"
+msgstr "الرسوم"
+
+msgid "Upfront Fees"
+msgstr "الرسوم المقدمة"
+
+msgid "Paid from the bank account on the drawdown date."
+msgstr "تُدفع من الحساب البنكي في تاريخ السحب."
+
+msgid "Fees Account"
+msgstr "حساب الرسوم"
+
+msgid "Repayment Schedule"
+msgstr "جدول السداد"
+
+msgid "Generated from the terms (Generate Schedule); may be adjusted before submit as long as the principal adds up to the amount."
+msgstr "يُنشأ من الشروط (إنشاء الجدول)، ويمكن تعديله قبل الاعتماد طالما أن مجموع الأصل يساوي المبلغ."
+
+msgid "Total Principal"
+msgstr "إجمالي الأصل"
+
+msgid "Total Interest / Profit"
+msgstr "إجمالي الفائدة / الربح"
+
+msgid "Total Payable"
+msgstr "إجمالي المستحق"
+
+msgid "Drawdown Journal Entry"
+msgstr "قيد يومية السحب"
+
+msgid "Fees Journal Entry"
+msgstr "قيد يومية الرسوم"
+
+msgid "Last Accrual Date"
+msgstr "تاريخ آخر استحقاق"
+
+msgid "The last month end the interest accrual job processed."
+msgstr "آخر نهاية شهر عالجتها مهمة استحقاق الفوائد."
+
+msgid "Annually"
+msgstr "سنوياً"
+
+# Repayment schedule rows
+msgid "Installment No"
+msgstr "رقم القسط"
+
+msgid "Principal"
+msgstr "الأصل"
+
+msgid "Interest / Profit"
+msgstr "الفائدة / الربح"
+
+msgid "Outstanding After"
+msgstr "المتبقي بعد القسط"
+
+msgid "Partially Paid"
+msgstr "مدفوع جزئياً"
+
+msgid "Paid Principal"
+msgstr "الأصل المدفوع"
+
+msgid "Paid Interest / Profit"
+msgstr "الفائدة / الربح المدفوع"
+
+msgid "Prepayment"
+msgstr "سداد معجل"
+
+msgid "An extra principal payment recorded by a Facility Repayment with Prepayment."
+msgstr "دفعة إضافية من الأصل سجّلها سداد تسهيل مع سداد معجل."
+
+msgid "Payment Journal"
+msgstr "قيد السداد"
+
+msgid "Last Repayment"
+msgstr "آخر سداد"
+
+msgid "Schedule Row"
+msgstr "سطر الجدول"
+
+msgctxt "Treasury Report"
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+msgctxt "Treasury Report"
+msgid "Partially Paid"
+msgstr "مدفوع جزئياً"
+
+msgctxt "Treasury Report"
+msgid "Paid"
+msgstr "مدفوع"
+
+msgctxt "Treasury Report"
+msgid "Overdue"
+msgstr "متأخر"
+
+msgctxt "Treasury Report"
+msgid "Quarterly"
+msgstr "ربع سنوي"
+
+msgctxt "Treasury Report"
+msgid "Yearly"
+msgstr "سنوي"
+
+# Facility Repayment
+msgid "A repayment of a Facility Drawdown: principal and interest / profit allocated to its repayment schedule, an optional penalty and an optional prepayment."
+msgstr "سداد لسحب من تسهيل: أصل وفائدة / ربح موزعان على جدول سداده، مع غرامة اختيارية وسداد معجل اختياري."
+
+msgid "Repayment Date"
+msgstr "تاريخ السداد"
+
+msgid "Facility currency to company currency, on the repayment date."
+msgstr "من عملة التسهيل إلى عملة الشركة في تاريخ السداد."
+
+msgid "The company bank account debited (default: the drawdown's bank account), in the facility currency."
+msgstr "الحساب البنكي للشركة الذي يُخصم منه (افتراضياً: الحساب البنكي للسحب) بعملة التسهيل."
+
+msgid "Total Paid"
+msgstr "إجمالي المدفوع"
+
+msgid "Amounts"
+msgstr "المبالغ"
+
+msgid "Oldest First"
+msgstr "الأقدم أولاً"
+
+msgid "Selected Row"
+msgstr "القسط المحدد"
+
+msgid "Principal Paid"
+msgstr "الأصل المدفوع"
+
+msgid "Leave the principal and the interest empty to pay the next unpaid installment (or the selected one)."
+msgstr "اترك الأصل والفائدة فارغين لسداد القسط التالي غير المدفوع (أو القسط المحدد)."
+
+msgid "Interest / Profit Paid"
+msgstr "الفائدة / الربح المدفوع"
+
+msgid "Principal beyond the installments due up to the repayment date is an early repayment: the later installments are reduced (the tenor is kept)."
+msgstr "ما يزيد من الأصل على الأقساط المستحقة حتى تاريخ السداد هو سداد معجل: تُخفَّض الأقساط اللاحقة (مع الإبقاء على المدة)."
+
+msgid "Prepayment Amount"
+msgstr "مبلغ السداد المعجل"
+
+msgid "Penalty"
+msgstr "الغرامة"
+
+msgid "Penalty Account"
+msgstr "حساب الغرامات"
+
+msgid "Allocation to Installments"
+msgstr "التوزيع على الأقساط"
+
+msgid "Allocations"
+msgstr "التوزيعات"
+
+msgid "Accrued Interest Cleared"
+msgstr "الفوائد المستحقة المسوّاة"
+
+msgid "The part of the interest paid that clears interest already accrued (Accrued Interest Account)."
+msgstr "جزء الفائدة المدفوعة الذي يسوّي فوائد سبق استحقاقها (حساب الفوائد المستحقة)."
+
+msgid "Interest Expensed"
+msgstr "الفائدة المحمّلة على المصروفات"
+
+msgid "The part of the interest paid booked straight to the Interest Expense Account."
+msgstr "جزء الفائدة المدفوعة المسجل مباشرة في حساب مصروف الفوائد."
+
+msgid "Schedule Snapshot"
+msgstr "لقطة الجدول"
+
+# Messages (facility actions)
+msgid "Bank Facility {0} expired on {1}. Renew it instead."
+msgstr "انتهى التسهيل البنكي {0} في {1}. قم بتجديده بدلاً من ذلك."
+
+msgid "Bank Facility {0} cannot be closed: {1} is still utilised."
+msgstr "لا يمكن إغلاق التسهيل البنكي {0}: لا يزال {1} مستخدماً."
+
+msgid "Bank Facility {0} cannot be closed: drawdowns {1} still have unpaid installments."
+msgstr "لا يمكن إغلاق التسهيل البنكي {0}: لا تزال للمسحوبات {1} أقساط غير مدفوعة."
+
+msgid "The new Expiry Date cannot be before the Renewal Date."
+msgstr "لا يمكن أن يكون تاريخ الانتهاء الجديد قبل تاريخ التجديد."
+
+msgid "New limits must be given as {limit type: amount}."
+msgstr "يجب إدخال الحدود الجديدة بالصيغة {نوع الحد: المبلغ}."
+
+msgid "Bank Facility {0} has no {1} sub-limit."
+msgstr "لا يوجد في التسهيل البنكي {0} حد فرعي من نوع {1}."
+
+msgid "Bank Facility {0} is already {1}."
+msgstr "التسهيل البنكي {0} بالفعل {1}."
+
+msgid "This action is not allowed while Bank Facility {0} is {1}."
+msgstr "هذا الإجراء غير مسموح به بينما التسهيل البنكي {0} {1}."
+
+msgid "The date ({0}) cannot be before {1}."
+msgstr "لا يمكن أن يكون التاريخ ({0}) قبل {1}."
+
+msgid "Bank Facility {0} cannot be deleted once activated or when it has drawdowns. Close it instead."
+msgstr "لا يمكن حذف التسهيل البنكي {0} بعد تفعيله أو عند وجود مسحوبات عليه. قم بإغلاقه بدلاً من ذلك."
+
+msgid "{0} can only be changed by the Bank Facility actions."
+msgstr "لا يمكن تغيير {0} إلا من خلال إجراءات التسهيل البنكي."
+
+msgid "The Expiry Date cannot be before the Start Date."
+msgstr "لا يمكن أن يكون تاريخ الانتهاء قبل تاريخ البدء."
+
+msgid "Total Limit must be greater than zero."
+msgstr "يجب أن يكون الحد الإجمالي أكبر من صفر."
+
+msgid "Add at least one sub-limit."
+msgstr "أضف حداً فرعياً واحداً على الأقل."
+
+msgid "Row #{0}: Sub-limit {1} appears more than once."
+msgstr "الصف رقم {0}: الحد الفرعي {1} مكرر."
+
+msgid "Row #{0}: Limit Amount must be greater than zero."
+msgstr "الصف رقم {0}: يجب أن يكون مبلغ الحد أكبر من صفر."
+
+msgid "Row #{0}: Limit Amount {1} cannot exceed the Total Limit {2}."
+msgstr "الصف رقم {0}: لا يمكن أن يتجاوز مبلغ الحد {1} الحد الإجمالي {2}."
+
+msgid "Row #{0}: {1} cannot be negative."
+msgstr "الصف رقم {0}: لا يمكن أن يكون {1} سالباً."
+
+msgid "Row #{0}: Liability Account is required for sub-limit {1}."
+msgstr "الصف رقم {0}: حساب الالتزام مطلوب للحد الفرعي {1}."
+
+msgid "Row #{0}: Liability Account"
+msgstr "الصف رقم {0}: حساب الالتزام"
+
+msgid "Default Bank Account is required for an Overdraft sub-limit."
+msgstr "الحساب البنكي الافتراضي مطلوب لحد السحب على المكشوف."
+
+msgid "Bank Account {0} is not at bank {1}."
+msgstr "الحساب البنكي {0} ليس لدى البنك {1}."
+
+msgid "Bank Account {0} is in {1}, but the facility is in {2}."
+msgstr "الحساب البنكي {0} بعملة {1}، لكن التسهيل بعملة {2}."
+
+msgid "{0} {1} cannot be a Payable or Receivable account."
+msgstr "لا يمكن أن يكون {0} {1} حساب دائنين أو مدينين."
+
+msgid "{0} {1} must be in {2}."
+msgstr "يجب أن يكون {0} {1} بعملة {2}."
+
+msgid "Row #{0}: Security Cheque {1} appears more than once."
+msgstr "الصف رقم {0}: شيك الضمان {1} مكرر."
+
+msgid "Row #{0}: Security Cheque {1} does not belong to company {2}."
+msgstr "الصف رقم {0}: شيك الضمان {1} لا يخص الشركة {2}."
+
+msgid "{0} cannot be changed after the facility is activated. Use the Renew action."
+msgstr "لا يمكن تغيير {0} بعد تفعيل التسهيل. استخدم إجراء التجديد."
+
+# Messages (accounting, schedule, accrual, repayments)
+msgid "Drawdown {0} of Bank Facility {1}"
+msgstr "السحب {0} من التسهيل البنكي {1}"
+
+msgid "Upfront fees of drawdown {0}"
+msgstr "الرسوم المقدمة للسحب {0}"
+
+msgid "Set the Interest Expense Account of Bank Facility {0}."
+msgstr "حدد حساب مصروف الفوائد للتسهيل البنكي {0}."
+
+msgid "Repayment {0} of drawdown {1}"
+msgstr "السداد {0} للسحب {1}"
+
+msgid "Set the {0} of Bank Facility {1}."
+msgstr "حدد {0} للتسهيل البنكي {1}."
+
+msgid "Interest accrual of drawdown {0} for {1}"
+msgstr "استحقاق فوائد السحب {0} عن {1}"
+
+msgid "Invalid Repayment Frequency: {0}"
+msgstr "دورية سداد غير صالحة: {0}"
+
+msgid "Invalid Day Count: {0}"
+msgstr "أساس حساب أيام غير صالح: {0}"
+
+msgid "Tenor (Months) must be greater than zero."
+msgstr "يجب أن تكون المدة (بالأشهر) أكبر من صفر."
+
+msgid "Invalid Repayment Method: {0}"
+msgstr "طريقة سداد غير صالحة: {0}"
+
+msgid "The interest rate and the profit amount cannot be negative."
+msgstr "لا يمكن أن يكون سعر الفائدة أو مبلغ الربح سالباً."
+
+msgid "Tenor (Months) {0} must be a multiple of the {1} months of a {2} period."
+msgstr "يجب أن تكون المدة (بالأشهر) {0} من مضاعفات أشهر الفترة ({1}) لدورية {2}."
+
+msgid "Grace (Months) must be a multiple of the {0} months of a {1} period."
+msgstr "يجب أن تكون فترة السماح (بالأشهر) من مضاعفات أشهر الفترة ({0}) لدورية {1}."
+
+msgid "The grace period must end before the last installment."
+msgstr "يجب أن تنتهي فترة السماح قبل القسط الأخير."
+
+msgid "The First Repayment Date must be after the drawdown date."
+msgstr "يجب أن يكون تاريخ أول سداد بعد تاريخ السحب."
+
+msgid "The interest of installment {0} exceeds the installment {1}."
+msgstr "فائدة القسط {0} تتجاوز قيمة القسط {1}."
+
+msgid "Facility interest accrual failed for drawdown {0}"
+msgstr "فشل استحقاق فوائد التسهيل للسحب {0}"
+
+msgid "Installment {0} does not exist on drawdown {1}."
+msgstr "القسط {0} غير موجود في السحب {1}."
+
+msgid "The interest paid exceeds the unpaid interest of the allocated installments by {0}."
+msgstr "الفائدة المدفوعة تتجاوز الفائدة غير المدفوعة للأقساط الموزع عليها بمقدار {0}."
+
+msgid "The principal paid exceeds the unpaid principal of the allocated installments by {0}. Tick Prepayment to prepay it."
+msgstr "الأصل المدفوع يتجاوز الأصل غير المدفوع للأقساط الموزع عليها بمقدار {0}. حدد السداد المعجل لسداده مبكراً."
+
+msgid "The prepayment {0} exceeds the principal {1} of the unpaid installments due after the repayment date."
+msgstr "السداد المعجل {0} يتجاوز أصل الأقساط غير المدفوعة المستحقة بعد تاريخ السداد ({1})."
+
+msgid "Schedule row {0} no longer exists."
+msgstr "سطر الجدول {0} لم يعد موجوداً."
+
+msgid "Cancel the later repayments of drawdown {0} first: {1}."
+msgstr "ألغِ أولاً عمليات السداد اللاحقة للسحب {0}: {1}."
+
+msgid "The prepayment exceeds the principal of the unpaid installments due after the repayment date."
+msgstr "السداد المعجل يتجاوز أصل الأقساط غير المدفوعة المستحقة بعد تاريخ السداد."
+
+# Messages (drawdown / repayment controllers)
+msgid "Limit Type must be one of: {0}."
+msgstr "يجب أن يكون نوع الحد أحد: {0}."
+
+msgid "Set the Liability Account of the {0} sub-limit of Bank Facility {1}."
+msgstr "حدد حساب الالتزام للحد الفرعي {0} في التسهيل البنكي {1}."
+
+msgid "Bank Account is required."
+msgstr "الحساب البنكي مطلوب."
+
+msgid "Fees Account is required for the upfront fees."
+msgstr "حساب الرسوم مطلوب للرسوم المقدمة."
+
+msgid "Fees Account {0} must be a ledger Expense account of {1} in {2}."
+msgstr "يجب أن يكون حساب الرسوم {0} حساب مصروفات فرعياً للشركة {1} بعملة {2}."
+
+msgid "Row #{0}: Principal and interest cannot be negative."
+msgstr "الصف رقم {0}: لا يمكن أن يكون الأصل أو الفائدة سالباً."
+
+msgid "Row #{0}: Due Date {1} must be after {2}."
+msgstr "الصف رقم {0}: يجب أن يكون تاريخ الاستحقاق {1} بعد {2}."
+
+msgid "The principal of the repayment schedule ({0}) must equal the drawdown amount ({1})."
+msgstr "يجب أن يساوي أصل جدول السداد ({0}) مبلغ السحب ({1})."
+
+msgid "Bank Facility {0} is {1}: drawdowns need an Active facility."
+msgstr "التسهيل البنكي {0} {1}: يتطلب السحب تسهيلاً سارياً."
+
+msgid "The Drawdown Date {0} is outside the facility period {1} - {2}."
+msgstr "تاريخ السحب {0} خارج فترة التسهيل {1} - {2}."
+
+msgid "Drawdown {0} exceeds the available {1} limit of Bank Facility {2}: available {3} (total available {4})."
+msgstr "السحب {0} يتجاوز المتاح من حد {1} في التسهيل البنكي {2}: المتاح {3} (إجمالي المتاح {4})."
+
+msgid "Limit Exceeded"
+msgstr "تم تجاوز الحد"
+
+msgid "The schedule can only be generated on a draft drawdown."
+msgstr "لا يمكن إنشاء الجدول إلا لسحب في حالة مسودة."
+
+msgid "Drawdown {0} has submitted repayments ({1}). Cancel them first."
+msgstr "للسحب {0} عمليات سداد معتمدة ({1}). ألغها أولاً."
+
+msgid "Facility Drawdown {0} is not submitted."
+msgstr "السحب من التسهيل {0} غير معتمد."
+
+msgid "The Repayment Date cannot be before the Drawdown Date {0}."
+msgstr "لا يمكن أن يكون تاريخ السداد قبل تاريخ السحب {0}."
+
+msgid "The Repayment Date cannot be before the latest submitted repayment ({0})."
+msgstr "لا يمكن أن يكون تاريخ السداد قبل آخر سداد معتمد ({0})."
+
+msgid "{0} cannot be negative."
+msgstr "لا يمكن أن يكون {0} سالباً."
+
+msgid "Enter the principal, interest or penalty paid."
+msgstr "أدخل الأصل أو الفائدة أو الغرامة المدفوعة."
+
+msgid "Penalty Account is required for the penalty."
+msgstr "حساب الغرامات مطلوب للغرامة."
+
+msgid "Penalty Account {0} must be a ledger Expense account of {1} in {2}."
+msgstr "يجب أن يكون حساب الغرامات {0} حساب مصروفات فرعياً للشركة {1} بعملة {2}."
+
+# Jobs and alerts
+msgid "Bank facility daily refresh failed for {0} {1}"
+msgstr "فشل التحديث اليومي للتسهيلات البنكية لـ {0} {1}"
+
+msgid "Overdue Installments"
+msgstr "أقساط متأخرة"
+
+msgid "Installments Due Soon"
+msgstr "أقساط مستحقة قريباً"
+
+msgid "Bank facility installments and expiries for {0} as of {1}"
+msgstr "أقساط التسهيلات البنكية وانتهاؤها لـ {0} في {1}"
+
+msgid "Bank facility alert email could not be sent"
+msgstr "تعذر إرسال بريد تنبيه التسهيلات البنكية"
+
+msgid "Bank facility installments due up to the alert date and facilities expiring soon for {0}, as of {1}:"
+msgstr "أقساط التسهيلات البنكية المستحقة حتى تاريخ التنبيه والتسهيلات التي تنتهي قريباً لـ {0} في {1}:"
+
+msgid "Unpaid"
+msgstr "غير مدفوع"
+
+msgid "Facilities Expiring Soon"
+msgstr "تسهيلات تنتهي قريباً"
+
+# Forecast
+msgid "Installment {0}"
+msgstr "القسط {0}"
+
+msgid "Available Overdraft"
+msgstr "السحب على المكشوف المتاح"
+
+# Reports
+msgid "Bank / Facility / Limit Type"
+msgstr "البنك / التسهيل / نوع الحد"
+
+msgid "Limit"
+msgstr "الحد"
+
+msgid "Limit (Company Currency)"
+msgstr "الحد (بعملة الشركة)"
+
+msgid "Utilised (Company Currency)"
+msgstr "المستخدم (بعملة الشركة)"
+
+msgid "Available (Company Currency)"
+msgstr "المتاح (بعملة الشركة)"
+
+msgid "Total Limits"
+msgstr "إجمالي الحدود"
+
+msgid "Include Closed"
+msgstr "تضمين المغلقة"
+
+msgid "Unpaid (Company Currency)"
+msgstr "غير المدفوع (بعملة الشركة)"
+
+msgid "Overdue (Company Currency)"
+msgstr "المتأخر (بعملة الشركة)"
+
+msgid "Unpaid Installments"
+msgstr "أقساط غير مدفوعة"
+
+msgid "Unpaid Principal"
+msgstr "الأصل غير المدفوع"
+
+msgid "Unpaid Interest / Profit"
+msgstr "الفائدة / الربح غير المدفوع"
+
+msgid "Include Paid"
+msgstr "تضمين المدفوعة"
+
+msgid "Commission"
+msgstr "العمولة"
+
+msgid "Penalties"
+msgstr "الغرامات"
+
+msgid "Total Cost of Financing"
+msgstr "إجمالي تكلفة التمويل"
+
+msgid "Facility / Period"
+msgstr "التسهيل / الفترة"
+
+# Form buttons and dialogs
+msgid "Refresh Utilisation"
+msgstr "تحديث الاستخدام"
+
+msgid "Activate"
+msgstr "تفعيل"
+
+msgid "Reactivate"
+msgstr "إعادة التفعيل"
+
+msgid "Suspend"
+msgstr "إيقاف"
+
+msgid "Renew"
+msgstr "تجديد"
+
+msgid "New {0} Limit"
+msgstr "الحد الجديد لـ {0}"
+
+msgid "New Total Limit"
+msgstr "الحد الإجمالي الجديد"
+
+msgid "Close Facility"
+msgstr "إغلاق التسهيل"
+
+msgid "Generate Schedule"
+msgstr "إنشاء الجدول"
+
+msgid "Outstanding Principal: {0}"
+msgstr "الأصل المتبقي: {0}"
+
+msgid "Refresh Status"
+msgstr "تحديث الحالة"
+
+msgid "The principal beyond the installments due up to the repayment date reduces the later installments; the tenor is kept."
+msgstr "ما يزيد من الأصل على الأقساط المستحقة حتى تاريخ السداد يخفض الأقساط اللاحقة مع الإبقاء على المدة."

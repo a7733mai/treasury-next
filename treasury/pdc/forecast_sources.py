@@ -16,11 +16,20 @@ accounts in scope —, from_date, to_date, currency_view) and returns a list of 
 	reference_doctype, reference_name, party, description   optional, shown in the details view
 
 Flows are read-only forecasts: a source never posts anything.
+
+Extra summary cards (e.g. "Available Overdraft") come from the `treasury_forecast_summary_sources` hook:
+
+	treasury_forecast_summary_sources = ["treasury.bank_facilities.forecast.get_summary"]
+
+Each function receives the same filters plus `currency` (the report's view currency) and `today`, and
+returns a list of {"label", "value" (in the view currency), "indicator" (optional)}; the report appends one
+Currency card per item after its own cards.
 """
 
 import frappe
 
 HOOK = "treasury_forecast_sources"
+SUMMARY_HOOK = "treasury_forecast_summary_sources"
 
 
 def get_source_methods() -> list[str]:
@@ -33,3 +42,11 @@ def get_additional_flows(filters) -> list[dict]:
 	for method in get_source_methods():
 		flows.extend(frappe.get_attr(method)(filters) or [])
 	return flows
+
+
+def get_additional_summary(filters) -> list[dict]:
+	"""Extra summary cards of all registered summary sources, in the order the hooks list them."""
+	items = []
+	for method in frappe.get_hooks(SUMMARY_HOOK) or []:
+		items.extend(frappe.get_attr(method)(filters) or [])
+	return items

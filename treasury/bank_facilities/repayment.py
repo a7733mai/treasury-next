@@ -219,12 +219,12 @@ def apply_repayment(drawdown, repayment, journal: str):
 	refresh_repayment_status(drawdown.name)
 
 
-def undo_repayment(drawdown, repayment):
-	"""Restore the schedule rows as they were before the repayment (its snapshot)."""
+def check_no_later_repayment(drawdown_name: str, repayment):
+	"""Only the latest submitted repayment of a drawdown may be cancelled."""
 	later = frappe.get_all(
 		"Facility Repayment",
 		filters={
-			"drawdown": drawdown.name,
+			"drawdown": drawdown_name,
 			"docstatus": 1,
 			"name": ["!=", repayment.name],
 			"creation": [">", repayment.creation],
@@ -234,10 +234,15 @@ def undo_repayment(drawdown, repayment):
 	if later:
 		frappe.throw(
 			_("Cancel the later repayments of drawdown {0} first: {1}.").format(
-				frappe.bold(drawdown.name), ", ".join(frappe.bold(r) for r in later)
+				frappe.bold(drawdown_name), ", ".join(frappe.bold(r) for r in later)
 			),
 			title=_("Not Allowed"),
 		)
+
+
+def undo_repayment(drawdown, repayment):
+	"""Restore the schedule rows as they were before the repayment (its snapshot)."""
+	check_no_later_repayment(drawdown.name, repayment)
 	saved = {r["name"]: r for r in json.loads(repayment.schedule_snapshot or "[]")}
 	for row in list(drawdown.repayment_schedule):
 		if row.is_prepayment and row.repayment == repayment.name:
@@ -260,6 +265,7 @@ def _save_rows(drawdown):
 		row.total = flt(flt(row.principal) + flt(row.interest), drawdown.precision("amount"))
 		if row.get("__islocal") or not row.name or not frappe.db.exists(SCHEDULE, row.name):
 			row.parent, row.parenttype, row.parentfield = drawdown.name, DRAWDOWN, "repayment_schedule"
+			row.docstatus = drawdown.docstatus
 			row.db_insert()
 		else:
 			row.db_update()
