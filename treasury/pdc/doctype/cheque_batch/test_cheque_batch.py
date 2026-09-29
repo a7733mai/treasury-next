@@ -13,7 +13,7 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, flt, formatdate, getdate, nowdate
 
 from treasury.pdc import lifecycle, scheduler
-from treasury.pdc.batch import create_cheques
+from treasury.pdc.batch import create_cheques, schedule_dates, split_amounts
 from treasury.pdc.batch_status import compute_batch_status
 from treasury.pdc.report.pdc_register import pdc_register
 from treasury.tests.utils import (
@@ -26,6 +26,7 @@ from treasury.tests.utils import (
 	assert_party_balance,
 	bank_account_name,
 	day,
+	ensure_customer,
 	ensure_supplier,
 	ensure_user,
 	get_ledger_open_amount,
@@ -34,6 +35,7 @@ from treasury.tests.utils import (
 	make_cheque_book,
 	make_pdc_cheque,
 	make_purchase_invoice,
+	make_sales_invoice,
 	unique_cheque_no,
 )
 
@@ -57,7 +59,11 @@ DOCTYPE = "Cheque Batch"
 CHEQUE = "PDC Cheque"
 TREASURY_USER = "treasury-batch-user@example.com"
 NO_CHEQUE_USER = "treasury-batch-nocheque@example.com"
+SYSTEM_MANAGER_USER = "treasury-batch-sysmanager@example.com"
+# FIFO scenarios each use a party of their own: another test's invoices must never be picked up
 FIFO_SUPPLIER = "_Test Treasury Supplier FIFO"
+RESERVED_SUPPLIER = "_Test Treasury Supplier FIFO Reserved"
+FIFO_CUSTOMER = "_Test Treasury Customer FIFO"
 PERMISSION_SAVEPOINT = "treasury_batch_permission_test"
 ARABIC = re.compile(r"[؀-ۿ]")
 
@@ -90,8 +96,11 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		# ranges of the other test classes)
 		cls.next_start = 73_000_000
 		ensure_supplier(FIFO_SUPPLIER)
+		ensure_supplier(RESERVED_SUPPLIER)
+		ensure_customer(FIFO_CUSTOMER)
 		ensure_user(TREASURY_USER, ["Treasury User"])
 		ensure_user(NO_CHEQUE_USER, ["Accounts User"])
+		ensure_user(SYSTEM_MANAGER_USER, ["System Manager"])
 
 	def setUp(self):
 		super().setUp()
@@ -170,12 +179,13 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		egp = self.data.egp
 		doc, book, preview = self.rent_batch()
 
-		self.assertTrue(doc.name.startswith("CHB-OUT-"))
+		self.assertTrue(doc.name.startswith("CHQB-OUT-"))
 		self.assertEqual(doc.posting_mode, "On Handover")
 		self.assertEqual(doc.status, "Draft")
 		self.assertEqual([getdate(r.due_date) for r in doc.cheques], MONTH_ENDS)
 		amounts = [r.amount for r in doc.cheques]
-		self.assertEqual(amounts, [8333.33] * 11 + [8333.37])
+		# 10,000,000 piastres / 12 = 833,333 rest 4: the last four cheques take one piastre more
+		self.assertEqual(amounts, [8333.33] * 8 + [8333.34] * 4)
 		self.assertEqual(flt(sum(amounts), 2), 100000)
 		self.assertEqual((doc.total_amount, doc.cheque_count), (100000, 12))
 		# leaves are only previewed while generating: nothing is allocated before the submit
@@ -298,7 +308,7 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, doc.generate_rows)
 		doc.gen_first_cheque_no = "1"
 
-		# split total: the last cheque absorbs the rounding, the sum is exact
+		# split total: the remainder goes one unit each to the last cheques, the sum is exact
 		doc.gen_amount_mode, doc.gen_total = "Split Total", 100
 		generate()
 		self.assertEqual([r.amount for r in doc.cheques], [33.33, 33.33, 33.34])
@@ -307,6 +317,30 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, doc.generate_rows)
 		doc.gen_count = 0
 		self.assertRaises(frappe.ValidationError, doc.generate_rows)
+
+	def test_split_total_small_amounts(self):
+		# 1.00 over 60 cheques: 100 piastres = 60 x 1 + 40 (rounding each share to nearest would fail)
+		amounts = split_amounts("Split Total", 60, 0, 1, 2)
+		self.assertEqual(amounts, [0.01] * 20 + [0.02] * 40)
+		self.assertEqual(flt(sum(amounts), 2), 1)
+		amounts = split_amounts("Split Total", 7, 0, 1000, 2)
+		self.assertEqual(flt(sum(amounts), 2), 1000)
+		self.assertLessEqual(max(amounts) - min(amounts), 0.011)
+		self.assertRaises(frappe.ValidationError, split_amounts, "Split Total", 3, 0, 0.02, 2)
+
+	def test_month_end_in_a_leap_year(self):
+		self.assertEqual(
+			schedule_dates("2028-01-31", 3, "Monthly"),
+			[getdate("2028-01-31"), getdate("2028-02-29"), getdate("2028-03-31")],
+		)
+		# from the last day of a leap February, month-end alignment keeps every month end
+		self.assertEqual(
+			schedule_dates("2028-02-29", 3, "Monthly", month_end=True),
+			[getdate("2028-02-29"), getdate("2028-03-31"), getdate("2028-04-30")],
+		)
+		self.assertEqual(
+			schedule_dates("2028-02-29", 2, "Yearly"), [getdate("2028-02-29"), getdate("2029-02-28")]
+		)
 
 	# ------------------------------------------------------------------ allocation
 
@@ -327,6 +361,7 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		summary = doc.allocate_fifo()
 
 		self.assertEqual((summary["allocated"], summary["unallocated"]), (3200, 800))
+		self.assertEqual(summary["not_covered"], 0)
 		self.assertEqual(
 			[(d["reference_name"], d["allocated"]) for d in summary["invoices"]],
 			[(first.name, 1000), (second.name, 1500), (third.name, 700)],
@@ -359,6 +394,90 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		# nothing left to allocate for a new batch of the same supplier
 		other = self.make_batch(party=FIFO_SUPPLIER, rows=self.numbered_rows(1))
 		self.assertEqual(other.allocate_fifo()["allocated"], 0)
+
+	def test_fifo_skips_what_other_cheques_reserve(self):
+		first = make_purchase_invoice(1000, posting_date=day(-170), supplier=RESERVED_SUPPLIER)
+		second = make_purchase_invoice(400, posting_date=day(-165), supplier=RESERVED_SUPPLIER)
+		# a not yet posted single cheque already allocates 300 of the first invoice
+		make_pdc_cheque(
+			amount=300, party=RESERVED_SUPPLIER, invoice=first, issue_date=day(-170), due_date=day(-100)
+		)
+		doc = self.make_batch(
+			party=RESERVED_SUPPLIER,
+			issue_date=day(-150),
+			allocation_method="FIFO Invoices",
+			rows=self.numbered_rows(3, amount=500, first_due=day(-140)),
+		)
+
+		summary = doc.allocate_fifo()
+
+		self.assertEqual(
+			[(d["reference_name"], d["outstanding"], d["allocated"]) for d in summary["invoices"]],
+			[(first.name, 700, 700), (second.name, 400, 400)],
+		)
+		self.assertEqual(
+			[(r.reference_name, r.allocated_amount) for r in doc.cheques],
+			[(first.name, 500), (first.name, 200), (second.name, 400)],
+		)
+		self.assertEqual((summary["allocated"], summary["unallocated"], summary["not_covered"]), (1100, 400, 0))
+		doc.insert()  # within what is still available
+
+	def test_fifo_incoming_sales_invoices(self):
+		egp = self.data.egp
+		first = make_sales_invoice(1500, posting_date=day(-170), customer=FIFO_CUSTOMER)
+		second = make_sales_invoice(1500, posting_date=day(-165), customer=FIFO_CUSTOMER)
+		doc = self.make_batch(
+			"Incoming",
+			party=FIFO_CUSTOMER,
+			issue_date=day(-150),
+			handover_date=day(-150),
+			allocation_method="FIFO Invoices",
+			rows=self.numbered_rows(3, amount=1000, first_due=day(-140), drawer_bank="Drawer Bank Y"),
+		)
+
+		summary = doc.allocate_fifo()
+
+		# one invoice per cheque: the second cheque takes the last 500 of the first invoice, keeping 500 as an
+		# advance while 500 of the second invoice stays open (reported as not covered)
+		self.assertEqual(
+			[(r.reference_doctype, r.reference_name, r.allocated_amount) for r in doc.cheques],
+			[
+				("Sales Invoice", first.name, 1000),
+				("Sales Invoice", first.name, 500),
+				("Sales Invoice", second.name, 1000),
+			],
+		)
+		self.assertEqual((summary["allocated"], summary["unallocated"], summary["not_covered"]), (2500, 500, 500))
+
+		doc.insert()
+		doc.submit()
+		doc.reload()
+
+		self.assertEqual(doc.status, "Received")
+		self.assertEqual(get_party_outstanding("Sales Invoice", first.name), 0)
+		self.assertEqual(get_party_outstanding("Sales Invoice", second.name), 500)
+		cheque = frappe.get_doc(CHEQUE, doc.cheques[1].pdc_cheque)
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			cheque.party_payment_entry,
+			[
+				(egp.pdc_receivable, 1000, 0, None, day(-150)),
+				(self.data.receivable, 0, 1000, FIFO_CUSTOMER, day(-150)),
+			],
+		)
+		self.assertEqual(abs(get_ledger_open_amount("Payment Entry", cheque.party_payment_entry)), 500)
+
+		# FIFO needs the matching party type
+		other = self.make_batch("Incoming", party_type="Supplier", party=SUPPLIER, rows=self.numbered_rows(1))
+		self.assertRaises(frappe.ValidationError, other.allocate_fifo)
+
+	def test_fifo_method_without_allocation_warns(self):
+		frappe.local.message_log = []
+		doc = self.make_batch(allocation_method="FIFO Invoices", rows=self.numbered_rows(1))
+		doc.insert()
+		self.assertTrue(any("Allocate FIFO" in str(m) for m in frappe.local.message_log))
+		frappe.local.message_log = []
 
 	def test_over_allocation_is_rejected(self):
 		pi = make_purchase_invoice(1000, posting_date=day(-170))
@@ -434,7 +553,7 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		)
 		doc.generate_rows()
 		doc.insert()
-		self.assertTrue(doc.name.startswith("CHB-IN-"))
+		self.assertTrue(doc.name.startswith("CHQB-IN-"))
 		self.assertEqual(doc.posting_mode, "On Receipt")
 
 		doc.submit()
@@ -564,6 +683,113 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 			self.assertEqual(self.status(row.pdc_cheque), ("Delivered", "Party Posted"))
 		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "docstatus"), 1)
 
+	def test_cancel_needs_the_treasury_manager_role(self):
+		# System Manager may cancel the batch document, but cancelling its cheques is a Treasury Manager action:
+		# refused up front, before any cheque is touched
+		doc = self.make_batch(rows=self.numbered_rows(2))
+		doc.insert()
+		doc.submit()
+		doc.reload()
+
+		with self.set_user(SYSTEM_MANAGER_USER):
+			with self.assertRaises(frappe.PermissionError) as ctx:
+				frappe.get_doc(DOCTYPE, doc.name).cancel()
+		self.assertIn(lifecycle.MANAGER, str(ctx.exception))
+		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "docstatus"), 1)
+		for row in doc.cheques:
+			self.assertEqual(self.status(row.pdc_cheque), ("Created", "Not Posted"))
+
+	def test_amend_keeps_hand_typed_numbers(self):
+		# without a cheque book the typed numbers are not book leaves: the amendment reuses them (the cancelled
+		# cheques released them)
+		rows = self.numbered_rows(2)
+		doc = self.make_batch(rows=rows)
+		doc.insert()
+		doc.submit()
+		doc.reload()
+		old = [r.pdc_cheque for r in doc.cheques]
+		doc.cancel()
+
+		amended = frappe.copy_doc(doc, ignore_no_copy=False)
+		amended.docstatus = 0
+		amended.amended_from = doc.name
+		amended.insert()
+		self.assertEqual([r.cheque_no for r in amended.cheques], [r["cheque_no"] for r in rows])
+		amended.submit()
+		amended.reload()
+
+		self.assertEqual([r.cheque_no for r in amended.cheques], [r["cheque_no"] for r in rows])
+		new = [r.pdc_cheque for r in amended.cheques]
+		self.assertFalse(set(new) & set(old))
+		for name in new:
+			self.assertEqual(self.status(name), ("Created", "Not Posted"))
+			self.assertEqual(frappe.db.get_value(CHEQUE, name, "cheque_batch"), amended.name)
+		for name in old:
+			self.assertEqual(self.status(name), ("Cancelled", "Not Posted"))
+
+	def test_on_creation_submit_failure_rolls_back(self):
+		# On Creation: every cheque is posted by its insert, so a failing row must undo the earlier vouchers
+		self.use_company_settings(outgoing_party_posting="On Creation")
+		book = self.book()
+		rows = [{"due_date": add_days(FIRST_DUE, 30 * i), "amount": 1000} for i in range(4)]
+		doc = self.make_batch(cheque_book=book.name, rows=rows)
+		doc.insert()
+		self.assertEqual(doc.posting_mode, "On Creation")
+		vouchers_before = frappe.db.count("Payment Entry", {"treasury_source_doctype": CHEQUE})
+		real_after_insert = lifecycle.after_insert
+		calls = []
+
+		def post_but_fail_on_row_3(cheque):
+			calls.append(cheque.name)
+			real_after_insert(cheque)  # rows 1 and 2 (and 3) have their Payment Entry when row 3 fails
+			if len(calls) == 3:
+				frappe.throw("Simulated failure")
+
+		with patch.object(lifecycle, "after_insert", side_effect=post_but_fail_on_row_3):
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				doc.submit()
+
+		self.assertIn("Row #3", str(ctx.exception))
+		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "docstatus"), 0)
+		self.assertEqual(frappe.db.count(CHEQUE, {"cheque_batch": doc.name}), 0)
+		for name in calls:
+			self.assertFalse(frappe.db.exists(CHEQUE, name))
+			self.assertEqual(get_voucher_count(CHEQUE, name), 0)
+		self.assertEqual(frappe.db.count("Payment Entry", {"treasury_source_doctype": CHEQUE}), vouchers_before)
+		book.reload()
+		self.assertEqual(book.next_no, book.start_no)
+
+		doc = frappe.get_doc(DOCTYPE, doc.name)
+		doc.submit()
+		doc.reload()
+		for row in doc.cheques:
+			self.assertEqual(self.status(row.pdc_cheque), ("Created", "Party Posted"))
+		self.assertEqual(doc.status, "Submitted")
+
+	def test_unexpected_error_names_the_row(self):
+		doc = self.make_batch(handover_date=ISSUE, rows=self.numbered_rows(3))
+		doc.insert()
+		real_deliver = lifecycle.deliver
+		calls = []
+
+		def deliver_but_break_on_row_2(name, *args, **kwargs):
+			calls.append(name)
+			if len(calls) == 2:
+				raise RuntimeError("Simulated crash")
+			return real_deliver(name, *args, **kwargs)
+
+		frappe.local.message_log = []
+		with patch.object(lifecycle, "deliver", side_effect=deliver_but_break_on_row_2):
+			with self.assertRaises(RuntimeError) as ctx:
+				doc.submit()
+
+		# not a validation error: the type is kept, the row number is added to the messages and the traceback
+		self.assertIn("Cheque Batch row #2", getattr(ctx.exception, "__notes__", []))
+		self.assertTrue(any("Row #2" in str(m) for m in frappe.local.message_log))
+		frappe.local.message_log = []
+		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "docstatus"), 0)
+		self.assertEqual(frappe.db.count(CHEQUE, {"cheque_batch": doc.name}), 0)
+
 	# ------------------------------------------------------------------ bulk actions
 
 	def test_deliver_all_isolates_failures(self):
@@ -577,11 +803,16 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		def post_then_fail(cheque, posting_date):
 			real_post_party(cheque, posting_date)  # the Payment Entry exists when it fails
 			if cheque.name == names[1]:
+				frappe.msgprint("Message of the rolled back cheque")
 				frappe.throw("Simulated posting failure")
 
+		frappe.local.message_log = []
 		with patch.object(lifecycle, "_post_party", side_effect=post_then_fail):
 			result = doc.deliver_all(handover_date=ISSUE)
 
+		# the rolled back cheque's messages are dropped with it (its failure is in the result instead)
+		self.assertFalse(any("rolled back cheque" in str(m) for m in frappe.local.message_log))
+		self.assertFalse(any("Simulated posting failure" in str(m) for m in frappe.local.message_log))
 		self.assertEqual(result["succeeded"], [names[0], names[2]])
 		self.assertEqual([f["cheque"] for f in result["failed"]], [names[1]])
 		self.assertIn("Simulated posting failure", result["failed"][0]["error"])
@@ -647,6 +878,101 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(new.operational_status, "Delivered")
 		self.assertEqual(self.batch_status(doc), "Delivered")
 
+	def test_batch_cheques_are_frozen_while_submitted(self):
+		doc = self.make_batch(rows=self.numbered_rows(2))
+		doc.insert()
+		doc.submit()
+		doc.reload()
+		name = doc.cheques[0].pdc_cheque
+
+		# Created and not posted, but listed on the submitted batch voucher: identity and amount are frozen
+		for fieldname, value in (
+			("amount", 999),
+			("cheque_no", unique_cheque_no()),
+			("original_due_date", add_days(FIRST_DUE, 1)),
+			("issue_date", add_days(ISSUE, 1)),
+		):
+			cheque = frappe.get_doc(CHEQUE, name)
+			cheque.set(fieldname, value)
+			with self.assertRaises(frappe.ValidationError, msg=fieldname) as ctx:
+				cheque.save()
+			self.assertIn(doc.name, str(ctx.exception))
+		pi = make_purchase_invoice(1000, posting_date=day(-170))
+		cheque = frappe.get_doc(CHEQUE, name)
+		cheque.append(
+			"references",
+			{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 100},
+		)
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			cheque.save()
+		self.assertIn(doc.name, str(ctx.exception))
+
+		# other fields stay editable, and the cheque actions still work
+		cheque = frappe.get_doc(CHEQUE, name)
+		cheque.remarks = "Edited remark"
+		cheque.save()
+		cheque.deliver(handover_date=ISSUE)
+		self.assertEqual(self.status(name), ("Delivered", "Party Posted"))
+		self.assertEqual(self.batch_status(doc), "Partially Delivered")
+
+		# a single cheque (not from a batch) keeps its usual rules
+		single = make_pdc_cheque(issue_date=ISSUE, due_date=FIRST_DUE)
+		single.amount = 999
+		single.save()
+
+	def test_receipt_prints_the_live_cheques_after_a_replacement(self):
+		doc = self.make_batch(handover_date=ISSUE, rows=self.numbered_rows(3, amount=1000))
+		doc.insert()
+		doc.submit()
+		doc.reload()
+		old = frappe.get_doc(CHEQUE, doc.cheques[1].pdc_cheque)
+		new_no = unique_cheque_no()
+
+		result = old.replace(
+			new_cheque_values={
+				"cheque_no": new_no,
+				"amount": 1500,
+				"original_due_date": add_days(FIRST_DUE, 45),
+				"replacement_date": day(-150),
+				"reason": "Amount renegotiated",
+			}
+		)
+
+		new = frappe.get_doc(CHEQUE, result["replaced_by"])
+		self.assertEqual((new.cheque_batch, new.cheque_batch_row), (doc.name, doc.cheques[1].name))
+		previous = frappe.local.lang
+		self.addCleanup(setattr, frappe.local, "lang", previous)
+		frappe.local.lang = "en"
+		html = frappe.get_print(DOCTYPE, doc.name, print_format="Cheque Batch Receipt")
+
+		numbers = re.findall(r'class="pdc-cheque-no">([^<]*)<', html)
+		# the replacement takes the place of its row, the Replaced cheque is left out
+		self.assertEqual(numbers, [doc.cheques[0].cheque_no, new_no, doc.cheques[2].cheque_no])
+		self.assertNotIn(old.cheque_no, html)
+		self.assertIn(formatdate(add_days(FIRST_DUE, 45)), html)
+		total = re.search(r'class="pdc-number pdc-total-amount">([^<]*)<', html).group(1)
+		self.assertIn("3,500", total)
+		self.assertIn("Three Thousand Five Hundred", html)
+		# the frozen rows are untouched: the receipt no longer relies on them
+		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "total_amount"), 3000)
+
+	def test_batch_operations_refresh_the_status_once(self):
+		doc = self.make_batch(handover_date=ISSUE, rows=self.numbered_rows(3))
+		doc.insert()
+
+		with patch.object(lifecycle, "update_batch_status", wraps=lifecycle.update_batch_status) as refresh:
+			doc.submit()
+			# no per-cheque refresh during the batch-wide operation (the batch refreshes once itself)
+			refresh.assert_not_called()
+			doc.reload()
+			self.assertEqual(doc.status, "Delivered")
+
+			# a single cheque action outside a batch operation refreshes its batch
+			frappe.get_doc(CHEQUE, doc.cheques[0].pdc_cheque).clear(clearance_date=day(-100))
+			self.assertTrue(refresh.called)
+			self.assertEqual({call.args for call in refresh.call_args_list}, {(doc.name,)})
+		self.assertEqual(self.batch_status(doc), "Partially Cleared")
+
 	def test_compute_batch_status(self):
 		cases = [
 			((0, "Outgoing", []), "Draft"),
@@ -659,6 +985,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 			((1, "Outgoing", ["Cleared", "Delivered"]), "Partially Cleared"),
 			((1, "Outgoing", ["Cleared", "Replaced", "Cleared"]), "Cleared"),
 			((1, "Outgoing", ["Cancelled"]), "Submitted"),
+			# endorsed / discounted incoming cheques leave nothing to collect: settled like cleared ones
+			((1, "Incoming", ["Cleared", "Endorsed", "Discounted"]), "Cleared"),
+			((1, "Incoming", ["Endorsed", "Received"]), "Partially Cleared"),
 		]
 		for args, expected in cases:
 			self.assertEqual(compute_batch_status(*args), expected, args)
@@ -725,6 +1054,15 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		print_date = re.search(r'class="pdc-print-date-value">([^<]*)<', html).group(1).strip()
 		self.assertEqual(print_date, formatdate(nowdate()))
 		self.assertIn('dir="ltr"', html)
+		self.assertNotIn("Not a valid voucher", html)
+
+		# a draft prints its rows, marked as not a valid voucher
+		draft = self.make_batch(rows=self.numbered_rows(2, amount=500))
+		draft.insert()
+		draft_html = frappe.get_print(DOCTYPE, draft.name, print_format="Cheque Batch Receipt")
+		self.assertIn("Not a valid voucher", draft_html)
+		for row in draft.cheques:
+			self.assertIn(row.cheque_no, draft_html)
 
 		frappe.local.lang = "ar"
 		html = frappe.get_print(DOCTYPE, doc.name, print_format="Cheque Batch Receipt")

@@ -271,6 +271,20 @@ def ensure_supplier(name: str) -> str:
 	)
 
 
+def ensure_customer(name: str) -> str:
+	"""An extra EGP customer (default receivable account), e.g. for scenarios that need a party of their own."""
+	return _ensure(
+		"Customer",
+		name,
+		{
+			"customer_name": name,
+			"customer_group": CUSTOMER_GROUP,
+			"territory": TERRITORY,
+			"customer_type": "Company",
+		},
+	)
+
+
 def mapping_row(bank: frappe._dict) -> dict:
 	return {
 		"bank_account": bank.bank_account,
