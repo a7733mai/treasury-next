@@ -12,7 +12,8 @@ gets its own vouchers while the history of earlier cycles is kept.
 
 Only this module may change the statuses, lifecycle dates, voucher links and history tables of a cheque:
 it saves with `flags.treasury_lifecycle`, and the controller rejects any other change to them. After every
-action on a cheque created by a Cheque Batch, the batch's derived status is refreshed (`batch_status`).
+action on a cheque created by a Cheque Batch, the batch's derived status is refreshed (`batch_status`; once
+at the end of a batch-wide operation instead).
 
 Date order: an event or voucher may not be dated before the cheque's latest event / voucher date
 (`_latest_date`), so no PDC or Under Collection account is ever credited before it was debited.
@@ -28,7 +29,7 @@ from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
-from treasury.pdc.batch_status import update_batch_status
+from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
 
@@ -720,7 +721,13 @@ def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write"
 
 	`system`: internal service call (scheduler, run inside `elevated`) — no user permission / role check.
 	The vouchers themselves are built by the posting service in an elevated context, *after* this check.
+
+	A cheque of a Cheque Batch locks the batch row first (always batch before cheque, so no deadlock): the
+	actions on cheques of one batch are serialised and the batch status is never refreshed from stale data.
 	"""
+	batch = name and frappe.db.get_value(DOCTYPE, name, "cheque_batch")  # insert-only, never changes
+	if batch:
+		lock_batch(batch)
 	if not name or not frappe.db.get_value(DOCTYPE, name, "name", for_update=True):
 		frappe.throw(_("{0} {1} does not exist").format(_(DOCTYPE), name), frappe.DoesNotExistError)
 	doc = frappe.get_doc(DOCTYPE, name)
@@ -741,7 +748,8 @@ def _save(doc) -> dict:
 	doc.flags.treasury_lifecycle = True
 	doc.flags.ignore_permissions = True
 	doc.save()
-	if doc.get("cheque_batch"):
+	# a batch operation (submit, cancel, Deliver All) refreshes its batch once at the end instead
+	if doc.get("cheque_batch") and not in_batch_operation(doc.cheque_batch):
 		update_batch_status(doc.cheque_batch)
 	return {
 		"name": doc.name,

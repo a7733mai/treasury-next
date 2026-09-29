@@ -1,5 +1,7 @@
 {%- set incoming = doc.direction == "Incoming" -%}
 {%- set direction = treasury_print_direction() -%}
+{#- the live cheques of a submitted batch (replacements included, Cancelled / Replaced left out) -#}
+{%- set receipt = treasury_batch_receipt(doc) -%}
 <div class="pdc-receipt" dir="{{ direction }}" style="text-align: {{ 'right' if direction == 'rtl' else 'left' }};">
 	<style>
 		.pdc-receipt table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
@@ -11,7 +13,14 @@
 		.pdc-receipt .pdc-number { text-align: {{ 'left' if direction == 'rtl' else 'right' }}; white-space: nowrap; }
 		.pdc-receipt .pdc-total td { font-weight: bold; }
 		.pdc-receipt .pdc-signatures td { border: none; text-align: center; padding-top: 48px; width: 33%; }
+		.pdc-receipt .pdc-not-valid { text-align: center; color: #c0392b; border: 2px solid #c0392b; padding: 6px; margin-bottom: 12px; font-size: 1.3em; font-weight: bold; }
 	</style>
+
+	{% if doc.docstatus != 1 %}
+	<div class="pdc-not-valid">
+		{{ _("Draft", context="Cheque Batch") if doc.docstatus == 0 else _("Cancelled") }} — {{ _("Not a valid voucher") }}
+	</div>
+	{% endif %}
 
 	{% if letter_head and not no_letterhead %}
 	<div class="letter-head">{{ letter_head }}</div>
@@ -36,7 +45,7 @@
 		{% if doc.purpose %}
 		<tr>
 			<td class="pdc-label">{{ _("Purpose", context="Cheque Batch") }}</td>
-			<td>{{ _(doc.purpose) }}</td>
+			<td>{{ _(doc.purpose, context="Cheque Batch") }}</td>
 		</tr>
 		{% endif %}
 		{% if doc.bank_account %}
@@ -68,18 +77,18 @@
 			</tr>
 		</thead>
 		<tbody>
-			{% for row in doc.cheques %}
+			{% for cheque in receipt.cheques %}
 			<tr>
-				<td>{{ row.idx }}</td>
-				<td class="pdc-cheque-no">{{ (row.cheque_no or "") | e }}</td>
-				<td>{{ frappe.utils.formatdate(row.due_date) }}</td>
-				<td>{{ ((row.drawer_bank if incoming else doc.bank_account) or "") | e }}</td>
-				<td class="pdc-number">{{ row.get_formatted("amount", doc) }}</td>
+				<td>{{ loop.index }}</td>
+				<td class="pdc-cheque-no">{{ (cheque.cheque_no or "") | e }}</td>
+				<td class="pdc-due-date">{{ frappe.utils.formatdate(cheque.due_date) }}</td>
+				<td>{{ (cheque.bank or "") | e }}</td>
+				<td class="pdc-number pdc-amount">{{ frappe.utils.fmt_money(cheque.amount, currency=doc.currency) }}</td>
 			</tr>
 			{% endfor %}
 			<tr class="pdc-total">
-				<td colspan="4">{{ _("Total", context="Cheque Batch") }} ({{ doc.cheques | length }})</td>
-				<td class="pdc-number">{{ doc.get_formatted("total_amount") }}</td>
+				<td colspan="4">{{ _("Total", context="Cheque Batch") }} ({{ receipt.count }})</td>
+				<td class="pdc-number pdc-total-amount">{{ frappe.utils.fmt_money(receipt.total, currency=doc.currency) }}</td>
 			</tr>
 		</tbody>
 	</table>
@@ -87,7 +96,7 @@
 	<table>
 		<tr>
 			<td class="pdc-label">{{ _("Amount in Words") }}</td>
-			<td class="pdc-amount-words">{{ treasury_amount_in_words(doc.total_amount, doc.currency) }}</td>
+			<td class="pdc-amount-words">{{ treasury_amount_in_words(receipt.total, doc.currency) }}</td>
 		</tr>
 	</table>
 

@@ -192,7 +192,15 @@ frappe.ui.form.on("Cheque Batch", {
 				<tbody>${rows || `<tr><td colspan="3">${__("No outstanding invoices.")}</td></tr>`}</tbody>
 			</table>
 			<p>${__("Allocated", null, CHEQUE_BATCH_CTX)}: <b>${fmt(summary.allocated)}</b><br>
-			${__("Unallocated (advance)")}: <b>${fmt(summary.unallocated)}</b></p>`,
+			${__("Unallocated (advance)")}: <b>${fmt(summary.unallocated)}</b><br>
+			${__("Outstanding not covered")}: <b>${fmt(summary.not_covered)}</b></p>
+			${
+				flt(summary.unallocated) > 0 && flt(summary.not_covered) > 0
+					? `<p class="text-muted">${__(
+							"One invoice per cheque: part of a cheque stays an advance while invoices are still open. Allocate those rows by hand, or reconcile the advance later."
+					  )}</p>`
+					: ""
+			}`,
 		});
 	},
 
@@ -303,8 +311,8 @@ frappe.ui.form.on("Cheque Batch", {
 					<td>${esc(c.cheque_no || "")}</td>
 					<td>${frappe.datetime.str_to_user(c.effective_due_date)}</td>
 					<td class="text-right">${format_currency(c.amount, c.currency)}</td>
-					<td><span class="indicator-pill ${color}">${__(c.operational_status)}</span></td>
-					<td>${__(c.accounting_status)}</td>
+					<td><span class="indicator-pill ${color}">${__(c.operational_status, null, "PDC Cheque")}</span></td>
+					<td>${__(c.accounting_status, null, "PDC Cheque")}</td>
 				</tr>`;
 			})
 			.join("");

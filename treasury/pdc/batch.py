@@ -16,9 +16,19 @@ savepoint and report successes and failures.
 
 Header and row validation reuse the PDC Cheque validators on a transient cheque that is never inserted
 (`transient_cheque`), so the batch accepts exactly what a PDC Cheque accepts.
+
+Size and locking: submit (with a handover date) and Deliver / Receive All post every cheque in one web request
+and one transaction, holding the locks of the batch, the cheque book and the bank account until the commit.
+`MAX_ROWS` keeps that within the request timeout; during such a batch-wide operation the per-cheque refresh of
+the batch status is skipped (`batch_operation`) and the status is refreshed once at the end.
+
+Once the batch is submitted, the identity and amount of its cheques are frozen outside the cheque actions
+(`PDCCheque.validate_locked_fields`), and the batch receipt prints the live cheques (replacements included,
+`get_receipt_cheques`): the voucher the party signs always matches the real cheques.
 """
 
 import re
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
@@ -29,7 +39,13 @@ import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.pdc import lifecycle
-from treasury.pdc.batch_status import RELEASED_STATUSES, compute_batch_status, update_batch_status
+from treasury.pdc.batch_status import (
+	RELEASED_STATUSES,
+	compute_batch_status,
+	lock_batch,
+	update_batch_status,
+)
+from treasury.pdc.doctype.cheque_book.cheque_book import SCAN_CHUNK
 
 CHEQUE = "PDC Cheque"
 BATCH = "Cheque Batch"
@@ -37,7 +53,9 @@ ITEM = "Cheque Batch Item"
 # Name given to the transient cheques used for validation (never inserted); keeps the duplicate cheque number
 # check of PDC Cheque from comparing against an empty name.
 TRANSIENT_NAME = "__cheque_batch_validation__"
-MAX_ROWS = 500
+# Every cheque of a batch may be inserted, handed over and posted (a Payment Entry each) in one request:
+# 120 (ten years of monthly cheques) stays well within the web request timeout.
+MAX_ROWS = 120
 SUBMIT_SAVEPOINT = "treasury_cheque_batch"
 ACTION_SAVEPOINT = "treasury_cheque_batch_action"
 
@@ -93,7 +111,12 @@ def schedule_dates(first_due_date, count: int, frequency: str, interval_days=0, 
 
 
 def split_amounts(mode: str, count: int, amount, total, precision: int) -> list[float]:
-	"""Row amounts: the same amount per cheque, or a total split evenly (the last row absorbs the rounding)."""
+	"""Row amounts: the same amount per cheque, or a total split evenly.
+
+	Split Total works in the smallest unit of the precision: every cheque gets the total divided by the count
+	rounded down, and the remainder (fewer units than cheques) goes one unit each to the last cheques, so the
+	sum is exact and no two cheques differ by more than one unit (100,000 / 12 = 8 x 8,333.33 + 4 x 8,333.34).
+	"""
 	if mode == PER_CHEQUE:
 		value = flt(amount, precision)
 		if value <= 0:
@@ -104,11 +127,12 @@ def split_amounts(mode: str, count: int, amount, total, precision: int) -> list[
 	total = flt(total, precision)
 	if total <= 0:
 		frappe.throw(_("Total Amount to Split must be greater than zero."))
-	share = flt(total / count, precision)
-	last = flt(total - share * (count - 1), precision)
-	if share <= 0 or last <= 0:
+	scale = 10**precision
+	units = round(total * scale)
+	share, remainder = divmod(units, count)
+	if share <= 0:
 		frappe.throw(_("The total {0} is too small to be split into {1} cheques.").format(total, count))
-	return [share] * (count - 1) + [last]
+	return [flt((share + (1 if i >= count - remainder else 0)) / scale, precision) for i in range(count)]
 
 
 def next_cheque_numbers(first: str | None, count: int) -> list[str]:
@@ -132,16 +156,16 @@ def preview_leaves(cheque_book: str, count: int, reserved=()) -> list[str]:
 	book = frappe.get_doc("Cheque Book", cheque_book)
 	if book.status != "Active":
 		return []
-	skip = {int(n) for n in (str(v).strip() for v in reserved) if n.isdigit()}
+	skip = {int(n) for n in (str(v).strip() for v in reserved) if n.isdigit()} | book.cancelled_numbers()
 	leaves = []
-	number = cint(book.next_no) or cint(book.start_no)
-	while len(leaves) < count:
-		found = book.find_available_leaf(number)
-		if found is None:
-			break
-		if found not in skip:
-			leaves.append(book.format_leaf(found))
-		number = found + 1
+	number = max(cint(book.next_no), cint(book.start_no))
+	end = cint(book.end_no)
+	# one query per chunk of leaves (like Cheque Book.find_available_leaf), not one per leaf
+	while len(leaves) < count and number <= end:
+		chunk = [n for n in range(number, min(number + SCAN_CHUNK, end + 1)) if n not in skip]
+		used = book.used_numbers(chunk)
+		leaves += [book.format_leaf(n) for n in chunk if n not in used][: count - len(leaves)]
+		number = min(number + SCAN_CHUNK, end + 1)
 	return leaves
 
 
@@ -192,6 +216,9 @@ def transient_cheque(batch, row=None):
 	"""A PDC Cheque built from the batch header (and `row`), never inserted: runs the PDC Cheque validators."""
 	cheque = frappe.new_doc(CHEQUE)
 	cheque.name = TRANSIENT_NAME
+	# validation only: no row lock for the duplicate cheque number check (a draft save must not lock the
+	# bank account; the real cheques are checked under the lock on submit)
+	cheque.flags.treasury_batch_validation = True
 	for fieldname in HEADER_FIELDS:
 		cheque.set(fieldname, batch.get(fieldname))
 	cheque.cheque_book = batch.cheque_book if batch.direction == lifecycle.OUTGOING else None
@@ -300,6 +327,14 @@ def validate_allocations(batch):
 		totals[key] = flt(totals.get(key, 0) + row.allocated_amount, precision)
 
 	if not totals:
+		if batch.allocation_method == FIFO:
+			frappe.msgprint(
+				_(
+					"The Allocation Method is FIFO Invoices, but no cheque is allocated: click Allocate FIFO, otherwise every cheque is posted as an advance."
+				),
+				title=_("Not Allocated"),
+				indicator="orange",
+			)
 		return
 	party_currency = get_account_currency(posting.get_party_account(batch.party_type, batch.party, batch.company))
 	for (doctype, name), allocated in totals.items():
@@ -332,12 +367,24 @@ def get_posting_mode(company: str | None, direction: str | None) -> str | None:
 
 
 def for_row(row, fn):
-	"""Run `fn`; a validation / permission error is raised again prefixed with the batch row number."""
+	"""Run `fn`; a validation / permission error is raised again prefixed with the batch row number.
+
+	Any other error (duplicate name, deadlock, lock timeout, ...) keeps its type, so Frappe still reports it
+	as what it is, and the row number is added to the messages shown to the user and to the traceback.
+	"""
 	try:
 		return fn()
 	except (frappe.ValidationError, frappe.PermissionError) as e:
 		_drop_error_message(e)
 		frappe.throw(_("Row #{0}: {1}").format(row.idx, _message(e)), exc=type(e))
+	except Exception as e:
+		e.add_note(f"Cheque Batch row #{row.idx}")
+		frappe.msgprint(
+			_("Row #{0}: {1}").format(row.idx, _message(e)),
+			title=_("Error", context="Cheque Batch"),
+			indicator="red",
+		)
+		raise
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +397,9 @@ def allocate_fifo(batch) -> dict:
 
 	One reference per row: a row takes what is left of the current invoice (up to its amount); the rest of a
 	row whose invoice is used up stays unallocated (an advance), and so do the rows after the last invoice.
+	So an advance can remain while later invoices are still open (e.g. invoices 1,500 + 1,500 and three
+	cheques of 1,000 leave 500 as an advance and 500 of the second invoice unpaid): the summary reports that
+	as `not_covered`, to be allocated by hand (or settled later by ERPNext's Payment Reconciliation).
 	"""
 	doctype, _party_field, party_type = FIFO_INVOICES[batch.direction]
 	if batch.party_type != party_type or not batch.party:
@@ -397,6 +447,8 @@ def allocate_fifo(batch) -> dict:
 		],
 		"allocated": allocated,
 		"unallocated": flt(batch.total_amount - allocated, precision),
+		# outstanding of the invoices that the cheques do not settle (see the docstring)
+		"not_covered": flt(sum(d.available for d in invoices) - allocated, precision),
 	}
 
 
@@ -495,11 +547,25 @@ def run_atomic(batch, fn):
 		frappe.db.release_savepoint(SUBMIT_SAVEPOINT)
 
 
+@contextmanager
+def batch_operation(batch_name: str):
+	"""Act on all the cheques of a batch: lock the batch row (before any cheque, like `lifecycle._begin`)
+	and skip the per-cheque refresh of the batch status meanwhile; the caller refreshes it once afterwards."""
+	lock_batch(batch_name)
+	previous = frappe.flags.get("treasury_batch_operation")
+	frappe.flags.treasury_batch_operation = batch_name
+	try:
+		yield
+	finally:
+		frappe.flags.treasury_batch_operation = previous
+
+
 def create_cheques(batch):
 	"""One PDC Cheque per row, handed over / received on the batch's date if it has one. Idempotent: a row
 	that already has its cheque keeps it, and only Created cheques are handed over."""
-	for row in batch.cheques:
-		for_row(row, lambda row=row: _submit_row(batch, row))
+	with batch_operation(batch.name):
+		for row in batch.cheques:
+			for_row(row, lambda row=row: _submit_row(batch, row))
 	batch.status = update_batch_status(batch.name)
 
 
@@ -549,10 +615,25 @@ def get_batch_cheques(batch_name: str, fields: list[str] | None = None, as_user:
 
 def validate_cancellation(batch):
 	"""A batch is cancelled only while none of its cheques is in use (all Created and not posted, or already
-	Cancelled / Replaced). Otherwise every blocking cheque is listed: the user acts on each of them."""
+	Cancelled / Replaced). Otherwise every blocking cheque is listed: the user acts on each of them.
+
+	The batch row is locked first, so no cheque of the batch can be handed over between this check and the
+	cancellation; cancelling the Created cheques needs the Treasury Manager role (`lifecycle.cancel_cheque`),
+	checked here before any work is done."""
+	lock_batch(batch.name)
+	cheque = frappe.qb.DocType(CHEQUE)
+	cheques = (
+		frappe.qb.from_(cheque)
+		.select(cheque.name, cheque.operational_status, cheque.accounting_status)
+		.where(cheque.cheque_batch == batch.name)
+		.orderby(cheque.creation)
+		.orderby(cheque.name)
+		.for_update()  # the latest statuses, not the transaction's snapshot
+		.run(as_dict=True)
+	)
 	blocking = [
 		c
-		for c in get_batch_cheques(batch.name)
+		for c in cheques
 		if c.operational_status not in RELEASED_STATUSES
 		and not (c.operational_status == "Created" and c.accounting_status == lifecycle.NOT_POSTED)
 	]
@@ -568,14 +649,23 @@ def validate_cancellation(batch):
 			),
 			title=_("Cancellation Not Allowed"),
 		)
+	if any(c.operational_status == "Created" for c in cheques) and lifecycle.MANAGER not in frappe.get_roles():
+		frappe.throw(
+			_("Cancelling Cheque Batch {0} cancels its cheques, which requires the role {1}.").format(
+				frappe.bold(batch.name), _(lifecycle.MANAGER)
+			),
+			frappe.PermissionError,
+			title=_("Not Permitted"),
+		)
 
 
 def cancel_cheques(batch):
 	"""Cancel the batch's Created cheques through the lifecycle (records their leaves as cancelled)."""
 	reason = _("Cheque Batch {0} cancelled").format(batch.name)
-	for cheque in get_batch_cheques(batch.name):
-		if cheque.operational_status == "Created":
-			lifecycle.cancel_cheque(cheque.name, reason)
+	with batch_operation(batch.name):
+		for cheque in get_batch_cheques(batch.name):
+			if cheque.operational_status == "Created":
+				lifecycle.cancel_cheque(cheque.name, reason)
 	batch.status = update_batch_status(batch.name)
 
 
@@ -601,6 +691,12 @@ def run_bulk_action(batch, direction: str, date=None, remarks: str | None = None
 
 	Each cheque runs in its own savepoint with the lifecycle's own permission and role checks: a failing
 	cheque is rolled back and reported, the others go on. Returns {"succeeded", "failed", "skipped"}.
+
+	Rolling back to the savepoint undoes the failed cheque's database writes and drops the messages it
+	queued (e.g. ERPNext's "Allocation Adjusted"). It cannot undo `frappe.db.after_commit` callbacks or jobs
+	queued with `enqueue_after_commit` by a voucher submitted before the failure: those still run at the
+	commit (a Frappe limitation, see `Database.rollback`), so they must tolerate a voucher that no longer
+	exists.
 	"""
 	if batch.docstatus != 1:
 		frappe.throw(_("Submit the Cheque Batch first."))
@@ -608,20 +704,24 @@ def run_bulk_action(batch, direction: str, date=None, remarks: str | None = None
 		frappe.throw(_("This action is only available for {0} cheques.").format(_(direction)))
 	action = lifecycle.deliver if direction == lifecycle.OUTGOING else lifecycle.receive
 	result = {"succeeded": [], "failed": [], "skipped": []}
-	for cheque in get_batch_cheques(batch.name):
-		if cheque.operational_status != "Created":
-			result["skipped"].append(cheque.name)
-			continue
-		frappe.db.savepoint(ACTION_SAVEPOINT)
-		try:
-			action(cheque.name, date, remarks)
-		except Exception as e:
-			frappe.db.rollback(save_point=ACTION_SAVEPOINT)
-			_drop_error_message(e)
-			result["failed"].append({"cheque": cheque.name, "cheque_no": cheque.cheque_no, "error": _message(e)})
-		else:
-			frappe.db.release_savepoint(ACTION_SAVEPOINT)
-			result["succeeded"].append(cheque.name)
+	with batch_operation(batch.name):
+		for cheque in get_batch_cheques(batch.name):
+			if cheque.operational_status != "Created":
+				result["skipped"].append(cheque.name)
+				continue
+			messages = len(frappe.local.message_log)
+			frappe.db.savepoint(ACTION_SAVEPOINT)
+			try:
+				action(cheque.name, date, remarks)
+			except Exception as e:
+				frappe.db.rollback(save_point=ACTION_SAVEPOINT)
+				del frappe.local.message_log[messages:]
+				result["failed"].append(
+					{"cheque": cheque.name, "cheque_no": cheque.cheque_no, "error": _message(e)}
+				)
+			else:
+				frappe.db.release_savepoint(ACTION_SAVEPOINT)
+				result["succeeded"].append(cheque.name)
 	update_batch_status(batch.name)
 	return result
 
@@ -635,6 +735,58 @@ def get_print_info(batch) -> dict:
 	]
 	print_format = transient_cheque(batch).get_cheque_print_format() or "PDC Cheque Print"
 	return {"doctype": CHEQUE, "names": names, "print_format": print_format}
+
+
+def get_receipt_cheques(batch) -> dict:
+	"""The cheques printed on the Cheque Batch Receipt: {"cheques", "total", "count"}.
+
+	A submitted batch prints its live cheques, not its frozen rows: replacements included (with their own
+	number, amount and due date), Cancelled / Replaced cheques left out, in batch row order. So the voucher
+	the party signs lists exactly the cheques that exist. A draft or cancelled batch prints its rows.
+	"""
+	incoming = batch.direction == lifecycle.INCOMING
+	if batch.docstatus == 1:
+		row_idx = {row.name: row.idx for row in batch.cheques}
+		cheques = [
+			frappe._dict(
+				cheque_no=c.cheque_no,
+				due_date=c.effective_due_date,
+				amount=c.amount,
+				bank=c.drawer_bank if incoming else c.bank_account,
+				pdc_cheque=c.name,
+			)
+			for c in sorted(
+				frappe.get_all(
+					CHEQUE,
+					filters={"cheque_batch": batch.name, "operational_status": ["not in", RELEASED_STATUSES]},
+					fields=[
+						"name",
+						"cheque_no",
+						"effective_due_date",
+						"amount",
+						"drawer_bank",
+						"bank_account",
+						"cheque_batch_row",
+					],
+					order_by="creation asc, name asc",
+				),
+				# stable: a replacement follows the cheques of earlier rows, in creation order
+				key=lambda c: row_idx.get(c.cheque_batch_row, len(row_idx) + 1),
+			)
+		]
+	else:
+		cheques = [
+			frappe._dict(
+				cheque_no=row.cheque_no,
+				due_date=row.due_date,
+				amount=row.amount,
+				bank=row.drawer_bank if incoming else batch.bank_account,
+				pdc_cheque=row.pdc_cheque,
+			)
+			for row in batch.cheques
+		]
+	total = flt(sum(flt(c.amount) for c in cheques), _precision(BATCH, "total_amount"))
+	return {"cheques": cheques, "total": total, "count": len(cheques)}
 
 
 def get_dashboard(batch) -> list:

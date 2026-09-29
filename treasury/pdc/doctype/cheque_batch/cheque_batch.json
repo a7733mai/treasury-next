@@ -54,7 +54,7 @@
    "hidden": 1,
    "label": "Series",
    "no_copy": 1,
-   "options": "CHB-OUT-.YYYY.-.####\nCHB-IN-.YYYY.-.####",
+   "options": "CHQB-OUT-.YYYY.-.####\nCHQB-IN-.YYYY.-.####",
    "print_hide": 1
   },
   {
@@ -258,7 +258,7 @@
   },
   {
    "depends_on": "eval:doc.gen_amount_mode=='Split Total'",
-   "description": "Split evenly; the last cheque absorbs the rounding difference.",
+   "description": "Split evenly; the rounding difference goes one unit each to the last cheques.",
    "fieldname": "gen_total",
    "fieldtype": "Currency",
    "label": "Total Amount to Split",
@@ -333,7 +333,7 @@
    "link_fieldname": "cheque_batch"
   }
  ],
- "modified": "2026-10-01 09:00:00.000000",
+ "modified": "2026-10-02 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Cheque Batch",

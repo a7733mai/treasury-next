@@ -1661,8 +1661,8 @@ msgstr "مبلغ الشيك الواحد"
 msgid "Total Amount to Split"
 msgstr "الإجمالي المطلوب تقسيمه"
 
-msgid "Split evenly; the last cheque absorbs the rounding difference."
-msgstr "يُقسم بالتساوي، ويتحمل آخر شيك فرق التقريب."
+msgid "Split evenly; the rounding difference goes one unit each to the last cheques."
+msgstr "يُقسم بالتساوي، ويُوزَّع فرق التقريب بواقع وحدة واحدة على كل شيك من الشيكات الأخيرة."
 
 msgid "First Cheque No"
 msgstr "رقم أول شيك"
@@ -1931,3 +1931,29 @@ msgstr "تم تخطيه"
 
 msgid "No cheques yet."
 msgstr "لا توجد شيكات بعد."
+
+# Phase 3 fix round — Cheque Batch
+msgid "The Allocation Method is FIFO Invoices, but no cheque is allocated: click Allocate FIFO, otherwise every cheque is posted as an advance."
+msgstr "طريقة التخصيص هي الفواتير الأقدم أولاً، لكن لم يتم تخصيص أي شيك: اضغط \"تخصيص الأقدم أولاً\"، وإلا سيتم ترحيل كل الشيكات كدفعات مقدمة."
+
+msgid "Not Allocated"
+msgstr "غير مخصص"
+
+msgctxt "Cheque Batch"
+msgid "Error"
+msgstr "خطأ"
+
+msgid "Cancelling Cheque Batch {0} cancels its cheques, which requires the role {1}."
+msgstr "إلغاء سند الشيكات {0} يلغي شيكاته، وهذا يتطلب الدور {1}."
+
+msgid "{0} cannot be changed on a cheque of the submitted Cheque Batch {1}. Replace or cancel the cheque instead."
+msgstr "لا يمكن تغيير {0} في شيك تابع لسند الشيكات المعتمد {1}. استبدل الشيك أو ألغه بدلاً من ذلك."
+
+msgid "Not a valid voucher"
+msgstr "ليس سنداً معتمداً"
+
+msgid "Outstanding not covered"
+msgstr "المستحق غير المغطى"
+
+msgid "One invoice per cheque: part of a cheque stays an advance while invoices are still open. Allocate those rows by hand, or reconcile the advance later."
+msgstr "فاتورة واحدة لكل شيك: يبقى جزء من الشيك دفعة مقدمة رغم وجود فواتير مستحقة. خصص هذه السطور يدوياً، أو قم بتسوية الدفعة المقدمة لاحقاً."

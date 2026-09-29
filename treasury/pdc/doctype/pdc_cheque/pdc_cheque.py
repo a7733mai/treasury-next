@@ -29,6 +29,10 @@ LOCKED_DATE_FIELDS = ("issue_date", "original_due_date")
 # Link to the Cheque Batch that created the cheque: set only on insert by treasury.pdc.batch (flag
 # `treasury_cheque_batch`) or carried to a replacement by the lifecycle, never changed afterwards.
 BATCH_FIELDS = ("cheque_batch", "cheque_batch_row")
+# What a submitted Cheque Batch voucher states about each of its cheques: frozen outside the cheque actions
+# while the batch is submitted (replace or cancel the cheque instead), together with the references.
+BATCH_LOCKED_FIELDS = (*LOCKED_FIELDS, "cheque_book", "drawer_bank")
+BATCH_LOCKED_VALUE_FIELDS = ("amount",)
 # Written only by treasury.pdc.lifecycle, which saves with `flags.treasury_lifecycle`. `read_only` in the
 # DocType only affects the form, so a REST / client save must be rejected here (see validate_protected_fields).
 PROTECTED_FIELDS = (
@@ -141,6 +145,7 @@ class PDCCheque(Document):
 		if not self.is_new():
 			self.set_onload("vouchers", posting.get_linked_vouchers(self.doctype, self.name))
 			self.set_onload("cheque_print_format", self.get_cheque_print_format())
+			self.set_onload("batch_locked", self.is_batch_locked())
 
 	def get_cheque_print_format(self) -> str | None:
 		"""The Cheque Print Format hinted by the PDC Account Mapping row of the bank account, if any."""
@@ -366,9 +371,12 @@ class PDCCheque(Document):
 			frappe.throw(_("Cheque No is required."))
 		if self.direction != "Outgoing" or self.operational_status in RELEASED_STATUSES:
 			return
-		if self.has_value_changed("cheque_no") or self.has_value_changed("bank_account"):
+		if not self.flags.treasury_batch_validation and (
+			self.has_value_changed("cheque_no") or self.has_value_changed("bank_account")
+		):
 			# Serialise concurrent saves of cheque numbers on this bank account until commit, so two
 			# transactions cannot both pass the duplicate check below with the same hand-typed number.
+			# (Not for the never-inserted cheques a draft Cheque Batch validates its rows with.)
 			frappe.db.get_value("Bank Account", self.bank_account, "name", for_update=True)
 		duplicate = frappe.db.exists(
 			"PDC Cheque",
@@ -444,6 +452,7 @@ class PDCCheque(Document):
 		if not before:
 			return
 
+		self._validate_batch_locked_fields(before)
 		if before.operational_status != "Created":
 			changed = [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
 			if changed:
@@ -474,6 +483,32 @@ class PDCCheque(Document):
 			frappe.throw(
 				_("{0} cannot be changed after the cheque is posted to accounts.").format(
 					", ".join(_(self.meta.get_label(f)) for f in changed)
+				),
+				title=_("Not Allowed"),
+			)
+
+	def is_batch_locked(self) -> bool:
+		"""True for a cheque of a submitted Cheque Batch (see `_validate_batch_locked_fields`)."""
+		return bool(self.cheque_batch) and (
+			frappe.db.get_value("Cheque Batch", self.cheque_batch, "docstatus") == 1
+		)
+
+	def _validate_batch_locked_fields(self, before):
+		"""A cheque of a submitted Cheque Batch is listed on the batch voucher the party signs: its number,
+		bank, amount, dates and references change only through the cheque actions (e.g. Replace)."""
+		if self.flags.treasury_lifecycle or not self.is_batch_locked():
+			return
+		changed = [f for f in BATCH_LOCKED_FIELDS if (before.get(f) or None) != (self.get(f) or None)]
+		changed += [f for f in BATCH_LOCKED_VALUE_FIELDS if flt(before.get(f), 9) != flt(self.get(f), 9)]
+		changed += [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
+		if self._references_key(before) != self._references_key(self):
+			changed.append("references")
+		if changed:
+			frappe.throw(
+				_(
+					"{0} cannot be changed on a cheque of the submitted Cheque Batch {1}. Replace or cancel the cheque instead."
+				).format(
+					", ".join(_(self.meta.get_label(f)) for f in changed), frappe.bold(self.cheque_batch)
 				),
 				title=_("Not Allowed"),
 			)

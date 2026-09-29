@@ -137,6 +137,10 @@ frappe.ui.form.on("PDC Cheque", {
 	lock_identity_fields(frm) {
 		// mirrors PDCCheque.validate_locked_fields: fixed once the cheque left the Created status
 		const locked = !frm.is_new() && frm.doc.operational_status !== "Created";
+		// and, for a cheque of a submitted Cheque Batch, everything the batch voucher lists
+		const batch_locked = !frm.is_new() && !!(frm.doc.__onload && frm.doc.__onload.batch_locked);
+		const batch_fieldnames = ["drawer_bank", "references"];
+		batch_fieldnames.forEach((fieldname) => frm.set_df_property(fieldname, "read_only", batch_locked ? 1 : 0));
 		const fieldnames = [
 			"direction",
 			"company",
@@ -150,7 +154,13 @@ frappe.ui.form.on("PDC Cheque", {
 			"issue_date",
 			"original_due_date",
 		];
-		fieldnames.forEach((fieldname) => frm.set_df_property(fieldname, "read_only", locked ? 1 : 0));
+		fieldnames.forEach((fieldname) =>
+			frm.set_df_property(
+				fieldname,
+				"read_only",
+				locked || (batch_locked && fieldname !== "exchange_rate") ? 1 : 0
+			)
+		);
 	},
 
 	translate_status_log(frm) {

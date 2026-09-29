@@ -69,10 +69,12 @@ bench install-app treasury
 
 - **What it is.** One voucher for many post-dated cheques to / from one party, e.g. 12 monthly rent cheques
   to a landlord. The *Installment Generator* fills the rows (count, frequency — monthly to yearly, weekly
-  or every N days —, first due date, same amount per cheque or a total split evenly with the last cheque
-  absorbing the rounding, first cheque number or the cheque book). Allocation per row: manual (one invoice /
-  order per cheque), *FIFO Invoices* (the party's outstanding invoices, oldest due first, to the earliest
-  due cheques; whatever is left is an advance) or *Advance (no allocation)*.
+  or every N days —, first due date, same amount per cheque or a total split evenly with the rounding
+  difference going one unit each to the last cheques, first cheque number or the cheque book). Allocation
+  per row: manual (one invoice / order per cheque), *FIFO Invoices* (the party's outstanding invoices, oldest
+  due first, to the earliest due cheques; whatever is left is an advance — the summary also shows the
+  outstanding the cheques do not cover, since one reference per row can leave both) or *Advance (no
+  allocation)*. Saving with *FIFO Invoices* but nothing allocated shows a warning.
 - **Submit** creates one PDC Cheque per row (cheque book leaves are allocated only now, in row order) and,
   if a Handover / Receipt Date is set, delivers / receives every cheque on it — which posts according to
   Treasury Company Settings exactly like a cheque entered on its own (e.g. `On Cheque Date`: the daily job
@@ -81,11 +83,22 @@ bench install-app treasury
 - **After submit** every cheque lives its own life (postpone, clear, bounce, replace ... on the cheque);
   the batch shows their statuses, derives its own status (Partially Delivered / Received / Cleared, ...),
   offers *Deliver / Receive All* (each cheque on its own: failures are reported, the others go on), the
-  *Cheque Batch Receipt* print (all cheques, total in figures and words) and printing all cheque leaves.
-  The PDC Register filters by batch. A replacement cheque stays in the batch of the cheque it replaces.
+  *Cheque Batch Receipt* print and printing all cheque leaves. The PDC Register filters by batch. A
+  replacement cheque stays in the batch of the cheque it replaces. The batch counts Cleared, Endorsed and
+  Discounted cheques as settled ("Cleared").
+- **The receipt matches the real cheques.** While the batch is submitted, the number, bank, amount, dates
+  and references of its cheques cannot be edited on the cheque (only the cheque actions change a cheque,
+  e.g. *Replace*). The receipt lists the live cheques — replacements with their own number, amount and due
+  date, without Cancelled / Replaced ones — and totals them (figures and words). A draft or cancelled batch
+  prints its rows marked as not a valid voucher. CHQB-OUT- / CHQB-IN- number the batches.
+- **Size and concurrency.** A batch holds at most 120 cheques: submit with a handover date and *Deliver /
+  Receive All* insert, hand over and post every cheque in one request. Every action on a cheque of a batch
+  locks the batch row first, so the stored batch status never goes stale; during a batch-wide operation it
+  is refreshed once at the end rather than after every cheque.
 - **Cancel** is possible only while every cheque is still Created and not posted (or already cancelled /
-  replaced): the cheques are cancelled and their leaves recorded as cancelled (Treasury Manager). Otherwise
-  the message lists the cheques to act on first. An amended batch gets fresh leaves.
+  replaced): the cheques are cancelled and their leaves recorded as cancelled — this needs the Treasury
+  Manager role, checked before anything is done. Otherwise the message lists the cheques to act on first.
+  An amended batch gets fresh book leaves (hand-typed numbers are kept).
 - **Why the Payment Entry is not changed.** A Payment Entry has one amount, one reference no / date and
   one clearance date, and the Bank Reconciliation matches it as a whole; a multi-cheque Payment Entry would
   need overriding ERPNext. Each cheque keeps its own Payment Entry / Journal Entries instead.

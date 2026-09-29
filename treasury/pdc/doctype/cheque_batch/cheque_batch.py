@@ -7,7 +7,8 @@ from frappe.model.document import Document
 
 from treasury.pdc import batch, lifecycle
 
-NAMING_SERIES = {"Outgoing": "CHB-OUT-.YYYY.-.####", "Incoming": "CHB-IN-.YYYY.-.####"}
+# "CHQB" (cheque batch), distinct from the "CHB-" series of Cheque Book
+NAMING_SERIES = {"Outgoing": "CHQB-OUT-.YYYY.-.####", "Incoming": "CHQB-IN-.YYYY.-.####"}
 
 
 class ChequeBatch(Document):
@@ -47,7 +48,7 @@ class ChequeBatch(Document):
 		gen_total: DF.Currency
 		handover_date: DF.Date | None
 		issue_date: DF.Date
-		naming_series: DF.Literal["CHB-OUT-.YYYY.-.####", "CHB-IN-.YYYY.-.####"]
+		naming_series: DF.Literal["CHQB-OUT-.YYYY.-.####", "CHQB-IN-.YYYY.-.####"]
 		party: DF.DynamicLink
 		party_name: DF.Data | None
 		party_type: DF.Link
