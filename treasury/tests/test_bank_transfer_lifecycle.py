@@ -324,6 +324,7 @@ class TestBankTransferLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		transfer = make_bank_transfer(amount=470, execution_date=self.day(-1))
 		transfer.cancel()
 		amended = frappe.copy_doc(transfer)
+		amended.docstatus = 0  # as the desk "Amend" action does
 		amended.amended_from = transfer.name
 		amended.insert()
 		self.assertEqual((amended.status, amended.accounting_status), ("Draft", "Not Posted"))

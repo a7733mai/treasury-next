@@ -92,7 +92,7 @@ class TestBankTransferSettings(TreasuryTestMixin, IntegrationTestCase):
 		}
 		for case, values in cases.items():
 			with self.subTest(case=case):
-				self.assert_invalid(rules=[fee_rule(b1, "Normal", **values)])
+				self.assert_invalid(rules=[{**fee_rule(b1, "Normal"), **values}])
 
 	def test_limit_and_default_bank_errors(self):
 		b1 = bank_account_name("EGP")
