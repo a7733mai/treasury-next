@@ -19,7 +19,7 @@ frappe.query_reports["Security Cheques by Custody"] = {
 		},
 		{
 			fieldname: "custodian",
-			label: __("Custodian"),
+			label: __("Custodian", null, "Treasury"),
 			fieldtype: "Link",
 			options: "User",
 		},

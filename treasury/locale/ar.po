@@ -362,9 +362,6 @@ msgstr "المصاريف البنكية"
 msgid "Dates"
 msgstr "التواريخ"
 
-msgid "Issue Date"
-msgstr "تاريخ التحرير"
-
 msgid "Handover / Receipt Date"
 msgstr "تاريخ التسليم / الاستلام"
 
@@ -1985,12 +1982,6 @@ msgstr "تاريخ الفقد"
 msgid "Encashment Date"
 msgstr "تاريخ التسييل"
 
-msgid "Custody"
-msgstr "الحفظ"
-
-msgid "Custodian"
-msgstr "المسؤول عن الحفظ"
-
 msgid "Returned To / Received By"
 msgstr "رُدَّ إلى / استلمه"
 
@@ -3160,9 +3151,6 @@ msgstr "السحب على المكشوف المتاح"
 msgid "Bank / Facility / Limit Type"
 msgstr "البنك / التسهيل / نوع الحد"
 
-msgid "Limit"
-msgstr "الحد"
-
 msgid "Limit (Company Currency)"
 msgstr "الحد (بعملة الشركة)"
 
@@ -3333,9 +3321,6 @@ msgstr "تاريخ الانتهاء الفعلي"
 
 msgid "The current expiry date (moved by extensions)."
 msgstr "تاريخ الانتهاء الحالي (يتغير بالتمديد)."
-
-msgid "Release Date"
-msgstr "تاريخ الإفراج"
 
 msgid "Claim Date"
 msgstr "تاريخ التسييل"
@@ -4218,3 +4203,2318 @@ msgstr "المبلغ غير المستخدم"
 
 msgid "The part of the credit amount not drawn at the settlement (credit amount less the settled amount): it no longer counts against the facility."
 msgstr "الجزء غير المسحوب من مبلغ الاعتماد عند السداد (مبلغ الاعتماد ناقص المبلغ المسدد): لم يعد محسوباً على التسهيل."
+
+# ---------------------------------------------------------------------------
+# Treasury terminology (UAT fix). Frappe / ERPNext translate these generic words for other contexts
+# ("Amount" = quantity, "Due Date", "Issue Date" = lawsuit date ...). The app's reports, dialogs, print
+# formats and emails pass the context "Treasury" (`_("Amount", context="Treasury")`,
+# `__("Amount", null, "Treasury")`), so these entries never replace the core wording elsewhere.
+# ---------------------------------------------------------------------------
+
+msgctxt "Treasury"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Treasury"
+msgid "Balance"
+msgstr "الرصيد"
+
+msgctxt "Treasury"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Treasury"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Treasury"
+msgid "Charges"
+msgstr "المصاريف"
+
+msgctxt "Treasury"
+msgid "Closing"
+msgstr "الرصيد الختامي"
+
+msgctxt "Treasury"
+msgid "Closing Balance"
+msgstr "الرصيد الختامي"
+
+msgctxt "Treasury"
+msgid "Custodian"
+msgstr "المسؤول عن الحفظ"
+
+msgctxt "Treasury"
+msgid "Custody"
+msgstr "الحفظ"
+
+msgctxt "Treasury"
+msgid "Date"
+msgstr "التاريخ"
+
+msgctxt "Treasury"
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
+
+msgctxt "Treasury"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "Treasury"
+msgid "Expiry Date"
+msgstr "تاريخ الانتهاء"
+
+msgctxt "Treasury"
+msgid "Interest Rate"
+msgstr "سعر الفائدة"
+
+msgctxt "Treasury"
+msgid "Issue Date"
+msgstr "تاريخ التحرير"
+
+msgctxt "Treasury"
+msgid "Limit"
+msgstr "الحد"
+
+msgctxt "Treasury"
+msgid "Net"
+msgstr "الصافي"
+
+msgctxt "Treasury"
+msgid "Opening"
+msgstr "الرصيد الافتتاحي"
+
+msgctxt "Treasury"
+msgid "Opening Balance"
+msgstr "الرصيد الافتتاحي"
+
+msgctxt "Treasury"
+msgid "Outstanding"
+msgstr "المستحق"
+
+msgctxt "Treasury"
+msgid "Overdue"
+msgstr "متأخر"
+
+msgctxt "Treasury"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "Treasury"
+msgid "Period"
+msgstr "الفترة"
+
+msgctxt "Treasury"
+msgid "Posting Date"
+msgstr "تاريخ الترحيل"
+
+msgctxt "Treasury"
+msgid "Rate"
+msgstr "السعر"
+
+msgctxt "Treasury"
+msgid "Reference"
+msgstr "المرجع"
+
+msgctxt "Treasury"
+msgid "Reference Name"
+msgstr "رقم المستند"
+
+msgctxt "Treasury"
+msgid "Release Date"
+msgstr "تاريخ الإفراج"
+
+msgctxt "Treasury"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Treasury"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Treasury"
+msgid "Total"
+msgstr "الإجمالي"
+
+# ---------------------------------------------------------------------------
+# DocType field labels, section / tab labels and Select options (UAT fix). Frappe translates them with
+# the DocType name as context (`__(df.label, null, df.parent)`, Select options too), so each DocType has
+# its own block. Pairs already defined above (e.g. "Party" / "PDC Cheque") are not repeated.
+# ---------------------------------------------------------------------------
+
+# Treasury Settings
+msgctxt "Treasury Settings"
+msgid "General"
+msgstr "عام"
+
+msgctxt "Treasury Settings"
+msgid "Default Alert Days"
+msgstr "أيام التنبيه الافتراضية"
+
+msgctxt "Treasury Settings"
+msgid "Security Cheque Alert Days"
+msgstr "أيام التنبيه لشيكات الضمان"
+
+msgctxt "Treasury Settings"
+msgid "Facility Alert Days"
+msgstr "أيام تنبيه التسهيلات"
+
+msgctxt "Treasury Settings"
+msgid "Allow Future Clearance Date"
+msgstr "السماح بتاريخ صرف مستقبلي"
+
+# Treasury Company Settings
+msgctxt "Treasury Company Settings"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Treasury Company Settings"
+msgid "Outgoing Cheques"
+msgstr "الشيكات الصادرة"
+
+msgctxt "Treasury Company Settings"
+msgid "Outgoing Party Posting"
+msgstr "ترحيل الطرف للشيكات الصادرة"
+
+msgctxt "Treasury Company Settings"
+msgid "Outgoing Bank Posting"
+msgstr "ترحيل البنك للشيكات الصادرة"
+
+msgctxt "Treasury Company Settings"
+msgid "Incoming Cheques"
+msgstr "الشيكات الواردة"
+
+msgctxt "Treasury Company Settings"
+msgid "Incoming Party Posting"
+msgstr "ترحيل الطرف للشيكات الواردة"
+
+msgctxt "Treasury Company Settings"
+msgid "Incoming Under Collection Stage"
+msgstr "مرحلة التحصيل للشيكات الواردة"
+
+msgctxt "Treasury Company Settings"
+msgid "Incoming Bank Posting"
+msgstr "ترحيل البنك للشيكات الواردة"
+
+msgctxt "Treasury Company Settings"
+msgid "Bounce"
+msgstr "الارتداد"
+
+msgctxt "Treasury Company Settings"
+msgid "On Bounce"
+msgstr "عند الارتداد"
+
+msgctxt "Treasury Company Settings"
+msgid "Bounce Charges Account"
+msgstr "حساب مصاريف الارتداد"
+
+msgctxt "Treasury Company Settings"
+msgid "Accounts"
+msgstr "الحسابات"
+
+msgctxt "Treasury Company Settings"
+msgid "PDC Accounts"
+msgstr "حسابات الشيكات الآجلة"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Facilities"
+msgstr "التسهيلات البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "Accrue Facility Interest Monthly"
+msgstr "استحقاق فوائد التسهيلات شهرياً"
+
+msgctxt "Treasury Company Settings"
+msgid "Manual"
+msgstr "يدوي"
+
+msgctxt "Treasury Company Settings"
+msgid "Disabled"
+msgstr "معطّل"
+
+# PDC Account Mapping
+msgctxt "PDC Account Mapping"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "PDC Account Mapping"
+msgid "PDC Payable Account"
+msgstr "حساب أوراق الدفع"
+
+msgctxt "PDC Account Mapping"
+msgid "PDC Receivable Account"
+msgstr "حساب أوراق القبض"
+
+msgctxt "PDC Account Mapping"
+msgid "Under Collection Account"
+msgstr "حساب شيكات تحت التحصيل"
+
+msgctxt "PDC Account Mapping"
+msgid "Bank Charges Account"
+msgstr "حساب المصاريف البنكية"
+
+msgctxt "PDC Account Mapping"
+msgid "Cheque Print Format"
+msgstr "نموذج طباعة الشيك"
+
+# Cheque Book ("Leaves" is above)
+msgctxt "Cheque Book"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Cheque Book"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Cheque Book"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Cheque Book"
+msgid "Book No"
+msgstr "رقم الدفتر"
+
+msgctxt "Cheque Book"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Cheque Book"
+msgid "Start No"
+msgstr "رقم البداية"
+
+msgctxt "Cheque Book"
+msgid "End No"
+msgstr "رقم النهاية"
+
+msgctxt "Cheque Book"
+msgid "Next No"
+msgstr "الرقم التالي"
+
+msgctxt "Cheque Book"
+msgid "Leaf Digits"
+msgstr "عدد خانات رقم الورقة"
+
+msgctxt "Cheque Book"
+msgid "Cancelled Leaves"
+msgstr "الأوراق الملغاة"
+
+msgctxt "Cheque Book"
+msgid "Active"
+msgstr "نشط"
+
+msgctxt "Cheque Book"
+msgid "Exhausted"
+msgstr "مستنفد"
+
+msgctxt "Cheque Book"
+msgid "Closed"
+msgstr "مغلق"
+
+# Cheque Book Cancelled Leaf
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Date"
+msgstr "التاريخ"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Reason"
+msgstr "السبب"
+
+# PDC Cheque ("Party", "Cheque", "Bank" ... are above)
+msgctxt "PDC Cheque"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "PDC Cheque"
+msgid "Direction"
+msgstr "الاتجاه"
+
+msgctxt "PDC Cheque"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "PDC Cheque"
+msgid "Party Type"
+msgstr "نوع الطرف"
+
+msgctxt "PDC Cheque"
+msgid "Party Name"
+msgstr "اسم الطرف"
+
+msgctxt "PDC Cheque"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "PDC Cheque"
+msgid "Cheque Book"
+msgstr "دفتر الشيكات"
+
+msgctxt "PDC Cheque"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "PDC Cheque"
+msgid "Drawer Bank"
+msgstr "بنك الساحب"
+
+msgctxt "PDC Cheque"
+msgid "Cheque Batch"
+msgstr "سند الشيكات"
+
+msgctxt "PDC Cheque"
+msgid "Cheque Batch Row"
+msgstr "سطر سند الشيكات"
+
+msgctxt "PDC Cheque"
+msgid "Security Cheque"
+msgstr "شيك الضمان"
+
+msgctxt "PDC Cheque"
+msgid "Cheque Discounting"
+msgstr "خصم الشيكات"
+
+msgctxt "PDC Cheque"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "PDC Cheque"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "PDC Cheque"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "PDC Cheque"
+msgid "Amount in Words"
+msgstr "المبلغ بالحروف"
+
+msgctxt "PDC Cheque"
+msgid "Bank Charges"
+msgstr "المصاريف البنكية"
+
+msgctxt "PDC Cheque"
+msgid "Dates"
+msgstr "التواريخ"
+
+msgctxt "PDC Cheque"
+msgid "Issue Date"
+msgstr "تاريخ التحرير"
+
+msgctxt "PDC Cheque"
+msgid "Handover / Receipt Date"
+msgstr "تاريخ التسليم / الاستلام"
+
+msgctxt "PDC Cheque"
+msgid "Original Due Date"
+msgstr "تاريخ الاستحقاق الأصلي"
+
+msgctxt "PDC Cheque"
+msgid "Effective Due Date"
+msgstr "تاريخ الاستحقاق الفعلي"
+
+msgctxt "PDC Cheque"
+msgid "Deposit Date"
+msgstr "تاريخ الإيداع"
+
+msgctxt "PDC Cheque"
+msgid "Discount Date"
+msgstr "تاريخ الخصم"
+
+msgctxt "PDC Cheque"
+msgid "Actual Clearance Date"
+msgstr "تاريخ الصرف الفعلي"
+
+msgctxt "PDC Cheque"
+msgid "Bank Transaction Date"
+msgstr "تاريخ حركة البنك"
+
+msgctxt "PDC Cheque"
+msgid "Party Posting Date"
+msgstr "تاريخ ترحيل الطرف"
+
+msgctxt "PDC Cheque"
+msgid "Bank Posting Date"
+msgstr "تاريخ ترحيل البنك"
+
+msgctxt "PDC Cheque"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "PDC Cheque"
+msgid "Operational Status"
+msgstr "الحالة التشغيلية"
+
+msgctxt "PDC Cheque"
+msgid "Accounting Status"
+msgstr "الحالة المحاسبية"
+
+msgctxt "PDC Cheque"
+msgid "Postponed"
+msgstr "مؤجل"
+
+msgctxt "PDC Cheque"
+msgid "Postponement Count"
+msgstr "عدد مرات التأجيل"
+
+msgctxt "PDC Cheque"
+msgid "Cycle"
+msgstr "الدورة"
+
+msgctxt "PDC Cheque"
+msgid "Allocation"
+msgstr "التخصيص"
+
+msgctxt "PDC Cheque"
+msgid "References"
+msgstr "المستندات المخصص عليها"
+
+msgctxt "PDC Cheque"
+msgid "Vouchers"
+msgstr "السندات"
+
+msgctxt "PDC Cheque"
+msgid "Linked Vouchers"
+msgstr "السندات المرتبطة"
+
+msgctxt "PDC Cheque"
+msgid "Party Payment Entry"
+msgstr "سند دفع الطرف"
+
+msgctxt "PDC Cheque"
+msgid "Under Collection Journal"
+msgstr "قيد التحصيل"
+
+msgctxt "PDC Cheque"
+msgid "Bank Journal"
+msgstr "قيد البنك"
+
+msgctxt "PDC Cheque"
+msgid "Bank Charges Journal"
+msgstr "قيد المصاريف البنكية"
+
+msgctxt "PDC Cheque"
+msgid "Reversal Journal"
+msgstr "قيد العكس"
+
+msgctxt "PDC Cheque"
+msgid "Bounce Charges Journal"
+msgstr "قيد مصاريف الارتداد"
+
+msgctxt "PDC Cheque"
+msgid "Replaced By"
+msgstr "مستبدل بـ"
+
+msgctxt "PDC Cheque"
+msgid "Replaces"
+msgstr "بديل عن"
+
+msgctxt "PDC Cheque"
+msgid "Postponements"
+msgstr "التأجيلات"
+
+msgctxt "PDC Cheque"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "PDC Cheque"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "PDC Cheque"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "PDC Cheque"
+msgid "Cheque Image"
+msgstr "صورة الشيك"
+
+msgctxt "PDC Cheque"
+msgid "Outgoing"
+msgstr "صادر"
+
+msgctxt "PDC Cheque"
+msgid "Incoming"
+msgstr "وارد"
+
+msgctxt "PDC Cheque"
+msgid "Cancelled"
+msgstr "ملغي"
+
+# PDC Cheque Reference
+msgctxt "PDC Cheque Reference"
+msgid "Reference Type"
+msgstr "نوع المستند"
+
+msgctxt "PDC Cheque Reference"
+msgid "Reference Name"
+msgstr "رقم المستند"
+
+msgctxt "PDC Cheque Reference"
+msgid "Allocated Amount"
+msgstr "المبلغ المخصص"
+
+# PDC Status Log
+msgctxt "PDC Status Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "PDC Status Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "PDC Status Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "PDC Status Log"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "PDC Status Log"
+msgid "From Operational Status"
+msgstr "من الحالة التشغيلية"
+
+msgctxt "PDC Status Log"
+msgid "To Operational Status"
+msgstr "إلى الحالة التشغيلية"
+
+msgctxt "PDC Status Log"
+msgid "From Accounting Status"
+msgstr "من الحالة المحاسبية"
+
+msgctxt "PDC Status Log"
+msgid "To Accounting Status"
+msgstr "إلى الحالة المحاسبية"
+
+msgctxt "PDC Status Log"
+msgid "Voucher Type"
+msgstr "نوع السند"
+
+msgctxt "PDC Status Log"
+msgid "Voucher No"
+msgstr "رقم السند"
+
+msgctxt "PDC Status Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "PDC Status Log"
+msgid "Cancelled"
+msgstr "تم الإلغاء"
+
+# PDC Postponement
+msgctxt "PDC Postponement"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "PDC Postponement"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "PDC Postponement"
+msgid "Old Due Date"
+msgstr "تاريخ الاستحقاق القديم"
+
+msgctxt "PDC Postponement"
+msgid "New Due Date"
+msgstr "تاريخ الاستحقاق الجديد"
+
+msgctxt "PDC Postponement"
+msgid "Reason"
+msgstr "السبب"
+
+msgctxt "PDC Postponement"
+msgid "Contact Person"
+msgstr "جهة الاتصال"
+
+msgctxt "PDC Postponement"
+msgid "Approved By"
+msgstr "اعتمده"
+
+# PDC Bank Clearing ("From Date", "To Date", "Matches" are above)
+msgctxt "PDC Bank Clearing"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "PDC Bank Clearing"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "PDC Bank Clearing"
+msgid "Date Tolerance (Days)"
+msgstr "هامش التاريخ (أيام)"
+
+msgctxt "PDC Bank Clearing"
+msgid "Get Suggestions"
+msgstr "جلب الاقتراحات"
+
+msgctxt "PDC Bank Clearing"
+msgid "Clear Selected"
+msgstr "صرف المحدد"
+
+msgctxt "PDC Bank Clearing"
+msgid "Suggested Matches"
+msgstr "المطابقات المقترحة"
+
+# PDC Clearing Match ("Selected", "Cheque", "Party" ... are above)
+msgctxt "PDC Clearing Match"
+msgid "Match Quality"
+msgstr "جودة المطابقة"
+
+msgctxt "PDC Clearing Match"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "PDC Clearing Match"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "PDC Clearing Match"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "PDC Clearing Match"
+msgid "Direction"
+msgstr "الاتجاه"
+
+msgctxt "PDC Clearing Match"
+msgid "Effective Due Date"
+msgstr "تاريخ الاستحقاق الفعلي"
+
+# Cheque Batch ("Party", "Purpose", "Frequency", "Amended From" and several options are above)
+msgctxt "Cheque Batch"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Cheque Batch"
+msgid "Direction"
+msgstr "الاتجاه"
+
+msgctxt "Cheque Batch"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Cheque Batch"
+msgid "Party Type"
+msgstr "نوع الطرف"
+
+msgctxt "Cheque Batch"
+msgid "Party Name"
+msgstr "اسم الطرف"
+
+msgctxt "Cheque Batch"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Cheque Batch"
+msgid "Cheque Book"
+msgstr "دفتر الشيكات"
+
+msgctxt "Cheque Batch"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Cheque Batch"
+msgid "Party Posting"
+msgstr "ترحيل الطرف"
+
+msgctxt "Cheque Batch"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Cheque Batch"
+msgid "Dates and Allocation"
+msgstr "التواريخ والتخصيص"
+
+msgctxt "Cheque Batch"
+msgid "Issue Date"
+msgstr "تاريخ التحرير"
+
+msgctxt "Cheque Batch"
+msgid "Handover / Receipt Date"
+msgstr "تاريخ التسليم / الاستلام"
+
+msgctxt "Cheque Batch"
+msgid "Allocation Method"
+msgstr "طريقة التخصيص"
+
+msgctxt "Cheque Batch"
+msgid "Total Amount"
+msgstr "إجمالي المبلغ"
+
+msgctxt "Cheque Batch"
+msgid "Number of Cheques"
+msgstr "عدد الشيكات"
+
+msgctxt "Cheque Batch"
+msgid "Installment Generator"
+msgstr "مولّد الأقساط"
+
+msgctxt "Cheque Batch"
+msgid "Number of Cheques to Generate"
+msgstr "عدد الشيكات المطلوب توليدها"
+
+msgctxt "Cheque Batch"
+msgid "Interval (Days)"
+msgstr "الفاصل (أيام)"
+
+msgctxt "Cheque Batch"
+msgid "First Due Date"
+msgstr "تاريخ أول استحقاق"
+
+msgctxt "Cheque Batch"
+msgid "Keep Month End"
+msgstr "الالتزام بآخر الشهر"
+
+msgctxt "Cheque Batch"
+msgid "Amount Mode"
+msgstr "طريقة المبلغ"
+
+msgctxt "Cheque Batch"
+msgid "Amount per Cheque"
+msgstr "مبلغ الشيك الواحد"
+
+msgctxt "Cheque Batch"
+msgid "Total Amount to Split"
+msgstr "الإجمالي المطلوب تقسيمه"
+
+msgctxt "Cheque Batch"
+msgid "First Cheque No"
+msgstr "رقم أول شيك"
+
+msgctxt "Cheque Batch"
+msgid "Drawer Bank"
+msgstr "بنك الساحب"
+
+msgctxt "Cheque Batch"
+msgid "Cheques"
+msgstr "الشيكات"
+
+msgctxt "Cheque Batch"
+msgid "Cheque Status"
+msgstr "حالة الشيكات"
+
+msgctxt "Cheque Batch"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Cheque Batch"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Cheque Batch"
+msgid "Outgoing"
+msgstr "صادر"
+
+msgctxt "Cheque Batch"
+msgid "Incoming"
+msgstr "وارد"
+
+msgctxt "Cheque Batch"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Cheque Batch"
+msgid "Submitted"
+msgstr "معتمد"
+
+msgctxt "Cheque Batch"
+msgid "Delivered"
+msgstr "مسلّم"
+
+msgctxt "Cheque Batch"
+msgid "Received"
+msgstr "مستلم"
+
+msgctxt "Cheque Batch"
+msgid "Cleared"
+msgstr "مصروف"
+
+msgctxt "Cheque Batch"
+msgid "Cancelled"
+msgstr "ملغي"
+
+msgctxt "Cheque Batch"
+msgid "Manual"
+msgstr "يدوي"
+
+# Cheque Batch Item
+msgctxt "Cheque Batch Item"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "Cheque Batch Item"
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
+
+msgctxt "Cheque Batch Item"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Cheque Batch Item"
+msgid "Drawer Bank"
+msgstr "بنك الساحب"
+
+msgctxt "Cheque Batch Item"
+msgid "PDC Cheque"
+msgstr "الشيك الآجل"
+
+msgctxt "Cheque Batch Item"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Cheque Batch Item"
+msgid "Allocation"
+msgstr "التخصيص"
+
+msgctxt "Cheque Batch Item"
+msgid "Reference Type"
+msgstr "نوع المستند"
+
+msgctxt "Cheque Batch Item"
+msgid "Reference Name"
+msgstr "رقم المستند"
+
+msgctxt "Cheque Batch Item"
+msgid "Allocated Amount"
+msgstr "المبلغ المخصص"
+
+# Custody Location ("Description" is above)
+msgctxt "Custody Location"
+msgid "Location Name"
+msgstr "اسم الموقع"
+
+msgctxt "Custody Location"
+msgid "Is Active"
+msgstr "نشط"
+
+# Security Cheque ("Party", "Purpose", "Cheque" and most options are above)
+msgctxt "Security Cheque"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Security Cheque"
+msgid "Direction"
+msgstr "الاتجاه"
+
+msgctxt "Security Cheque"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Security Cheque"
+msgid "Party Type"
+msgstr "نوع الطرف"
+
+msgctxt "Security Cheque"
+msgid "Party Name (Other)"
+msgstr "اسم الطرف (أخرى)"
+
+msgctxt "Security Cheque"
+msgid "Party Name"
+msgstr "اسم الطرف"
+
+msgctxt "Security Cheque"
+msgid "Reference Type"
+msgstr "نوع المستند المرتبط"
+
+msgctxt "Security Cheque"
+msgid "Reference Name"
+msgstr "رقم المستند المرتبط"
+
+msgctxt "Security Cheque"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Security Cheque"
+msgid "Expired"
+msgstr "منتهي الصلاحية"
+
+msgctxt "Security Cheque"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "Security Cheque"
+msgid "Drawer Bank"
+msgstr "بنك الساحب"
+
+msgctxt "Security Cheque"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Security Cheque"
+msgid "Cheque Book"
+msgstr "دفتر الشيكات"
+
+msgctxt "Security Cheque"
+msgid "Amount Type"
+msgstr "نوع المبلغ"
+
+msgctxt "Security Cheque"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Security Cheque"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Security Cheque"
+msgid "Required Amount"
+msgstr "المبلغ المطلوب"
+
+msgctxt "Security Cheque"
+msgid "Dates"
+msgstr "التواريخ"
+
+msgctxt "Security Cheque"
+msgid "Issue Date"
+msgstr "تاريخ التحرير"
+
+msgctxt "Security Cheque"
+msgid "Cheque Date"
+msgstr "تاريخ الشيك"
+
+msgctxt "Security Cheque"
+msgid "Expiry Date"
+msgstr "تاريخ انتهاء الضمان"
+
+msgctxt "Security Cheque"
+msgid "Handover / Receipt Date"
+msgstr "تاريخ التسليم / الاستلام"
+
+msgctxt "Security Cheque"
+msgid "Return Date"
+msgstr "تاريخ الرد"
+
+msgctxt "Security Cheque"
+msgid "Lost Date"
+msgstr "تاريخ الفقد"
+
+msgctxt "Security Cheque"
+msgid "Encashment Date"
+msgstr "تاريخ التسييل"
+
+msgctxt "Security Cheque"
+msgid "Custody"
+msgstr "الحفظ"
+
+msgctxt "Security Cheque"
+msgid "Custody Location"
+msgstr "مكان الحفظ"
+
+msgctxt "Security Cheque"
+msgid "Custodian"
+msgstr "المسؤول عن الحفظ"
+
+msgctxt "Security Cheque"
+msgid "Returned To / Received By"
+msgstr "رُدَّ إلى / استلمه"
+
+msgctxt "Security Cheque"
+msgid "Encashment"
+msgstr "التسييل"
+
+msgctxt "Security Cheque"
+msgid "Converted PDC Cheque"
+msgstr "الشيك الآجل الناتج عن التسييل"
+
+msgctxt "Security Cheque"
+msgid "Encashed Amount"
+msgstr "المبلغ المسيَّل"
+
+msgctxt "Security Cheque"
+msgid "Custody Log"
+msgstr "سجل الحفظ"
+
+msgctxt "Security Cheque"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "Security Cheque"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Security Cheque"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Security Cheque"
+msgid "Cheque Image"
+msgstr "صورة الشيك"
+
+msgctxt "Security Cheque"
+msgid "Incoming"
+msgstr "وارد"
+
+msgctxt "Security Cheque"
+msgid "Outgoing"
+msgstr "صادر"
+
+msgctxt "Security Cheque"
+msgid "Customer"
+msgstr "عميل"
+
+msgctxt "Security Cheque"
+msgid "Supplier"
+msgstr "مورد"
+
+# Security Cheque Custody Log
+msgctxt "Security Cheque Custody Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Security Cheque Custody Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "Security Cheque Custody Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Security Cheque Custody Log"
+msgid "From Location"
+msgstr "من مكان"
+
+msgctxt "Security Cheque Custody Log"
+msgid "To Location"
+msgstr "إلى مكان"
+
+msgctxt "Security Cheque Custody Log"
+msgid "From Custodian"
+msgstr "من المسؤول"
+
+msgctxt "Security Cheque Custody Log"
+msgid "To Custodian"
+msgstr "إلى المسؤول"
+
+msgctxt "Security Cheque Custody Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+# Security Cheque Status Log ("Issued", "Lost" are above)
+msgctxt "Security Cheque Status Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Security Cheque Status Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "Security Cheque Status Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Security Cheque Status Log"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Security Cheque Status Log"
+msgid "From Status"
+msgstr "من الحالة"
+
+msgctxt "Security Cheque Status Log"
+msgid "To Status"
+msgstr "إلى الحالة"
+
+msgctxt "Security Cheque Status Log"
+msgid "PDC Cheque"
+msgstr "الشيك الآجل"
+
+msgctxt "Security Cheque Status Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Security Cheque Status Log"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Security Cheque Status Log"
+msgid "Received"
+msgstr "تم الاستلام"
+
+msgctxt "Security Cheque Status Log"
+msgid "Stored"
+msgstr "تم الحفظ"
+
+msgctxt "Security Cheque Status Log"
+msgid "Custody Transferred"
+msgstr "تم نقل الحفظ"
+
+msgctxt "Security Cheque Status Log"
+msgid "Returned"
+msgstr "تم الرد"
+
+msgctxt "Security Cheque Status Log"
+msgid "Cancelled"
+msgstr "تم الإلغاء"
+
+msgctxt "Security Cheque Status Log"
+msgid "Encashed"
+msgstr "تم التسييل"
+
+msgctxt "Security Cheque Status Log"
+msgid "Expiry Extended"
+msgstr "تم تمديد الصلاحية"
+
+# Bank Facility (statuses, limit types and "Action" are above)
+msgctxt "Bank Facility"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Bank Facility"
+msgid "Facility Name"
+msgstr "اسم التسهيل"
+
+msgctxt "Bank Facility"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Bank Facility"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Bank Facility"
+msgid "Contract No"
+msgstr "رقم العقد"
+
+msgctxt "Bank Facility"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Bank Facility"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Bank Facility"
+msgid "Total Limit"
+msgstr "الحد الإجمالي"
+
+msgctxt "Bank Facility"
+msgid "Total Utilised"
+msgstr "إجمالي المستخدم"
+
+msgctxt "Bank Facility"
+msgid "Total Available"
+msgstr "إجمالي المتاح"
+
+msgctxt "Bank Facility"
+msgid "Utilisation Refreshed On"
+msgstr "تاريخ تحديث الاستخدام"
+
+msgctxt "Bank Facility"
+msgid "Dates"
+msgstr "التواريخ"
+
+msgctxt "Bank Facility"
+msgid "Start Date"
+msgstr "تاريخ البدء"
+
+msgctxt "Bank Facility"
+msgid "Expiry Date"
+msgstr "تاريخ الانتهاء"
+
+msgctxt "Bank Facility"
+msgid "Renewal Date"
+msgstr "تاريخ التجديد"
+
+msgctxt "Bank Facility"
+msgid "Sub-Limits"
+msgstr "الحدود الفرعية"
+
+msgctxt "Bank Facility"
+msgid "Accounts"
+msgstr "الحسابات"
+
+msgctxt "Bank Facility"
+msgid "Default Bank Account"
+msgstr "الحساب البنكي الافتراضي"
+
+msgctxt "Bank Facility"
+msgid "Interest Expense Account"
+msgstr "حساب مصروف الفوائد"
+
+msgctxt "Bank Facility"
+msgid "Commission Expense Account"
+msgstr "حساب مصروف العمولات"
+
+msgctxt "Bank Facility"
+msgid "Accrued Interest Account"
+msgstr "حساب الفوائد المستحقة"
+
+msgctxt "Bank Facility"
+msgid "Collateral"
+msgstr "الضمانات"
+
+msgctxt "Bank Facility"
+msgid "Collateral Notes"
+msgstr "ملاحظات الضمانات"
+
+msgctxt "Bank Facility"
+msgid "Security Cheques"
+msgstr "شيكات الضمان"
+
+msgctxt "Bank Facility"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+# Bank Facility Limit
+msgctxt "Bank Facility Limit"
+msgid "Limit Type"
+msgstr "نوع الحد"
+
+msgctxt "Bank Facility Limit"
+msgid "Limit Amount"
+msgstr "مبلغ الحد"
+
+msgctxt "Bank Facility Limit"
+msgid "Liability Account"
+msgstr "حساب الالتزام"
+
+msgctxt "Bank Facility Limit"
+msgid "Rate Type"
+msgstr "نوع السعر"
+
+msgctxt "Bank Facility Limit"
+msgid "Interest / Profit Rate (% p.a.)"
+msgstr "سعر الفائدة / الربح (% سنوياً)"
+
+msgctxt "Bank Facility Limit"
+msgid "Reference Rate"
+msgstr "السعر المرجعي"
+
+msgctxt "Bank Facility Limit"
+msgid "Margin (% p.a.)"
+msgstr "الهامش (% سنوياً)"
+
+msgctxt "Bank Facility Limit"
+msgid "Day Count"
+msgstr "أساس حساب الأيام"
+
+msgctxt "Bank Facility Limit"
+msgid "Commission Rate (%)"
+msgstr "نسبة العمولة (%)"
+
+msgctxt "Bank Facility Limit"
+msgid "Cash Margin (%)"
+msgstr "نسبة التأمين النقدي (%)"
+
+msgctxt "Bank Facility Limit"
+msgid "Utilisation"
+msgstr "الاستخدام"
+
+msgctxt "Bank Facility Limit"
+msgid "Utilised"
+msgstr "المستخدم"
+
+msgctxt "Bank Facility Limit"
+msgid "Available"
+msgstr "المتاح"
+
+msgctxt "Bank Facility Limit"
+msgid "Fixed"
+msgstr "ثابت"
+
+msgctxt "Bank Facility Limit"
+msgid "Other"
+msgstr "أخرى"
+
+# Bank Facility Security Cheque
+msgctxt "Bank Facility Security Cheque"
+msgid "Security Cheque"
+msgstr "شيك الضمان"
+
+msgctxt "Bank Facility Security Cheque"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "Bank Facility Security Cheque"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Bank Facility Security Cheque"
+msgid "Expiry Date"
+msgstr "تاريخ انتهاء الضمان"
+
+msgctxt "Bank Facility Security Cheque"
+msgid "Status"
+msgstr "الحالة"
+
+# Bank Facility Status Log
+msgctxt "Bank Facility Status Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Bank Facility Status Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "Bank Facility Status Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Bank Facility Status Log"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Bank Facility Status Log"
+msgid "From Status"
+msgstr "من الحالة"
+
+msgctxt "Bank Facility Status Log"
+msgid "To Status"
+msgstr "إلى الحالة"
+
+msgctxt "Bank Facility Status Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Bank Facility Status Log"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Bank Facility Status Log"
+msgid "Suspended"
+msgstr "تم الإيقاف"
+
+msgctxt "Bank Facility Status Log"
+msgid "Expired"
+msgstr "انتهى"
+
+msgctxt "Bank Facility Status Log"
+msgid "Closed"
+msgstr "تم الإغلاق"
+
+# Facility Drawdown
+msgctxt "Facility Drawdown"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Facility Drawdown"
+msgid "Bank Facility"
+msgstr "التسهيل البنكي"
+
+msgctxt "Facility Drawdown"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Facility Drawdown"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Facility Drawdown"
+msgid "Limit Type"
+msgstr "نوع الحد"
+
+msgctxt "Facility Drawdown"
+msgid "Drawdown Date"
+msgstr "تاريخ السحب"
+
+msgctxt "Facility Drawdown"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Facility Drawdown"
+msgid "Amount"
+msgstr "مبلغ السحب"
+
+msgctxt "Facility Drawdown"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "Facility Drawdown"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Facility Drawdown"
+msgid "Liability Account"
+msgstr "حساب الالتزام"
+
+msgctxt "Facility Drawdown"
+msgid "Repayment Status"
+msgstr "حالة السداد"
+
+msgctxt "Facility Drawdown"
+msgid "Terms"
+msgstr "الشروط"
+
+msgctxt "Facility Drawdown"
+msgid "Rate Type"
+msgstr "نوع السعر"
+
+msgctxt "Facility Drawdown"
+msgid "Interest / Profit Rate (% p.a.)"
+msgstr "سعر الفائدة / الربح (% سنوياً)"
+
+msgctxt "Facility Drawdown"
+msgid "Day Count"
+msgstr "أساس حساب الأيام"
+
+msgctxt "Facility Drawdown"
+msgid "Profit Amount"
+msgstr "مبلغ الربح"
+
+msgctxt "Facility Drawdown"
+msgid "Tenor (Months)"
+msgstr "المدة (بالأشهر)"
+
+msgctxt "Facility Drawdown"
+msgid "Repayment Frequency"
+msgstr "دورية السداد"
+
+msgctxt "Facility Drawdown"
+msgid "Repayment Method"
+msgstr "طريقة السداد"
+
+msgctxt "Facility Drawdown"
+msgid "First Repayment Date"
+msgstr "تاريخ أول سداد"
+
+msgctxt "Facility Drawdown"
+msgid "Grace (Months)"
+msgstr "فترة السماح (بالأشهر)"
+
+msgctxt "Facility Drawdown"
+msgid "Fees"
+msgstr "الرسوم"
+
+msgctxt "Facility Drawdown"
+msgid "Upfront Fees"
+msgstr "الرسوم المقدمة"
+
+msgctxt "Facility Drawdown"
+msgid "Fees Account"
+msgstr "حساب الرسوم"
+
+msgctxt "Facility Drawdown"
+msgid "Repayment Schedule"
+msgstr "جدول السداد"
+
+msgctxt "Facility Drawdown"
+msgid "Total Principal"
+msgstr "إجمالي الأصل"
+
+msgctxt "Facility Drawdown"
+msgid "Total Interest / Profit"
+msgstr "إجمالي الفائدة / الربح"
+
+msgctxt "Facility Drawdown"
+msgid "Total Payable"
+msgstr "إجمالي المستحق"
+
+msgctxt "Facility Drawdown"
+msgid "Accounting"
+msgstr "المحاسبة"
+
+msgctxt "Facility Drawdown"
+msgid "Drawdown Journal Entry"
+msgstr "قيد يومية السحب"
+
+msgctxt "Facility Drawdown"
+msgid "Fees Journal Entry"
+msgstr "قيد يومية الرسوم"
+
+msgctxt "Facility Drawdown"
+msgid "Last Accrual Date"
+msgstr "تاريخ آخر استحقاق"
+
+msgctxt "Facility Drawdown"
+msgid "Schedule Version"
+msgstr "إصدار الجدول"
+
+msgctxt "Facility Drawdown"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Facility Drawdown"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Facility Drawdown"
+msgid "Amended From"
+msgstr "معدّل من"
+
+msgctxt "Facility Drawdown"
+msgid "Open"
+msgstr "قائم"
+
+msgctxt "Facility Drawdown"
+msgid "Fixed"
+msgstr "ثابت"
+
+msgctxt "Facility Drawdown"
+msgid "Monthly"
+msgstr "شهري"
+
+msgctxt "Facility Drawdown"
+msgid "Quarterly"
+msgstr "ربع سنوي"
+
+msgctxt "Facility Drawdown"
+msgid "Other"
+msgstr "أخرى"
+
+# Facility Repayment
+msgctxt "Facility Repayment"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Facility Repayment"
+msgid "Facility Drawdown"
+msgstr "السحب من التسهيل"
+
+msgctxt "Facility Repayment"
+msgid "Bank Facility"
+msgstr "التسهيل البنكي"
+
+msgctxt "Facility Repayment"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Facility Repayment"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Facility Repayment"
+msgid "Repayment Date"
+msgstr "تاريخ السداد"
+
+msgctxt "Facility Repayment"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Facility Repayment"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "Facility Repayment"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Facility Repayment"
+msgid "Total Paid"
+msgstr "إجمالي المدفوع"
+
+msgctxt "Facility Repayment"
+msgid "Amounts"
+msgstr "المبالغ"
+
+msgctxt "Facility Repayment"
+msgid "Allocation"
+msgstr "طريقة التوزيع"
+
+msgctxt "Facility Repayment"
+msgid "Installment No"
+msgstr "رقم القسط"
+
+msgctxt "Facility Repayment"
+msgid "Principal Paid"
+msgstr "الأصل المدفوع"
+
+msgctxt "Facility Repayment"
+msgid "Interest / Profit Paid"
+msgstr "الفائدة / الربح المدفوع"
+
+msgctxt "Facility Repayment"
+msgid "Prepayment"
+msgstr "سداد معجل"
+
+msgctxt "Facility Repayment"
+msgid "Prepayment Amount"
+msgstr "مبلغ السداد المعجل"
+
+msgctxt "Facility Repayment"
+msgid "Penalty"
+msgstr "الغرامة"
+
+msgctxt "Facility Repayment"
+msgid "Penalty Account"
+msgstr "حساب الغرامات"
+
+msgctxt "Facility Repayment"
+msgid "Allocation to Installments"
+msgstr "التوزيع على الأقساط"
+
+msgctxt "Facility Repayment"
+msgid "Allocations"
+msgstr "التوزيعات"
+
+msgctxt "Facility Repayment"
+msgid "Accounting"
+msgstr "المحاسبة"
+
+msgctxt "Facility Repayment"
+msgid "Accrued Interest Cleared"
+msgstr "الفوائد المستحقة المسوّاة"
+
+msgctxt "Facility Repayment"
+msgid "Interest Expensed"
+msgstr "الفائدة المحمّلة على المصروفات"
+
+msgctxt "Facility Repayment"
+msgid "Journal Entry"
+msgstr "قيد اليومية"
+
+msgctxt "Facility Repayment"
+msgid "Submission No"
+msgstr "رقم الاعتماد"
+
+msgctxt "Facility Repayment"
+msgid "Schedule Snapshot"
+msgstr "لقطة الجدول"
+
+msgctxt "Facility Repayment"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Facility Repayment"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Facility Repayment"
+msgid "Amended From"
+msgstr "معدّل من"
+
+# Facility Repayment Schedule
+msgctxt "Facility Repayment Schedule"
+msgid "Installment No"
+msgstr "رقم القسط"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Principal"
+msgstr "الأصل"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Interest / Profit"
+msgstr "الفائدة / الربح"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Total"
+msgstr "إجمالي القسط"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Outstanding After"
+msgstr "المتبقي بعد القسط"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Paid Principal"
+msgstr "الأصل المدفوع"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Paid Interest / Profit"
+msgstr "الفائدة / الربح المدفوع"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Prepayment"
+msgstr "سداد معجل"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Payment Journal"
+msgstr "قيد السداد"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Last Repayment"
+msgstr "آخر سداد"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Partially Paid"
+msgstr "مدفوع جزئياً"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Paid"
+msgstr "مدفوع"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Overdue"
+msgstr "متأخر"
+
+# Facility Repayment Allocation
+msgctxt "Facility Repayment Allocation"
+msgid "Installment No"
+msgstr "رقم القسط"
+
+msgctxt "Facility Repayment Allocation"
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
+
+msgctxt "Facility Repayment Allocation"
+msgid "Principal"
+msgstr "الأصل"
+
+msgctxt "Facility Repayment Allocation"
+msgid "Interest / Profit"
+msgstr "الفائدة / الربح"
+
+msgctxt "Facility Repayment Allocation"
+msgid "Schedule Row"
+msgstr "سطر الجدول"
+
+# Letter of Guarantee ("Beneficiary", "Claim", "Accounting", types and statuses are above)
+msgctxt "Letter of Guarantee"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Letter of Guarantee"
+msgid "Bank Facility"
+msgstr "التسهيل البنكي"
+
+msgctxt "Letter of Guarantee"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Letter of Guarantee"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Letter of Guarantee"
+msgid "LG Type"
+msgstr "نوع خطاب الضمان"
+
+msgctxt "Letter of Guarantee"
+msgid "LG No"
+msgstr "رقم خطاب الضمان"
+
+msgctxt "Letter of Guarantee"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Letter of Guarantee"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Letter of Guarantee"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Letter of Guarantee"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "Letter of Guarantee"
+msgid "Beneficiary Type"
+msgstr "نوع المستفيد"
+
+msgctxt "Letter of Guarantee"
+msgid "Beneficiary Name"
+msgstr "اسم المستفيد"
+
+msgctxt "Letter of Guarantee"
+msgid "Reference Type"
+msgstr "نوع المستند المرتبط"
+
+msgctxt "Letter of Guarantee"
+msgid "Reference Name"
+msgstr "رقم المستند المرتبط"
+
+msgctxt "Letter of Guarantee"
+msgid "ERPNext Bank Guarantee"
+msgstr "الضمان البنكي في ERPNext"
+
+msgctxt "Letter of Guarantee"
+msgid "Amount and Dates"
+msgstr "المبلغ والتواريخ"
+
+msgctxt "Letter of Guarantee"
+msgid "Amount"
+msgstr "مبلغ الضمان"
+
+msgctxt "Letter of Guarantee"
+msgid "Open Amount"
+msgstr "المبلغ القائم"
+
+msgctxt "Letter of Guarantee"
+msgid "Issue Date"
+msgstr "تاريخ الإصدار"
+
+msgctxt "Letter of Guarantee"
+msgid "Original Expiry Date"
+msgstr "تاريخ الانتهاء الأصلي"
+
+msgctxt "Letter of Guarantee"
+msgid "Effective Expiry Date"
+msgstr "تاريخ الانتهاء الفعلي"
+
+msgctxt "Letter of Guarantee"
+msgid "Release Date"
+msgstr "تاريخ الإفراج"
+
+msgctxt "Letter of Guarantee"
+msgid "Claim Date"
+msgstr "تاريخ التسييل"
+
+msgctxt "Letter of Guarantee"
+msgid "Cash Margin and Commission"
+msgstr "التأمين النقدي والعمولة"
+
+msgctxt "Letter of Guarantee"
+msgid "Cash Margin (%)"
+msgstr "نسبة التأمين النقدي (%)"
+
+msgctxt "Letter of Guarantee"
+msgid "Cash Margin Amount"
+msgstr "مبلغ التأمين النقدي"
+
+msgctxt "Letter of Guarantee"
+msgid "Margin Account"
+msgstr "حساب التأمينات النقدية"
+
+msgctxt "Letter of Guarantee"
+msgid "Margin Held"
+msgstr "التأمين المحتجز"
+
+msgctxt "Letter of Guarantee"
+msgid "Commission Rate (%)"
+msgstr "نسبة العمولة (%)"
+
+msgctxt "Letter of Guarantee"
+msgid "Commission Amount"
+msgstr "مبلغ العمولة"
+
+msgctxt "Letter of Guarantee"
+msgid "Commission Account"
+msgstr "حساب العمولات"
+
+msgctxt "Letter of Guarantee"
+msgid "Claim Amount"
+msgstr "مبلغ التسييل"
+
+msgctxt "Letter of Guarantee"
+msgid "Claim Account"
+msgstr "حساب التسييل"
+
+msgctxt "Letter of Guarantee"
+msgid "Claim Owed to the Bank"
+msgstr "المستحق للبنك من التسييل"
+
+msgctxt "Letter of Guarantee"
+msgid "Margin Journal Entry"
+msgstr "قيد التأمين النقدي"
+
+msgctxt "Letter of Guarantee"
+msgid "Commission Journal Entry"
+msgstr "قيد العمولة"
+
+msgctxt "Letter of Guarantee"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "Letter of Guarantee"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Letter of Guarantee"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Letter of Guarantee"
+msgid "Amended From"
+msgstr "معدّل من"
+
+msgctxt "Letter of Guarantee"
+msgid "Customer"
+msgstr "عميل"
+
+msgctxt "Letter of Guarantee"
+msgid "Supplier"
+msgstr "مورد"
+
+# Letter of Credit ("Accounting", types and statuses are above)
+msgctxt "Letter of Credit"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Letter of Credit"
+msgid "Bank Facility"
+msgstr "التسهيل البنكي"
+
+msgctxt "Letter of Credit"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Letter of Credit"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Letter of Credit"
+msgid "LC Type"
+msgstr "نوع الاعتماد"
+
+msgctxt "Letter of Credit"
+msgid "LC No"
+msgstr "رقم الاعتماد"
+
+msgctxt "Letter of Credit"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Letter of Credit"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Letter of Credit"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Letter of Credit"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "Letter of Credit"
+msgid "Supplier and Shipment"
+msgstr "المورد والشحن"
+
+msgctxt "Letter of Credit"
+msgid "Supplier"
+msgstr "المورد"
+
+msgctxt "Letter of Credit"
+msgid "Supplier Name"
+msgstr "اسم المورد"
+
+msgctxt "Letter of Credit"
+msgid "Purchase Order"
+msgstr "أمر الشراء"
+
+msgctxt "Letter of Credit"
+msgid "Tolerance (%)"
+msgstr "نسبة التجاوز المسموح (%)"
+
+msgctxt "Letter of Credit"
+msgid "Latest Shipment Date"
+msgstr "آخر موعد للشحن"
+
+msgctxt "Letter of Credit"
+msgid "Usance Days"
+msgstr "أيام الأجل"
+
+msgctxt "Letter of Credit"
+msgid "Amount and Dates"
+msgstr "المبلغ والتواريخ"
+
+msgctxt "Letter of Credit"
+msgid "Amount"
+msgstr "مبلغ الاعتماد"
+
+msgctxt "Letter of Credit"
+msgid "Current Amount"
+msgstr "المبلغ الحالي"
+
+msgctxt "Letter of Credit"
+msgid "Open Amount"
+msgstr "المبلغ القائم"
+
+msgctxt "Letter of Credit"
+msgid "Opening Date"
+msgstr "تاريخ الفتح"
+
+msgctxt "Letter of Credit"
+msgid "Original Expiry Date"
+msgstr "تاريخ الانتهاء الأصلي"
+
+msgctxt "Letter of Credit"
+msgid "Effective Expiry Date"
+msgstr "تاريخ الانتهاء الفعلي"
+
+msgctxt "Letter of Credit"
+msgid "Documents and Settlement"
+msgstr "المستندات والسداد"
+
+msgctxt "Letter of Credit"
+msgid "Documents Received Date"
+msgstr "تاريخ استلام المستندات"
+
+msgctxt "Letter of Credit"
+msgid "Documents Amount"
+msgstr "مبلغ المستندات"
+
+msgctxt "Letter of Credit"
+msgid "Acceptance Date"
+msgstr "تاريخ القبول"
+
+msgctxt "Letter of Credit"
+msgid "Maturity Date"
+msgstr "تاريخ الاستحقاق"
+
+msgctxt "Letter of Credit"
+msgid "Settlement Date"
+msgstr "تاريخ السداد"
+
+msgctxt "Letter of Credit"
+msgid "Settled Amount"
+msgstr "المبلغ المسدد"
+
+msgctxt "Letter of Credit"
+msgid "Unused Amount"
+msgstr "المبلغ غير المستخدم"
+
+msgctxt "Letter of Credit"
+msgid "Settlement Payment Entry"
+msgstr "سند دفع السداد"
+
+msgctxt "Letter of Credit"
+msgid "Cash Margin, Commission and Charges"
+msgstr "التأمين النقدي والعمولة والمصاريف"
+
+msgctxt "Letter of Credit"
+msgid "Cash Margin (%)"
+msgstr "نسبة التأمين النقدي (%)"
+
+msgctxt "Letter of Credit"
+msgid "Cash Margin Amount"
+msgstr "مبلغ التأمين النقدي"
+
+msgctxt "Letter of Credit"
+msgid "Margin Account"
+msgstr "حساب التأمينات النقدية"
+
+msgctxt "Letter of Credit"
+msgid "Margin Held"
+msgstr "التأمين المحتجز"
+
+msgctxt "Letter of Credit"
+msgid "Commission Rate (%)"
+msgstr "نسبة العمولة (%)"
+
+msgctxt "Letter of Credit"
+msgid "Commission Amount"
+msgstr "مبلغ العمولة"
+
+msgctxt "Letter of Credit"
+msgid "Commission Account"
+msgstr "حساب العمولات"
+
+msgctxt "Letter of Credit"
+msgid "Charges Account"
+msgstr "حساب المصاريف"
+
+msgctxt "Letter of Credit"
+msgid "Margin Journal Entry"
+msgstr "قيد التأمين النقدي"
+
+msgctxt "Letter of Credit"
+msgid "Commission Journal Entry"
+msgstr "قيد العمولة"
+
+msgctxt "Letter of Credit"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "Letter of Credit"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Letter of Credit"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Letter of Credit"
+msgid "Amended From"
+msgstr "معدّل من"
+
+# Bank Instrument Status Log
+msgctxt "Bank Instrument Status Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Bank Instrument Status Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "Bank Instrument Status Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Bank Instrument Status Log"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Bank Instrument Status Log"
+msgid "From Status"
+msgstr "من الحالة"
+
+msgctxt "Bank Instrument Status Log"
+msgid "To Status"
+msgstr "إلى الحالة"
+
+msgctxt "Bank Instrument Status Log"
+msgid "Open Amount"
+msgstr "المبلغ القائم"
+
+msgctxt "Bank Instrument Status Log"
+msgid "Voucher Type"
+msgstr "نوع السند"
+
+msgctxt "Bank Instrument Status Log"
+msgid "Voucher No"
+msgstr "رقم السند"
+
+msgctxt "Bank Instrument Status Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+# Cheque Discounting ("Accounting", "Totals" and statuses are above)
+msgctxt "Cheque Discounting"
+msgid "Series"
+msgstr "سلسلة الترقيم"
+
+msgctxt "Cheque Discounting"
+msgid "Bank Facility"
+msgstr "التسهيل البنكي"
+
+msgctxt "Cheque Discounting"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Cheque Discounting"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Cheque Discounting"
+msgid "Discount Date"
+msgstr "تاريخ الخصم"
+
+msgctxt "Cheque Discounting"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Cheque Discounting"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Cheque Discounting"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Cheque Discounting"
+msgid "Exchange Rate"
+msgstr "سعر الصرف"
+
+msgctxt "Cheque Discounting"
+msgid "Terms"
+msgstr "الشروط"
+
+msgctxt "Cheque Discounting"
+msgid "Discount Rate (% p.a.)"
+msgstr "سعر الخصم (% سنوياً)"
+
+msgctxt "Cheque Discounting"
+msgid "Day Count"
+msgstr "أساس حساب الأيام"
+
+msgctxt "Cheque Discounting"
+msgid "Set Commission Manually"
+msgstr "إدخال العمولة يدوياً"
+
+msgctxt "Cheque Discounting"
+msgid "Commission"
+msgstr "العمولة"
+
+msgctxt "Cheque Discounting"
+msgid "Discounted Liability Account"
+msgstr "حساب التزام الأوراق المخصومة"
+
+msgctxt "Cheque Discounting"
+msgid "Discount Expense Account"
+msgstr "حساب مصروف الخصم"
+
+msgctxt "Cheque Discounting"
+msgid "Cheques"
+msgstr "الشيكات"
+
+msgctxt "Cheque Discounting"
+msgid "Total Amount"
+msgstr "إجمالي مبلغ الشيكات"
+
+msgctxt "Cheque Discounting"
+msgid "Discount Charges"
+msgstr "مصاريف الخصم"
+
+msgctxt "Cheque Discounting"
+msgid "Total Charges and Commission"
+msgstr "إجمالي المصاريف والعمولة"
+
+msgctxt "Cheque Discounting"
+msgid "Net Proceeds"
+msgstr "صافي المتحصلات"
+
+msgctxt "Cheque Discounting"
+msgid "Outstanding Amount"
+msgstr "المبلغ القائم"
+
+msgctxt "Cheque Discounting"
+msgid "Discounting Journal Entry"
+msgstr "قيد الخصم"
+
+msgctxt "Cheque Discounting"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "Cheque Discounting"
+msgid "More Information"
+msgstr "معلومات إضافية"
+
+msgctxt "Cheque Discounting"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Cheque Discounting"
+msgid "Amended From"
+msgstr "معدّل من"
+
+# Cheque Discounting Item ("Days" and statuses are above)
+msgctxt "Cheque Discounting Item"
+msgid "PDC Cheque"
+msgstr "الشيك الآجل"
+
+msgctxt "Cheque Discounting Item"
+msgid "Cheque No"
+msgstr "رقم الشيك"
+
+msgctxt "Cheque Discounting Item"
+msgid "Party Type"
+msgstr "نوع الطرف"
+
+msgctxt "Cheque Discounting Item"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "Cheque Discounting Item"
+msgid "Party Name"
+msgstr "اسم الطرف"
+
+msgctxt "Cheque Discounting Item"
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
+
+msgctxt "Cheque Discounting Item"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Cheque Discounting Item"
+msgid "Discount Charges"
+msgstr "مصاريف الخصم"
+
+msgctxt "Cheque Discounting Item"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Cheque Discounting Item"
+msgid "Closed Date"
+msgstr "تاريخ الإقفال"
+
+msgctxt "Cheque Discounting Item"
+msgid "Closing Journal Entry"
+msgstr "قيد الإقفال"

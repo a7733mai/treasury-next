@@ -20,7 +20,8 @@ from treasury.accounting import posting
 
 DOCTYPE = "PDC Cheque"
 # Translation context of generic words in the reports (e.g. "Party", "Total"), so their Arabic entries in
-# locale/ar.po never change the translation of the same words elsewhere in ERPNext.
+# locale/ar.po never change the translation of the same words elsewhere in ERPNext. The other generic
+# financial words (Amount, Bank Account, Due Date, Status ...) use the app-wide context "Treasury".
 CTX = "Treasury Report"
 OUTGOING = "Outgoing"
 INCOMING = "Incoming"
@@ -129,9 +130,9 @@ def cheque_columns() -> list[dict]:
 		column("party_type", _("Party Type"), width=90, hidden=1),
 		column("party", _("Party", context=CTX), "Dynamic Link", 150, options="party_type"),
 		column("party_name", _("Party Name"), width=160),
-		column("bank_account", _("Bank Account"), "Link", 170, options="Bank Account"),
+		column("bank_account", _("Bank Account", context="Treasury"), "Link", 170, options="Bank Account"),
 		column("cheque_no", _("Cheque No")),
-		column("amount", _("Amount"), "Currency", 120, options="currency"),
+		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 	]
 

@@ -50,12 +50,12 @@
 		{% endif %}
 		{% if doc.bank_account %}
 		<tr>
-			<td class="pdc-label">{{ _("Bank Account") }}</td>
+			<td class="pdc-label">{{ _("Bank Account", context="Treasury") }}</td>
 			<td>{{ doc.bank_account | e }}</td>
 		</tr>
 		{% endif %}
 		<tr>
-			<td class="pdc-label">{{ _("Issue Date") }}</td>
+			<td class="pdc-label">{{ _("Issue Date", context="Treasury") }}</td>
 			<td>{{ frappe.utils.formatdate(doc.issue_date) }}</td>
 		</tr>
 		{% if doc.handover_date %}
@@ -71,9 +71,9 @@
 			<tr>
 				<th>#</th>
 				<th>{{ _("Cheque No") }}</th>
-				<th>{{ _("Due Date") }}</th>
+				<th>{{ _("Due Date", context="Treasury") }}</th>
 				<th>{{ _("Bank", context="PDC Cheque") }}</th>
-				<th>{{ _("Amount") }}</th>
+				<th>{{ _("Amount", context="Treasury") }}</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -101,7 +101,7 @@
 	</table>
 
 	{% if doc.remarks %}
-	<p><strong>{{ _("Remarks") }}:</strong> {{ doc.remarks | e }}</p>
+	<p><strong>{{ _("Remarks", context="Treasury") }}:</strong> {{ doc.remarks | e }}</p>
 	{% endif %}
 
 	<table class="pdc-signatures">

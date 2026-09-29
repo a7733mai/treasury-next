@@ -38,11 +38,11 @@
 			<td>{{ doc.cheque_no | e }}</td>
 		</tr>
 		<tr>
-			<td class="sec-label">{{ _("Drawer Bank") if incoming else _("Bank Account") }}</td>
+			<td class="sec-label">{{ _("Drawer Bank") if incoming else _("Bank Account", context="Treasury") }}</td>
 			<td>{{ ((doc.drawer_bank if incoming else doc.bank_account) or "") | e }}</td>
 		</tr>
 		<tr>
-			<td class="sec-label">{{ _("Amount") }}</td>
+			<td class="sec-label">{{ _("Amount", context="Treasury") }}</td>
 			<td>
 				{% if open_amount %}
 				<span class="sec-amount sec-open-amount">{{ _("Open / Blank", context="Security Cheque") }}</span>
@@ -77,7 +77,7 @@
 
 	<table>
 		<tr>
-			<td class="sec-label">{{ _("Issue Date") }}</td>
+			<td class="sec-label">{{ _("Issue Date", context="Treasury") }}</td>
 			<td>{{ frappe.utils.formatdate(doc.issue_date) }}</td>
 		</tr>
 		{% if doc.cheque_date %}
@@ -91,7 +91,7 @@
 			<td>{{ frappe.utils.formatdate(doc.handover_date) if doc.handover_date else "" }}</td>
 		</tr>
 		<tr>
-			<td class="sec-label">{{ _("Expiry Date") }}</td>
+			<td class="sec-label">{{ _("Expiry Date", context="Treasury") }}</td>
 			<td>{{ frappe.utils.formatdate(doc.expiry_date) if doc.expiry_date else _("Open-ended") }}</td>
 		</tr>
 		{% if incoming %}
@@ -107,7 +107,7 @@
 	</p>
 
 	{% if doc.remarks %}
-	<p><strong>{{ _("Remarks") }}:</strong> {{ doc.remarks | e }}</p>
+	<p><strong>{{ _("Remarks", context="Treasury") }}:</strong> {{ doc.remarks | e }}</p>
 	{% endif %}
 
 	<table class="sec-signatures">

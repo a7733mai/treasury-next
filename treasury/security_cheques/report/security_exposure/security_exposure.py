@@ -218,7 +218,13 @@ def get_columns(group_by: str) -> list[dict]:
 	if group_by == REFERENCE:
 		columns += [
 			column("reference_doctype", _("Reference Type"), "Link", 120, options="DocType"),
-			column("reference_name", _("Reference Name"), "Dynamic Link", 160, options="reference_doctype"),
+			column(
+				"reference_name",
+				_("Reference Name", context="Treasury"),
+				"Dynamic Link",
+				160,
+				options="reference_doctype",
+			),
 		]
 	columns += [
 		column("party_type", _("Party Type"), width=90, hidden=1),

@@ -13,7 +13,7 @@ frappe.query_reports["Facility Utilisation"] = {
 		},
 		{
 			fieldname: "bank",
-			label: __("Bank"),
+			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank",
 		},

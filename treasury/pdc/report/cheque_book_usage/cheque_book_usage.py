@@ -108,7 +108,7 @@ def make_row(book, used_leaves: set[int], cancelled_leaves: set[int]) -> frappe.
 def get_columns() -> list[dict]:
 	return [
 		column("cheque_book", _("Cheque Book"), "Link", 150, options=BOOK_DOCTYPE),
-		column("bank_account", _("Bank Account"), "Link", 180, options="Bank Account"),
+		column("bank_account", _("Bank Account", context="Treasury"), "Link", 180, options="Bank Account"),
 		column("book_no", _("Book No"), width=90),
 		column("leaf_range", _("Range", context=CTX), width=150),
 		column("total_leaves", _("Total Leaves"), "Int", 90),
@@ -116,6 +116,6 @@ def get_columns() -> list[dict]:
 		column("cancelled_leaves", _("Cancelled Leaves"), "Int", 110),
 		column("remaining_leaves", _("Remaining", context=CTX), "Int", 90),
 		column("next_no", _("Next No"), width=100),
-		column("status", _("Status"), width=90),
+		column("status", _("Status", context="Treasury"), width=90),
 		column("used_percent", _("% Used"), "Percent", 90),
 	]

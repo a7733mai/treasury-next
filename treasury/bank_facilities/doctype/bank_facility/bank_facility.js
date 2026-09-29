@@ -98,7 +98,7 @@ frappe.ui.form.on("Bank Facility", {
 			default: frappe.datetime.get_today(),
 		});
 		const reason = { fieldname: "reason", label: __("Reason"), fieldtype: "Small Text", reqd: 1 };
-		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
+		const remarks = { fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" };
 
 		frm.add_custom_button(__("Refresh Utilisation"), () => {
 			frm.call({ doc: frm.doc, method: "refresh_utilisation", freeze: true }).then(() => frm.reload_doc());
@@ -114,13 +114,22 @@ frappe.ui.form.on("Bank Facility", {
 			return;
 		}
 		if (status === "Draft") {
-			facility_action(frm, "activate", __("Activate"), [date("activation_date", __("Date")), remarks]);
+			facility_action(frm, "activate", __("Activate"), [
+				date("activation_date", __("Date", null, "Treasury")),
+				remarks,
+			]);
 		}
 		if (status === "Suspended") {
-			facility_action(frm, "activate", __("Reactivate"), [date("activation_date", __("Date")), remarks]);
+			facility_action(frm, "activate", __("Reactivate"), [
+				date("activation_date", __("Date", null, "Treasury")),
+				remarks,
+			]);
 		}
 		if (status === "Active") {
-			facility_action(frm, "suspend", __("Suspend"), [date("suspension_date", __("Date")), reason]);
+			facility_action(frm, "suspend", __("Suspend"), [
+				date("suspension_date", __("Date", null, "Treasury")),
+				reason,
+			]);
 		}
 		if (["Active", "Suspended", "Expired"].includes(status)) {
 			const limit_fields = (frm.doc.limits || []).map((row) => ({
@@ -174,7 +183,10 @@ frappe.ui.form.on("Bank Facility", {
 				},
 				__("Actions")
 			);
-			facility_action(frm, "close", __("Close Facility"), [date("closing_date", __("Date")), remarks]);
+			facility_action(frm, "close", __("Close Facility"), [
+				date("closing_date", __("Date", null, "Treasury")),
+				remarks,
+			]);
 		}
 	},
 });

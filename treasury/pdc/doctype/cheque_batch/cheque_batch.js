@@ -223,7 +223,7 @@ frappe.ui.form.on("Cheque Batch", {
 								reqd: 1,
 								default: frappe.datetime.get_today(),
 							},
-							{ fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" },
+							{ fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" },
 						],
 						(values) => {
 							frm.call({ doc: frm.doc, method, args: values, freeze: true }).then((r) => {
@@ -319,7 +319,8 @@ frappe.ui.form.on("Cheque Batch", {
 		field.$wrapper.html(`<table class="table table-bordered table-sm">
 			<thead><tr>
 				<th>${__("PDC Cheque")}</th><th>${__("Cheque No")}</th><th>${__("Effective Due Date")}</th>
-				<th>${__("Amount")}</th><th>${__("Operational Status")}</th><th>${__("Accounting Status")}</th>
+				<th>${__("Amount", null, "Treasury")}</th><th>${__("Operational Status")}</th>
+				<th>${__("Accounting Status")}</th>
 			</tr></thead>
 			<tbody>${rows}</tbody>
 		</table>`);

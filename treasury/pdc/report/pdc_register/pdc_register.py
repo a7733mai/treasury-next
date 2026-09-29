@@ -213,7 +213,7 @@ def group_label(group_field: str, key: str, row: frappe._dict) -> str:
 def get_columns(group_field: str | None) -> list[dict]:
 	group_labels = {
 		"party": _("Party Name"),
-		"bank_account": _("Bank Account"),
+		"bank_account": _("Bank Account", context="Treasury"),
 		"operational_status": _("Operational Status"),
 	}
 	columns = [column("group_label", group_labels[group_field], width=220)] if group_field else []
@@ -221,7 +221,7 @@ def get_columns(group_field: str | None) -> list[dict]:
 		*cheque_columns(),
 		column("base_amount", _("Amount (Company Currency)"), "Currency", 140, options="company_currency"),
 		column("cheque_count", _("Cheques"), "Int", 70),
-		column("issue_date", _("Issue Date"), "Date", 100),
+		column("issue_date", _("Issue Date", context="Treasury"), "Date", 100),
 		column("handover_date", _("Handover / Receipt Date"), "Date"),
 		column("original_due_date", _("Original Due Date"), "Date"),
 		column("effective_due_date", _("Effective Due Date"), "Date"),

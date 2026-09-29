@@ -177,7 +177,7 @@ frappe.ui.form.on("Security Cheque", {
 			default: frappe.datetime.get_today(),
 		});
 		const reason = { fieldname: "reason", label: __("Reason"), fieldtype: "Small Text", reqd: 1 };
-		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
+		const remarks = { fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" };
 		const location = (reqd) => ({
 			fieldname: "custody_location",
 			label: __("Custody Location"),
@@ -188,7 +188,7 @@ frappe.ui.form.on("Security Cheque", {
 		});
 		const custodian = {
 			fieldname: "custodian",
-			label: __("Custodian"),
+			label: __("Custodian", null, "Treasury"),
 			fieldtype: "Link",
 			options: "User",
 		};
@@ -211,7 +211,7 @@ frappe.ui.form.on("Security Cheque", {
 		}
 		if (incoming && status === "Received") {
 			sec_action(frm, "store", __("Put in Custody"), [
-				date("store_date", __("Date")),
+				date("store_date", __("Date", null, "Treasury")),
 				location(1),
 				custodian,
 				remarks,
@@ -219,7 +219,7 @@ frappe.ui.form.on("Security Cheque", {
 		}
 		if (incoming && status === "In Custody") {
 			sec_action(frm, "transfer_custody", __("Transfer Custody"), [
-				date("transfer_date", __("Date")),
+				date("transfer_date", __("Date", null, "Treasury")),
 				location(1),
 				custodian,
 				remarks,
@@ -304,7 +304,7 @@ function sec_encash_prompt(frm, bank_accounts) {
 			},
 			{
 				fieldname: "amount",
-				label: __("Amount"),
+				label: __("Amount", null, "Treasury"),
 				fieldtype: "Currency",
 				options: doc.currency,
 				default: doc.amount_type === "Fixed" ? doc.amount : null,
@@ -313,7 +313,7 @@ function sec_encash_prompt(frm, bank_accounts) {
 			},
 			{
 				fieldname: "due_date",
-				label: __("Due Date"),
+				label: __("Due Date", null, "Treasury"),
 				fieldtype: "Date",
 				default: frappe.datetime.get_today(),
 			},
@@ -344,7 +344,7 @@ function sec_encash_prompt(frm, bank_accounts) {
 				options: "reference_doctype",
 				depends_on: "eval:doc.reference_doctype",
 			},
-			{ fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" },
+			{ fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" },
 		],
 		(values) => {
 			const args = {

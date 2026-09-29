@@ -85,7 +85,7 @@ frappe.query_reports["PDC Register"] = {
 		},
 		{
 			fieldname: "bank_account",
-			label: __("Bank Account"),
+			label: __("Bank Account", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank Account",
 			get_query: function () {
@@ -102,7 +102,7 @@ frappe.query_reports["PDC Register"] = {
 			label: __("Date Based On"),
 			fieldtype: "Select",
 			options: [
-				{ value: "Issue Date", label: __("Issue Date") },
+				{ value: "Issue Date", label: __("Issue Date", null, "Treasury") },
 				{ value: "Handover / Receipt Date", label: __("Handover / Receipt Date") },
 				{ value: "Original Due Date", label: __("Original Due Date") },
 				{ value: "Effective Due Date", label: __("Effective Due Date") },
@@ -146,7 +146,7 @@ frappe.query_reports["PDC Register"] = {
 			options: [
 				{ value: "", label: "" },
 				{ value: "Party", label: __("Party Name") },
-				{ value: "Bank Account", label: __("Bank Account") },
+				{ value: "Bank Account", label: __("Bank Account", null, "Treasury") },
 				{ value: "Operational Status", label: __("Operational Status") },
 			],
 		},

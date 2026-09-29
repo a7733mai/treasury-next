@@ -68,7 +68,7 @@ frappe.query_reports["Security Exposure"] = {
 		},
 		{
 			fieldname: "reference_name",
-			label: __("Reference Name"),
+			label: __("Reference Name", null, "Treasury"),
 			fieldtype: "Dynamic Link",
 			get_options: function () {
 				const doctype = frappe.query_report.get_filter_value("reference_doctype");

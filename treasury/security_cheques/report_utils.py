@@ -118,7 +118,7 @@ def cheque_columns() -> list[dict]:
 		column("purpose", _("Purpose", context="Security Cheque"), width=130),
 		column("cheque_no", _("Cheque No")),
 		column("amount_type", _("Amount Type"), width=100),
-		column("amount", _("Amount"), "Currency", 120, options="currency"),
+		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 		column("base_amount", _("Amount (Company Currency)"), "Currency", 140, options="company_currency"),
 	]

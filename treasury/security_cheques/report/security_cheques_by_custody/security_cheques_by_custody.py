@@ -87,10 +87,10 @@ def get_columns() -> list[dict]:
 		column("group_label", _("Custody Location / Custodian"), width=230),
 		*cheque_columns(),
 		column("cheque_count", _("Cheques"), "Int", 70),
-		column("expiry_date", _("Expiry Date"), "Date", 100),
+		column("expiry_date", _("Expiry Date", context="Treasury"), "Date", 100),
 		column("days_to_expiry", _("Days to Expiry"), "Int", 90),
-		column("status", _("Status"), width=100),
+		column("status", _("Status", context="Treasury"), width=100),
 		column("custody_location", _("Custody Location"), "Link", 140, options="Custody Location"),
-		column("custodian", _("Custodian"), "Link", 140, options="User"),
+		column("custodian", _("Custodian", context="Treasury"), "Link", 140, options="User"),
 		company_currency_column(),
 	]

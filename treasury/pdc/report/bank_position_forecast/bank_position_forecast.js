@@ -13,7 +13,7 @@ frappe.query_reports["Bank Position Forecast"] = {
 		},
 		{
 			fieldname: "bank_account",
-			label: __("Bank Account"),
+			label: __("Bank Account", null, "Treasury"),
 			fieldtype: "MultiSelectList",
 			get_data: function (txt) {
 				return frappe.db.get_link_options("Bank Account", txt, {

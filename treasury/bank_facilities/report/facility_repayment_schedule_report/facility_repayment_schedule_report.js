@@ -27,7 +27,7 @@ frappe.query_reports["Facility Repayment Schedule Report"] = {
 		},
 		{
 			fieldname: "bank",
-			label: __("Bank"),
+			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank",
 		},
@@ -49,7 +49,7 @@ frappe.query_reports["Facility Repayment Schedule Report"] = {
 		},
 		{
 			fieldname: "status",
-			label: __("Status"),
+			label: __("Status", null, "Treasury"),
 			fieldtype: "Select",
 			options: ["", "Pending", "Partially Paid", "Overdue", "Paid"].map((value) => ({
 				value,

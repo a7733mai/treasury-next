@@ -223,11 +223,11 @@ def get_columns() -> list[dict]:
 	return [
 		column("label", _("Facility / Period"), width=240),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
-		column("bank", _("Bank"), "Link", 130, options="Bank"),
+		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank"),
 		money("interest", _("Interest / Profit")),
 		money("commission", _("Commission")),
 		money("fees", _("Fees")),
 		money("penalty", _("Penalties")),
-		money("total", _("Total")),
+		money("total", _("Total", context=CTX)),
 		column("currency", _("Currency"), "Link", 70, options="Currency", hidden=1),
 	]

@@ -13,7 +13,7 @@ frappe.query_reports["Cheque Book Usage"] = {
 		},
 		{
 			fieldname: "bank_account",
-			label: __("Bank Account"),
+			label: __("Bank Account", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank Account",
 			get_query: function () {
@@ -27,7 +27,7 @@ frappe.query_reports["Cheque Book Usage"] = {
 		},
 		{
 			fieldname: "status",
-			label: __("Status"),
+			label: __("Status", null, "Treasury"),
 			fieldtype: "Select",
 			options: [
 				{ value: "", label: "" },

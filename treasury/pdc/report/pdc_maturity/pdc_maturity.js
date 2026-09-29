@@ -24,7 +24,7 @@ frappe.query_reports["PDC Maturity"] = {
 		},
 		{
 			fieldname: "bank_account",
-			label: __("Bank Account"),
+			label: __("Bank Account", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank Account",
 			get_query: function () {
@@ -48,7 +48,7 @@ frappe.query_reports["PDC Maturity"] = {
 			label: __("Group By", null, "Treasury Report"),
 			fieldtype: "Select",
 			options: [
-				{ value: "Bank Account", label: __("Bank Account") },
+				{ value: "Bank Account", label: __("Bank Account", null, "Treasury") },
 				{ value: "Party", label: __("Party Name") },
 			],
 			default: "Bank Account",

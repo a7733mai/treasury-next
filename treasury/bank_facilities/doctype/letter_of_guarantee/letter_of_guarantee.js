@@ -59,7 +59,7 @@ frappe.ui.form.on("Letter of Guarantee", {
 			options: frm.doc.currency,
 			...extra,
 		});
-		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
+		const remarks = { fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" };
 
 		if ([...LG_OPEN, "Expired"].includes(status)) {
 			treasury_instrument_action(frm, "extend_validity", __("Extend", null, "Letter of Guarantee"), [
@@ -84,7 +84,7 @@ frappe.ui.form.on("Letter of Guarantee", {
 		}
 		if ([...LG_OPEN, "Expired"].includes(status)) {
 			treasury_instrument_action(frm, "release", __("Release", null, "Letter of Guarantee"), [
-				today("release_date", __("Release Date")),
+				today("release_date", __("Release Date", null, "Treasury")),
 				remarks,
 			]);
 			treasury_instrument_action(frm, "claim", __("Claim (Liquidation)"), [
@@ -106,7 +106,7 @@ frappe.ui.form.on("Letter of Guarantee", {
 				},
 				{
 					fieldname: "party",
-					label: __("Party"),
+					label: __("Party", null, "Treasury"),
 					fieldtype: "Dynamic Link",
 					options: "party_type",
 				},
@@ -116,7 +116,7 @@ frappe.ui.form.on("Letter of Guarantee", {
 		}
 		if (status === "Claimed" && flt(frm.doc.claim_outstanding) > 0) {
 			treasury_instrument_action(frm, "repay_claim", __("Repay Claim"), [
-				money("amount", __("Amount"), { reqd: 1, default: frm.doc.claim_outstanding }),
+				money("amount", __("Amount", null, "Treasury"), { reqd: 1, default: frm.doc.claim_outstanding }),
 				today("repayment_date", __("Repayment Date")),
 				remarks,
 			]);

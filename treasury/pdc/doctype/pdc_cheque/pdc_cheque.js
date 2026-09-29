@@ -185,7 +185,7 @@ frappe.ui.form.on("PDC Cheque", {
 			frm.doc.effective_due_date &&
 			frm.doc.effective_due_date < frappe.datetime.get_today();
 		if (overdue) {
-			frm.page.set_indicator(__("Overdue"), "red");
+			frm.page.set_indicator(__("Overdue", null, "Treasury"), "red");
 		} else {
 			frm.page.set_indicator(__(frm.doc.operational_status), "blue");
 		}
@@ -215,7 +215,8 @@ frappe.ui.form.on("PDC Cheque", {
 		wrapper.html(`<table class="table table-bordered table-sm">
 			<thead><tr>
 				<th>${__("Voucher Type")}</th><th>${__("Voucher No")}</th><th>${__("Event")}</th>
-				<th>${__("Cycle")}</th><th>${__("Posting Date")}</th><th>${__("Status")}</th>
+				<th>${__("Cycle")}</th><th>${__("Posting Date", null, "Treasury")}</th>
+				<th>${__("Status", null, "Treasury")}</th>
 			</tr></thead>
 			<tbody>${rows}</tbody>
 		</table>`);
@@ -238,7 +239,7 @@ frappe.ui.form.on("PDC Cheque", {
 			default: frappe.datetime.get_today(),
 		});
 		const reason = { fieldname: "reason", label: __("Reason"), fieldtype: "Small Text", reqd: 1 };
-		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
+		const remarks = { fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" };
 
 		if (status === "Created") {
 			if (outgoing) {
@@ -257,7 +258,7 @@ frappe.ui.form.on("PDC Cheque", {
 			const handover = doc.handover_date || "";
 			const default_date = handover > (doc.effective_due_date || "") ? handover : doc.effective_due_date;
 			pdc_action(frm, "post_party", __("Post to Party Now"), [
-				{ ...date("posting_date", __("Posting Date")), default: default_date },
+				{ ...date("posting_date", __("Posting Date", null, "Treasury")), default: default_date },
 			]);
 		}
 
@@ -266,7 +267,7 @@ frappe.ui.form.on("PDC Cheque", {
 				date("deposit_date", __("Deposit Date")),
 				{
 					fieldname: "bank_account",
-					label: __("Bank Account"),
+					label: __("Bank Account", null, "Treasury"),
 					fieldtype: "Link",
 					options: "Bank Account",
 					default: doc.bank_account,
@@ -284,7 +285,7 @@ frappe.ui.form.on("PDC Cheque", {
 				{
 					// an incoming cheque received without a bank: the bank it was cleared into
 					fieldname: "bank_account",
-					label: __("Bank Account"),
+					label: __("Bank Account", null, "Treasury"),
 					fieldtype: "Link",
 					options: "Bank Account",
 					reqd: doc.bank_account ? 0 : 1,
@@ -328,7 +329,7 @@ frappe.ui.form.on("PDC Cheque", {
 		if (status === "Cleared" && !["Bank Posted", "Reversed"].includes(doc.accounting_status)) {
 			pdc_action(frm, "post_bank", __("Post to Bank"), [
 				{
-					...date("posting_date", __("Posting Date")),
+					...date("posting_date", __("Posting Date", null, "Treasury")),
 					default: doc.bank_transaction_date || doc.actual_clearance_date,
 				},
 				{ fieldname: "bank_charges", label: __("Bank Charges"), fieldtype: "Currency", default: doc.bank_charges },
@@ -349,7 +350,7 @@ frappe.ui.form.on("PDC Cheque", {
 
 		if (status === "Bounced" && is_manager) {
 			pdc_action(frm, "represent", __("Re-present"), [
-				date("represent_date", __("Date")),
+				date("represent_date", __("Date", null, "Treasury")),
 				{ fieldname: "new_due_date", label: __("New Due Date"), fieldtype: "Date" },
 				remarks,
 			]);
@@ -400,10 +401,16 @@ function pdc_replace(frm) {
 				description: __("Leave empty to take the next leaf of the cheque book."),
 				reqd: doc.direction === "Incoming" || !doc.cheque_book ? 1 : 0,
 			},
-			{ fieldname: "amount", label: __("Amount"), fieldtype: "Currency", default: doc.amount, reqd: 1 },
+			{
+				fieldname: "amount",
+				label: __("Amount", null, "Treasury"),
+				fieldtype: "Currency",
+				default: doc.amount,
+				reqd: 1,
+			},
 			{
 				fieldname: "original_due_date",
-				label: __("Due Date"),
+				label: __("Due Date", null, "Treasury"),
 				fieldtype: "Date",
 				default: doc.effective_due_date,
 				reqd: 1,

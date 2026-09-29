@@ -188,10 +188,11 @@ def amend(
 		)
 	changes = []
 	if new_amount != current:
-		changes.append(f"{_('Amount')}: {current} → {new_amount}")
+		changes.append(f"{_('Amount', context='Treasury')}: {current} → {new_amount}")
 	if new_expiry != getdate(doc.effective_expiry_date):
 		changes.append(
-			f"{_('Expiry Date')}: {formatdate(doc.effective_expiry_date)} → {formatdate(new_expiry)}"
+			f"{_('Expiry Date', context='Treasury')}: "
+			f"{formatdate(doc.effective_expiry_date)} → {formatdate(new_expiry)}"
 		)
 	doc.current_amount = new_amount
 	doc.open_amount = new_amount

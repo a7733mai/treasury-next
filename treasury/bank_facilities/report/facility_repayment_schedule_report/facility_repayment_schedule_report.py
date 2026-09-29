@@ -96,25 +96,25 @@ def get_columns() -> list[dict]:
 		return column(fieldname, label, "Currency", width, options=options)
 
 	return [
-		column("due_date", _("Due Date"), "Date", 100),
+		column("due_date", _("Due Date", context="Treasury"), "Date", 100),
 		column("drawdown", _("Facility Drawdown"), "Link", 150, options=DRAWDOWN),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
-		column("bank", _("Bank"), "Link", 130, options="Bank"),
+		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank"),
 		column("limit_type_label", _("Limit Type"), width=120),
 		column("installment_no", _("Installment No"), "Int", 80),
 		money("principal", _("Principal")),
 		money("interest", _("Interest / Profit")),
-		money("total", _("Total")),
+		money("total", _("Total", context=CTX)),
 		money("paid_principal", _("Paid Principal")),
 		money("paid_interest", _("Paid Interest / Profit")),
 		money("unpaid_principal", _("Unpaid Principal")),
 		money("unpaid_interest", _("Unpaid Interest / Profit")),
 		money("unpaid", _("Unpaid")),
-		column("status_label", _("Status"), width=100),
-		column("status", _("Status"), width=90, hidden=1),
+		column("status_label", _("Status", context="Treasury"), width=100),
+		column("status", _("Status", context="Treasury"), width=90, hidden=1),
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 		money("unpaid_company", _("Unpaid (Company Currency)"), "company_currency", 150),
-		column("bank_account", _("Bank Account"), "Link", 160, options="Bank Account"),
+		column("bank_account", _("Bank Account", context="Treasury"), "Link", 160, options="Bank Account"),
 		column(
 			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
 		),

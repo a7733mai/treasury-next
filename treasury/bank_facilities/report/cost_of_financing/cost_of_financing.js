@@ -39,7 +39,7 @@ frappe.query_reports["Cost of Financing"] = {
 		},
 		{
 			fieldname: "bank",
-			label: __("Bank"),
+			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank",
 		},

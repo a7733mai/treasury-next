@@ -126,7 +126,7 @@ def renew(
 	if new_expiry < date:
 		frappe.throw(_("The new Expiry Date cannot be before the Renewal Date."))
 
-	changes = [f"{_('Expiry Date')}: {formatdate(old_expiry)} → {formatdate(new_expiry)}"]
+	changes = [f"{_('Expiry Date', context='Treasury')}: {formatdate(old_expiry)} → {formatdate(new_expiry)}"]
 	doc.expiry_date = new_expiry
 	doc.renewal_date = date
 	if new_total_limit not in (None, "") and flt(new_total_limit) != flt(doc.total_limit):

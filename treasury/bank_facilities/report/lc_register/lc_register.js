@@ -20,7 +20,7 @@ frappe.query_reports["LC Register"] = {
 		},
 		{
 			fieldname: "bank",
-			label: __("Bank"),
+			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank",
 		},
@@ -41,7 +41,7 @@ frappe.query_reports["LC Register"] = {
 		},
 		{
 			fieldname: "status",
-			label: __("Status"),
+			label: __("Status", null, "Treasury"),
 			fieldtype: "Select",
 			options: ["", "Opened", "Amended", "Documents Received", "Accepted", "Settled", "Expired"].map(
 				(value) => ({ value, label: value ? __(value, null, "Letter of Credit") : "" })

@@ -107,7 +107,7 @@ def round_row(row: frappe._dict, precision: int) -> frappe._dict:
 
 def bucket_labels() -> dict[str, str]:
 	return {
-		"overdue": _("Overdue"),
+		"overdue": _("Overdue", context=CTX),
 		"days_0_7": _("0-7 Days"),
 		"days_8_30": _("8-30 Days"),
 		"days_31_60": _("31-60 Days"),
@@ -120,7 +120,7 @@ def get_columns(group_by: str) -> list[dict]:
 	columns = [
 		{
 			"fieldname": "group_label",
-			"label": _("Party Name") if group_by == GROUP_BY_PARTY else _("Bank Account"),
+			"label": _("Party Name") if group_by == GROUP_BY_PARTY else _("Bank Account", context="Treasury"),
 			"fieldtype": "Data",
 			"width": 220,
 		}

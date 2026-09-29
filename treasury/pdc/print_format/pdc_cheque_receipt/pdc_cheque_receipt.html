@@ -36,7 +36,7 @@
 			<td>{{ doc.cheque_no | e }}</td>
 		</tr>
 		<tr>
-			<td class="pdc-label">{{ _("Bank Account") }}</td>
+			<td class="pdc-label">{{ _("Bank Account", context="Treasury") }}</td>
 			<td>{{ (doc.bank_account or "") | e }}</td>
 		</tr>
 		{% if incoming and doc.drawer_bank %}
@@ -46,7 +46,7 @@
 		</tr>
 		{% endif %}
 		<tr>
-			<td class="pdc-label">{{ _("Amount") }}</td>
+			<td class="pdc-label">{{ _("Amount", context="Treasury") }}</td>
 			<td><span class="pdc-amount">{{ doc.get_formatted("amount") }}</span></td>
 		</tr>
 		<tr>
@@ -57,7 +57,7 @@
 
 	<table>
 		<tr>
-			<td class="pdc-label">{{ _("Issue Date") }}</td>
+			<td class="pdc-label">{{ _("Issue Date", context="Treasury") }}</td>
 			<td>{{ frappe.utils.formatdate(doc.issue_date) }}</td>
 		</tr>
 		<tr>
@@ -65,7 +65,7 @@
 			<td>{{ frappe.utils.formatdate(doc.handover_date) if doc.handover_date else "" }}</td>
 		</tr>
 		<tr>
-			<td class="pdc-label">{{ _("Due Date") }}</td>
+			<td class="pdc-label">{{ _("Due Date", context="Treasury") }}</td>
 			<td>{{ frappe.utils.formatdate(doc.effective_due_date or doc.original_due_date) }}</td>
 		</tr>
 		{% if doc.is_postponed %}
@@ -82,7 +82,7 @@
 			<tr>
 				<th>#</th>
 				<th>{{ _("Reference Type") }}</th>
-				<th>{{ _("Reference Name") }}</th>
+				<th>{{ _("Reference Name", context="Treasury") }}</th>
 				<th>{{ _("Allocated Amount") }}</th>
 			</tr>
 		</thead>
@@ -100,7 +100,7 @@
 	{% endif %}
 
 	{% if doc.remarks %}
-	<p><strong>{{ _("Remarks") }}:</strong> {{ doc.remarks | e }}</p>
+	<p><strong>{{ _("Remarks", context="Treasury") }}:</strong> {{ doc.remarks | e }}</p>
 	{% endif %}
 
 	<table class="pdc-signatures">

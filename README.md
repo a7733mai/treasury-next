@@ -463,9 +463,17 @@ set up, by email, listing only the documents each recipient may read.
   covered by the concurrency stamp; import loans are manual (an LC settlement does not create a drawdown);
   Sight LCs are not forecast; no print formats for LG / LC / Cheque Discounting (the standard print view
   applies); discounted cheques are settled by a user action (no daily job).
-- **Translations**: Arabic only. Generic words already translated by Frappe / ERPNext are left to the core
-  translation or given a context (`msgctxt`); a few PDC status words (Received, Delivered, Returned ...)
-  keep a plain entry with a compatible wording.
+- **Translations**: Arabic only. The core Arabic wording of many generic financial words is wrong for a
+  treasury ("Amount" = quantity, "Issue Date" = the date of a lawsuit, "Total" = total excluding tax ...),
+  and a context-less entry in the app would replace it in every ERPNext screen. So the app never translates
+  such words without a context (`msgctxt`): field / section labels and Select options have entries under
+  their DocType name (the context Frappe itself uses for them), and the generic words of reports, dialogs,
+  print formats and alert emails use the context `Treasury` (`_("Amount", context="Treasury")`,
+  `__("Amount", null, "Treasury")`); older report-only words keep the context `Treasury Report`. Only
+  app-specific sentences and a few PDC status words (Received, Delivered, Returned ...) keep a plain entry.
+  Limitations: the few Frappe screens that translate a label without its DocType context (e.g. the Form
+  Builder of Customize Form) show the core wording of generic labels, and a label added later through
+  Customize Form has no Arabic entry until one is added to `locale/ar.po`.
 - **Uninstall**: `bench uninstall-app treasury` removes the app's DocTypes, reports, workspace and its
   custom fields on Payment Entry / Journal Entry, and leaves the Treasury roles. As usual in Frappe, the
   database columns of deleted custom fields (`treasury_*` on `tabPayment Entry` / `tabJournal Entry`) are
@@ -483,7 +491,8 @@ test file builds its own fixtures (test company in EGP, EGP and USD bank account
 customer, supplier, invoices — `treasury/tests/utils.py`) and everything is rolled back. They assert exact
 GL rows, Payment Ledger outstanding, both statuses and idempotency for every posting-mode combination,
 security cheques leaving every ledger untouched, reports, alerts, translations (`test_translations.py`:
-valid `ar.po`, no duplicates, every `_()` / `__()` string translated, no plain generic core words) and the
+valid `ar.po`, no duplicates, every `_()` / `__()` string translated, every DocType label under its DocType
+context, no plain generic core words in `ar.po` nor treasury terms without context in the code) and the
 install / uninstall field list (`test_install.py`). One scheduler test is skipped when `freezegun` is not
 installed.
 

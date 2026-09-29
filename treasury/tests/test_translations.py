@@ -6,9 +6,16 @@
   (with the context of the call, or without context, which Frappe falls back to), or Frappe / ERPNext's own.
 - Generic words that Frappe / ERPNext already translate are never translated by us without a context: an entry
   without msgctxt is loaded site-wide after the core apps and would replace their wording everywhere.
+- Every field / section / tab label of every app DocType has an entry under its DocType as msgctxt (Frappe
+  translates labels and Select options with `__(label, null, df.parent)`), or a plain entry for an
+  app-specific label; generic Select options have an entry under their DocType too.
+- The treasury terms (Amount, Due Date, Issue Date ...), whose core translation is wrong for a treasury, are
+  never translated without a context in the Python code, the client scripts and the Jinja / report templates,
+  and have an entry under msgctxt "Treasury".
 """
 
 import ast
+import json
 import re
 from pathlib import Path
 
@@ -98,6 +105,47 @@ GENERIC_CORE_WORDS = frozenset(
 	}
 )
 
+# Financial words whose Frappe / ERPNext translation is wrong for a treasury ("Amount" = quantity, "Due Date",
+# "Issue Date" = the date of a lawsuit, "Total" = total excluding tax, "Outstanding" = pending ...). App code
+# always passes a context: TREASURY_CONTEXT, a DocType name or "Treasury Report".
+TREASURY_CONTEXT = "Treasury"
+TREASURY_TERMS = frozenset(
+	{
+		"Amount",
+		"Balance",
+		"Bank",
+		"Bank Account",
+		"Charges",
+		"Closing",
+		"Closing Balance",
+		"Custodian",
+		"Custody",
+		"Date",
+		"Due Date",
+		"Exchange Rate",
+		"Expiry Date",
+		"Interest Rate",
+		"Issue Date",
+		"Limit",
+		"Net",
+		"Opening",
+		"Opening Balance",
+		"Outstanding",
+		"Overdue",
+		"Party",
+		"Period",
+		"Posting Date",
+		"Rate",
+		"Reference",
+		"Reference Name",
+		"Release Date",
+		"Remarks",
+		"Status",
+		"Total",
+	}
+)
+GENERIC_WORDS = GENERIC_CORE_WORDS | TREASURY_TERMS
+
 # A context argument that cannot be resolved statically (an attribute, a variable of another module...).
 ANY_CONTEXT = object()
 
@@ -114,6 +162,9 @@ JS_CONSTANT = re.compile(
 	r"(?:const|let|var)\s+(?P<name>[A-Za-z_$][\w$]*)\s*=\s*" + JS_STRING.format(name="value")
 )
 JS_ESCAPE = re.compile(r"\\(.)")
+# Jinja `_("...")` (print formats, emails) and microtemplate `__("...")` (report print templates)
+TEMPLATE_CALL = re.compile(r"(?<![\w.$])_{1,2}\(\s*" + JS_STRING.format(name="msg"))
+JINJA_CONTEXT = re.compile(r"\s*,\s*context\s*=\s*" + JS_STRING.format(name="ctx") + r"\s*\)")
 
 
 # ---------------------------------------------------------------------------------------------- parsing
@@ -273,6 +324,37 @@ def js_messages(path: Path):
 			yield msgid, ANY_CONTEXT, line
 
 
+def template_messages(path: Path):
+	"""(msgid, context, line) of every literal `_("...")` / `__("...")` call of a Jinja or report template."""
+	text = path.read_text(encoding="utf-8")
+	for match in TEMPLATE_CALL.finditer(text):
+		msgid = js_unescape(match.group("msg"))
+		line = text.count("\n", 0, match.start()) + 1
+		rest = text[match.end() :]
+		if JS_NO_CONTEXT.match(rest):
+			yield msgid, None, line
+		elif context := (JINJA_CONTEXT.match(rest) or JS_CONTEXT.match(rest)):
+			if context.group("ctx") is not None:
+				yield msgid, js_unescape(context.group("ctx")), line
+			elif context.groupdict().get("ctxname") in ("null", "undefined"):
+				yield msgid, None, line
+			else:
+				yield msgid, ANY_CONTEXT, line
+		else:
+			yield msgid, ANY_CONTEXT, line
+
+
+MESSAGE_EXTRACTORS = ((".py", python_messages), (".js", js_messages), (".html", template_messages))
+
+
+def app_doctypes():
+	"""(name, definition) of every DocType of the app."""
+	for path in sorted(APP_DIR.glob("*/doctype/*/*.json")):
+		definition = json.loads(path.read_text(encoding="utf-8"))
+		if definition.get("doctype") == "DocType":
+			yield definition["name"], definition
+
+
 # ---------------------------------------------------------------------------------------------- tests
 
 
@@ -330,14 +412,58 @@ class TestTranslations(IntegrationTestCase):
 		plain = sorted(
 			f"line {e['line']}: {e['msgid']}"
 			for e in self.messages
-			if "msgctxt" not in e and e["msgid"] in GENERIC_CORE_WORDS
+			if "msgctxt" not in e and e["msgid"] in GENERIC_WORDS
 		)
 		self.assertEqual(plain, [])
+
+	def test_treasury_terms_have_a_treasury_entry(self):
+		missing = sorted(t for t in TREASURY_TERMS if TREASURY_CONTEXT not in self.contexts_by_msgid.get(t, ()))
+		self.assertEqual(missing, [])
+
+	def test_treasury_terms_are_never_translated_without_context(self):
+		plain, count = [], 0
+		for suffix, extract in MESSAGE_EXTRACTORS:
+			for path in source_files(suffix):
+				for msgid, context, line in extract(path):
+					count += 1
+					if msgid in TREASURY_TERMS and context is None:
+						plain.append(f"{path.relative_to(APP_DIR)}:{line}: {msgid!r}")
+
+		self.assertGreater(count, 500, "the extraction found (almost) no translatable strings")
+		self.assertEqual(sorted(plain), [])
+
+	def test_every_doctype_label_has_an_entry(self):
+		generic = GENERIC_WORDS | core_msgids()
+		missing, count = [], 0
+		for doctype, definition in app_doctypes():
+			for df in definition.get("fields", []):
+				label = df.get("label")
+				if not label:
+					continue
+				count += 1
+				contexts = self.contexts_by_msgid.get(label, set())
+				if doctype in contexts or (None in contexts and label not in generic):
+					continue
+				missing.append(f"{doctype}: {df['fieldname']} {label!r}")
+
+		self.assertGreater(count, 300, "no DocType labels found")
+		self.assertEqual(sorted(missing), [])
+
+	def test_generic_select_options_have_a_doctype_entry(self):
+		missing = []
+		for doctype, definition in app_doctypes():
+			for df in definition.get("fields", []):
+				if df.get("fieldtype") != "Select" or df.get("fieldname") == "naming_series":
+					continue
+				for option in (df.get("options") or "").split("\n"):
+					if option in GENERIC_WORDS and doctype not in self.contexts_by_msgid.get(option, ()):
+						missing.append(f"{doctype}: {df['fieldname']} {option!r}")
+		self.assertEqual(sorted(missing), [])
 
 	def test_every_translatable_string_has_an_entry(self):
 		core = core_msgids()
 		missing, count = [], 0
-		for suffix, extract in ((".py", python_messages), (".js", js_messages)):
+		for suffix, extract in MESSAGE_EXTRACTORS:
 			for path in source_files(suffix):
 				for msgid, context, line in extract(path):
 					count += 1
@@ -376,3 +502,13 @@ class TestTranslations(IntegrationTestCase):
 			),
 			found,
 		)  # string on its own line
+
+		html = APP_DIR / "pdc" / "print_format" / "pdc_cheque_receipt" / "pdc_cheque_receipt.html"
+		found = {(msgid, context) for msgid, context, _line in template_messages(html)}
+		self.assertIn(("Amount", TREASURY_CONTEXT), found)  # Jinja context keyword
+		self.assertIn(("Cheque No", None), found)
+
+		html = APP_DIR / "pdc" / "report" / "projected_party_statement" / "projected_party_statement.html"
+		found = {(msgid, context) for msgid, context, _line in template_messages(html)}
+		self.assertIn(("Debit", "Treasury Report"), found)  # microtemplate `__(msg, null, context)`
+		self.assertIn(("Date", TREASURY_CONTEXT), found)

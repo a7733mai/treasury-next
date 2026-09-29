@@ -20,7 +20,7 @@ frappe.query_reports["Discounted Cheques"] = {
 		},
 		{
 			fieldname: "bank",
-			label: __("Bank"),
+			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
 			options: "Bank",
 		},

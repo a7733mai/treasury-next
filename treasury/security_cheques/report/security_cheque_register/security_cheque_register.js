@@ -23,7 +23,7 @@ frappe.query_reports["Security Cheque Register"] = {
 		},
 		{
 			fieldname: "status",
-			label: __("Status"),
+			label: __("Status", null, "Treasury"),
 			fieldtype: "MultiSelectList",
 			get_data: function (txt) {
 				const statuses = [
@@ -116,7 +116,7 @@ frappe.query_reports["Security Cheque Register"] = {
 		},
 		{
 			fieldname: "reference_name",
-			label: __("Reference Name"),
+			label: __("Reference Name", null, "Treasury"),
 			fieldtype: "Dynamic Link",
 			get_options: function () {
 				const doctype = frappe.query_report.get_filter_value("reference_doctype");

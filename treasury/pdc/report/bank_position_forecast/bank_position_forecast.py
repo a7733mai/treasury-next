@@ -270,7 +270,15 @@ class BankPositionForecast:
 		for index, period in enumerate(self.periods):
 			if index == self.overdue_index and overdue:
 				row = self.make_row(
-					"overdue", _("Overdue"), None, add_days(self.today, -1), balance, 0, 0, overdue, 1
+					"overdue",
+					_("Overdue", context=CTX),
+					None,
+					add_days(self.today, -1),
+					balance,
+					0,
+					0,
+					overdue,
+					1,
 				)
 				balance = row.closing
 				summary_rows.append(row)
@@ -387,14 +395,19 @@ class BankPositionForecast:
 				},
 				{
 					"fieldname": "reference_name",
-					"label": _("Reference Name"),
+					"label": _("Reference Name", context="Treasury"),
 					"fieldtype": "Dynamic Link",
 					"options": "reference_doctype",
 					"width": 170,
 				},
 				{"fieldname": "description", "label": _("Cheque No"), "fieldtype": "Data", "width": 110},
 				{"fieldname": "party", "label": _("Party Name"), "fieldtype": "Data", "width": 170},
-				{"fieldname": "bank_account", "label": _("Bank Account"), "fieldtype": "Data", "width": 170},
+				{
+					"fieldname": "bank_account",
+					"label": _("Bank Account", context="Treasury"),
+					"fieldtype": "Data",
+					"width": 170,
+				},
 			]
 		columns.append(
 			{

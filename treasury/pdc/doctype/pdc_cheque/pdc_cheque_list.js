@@ -22,7 +22,7 @@ frappe.listview_settings["PDC Cheque"] = {
 		) {
 			// "|" separates filters; a "not in" value is a comma-separated list
 			return [
-				__("Overdue"),
+				__("Overdue", null, "Treasury"),
 				"red",
 				`effective_due_date,<,${today}|operational_status,not in,${settled.join(",")}`,
 			];

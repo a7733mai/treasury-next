@@ -59,12 +59,12 @@ frappe.ui.form.on("Letter of Credit", {
 		});
 		const rate = {
 			fieldname: "exchange_rate",
-			label: __("Exchange Rate"),
+			label: __("Exchange Rate", null, "Treasury"),
 			fieldtype: "Float",
 			precision: 9,
 			description: __("Foreign currency only. Default: the exchange rate of the date."),
 		};
-		const remarks = { fieldname: "remarks", label: __("Remarks"), fieldtype: "Small Text" };
+		const remarks = { fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" };
 
 		if (["Opened", "Amended"].includes(status)) {
 			lc_action(frm, "amend", __("Amend", null, "Letter of Credit"), [
@@ -106,7 +106,7 @@ frappe.ui.form.on("Letter of Credit", {
 		) {
 			lc_action(frm, "settle", __("Settle", null, "Letter of Credit"), [
 				today("settlement_date", __("Settlement Date")),
-				money("amount", __("Amount"), { reqd: 1, default: frm.doc.documents_amount }),
+				money("amount", __("Amount", null, "Treasury"), { reqd: 1, default: frm.doc.documents_amount }),
 				rate,
 				{
 					fieldname: "purchase_invoice",
@@ -127,7 +127,7 @@ frappe.ui.form.on("Letter of Credit", {
 		}
 		if (status === "Expired" && flt(frm.doc.margin_held) > 0) {
 			lc_action(frm, "release_margin", __("Release Margin"), [
-				today("release_date", __("Release Date")),
+				today("release_date", __("Release Date", null, "Treasury")),
 				rate,
 				remarks,
 			]);

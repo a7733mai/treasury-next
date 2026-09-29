@@ -59,12 +59,18 @@ def get_columns() -> list[dict]:
 	return [
 		*cheque_columns(),
 		column("cheque_count", _("Cheques"), "Int", 70),
-		column("expiry_date", _("Expiry Date"), "Date", 100),
+		column("expiry_date", _("Expiry Date", context="Treasury"), "Date", 100),
 		column("days_expired", _("Days Since Expiry"), "Int", 100),
-		column("status", _("Status"), width=100),
+		column("status", _("Status", context="Treasury"), width=100),
 		column("custody_location", _("Custody Location"), "Link", 140, options="Custody Location"),
-		column("custodian", _("Custodian"), "Link", 140, options="User"),
+		column("custodian", _("Custodian", context="Treasury"), "Link", 140, options="User"),
 		column("reference_doctype", _("Reference Type"), "Link", 120, options="DocType"),
-		column("reference_name", _("Reference Name"), "Dynamic Link", 150, options="reference_doctype"),
+		column(
+			"reference_name",
+			_("Reference Name", context="Treasury"),
+			"Dynamic Link",
+			150,
+			options="reference_doctype",
+		),
 		company_currency_column(),
 	]
