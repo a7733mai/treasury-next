@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased (1.1)
+
+### Bank Transfers (Phase 7b)
+- New module **Bank Transfers**: the submittable **Bank Transfer** (Party Payment / Party Receipt /
+  Internal Transfer; Normal, Fawran, SWIFT), posted as one Payment Entry with the bank fee as a deduction
+  row; Scheduled transfers are sent by a daily job on their execution date.
+- Treasury Company Settings: *Bank Transfers* section (default method, banks per method, charge bearer,
+  completion, fee refund on return, limit action, approval threshold), **Transfer Fee Rules** and **Transfer
+  Limits**. Patch `set_bank_transfer_defaults` fills the new settings of existing companies.
+- Posting service: charges on Pay / Receive Payment Entries, Internal Transfers between two currencies
+  (no exchange difference in the entry), reversals keeping the charges, a public clearance date setter.
+- PDC Bank Clearing matches statement lines with Sent transfers too.
+- Reports: Bank Transfer Register, Transfer Fees Analysis; Bank Position Forecast flows and summary card.
+- Bank Transfer is an accounting dimension doctype.
+
 ## 1.0.1 — 2026-09-29
 
 Fixes found during UAT on a live ERPNext 16 site.

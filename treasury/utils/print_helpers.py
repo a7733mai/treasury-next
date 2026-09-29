@@ -28,16 +28,18 @@ def treasury_batch_receipt(doc) -> dict:
 
 
 def treasury_payment_entries(doc) -> list[dict]:
-	"""The submitted Payment Entries of the current cycle of a PDC Cheque, for its receipt: the numbers the
-	paper is filed under. [{name, posting_date, event_label}]; [] for any other document, and for a cheque the
-	user cannot read (any Jinja template may call this helper)."""
+	"""The submitted Payment Entries of a PDC Cheque (its current cycle) or a Bank Transfer, for its print: the
+	numbers the paper is filed under. [{name, posting_date, event_label}]; [] for any other document, and for
+	a document the user cannot read (any Jinja template may call this helper)."""
 	from treasury.utils.voucher_summary import payment_entries
 
-	if getattr(doc, "doctype", None) != "PDC Cheque" or not getattr(doc, "name", None):
+	doctype = getattr(doc, "doctype", None)
+	if doctype not in ("PDC Cheque", "Bank Transfer") or not getattr(doc, "name", None):
 		return []
-	if not frappe.has_permission("PDC Cheque", "read", doc=doc.name):
+	if not frappe.has_permission(doctype, "read", doc=doc.name):
 		return []
+	cycle = (doc.get("cycle") or 1) if doctype == "PDC Cheque" else None
 	return [
 		{"name": pe["name"], "posting_date": pe["posting_date"], "event_label": pe["event_label"]}
-		for pe in payment_entries("PDC Cheque", [doc.name], cycle=doc.get("cycle") or 1)
+		for pe in payment_entries(doctype, [doc.name], cycle=cycle)
 	]

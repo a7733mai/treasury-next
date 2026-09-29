@@ -51,6 +51,7 @@ EVENT_LABELS = {
 	"lc_amendment_charges": "Amendment Charges",
 	"lc_document_charges": "Document Charges",
 	"lc_settlement": "Settlement",
+	"bt_transfer": "Transfer",
 }
 
 # docstatus -> (label, indicator colour): Treasury always submits, so a draft is an interrupted posting.

@@ -1,12 +1,18 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
-"""PDC Bank Clearing: match unreconciled Bank Transactions with PDC Cheques, clear them and reconcile.
+"""PDC Bank Clearing: match unreconciled Bank Transactions with PDC Cheques and Bank Transfers, clear them
+and reconcile.
 
 A UI tool (never saved): "Get Suggestions" fills `matches`, "Clear Selected" clears every selected cheque
 through the lifecycle on the bank transaction date and reconciles the Bank Transaction against the bank
 Journal Entry with ERPNext's own Bank Transaction methods (as `reconcile_vouchers` of the Bank
 Reconciliation Tool does). Each row runs in its own savepoint: a failing row is rolled back and reported.
+
+Bank Transfers (Sent): the statement line of the transfer's own bank (its amount with the fee) completes the
+transfer and is reconciled against its Payment Entry, which is cleared on the statement date; the deposit on
+the target bank of an Internal Transfer is reconciled against the same Payment Entry and logged ("Target
+Confirmed"), the transfer's status and clearance date stay as they are.
 """
 
 import re
@@ -16,11 +22,32 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, cint, flt, formatdate, getdate, strip_html
 
+from treasury.accounting import posting
+from treasury.bank_transfers import lifecycle as transfer_lifecycle
 from treasury.pdc import lifecycle
 from treasury.utils.context import elevated
 
 CHEQUE = "PDC Cheque"
+TRANSFER = "Bank Transfer"
 BANK_TRANSACTION = "Bank Transaction"
+SOURCE_SIDE = "source"
+TARGET_SIDE = "target"
+TRANSFER_FIELDS = [
+	"name",
+	"company",
+	"transfer_type",
+	"status",
+	"bank_account",
+	"to_bank_account",
+	"currency",
+	"to_currency",
+	"bank_amount",
+	"received_amount",
+	"execution_date",
+	"bank_reference",
+	"party_name",
+	"payment_entry",
+]
 ROLES = ("Treasury Manager", "Treasury User", "System Manager")
 SAVEPOINT = "treasury_pdc_bank_clearing"
 STRONG = "Strong"
@@ -56,47 +83,63 @@ class PDCBankClearing(Document):
 
 	@frappe.whitelist()
 	def get_suggestions(self):
-		"""Fill `matches`: strong (cheque no in the reference / description and same amount) first, then weak
-		(same amount, transaction date within `date_tolerance` days of the effective due date). Every bank
-		transaction and every cheque is suggested at most once."""
+		"""Fill `matches`: strong (cheque no / transfer reference in the reference / description and same
+		amount) first, then weak (same amount, transaction date within `date_tolerance` days of the effective
+		due date / execution date). Every bank transaction, cheque and transfer is suggested at most once."""
 		self.check_access("read")
 		self.validate_filters()
 		# Bank Transactions are read without the user's (usual lack of) permission on them, but only those of
-		# a bank account the user may read (validate_filters); the cheques are the ones the user may read.
+		# a bank account the user may read (validate_filters); the cheques and transfers are the ones the user
+		# may read.
 		transactions = self.get_open_transactions()
-		cheques = self.get_open_cheques()
+		documents = [(CHEQUE, c) for c in self.get_open_cheques()]
+		documents += [(TRANSFER, t) for t in self.get_open_transfers()]
+		tolerance = cint(self.date_tolerance)
 
 		candidates = []
 		for bt in transactions:
-			for cheque in cheques:
-				quality = match_quality(bt, cheque, cint(self.date_tolerance))
+			for doctype, doc in documents:
+				if doctype == CHEQUE:
+					quality = match_quality(bt, doc, tolerance)
+				else:
+					quality = transfer_match_quality(bt, doc, tolerance)
 				if quality:
-					candidates.append((0 if quality == STRONG else 1, bt, cheque, quality))
-		candidates.sort(key=lambda c: (c[0], getdate(c[1].date), c[1].name, c[2].name))
+					candidates.append((0 if quality == STRONG else 1, bt, doctype, doc, quality))
+		candidates.sort(key=lambda c: (c[0], getdate(c[1].date), c[1].name, c[2], c[3].name))
 
 		self.set("matches", [])
-		used_transactions, used_cheques = set(), set()
-		for _rank, bt, cheque, quality in candidates:
-			if bt.name in used_transactions or cheque.name in used_cheques:
+		used_transactions, used_documents = set(), set()
+		for _rank, bt, doctype, doc, quality in candidates:
+			if bt.name in used_transactions or (doctype, doc.name) in used_documents:
 				continue
 			used_transactions.add(bt.name)
-			used_cheques.add(cheque.name)
-			self.append(
-				"matches",
-				{
-					"selected": 1 if quality == STRONG else 0,
-					"match_quality": quality,
-					"bank_transaction": bt.name,
-					"transaction_date": bt.date,
-					"amount": flt(bt.unallocated_amount),
-					"currency": bt.currency,
-					"cheque": cheque.name,
-					"cheque_no": cheque.cheque_no,
-					"direction": cheque.direction,
-					"party": cheque.party_name or cheque.party,
-					"due_date": cheque.effective_due_date,
-				},
-			)
+			used_documents.add((doctype, doc.name))
+			row = {
+				"selected": 1 if quality == STRONG else 0,
+				"match_quality": quality,
+				"bank_transaction": bt.name,
+				"transaction_date": bt.date,
+				"amount": flt(bt.unallocated_amount),
+				"currency": bt.currency,
+				"reference_doctype": doctype,
+			}
+			if doctype == CHEQUE:
+				row.update(
+					cheque=doc.name,
+					cheque_no=doc.cheque_no,
+					direction=doc.direction,
+					party=doc.party_name or doc.party,
+					due_date=doc.effective_due_date,
+				)
+			else:
+				row.update(
+					bank_transfer=doc.name,
+					cheque_no=doc.bank_reference,
+					direction=doc.direction,
+					party=doc.counterparty,
+					due_date=doc.execution_date,
+				)
+			self.append("matches", row)
 		return len(self.matches)
 
 	def validate_filters(self):
@@ -186,13 +229,47 @@ class PDCBankClearing(Document):
 		)
 		return cheques
 
+	def get_open_transfers(self) -> list[frappe._dict]:
+		"""Sent transfers of the bank account (their source side), and the Sent / Completed Internal Transfers
+		to it whose target side is not confirmed yet, that the user may read. Each gets the `side`, the
+		statement `direction` / `expected_amount` / `expected_currency` and the `counterparty`."""
+		if not frappe.has_permission(TRANSFER, "read"):
+			return []
+		base = {"company": self.company, "docstatus": 1}
+		transfers = []
+		for row in frappe.get_list(
+			TRANSFER,
+			filters={**base, "status": transfer_lifecycle.SENT, "bank_account": self.bank_account},
+			fields=TRANSFER_FIELDS,
+			limit_page_length=0,
+		):
+			transfers.append(transfer_side(row, SOURCE_SIDE))
+		targets = frappe.get_list(
+			TRANSFER,
+			filters={
+				**base,
+				"transfer_type": transfer_lifecycle.INTERNAL,
+				"status": ["in", (transfer_lifecycle.SENT, transfer_lifecycle.COMPLETED)],
+				"to_bank_account": self.bank_account,
+			},
+			fields=TRANSFER_FIELDS,
+			limit_page_length=0,
+		)
+		confirmed = transfer_lifecycle.target_confirmed([row.name for row in targets])
+		transfers += [transfer_side(row, TARGET_SIDE) for row in targets if row.name not in confirmed]
+		return transfers
+
 	# ------------------------------------------------------------------ clearing
 
 	@frappe.whitelist(methods=["POST"])
 	def clear_selected(self) -> dict:
-		"""Clear the selected rows. Returns {"cleared": [cheques], "skipped": [{"cheque", "reason"}]}."""
+		"""Clear the selected rows. Returns {"cleared": [cheques and transfers], "skipped": [{"cheque",
+		"bank_transfer", "document", "reason"}]}. The write permission on Bank Transfer is checked per
+		transfer row (a row the user may not change is skipped)."""
 		self.check_access("write")
-		frappe.has_permission(CHEQUE, "write", throw=True)
+		selected = [row for row in self.matches if cint(row.selected)]
+		if any(not is_transfer_row(row) for row in selected):
+			frappe.has_permission(CHEQUE, "write", throw=True)
 		if not set(ROLES) & set(frappe.get_roles()):
 			frappe.throw(
 				_("This action requires one of the roles: {0}.").format(", ".join(_(r) for r in ROLES)),
@@ -202,17 +279,23 @@ class PDCBankClearing(Document):
 		self.validate_filters()
 
 		result = {"cleared": [], "skipped": []}
-		for row in self.matches:
-			if not cint(row.selected):
-				continue
+		for row in selected:
+			document = row.bank_transfer if is_transfer_row(row) else row.cheque
 			reason = self.clear_row(row)
 			if reason:
 				row.result = reason
-				result["skipped"].append({"cheque": row.cheque, "reason": reason})
+				result["skipped"].append(
+					{
+						"cheque": row.cheque,
+						"bank_transfer": row.get("bank_transfer"),
+						"document": document,
+						"reason": reason,
+					}
+				)
 			else:
 				row.result = _("Cleared and reconciled")
 				row.selected = 0
-				result["cleared"].append(row.cheque)
+				result["cleared"].append(document)
 
 		frappe.clear_messages()
 		frappe.msgprint(
@@ -232,14 +315,21 @@ class PDCBankClearing(Document):
 		"""Clear and reconcile one match in its own savepoint. Returns the reason it was skipped, if so."""
 		frappe.db.savepoint(SAVEPOINT)
 		try:
-			self.validate_row(row)
-			self.clear_cheque(row)
-			self.reconcile(row)
+			if is_transfer_row(row):
+				self.clear_transfer(row)
+			else:
+				self.validate_row(row)
+				self.clear_cheque(row)
+				self.reconcile(row)
 		except Exception as e:
 			frappe.db.rollback(save_point=SAVEPOINT)
-			# expected: business rules and the user's permission on the cheque; anything else is logged
+			# expected: business rules and the user's permission on the document; anything else is logged
 			if not isinstance(e, frappe.ValidationError | frappe.PermissionError):
-				frappe.log_error(title=_("PDC Bank Clearing failed for cheque {0}").format(row.cheque))
+				if is_transfer_row(row):
+					title = _("PDC Bank Clearing failed for Bank Transfer {0}").format(row.bank_transfer)
+				else:
+					title = _("PDC Bank Clearing failed for cheque {0}").format(row.cheque)
+				frappe.log_error(title=title)
 			return strip_html(str(e)) or _("Could not be cleared.")
 		frappe.db.release_savepoint(SAVEPOINT)
 		return None
@@ -329,33 +419,132 @@ class PDCBankClearing(Document):
 			CHEQUE, row.cheque, ["bank_payment_entry", "bank_journal"], as_dict=True
 		)
 		if vouchers and vouchers.bank_payment_entry:
-			voucher = {"payment_doctype": "Payment Entry", "payment_name": vouchers.bank_payment_entry}
+			voucher = ("Payment Entry", vouchers.bank_payment_entry)
 		elif vouchers and vouchers.bank_journal:
-			voucher = {"payment_doctype": "Journal Entry", "payment_name": vouchers.bank_journal}
+			voucher = ("Journal Entry", vouchers.bank_journal)
 		else:
 			frappe.throw(_("Cheque {0} has no bank voucher to reconcile.").format(row.cheque))
-		# the user's right to clear the cheque was checked by the lifecycle just before; Treasury users need
-		# not hold Bank Transaction / voucher permissions (like the vouchers of treasury.accounting.posting)
-		with elevated():
-			transaction = frappe.get_doc(BANK_TRANSACTION, row.bank_transaction)
-			transaction.add_payment_entries([voucher])
-			transaction.validate_duplicate_references()
-			transaction.allocate_payment_entries()
-			transaction.update_allocated_amount()
-			transaction.set_status()
-			transaction.flags.ignore_permissions = True
-			transaction.save()
+		reconcile_voucher(row.bank_transaction, *voucher)
+
+	# ------------------------------------------------------------------ bank transfers
+
+	def clear_transfer(self, row):
+		"""Source side: complete the transfer on the statement date, reconcile the statement line against its
+		Payment Entry and clear the Payment Entry on that date (ERPNext does not clear a voucher with a second
+		bank row, e.g. an Internal Transfer). Target side: reconcile and log; the clearance date stays."""
+		if not frappe.has_permission(TRANSFER, "write"):
+			frappe.throw(_("You are not permitted to change Bank Transfers."), frappe.PermissionError)
+		transfer, bt = self.validate_transfer_row(row)
+		date = getdate(bt.date)
+		if transfer.side == SOURCE_SIDE:
+			transfer_lifecycle.complete(transfer.name, completion_date=date, bank_transaction_date=date)
+			reconcile_voucher(row.bank_transaction, "Payment Entry", transfer.payment_entry)
+			posting.set_clearance_date("Payment Entry", transfer.payment_entry, date)
+			return
+		# the target side must not change the date the transfer was cleared on (set by its source side)
+		clearance_date = frappe.db.get_value("Payment Entry", transfer.payment_entry, "clearance_date")
+		reconcile_voucher(row.bank_transaction, "Payment Entry", transfer.payment_entry)
+		if frappe.db.get_value("Payment Entry", transfer.payment_entry, "clearance_date") != clearance_date:
+			posting.set_clearance_date("Payment Entry", transfer.payment_entry, clearance_date)
+		transfer_lifecycle.confirm_target(transfer.name, date)
+
+	def validate_transfer_row(self, row) -> tuple[frappe._dict, frappe._dict]:
+		"""The transfer (with its side on this bank account) and the Bank Transaction of a row, still open and
+		matching: bank, currency, direction and open amount, not dated before the execution date."""
+		transfer = row.bank_transfer and frappe.db.get_value(
+			TRANSFER, row.bank_transfer, TRANSFER_FIELDS, as_dict=True
+		)
+		bt_fields = ["docstatus", "bank_account", "currency", "unallocated_amount", "deposit", "withdrawal"]
+		bt = row.bank_transaction and frappe.db.get_value(
+			BANK_TRANSACTION, row.bank_transaction, [*bt_fields, "date"], as_dict=True
+		)
+		if not transfer or not bt:
+			frappe.throw(_("The bank transfer or the bank transaction no longer exists."))
+		side = None
+		if transfer.company == self.company and transfer.bank_account == self.bank_account:
+			side = SOURCE_SIDE
+		elif (
+			transfer.company == self.company
+			and transfer.transfer_type == transfer_lifecycle.INTERNAL
+			and transfer.to_bank_account == self.bank_account
+		):
+			side = TARGET_SIDE
+		if not side:
+			frappe.throw(
+				_("Bank Transfer {0} does not belong to Bank Account {1}.").format(
+					row.bank_transfer, self.bank_account
+				)
+			)
+		transfer = transfer_side(transfer, side)
+		if side == SOURCE_SIDE:
+			is_open = transfer.status == transfer_lifecycle.SENT
+		else:
+			is_open = transfer.status in (
+				transfer_lifecycle.SENT,
+				transfer_lifecycle.COMPLETED,
+			) and not transfer_lifecycle.target_confirmed([transfer.name])
+		if not is_open or not transfer.payment_entry:
+			frappe.throw(
+				_("Bank Transfer {0} is already completed or no longer open.").format(row.bank_transfer)
+			)
+		if bt.docstatus != 1 or bt.bank_account != self.bank_account or flt(bt.unallocated_amount) <= 0:
+			frappe.throw(
+				_("Bank Transaction {0} is not an open transaction of this bank account.").format(
+					row.bank_transaction
+				)
+			)
+		if bt.currency and bt.currency != transfer.expected_currency:
+			frappe.throw(
+				_("Bank Transaction {0} is in {1} but Bank Transfer {2} is in {3}.").format(
+					row.bank_transaction, bt.currency, row.bank_transfer, transfer.expected_currency
+				)
+			)
+		precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount")
+		side = "withdrawal" if transfer.direction == lifecycle.OUTGOING else "deposit"
+		if flt(bt.get(side), precision) <= 0 or flt(bt.unallocated_amount, precision) != flt(
+			transfer.expected_amount, precision
+		):
+			frappe.throw(
+				_("The open amount of Bank Transaction {0} does not match Bank Transfer {1}.").format(
+					row.bank_transaction, row.bank_transfer
+				)
+			)
+		if getdate(bt.date) < getdate(transfer.execution_date):
+			frappe.throw(
+				_("Bank Transaction {0} is dated before the execution date of Bank Transfer {1}.").format(
+					row.bank_transaction, row.bank_transfer
+				)
+			)
+		row.transaction_date = bt.date
+		return transfer, bt
 
 	@staticmethod
 	def summary_message(result: dict) -> str:
-		lines = [_("{0} cheque(s) cleared and reconciled.").format(len(result["cleared"]))]
+		lines = [_("{0} document(s) cleared and reconciled.").format(len(result["cleared"]))]
 		if result["skipped"]:
 			lines.append(_("{0} row(s) skipped:").format(len(result["skipped"])))
 			lines += [
-				f"{frappe.utils.escape_html(d['cheque'] or '')}: {frappe.utils.escape_html(d['reason'])}"
+				f"{frappe.utils.escape_html(d.get('document') or d.get('cheque') or '')}: "
+				f"{frappe.utils.escape_html(d['reason'])}"
 				for d in result["skipped"]
 			]
 		return "<br>".join(lines)
+
+
+def reconcile_voucher(bank_transaction: str, voucher_doctype: str, voucher_name: str):
+	"""Reconcile a Bank Transaction against a voucher with ERPNext's BankTransaction methods, in the order
+	`bank_reconciliation_tool.reconcile_vouchers` calls them. The user's right to clear the Treasury document
+	was checked by its lifecycle just before; Treasury users need not hold Bank Transaction / voucher
+	permissions (like the vouchers of treasury.accounting.posting)."""
+	with elevated():
+		transaction = frappe.get_doc(BANK_TRANSACTION, bank_transaction)
+		transaction.add_payment_entries([{"payment_doctype": voucher_doctype, "payment_name": voucher_name}])
+		transaction.validate_duplicate_references()
+		transaction.allocate_payment_entries()
+		transaction.update_allocated_amount()
+		transaction.set_status()
+		transaction.flags.ignore_permissions = True
+		transaction.save()
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +569,53 @@ def match_quality(bt, cheque, tolerance_days: int) -> str | None:
 		return STRONG
 	due = getdate(cheque.effective_due_date)
 	if add_days(due, -tolerance_days) <= getdate(bt.date) <= add_days(due, tolerance_days):
+		return WEAK
+	return None
+
+
+def is_transfer_row(row) -> bool:
+	return row.get("reference_doctype") == TRANSFER or bool(row.get("bank_transfer") and not row.cheque)
+
+
+def transfer_side(transfer, side: str) -> frappe._dict:
+	"""The statement line a transfer leaves on one of its banks: the source bank pays the amount with the fee
+	(a receipt: receives the amount less the fee), the target bank of an Internal Transfer receives the
+	received amount."""
+	transfer = frappe._dict(transfer)
+	transfer.side = side
+	if side == SOURCE_SIDE:
+		incoming = transfer.transfer_type == transfer_lifecycle.PARTY_RECEIPT
+		transfer.direction = lifecycle.INCOMING if incoming else lifecycle.OUTGOING
+		transfer.expected_amount = flt(transfer.bank_amount)
+		transfer.expected_currency = transfer.currency
+		transfer.counterparty = transfer.party_name or transfer.to_bank_account
+	else:
+		transfer.direction = lifecycle.INCOMING
+		transfer.expected_amount = flt(transfer.received_amount)
+		transfer.expected_currency = transfer.to_currency
+		transfer.counterparty = transfer.bank_account
+	return transfer
+
+
+def transfer_match_quality(bt, transfer, tolerance_days: int) -> str | None:
+	"""Strong: the statement amount on the right side and the transfer's bank reference (or name) in the
+	reference number / description. Weak: same amount, within `tolerance_days` of the execution date. Never a
+	transaction dated before the execution date."""
+	side = flt(bt.withdrawal) if transfer.direction == lifecycle.OUTGOING else flt(bt.deposit)
+	if side <= 0:
+		return None
+	if bt.currency and transfer.expected_currency and bt.currency != transfer.expected_currency:
+		return None
+	execution = getdate(transfer.execution_date)
+	if getdate(bt.date) < execution:
+		return None
+	precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount")
+	if flt(bt.unallocated_amount, precision) != flt(transfer.expected_amount, precision):
+		return None
+	for reference in (transfer.bank_reference, transfer.name):
+		if cheque_no_in(reference, bt.reference_number) or cheque_no_in(reference, bt.description):
+			return STRONG
+	if getdate(bt.date) <= add_days(execution, tolerance_days):
 		return WEAK
 	return None
 

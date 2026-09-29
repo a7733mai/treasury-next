@@ -85,7 +85,25 @@ class TestInstall(IntegrationTestCase):
 		listed = set(dimensions.dimension_custom_fields())
 		self.assertIn(("PDC Cheque", self.dimension_field), listed)
 		self.assertIn(("Cheque Batch", self.dimension_field), listed)
+		self.assertIn(("Bank Transfer", self.dimension_field), listed)
 		self.assertEqual({dt for dt, _f in listed}, set(dimensions.TREASURY_DIMENSION_DOCTYPES))
+
+	def test_bank_transfers_module(self):
+		"""Phase 7b: the module, its dimension hook and the Treasury Company Settings defaults patch."""
+		install.create_module_defs()
+		self.assertEqual(frappe.db.get_value("Module Def", "Bank Transfers", "app_name"), "treasury")
+		doctypes = frappe.get_hooks("accounting_dimension_doctypes")
+		self.assertIn("Bank Transfer", doctypes)
+		self.assertIn("Payment Entry", doctypes)
+		self.assertIn("Bank Transfer", dimensions.TREASURY_DIMENSION_DOCTYPES)
+		self.assertTrue(frappe.get_meta("Bank Transfer").has_field(self.dimension_field))
+		self.assertIn(
+			"treasury.bank_transfers.scheduler.post_scheduled_transfers",
+			frappe.get_hooks("scheduler_events").get("daily_long", []),
+		)
+		self.assertIn(
+			"treasury.bank_transfers.forecast.get_flows", frappe.get_hooks("treasury_forecast_sources")
+		)
 
 	def test_uninstall_keeps_series_modes_and_payees(self):
 		"""`before_uninstall` deletes only custom fields: the Payment Entry series (Property Setters), the Modes

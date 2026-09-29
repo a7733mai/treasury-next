@@ -2,3 +2,4 @@ Treasury Setup
 PDC
 Security Cheques
 Bank Facilities
+Bank Transfers

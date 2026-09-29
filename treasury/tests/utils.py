@@ -1038,10 +1038,10 @@ def ensure_branch_dimension() -> str:
 		)
 		frappe.db.commit()  # nosemgrep: persistent fixture (see docstring)
 	fieldname = frappe.db.get_value("Accounting Dimension", name, "fieldname")
-	if not frappe.get_meta("PDC Cheque").has_field(fieldname):
-		# a dimension created before the app's hook was loaded
-		from treasury.accounting.dimensions import create_dimension_fields
+	from treasury.accounting.dimensions import TREASURY_DIMENSION_DOCTYPES, create_dimension_fields
 
+	if not all(frappe.get_meta(doctype).has_field(fieldname) for doctype in TREASURY_DIMENSION_DOCTYPES):
+		# a dimension created before the app's hook was loaded (or before a Treasury doctype existed)
 		create_dimension_fields()
 		frappe.db.commit()  # nosemgrep: persistent fixture (see docstring)
 	return fieldname
@@ -1053,6 +1053,198 @@ def ensure_branch(name: str = BRANCH) -> str:
 
 def get_pe(name: str):
 	return frappe.get_doc("Payment Entry", name)
+
+
+# ---------------------------------------------------------------------------
+# Phase 7b: bank transfers
+# ---------------------------------------------------------------------------
+
+OTHER_BANK = "_Test Treasury Other Bank"
+BANK_SWIFT = "TTRBQAQA"
+OTHER_BANK_SWIFT = "OTHBQAQA"
+FEE_RULE_DOCTYPE = "Bank Transfer Fee Rule"
+LIMIT_DOCTYPE = "Bank Transfer Limit"
+TRANSFER_SETTINGS = {
+	"default_transfer_method": "Normal",
+	"default_charge_bearer": "SHA",
+	"transfer_completion": "On Bank Confirmation",
+	"refund_fees_on_return": 0,
+	"transfer_limit_action": "Warn",
+	"transfer_approval_threshold": 0,
+}
+
+
+def make_iban(bank_code: str, account: str | None = None, country: str = "QA") -> str:
+	"""A valid IBAN (mod-97 check digits, which the Bank Account IBAN field validates) with `bank_code` in
+	characters 5-8."""
+	bban = f"{bank_code}{account or frappe.generate_hash(length=21).upper()}".upper()
+
+	def encode(text: str) -> str:
+		return "".join(str(int(char, 36)) for char in text)
+
+	check = 98 - int(encode(f"{bban}{country}00")) % 97
+	return f"{country}{check:02d}{bban}"
+
+
+def ensure_other_bank(name: str = OTHER_BANK, swift: str = OTHER_BANK_SWIFT) -> str:
+	"""A second Bank with its SWIFT code; the test Bank gets the SWIFT code BANK_SWIFT."""
+	_ensure("Bank", BANK, {"bank_name": BANK})
+	if frappe.db.get_value("Bank", BANK, "swift_number") != BANK_SWIFT:
+		frappe.db.set_value("Bank", BANK, "swift_number", BANK_SWIFT)
+	_ensure("Bank", name, {"bank_name": name, "swift_number": swift})
+	return name
+
+
+def ensure_other_company_bank() -> frappe._dict:
+	"""An EGP company bank account of the test company at the Other Bank (own GL account)."""
+	ensure_other_bank()
+	bank_gl = ensure_account("Treasury Bank EGP Other", "Bank Accounts", "Bank")
+	name = f"Treasury EGP Other - {OTHER_BANK}"
+	if not frappe.db.exists("Bank Account", name):
+		frappe.get_doc(
+			{
+				"doctype": "Bank Account",
+				"account_name": "Treasury EGP Other",
+				"bank": OTHER_BANK,
+				"account": bank_gl,
+				"company": COMPANY,
+				"is_company_account": 1,
+			}
+		).insert(ignore_permissions=True)
+	return frappe._dict(currency="EGP", bank_gl=bank_gl, bank_account=name)
+
+
+def ensure_party_bank_account(
+	party_type: str, party: str, bank: str | None = None, iban: str | None = None, is_default: int = 1
+) -> str:
+	"""A bank account of a party (not a company account), at `bank` (default the Other Bank)."""
+	bank = bank or ensure_other_bank()
+	return (
+		frappe.get_doc(
+			{
+				"doctype": "Bank Account",
+				"account_name": f"Party {frappe.generate_hash(length=6)}",
+				"bank": bank,
+				"party_type": party_type,
+				"party": party,
+				"iban": iban,
+				"is_company_account": 0,
+				"is_default": is_default,
+			}
+		)
+		.insert(ignore_permissions=True)
+		.name
+	)
+
+
+def _child_rows(doctype: str, parentfield: str) -> list[dict]:
+	fields = [df.fieldname for df in frappe.get_meta(doctype).fields if df.fieldtype not in ("Column Break",)]
+	return frappe.get_all(
+		doctype,
+		filters={"parenttype": "Treasury Company Settings", "parent": COMPANY, "parentfield": parentfield},
+		fields=fields,
+		order_by="idx asc",
+	)
+
+
+def _write_child_rows(doctype: str, parentfield: str, rows: list[dict]):
+	frappe.db.delete(
+		doctype, {"parenttype": "Treasury Company Settings", "parent": COMPANY, "parentfield": parentfield}
+	)
+	for idx, row in enumerate(rows, 1):
+		frappe.get_doc(
+			{
+				"doctype": doctype,
+				"name": frappe.generate_hash(length=10),
+				"parenttype": "Treasury Company Settings",
+				"parentfield": parentfield,
+				"parent": COMPANY,
+				"idx": idx,
+				**row,
+			}
+		).db_insert()
+
+
+def set_fee_rules(testcase, rows: list[dict]):
+	"""Replace the Transfer Fee Rules of the test company for the current test (restored by a cleanup).
+	Written straight to the table (no settings validation): the validation has tests of its own."""
+	previous = [dict(row) for row in _child_rows(FEE_RULE_DOCTYPE, "transfer_fee_rules")]
+	_write_child_rows(FEE_RULE_DOCTYPE, "transfer_fee_rules", rows)
+	testcase.addCleanup(_write_child_rows, FEE_RULE_DOCTYPE, "transfer_fee_rules", previous)
+
+
+def set_transfer_limits(testcase, rows: list[dict]):
+	"""Replace the Transfer Limits of the test company for the current test (restored by a cleanup)."""
+	previous = [dict(row) for row in _child_rows(LIMIT_DOCTYPE, "transfer_limits")]
+	_write_child_rows(LIMIT_DOCTYPE, "transfer_limits", rows)
+	testcase.addCleanup(_write_child_rows, LIMIT_DOCTYPE, "transfer_limits", previous)
+
+
+def fee_rule(bank_account: str, method: str, direction: str = "Outgoing", scope: str = "Other Bank", **values):
+	return {
+		"bank_account": bank_account,
+		"method": method,
+		"direction": direction,
+		"scope": scope,
+		"amount_from": 0,
+		"amount_to": 0,
+		"fixed_fee": 0,
+		"fee_percent": 0,
+		"min_fee": 0,
+		"max_fee": 0,
+		"charge_bearer": None,
+		"correspondent_fee": 0,
+		"expense_account": acc("Treasury Bank Charges"),
+		**values,
+	}
+
+
+def standard_fee_rules() -> list[dict]:
+	"""The rules R1-R7 of spec 7b §7 (EGP bank B1, USD bank BU; expense Treasury Bank Charges)."""
+	b1, bu = bank_account_name("EGP"), bank_account_name("USD")
+	return [
+		fee_rule(b1, "Fawran", amount_from=0, amount_to=1000, fixed_fee=0.5),
+		fee_rule(b1, "Fawran", amount_from=1000.01, amount_to=50000, fixed_fee=2),
+		fee_rule(b1, "Normal", fixed_fee=10, fee_percent=0.1, min_fee=15, max_fee=50),
+		fee_rule(b1, "Normal", direction="Incoming", scope="Any", fixed_fee=5),
+		fee_rule(bu, "SWIFT", scope="International", charge_bearer="OUR", fixed_fee=25, correspondent_fee=15),
+		fee_rule(bu, "SWIFT", scope="International", charge_bearer="SHA", fixed_fee=25),
+		fee_rule(bu, "Normal", fixed_fee=5),
+	]
+
+
+def make_bank_transfer(submit: bool = True, **values):
+	"""A Bank Transfer (a Normal payment of 1,000 from the EGP bank to SUPPLIER today, to an IBAN at the
+	Other Bank, unless `values` say otherwise); submitted unless `submit` is False."""
+	ensure_other_bank()
+	transfer_type = values.get("transfer_type", "Party Payment")
+	base = {
+		"doctype": "Bank Transfer",
+		"company": COMPANY,
+		"transfer_type": transfer_type,
+		"method": "Normal",
+		"bank_account": bank_account_name("EGP"),
+		"amount": 1000,
+		"request_date": getdate(today()),
+		"execution_date": getdate(today()),
+	}
+	if transfer_type != "Internal Transfer":
+		base.update(
+			party_type="Supplier" if transfer_type == "Party Payment" else "Customer",
+			party=SUPPLIER if transfer_type == "Party Payment" else CUSTOMER,
+		)
+		if transfer_type == "Party Payment":
+			base["beneficiary_iban"] = make_iban("OTHB")
+	doc = frappe.get_doc({**base, **values})
+	doc.insert()
+	if submit:
+		doc.submit()
+		doc.reload()
+	return doc
+
+
+def get_transfer(name: str):
+	return frappe.get_doc("Bank Transfer", name)
 
 
 def assert_deductions(testcase, pe, expected: list[tuple]):

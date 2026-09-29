@@ -7127,3 +7127,1009 @@ msgstr "تبقى السلسلة الافتراضية الحالية ({0}) في �
 
 msgid "Added {0} series to Payment Entry."
 msgstr "تمت إضافة {0} سلسلة إلى سند الدفع."
+
+# ---------------------------------------------------------------------------
+# Phase 7b — Bank Transfers (Normal / Fawran / SWIFT / Internal) with fee rules
+# ---------------------------------------------------------------------------
+
+# Module, DocTypes, reports, workspace
+msgid "Bank Transfers"
+msgstr "التحويلات البنكية"
+
+msgid "Bank Transfer"
+msgstr "تحويل بنكي"
+
+msgid "Bank Transfer Status Log"
+msgstr "سجل حالات التحويل البنكي"
+
+msgid "Bank Transfer Fee Rule"
+msgstr "قاعدة رسوم التحويل البنكي"
+
+msgid "Bank Transfer Limit"
+msgstr "حد التحويل البنكي"
+
+msgid "Bank Transfer Register"
+msgstr "سجل التحويلات البنكية"
+
+msgid "Transfer Fees Analysis"
+msgstr "تحليل رسوم التحويلات"
+
+msgid "Bank Transfer Reports"
+msgstr "تقارير التحويلات البنكية"
+
+# Bank Transfer fields
+msgctxt "Bank Transfer"
+msgid "Transfer"
+msgstr "التحويل"
+
+msgctxt "Bank Transfer"
+msgid "Series"
+msgstr "السلسلة"
+
+msgctxt "Bank Transfer"
+msgid "Transfer Type"
+msgstr "نوع التحويل"
+
+msgctxt "Bank Transfer"
+msgid "Method"
+msgstr "الطريقة"
+
+msgctxt "Bank Transfer"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Bank Transfer"
+msgid "Request Date"
+msgstr "تاريخ الطلب"
+
+msgctxt "Bank Transfer"
+msgid "Execution Date"
+msgstr "تاريخ التنفيذ"
+
+msgctxt "Bank Transfer"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Bank Transfer"
+msgid "Accounting Status"
+msgstr "الحالة المحاسبية"
+
+msgctxt "Bank Transfer"
+msgid "Title"
+msgstr "العنوان"
+
+msgctxt "Bank Transfer"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "Bank Transfer"
+msgid "Party Type"
+msgstr "نوع الطرف"
+
+msgctxt "Bank Transfer"
+msgid "Party Name"
+msgstr "اسم الطرف"
+
+msgctxt "Bank Transfer"
+msgid "Beneficiary Bank Account"
+msgstr "الحساب البنكي للمستفيد"
+
+msgctxt "Bank Transfer"
+msgid "IBAN"
+msgstr "رقم الآيبان (IBAN)"
+
+msgctxt "Bank Transfer"
+msgid "Beneficiary Bank"
+msgstr "بنك المستفيد"
+
+msgctxt "Bank Transfer"
+msgid "SWIFT / BIC"
+msgstr "رمز السويفت / BIC"
+
+msgctxt "Bank Transfer"
+msgid "Contact Person"
+msgstr "جهة الاتصال"
+
+msgctxt "Bank Transfer"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Bank Transfer"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Bank Transfer"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Bank Transfer"
+msgid "To Bank Account"
+msgstr "إلى الحساب البنكي"
+
+msgctxt "Bank Transfer"
+msgid "To Bank"
+msgstr "إلى البنك"
+
+msgctxt "Bank Transfer"
+msgid "To Currency"
+msgstr "إلى العملة"
+
+msgctxt "Bank Transfer"
+msgid "Scope"
+msgstr "النطاق"
+
+msgctxt "Bank Transfer"
+msgid "Bank Reference"
+msgstr "مرجع البنك"
+
+msgctxt "Bank Transfer"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Bank Transfer"
+msgid "Exchange Rate (to Company Currency)"
+msgstr "سعر الصرف (إلى عملة الشركة)"
+
+msgctxt "Bank Transfer"
+msgid "Amount (Company Currency)"
+msgstr "المبلغ (بعملة الشركة)"
+
+msgctxt "Bank Transfer"
+msgid "Received Amount"
+msgstr "المبلغ المستلم"
+
+msgctxt "Bank Transfer"
+msgid "Charge Bearer"
+msgstr "متحمل الرسوم"
+
+msgctxt "Bank Transfer"
+msgid "Bank Debit / Credit"
+msgstr "المبلغ المدين / الدائن في البنك"
+
+msgctxt "Bank Transfer"
+msgid "Fees"
+msgstr "الرسوم"
+
+msgctxt "Bank Transfer"
+msgid "Fee"
+msgstr "الرسم"
+
+msgctxt "Bank Transfer"
+msgid "Computed Fee"
+msgstr "الرسم المحسوب"
+
+msgctxt "Bank Transfer"
+msgid "Correspondent Fee"
+msgstr "رسم البنك المراسل"
+
+msgctxt "Bank Transfer"
+msgid "Fee Rule"
+msgstr "قاعدة الرسوم"
+
+msgctxt "Bank Transfer"
+msgid "Fee Basis"
+msgstr "أساس حساب الرسم"
+
+msgctxt "Bank Transfer"
+msgid "Override Fee"
+msgstr "تعديل الرسم يدوياً"
+
+msgctxt "Bank Transfer"
+msgid "Fee Amount"
+msgstr "مبلغ الرسم"
+
+msgctxt "Bank Transfer"
+msgid "Fee Account"
+msgstr "حساب الرسوم"
+
+msgctxt "Bank Transfer"
+msgid "Fee Override Reason"
+msgstr "سبب تعديل الرسم"
+
+msgctxt "Bank Transfer"
+msgid "Fee Booked (Company Currency)"
+msgstr "الرسم المسجل (بعملة الشركة)"
+
+msgctxt "Bank Transfer"
+msgid "Fees Refunded"
+msgstr "تم استرداد الرسوم"
+
+msgctxt "Bank Transfer"
+msgid "References"
+msgstr "المراجع"
+
+msgctxt "Bank Transfer"
+msgid "Accounting Details"
+msgstr "البيانات المحاسبية"
+
+msgctxt "Bank Transfer"
+msgid "Cost Center"
+msgstr "مركز التكلفة"
+
+msgctxt "Bank Transfer"
+msgid "Project"
+msgstr "المشروع"
+
+msgctxt "Bank Transfer"
+msgid "Mode of Payment"
+msgstr "طريقة الدفع"
+
+msgctxt "Bank Transfer"
+msgid "Accounting Dimensions"
+msgstr "الأبعاد المحاسبية"
+
+msgctxt "Bank Transfer"
+msgid "Payment Entries and Vouchers"
+msgstr "سندات الدفع والقيود"
+
+msgctxt "Bank Transfer"
+msgid "Payment Entry"
+msgstr "سند الدفع"
+
+msgctxt "Bank Transfer"
+msgid "Reversal Payment Entry"
+msgstr "سند دفع العكس"
+
+msgctxt "Bank Transfer"
+msgid "Reversal Journal Entry"
+msgstr "قيد يومية العكس"
+
+msgctxt "Bank Transfer"
+msgid "Completion Date"
+msgstr "تاريخ الإتمام"
+
+msgctxt "Bank Transfer"
+msgid "Bank Transaction Date"
+msgstr "تاريخ الحركة البنكية"
+
+msgctxt "Bank Transfer"
+msgid "Return Date"
+msgstr "تاريخ الارتجاع"
+
+msgctxt "Bank Transfer"
+msgid "Return Reason"
+msgstr "سبب الارتجاع"
+
+msgctxt "Bank Transfer"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "Bank Transfer"
+msgid "More Info"
+msgstr "معلومات إضافية"
+
+msgctxt "Bank Transfer"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Bank Transfer"
+msgid "Amended From"
+msgstr "معدَّل من"
+
+msgctxt "Bank Transfer"
+msgid "Fees (Company Currency)"
+msgstr "الرسوم (بعملة الشركة)"
+
+msgctxt "Bank Transfer"
+msgid "Average Fee"
+msgstr "متوسط الرسم"
+
+msgctxt "Bank Transfer"
+msgid "Fee %"
+msgstr "نسبة الرسم %"
+
+# Bank Transfer options, statuses and log events (stored in English, translated on display)
+msgctxt "Bank Transfer"
+msgid "Party Payment"
+msgstr "دفع لطرف"
+
+msgctxt "Bank Transfer"
+msgid "Party Receipt"
+msgstr "تحصيل من طرف"
+
+msgctxt "Bank Transfer"
+msgid "Internal Transfer"
+msgstr "تحويل داخلي"
+
+msgctxt "Bank Transfer"
+msgid "Normal"
+msgstr "عادي"
+
+msgctxt "Bank Transfer"
+msgid "Fawran"
+msgstr "فوران"
+
+msgctxt "Bank Transfer"
+msgid "SWIFT"
+msgstr "سويفت"
+
+msgctxt "Bank Transfer"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Bank Transfer"
+msgid "Scheduled"
+msgstr "مجدول"
+
+msgctxt "Bank Transfer"
+msgid "Sent"
+msgstr "مُرسل"
+
+msgctxt "Bank Transfer"
+msgid "Completed"
+msgstr "مكتمل"
+
+msgctxt "Bank Transfer"
+msgid "Returned"
+msgstr "مرتجع"
+
+msgctxt "Bank Transfer"
+msgid "Cancelled"
+msgstr "ملغي"
+
+msgctxt "Bank Transfer"
+msgid "Not Posted"
+msgstr "غير مرحّل"
+
+msgctxt "Bank Transfer"
+msgid "Posted"
+msgstr "مرحّل"
+
+msgctxt "Bank Transfer"
+msgid "Reversed"
+msgstr "معكوس"
+
+msgctxt "Bank Transfer"
+msgid "Same Bank"
+msgstr "نفس البنك"
+
+msgctxt "Bank Transfer"
+msgid "Other Bank"
+msgstr "بنك آخر"
+
+msgctxt "Bank Transfer"
+msgid "International"
+msgstr "دولي"
+
+msgctxt "Bank Transfer"
+msgid "OUR"
+msgstr "OUR - على المُحوِّل"
+
+msgctxt "Bank Transfer"
+msgid "SHA"
+msgstr "SHA - مشتركة"
+
+msgctxt "Bank Transfer"
+msgid "BEN"
+msgstr "BEN - على المستفيد"
+
+msgctxt "Bank Transfer"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Bank Transfer"
+msgid "Fee Overridden"
+msgstr "تم تعديل الرسم"
+
+msgctxt "Bank Transfer"
+msgid "Rescheduled"
+msgstr "أعيدت جدولته"
+
+msgctxt "Bank Transfer"
+msgid "Target Confirmed"
+msgstr "تم تأكيد وصوله للحساب المستهدف"
+
+# Bank Transfer field descriptions
+msgid "A bank transfer order (Normal, Fawran or SWIFT): a payment to a party, a receipt from a party or an internal transfer between two company bank accounts, with its bank fee. Posted as one Payment Entry on the execution date."
+msgstr "أمر تحويل بنكي (عادي أو فوران أو سويفت): دفع لطرف أو تحصيل من طرف أو تحويل داخلي بين حسابين بنكيين للشركة، مع رسم البنك. يُرحّل كسند دفع واحد بتاريخ التنفيذ."
+
+msgid "A new transfer takes the company's Default Transfer Method (Treasury Company Settings)."
+msgstr "يأخذ التحويل الجديد طريقة التحويل الافتراضية للشركة (إعدادات الخزينة للشركة)."
+
+msgid "Date the transfer order is prepared."
+msgstr "تاريخ إعداد أمر التحويل."
+
+msgid "Value date: the bank executes the transfer; posting date of the Payment Entry. A future date schedules the transfer."
+msgstr "تاريخ الحق: ينفّذ البنك التحويل فيه، وهو تاريخ ترحيل سند الدفع. التاريخ المستقبلي يجعل التحويل مجدولاً."
+
+msgid "Bank / Fawran / SWIFT reference of the executed transfer."
+msgstr "مرجع البنك / فوران / سويفت للتحويل المنفَّذ."
+
+msgid "Party Payment: amount credited to the beneficiary. Party Receipt: amount the party paid (before our bank's incoming fee). Internal Transfer: amount leaving the source account, excluding the fee."
+msgstr "الدفع لطرف: المبلغ الذي يصل إلى المستفيد. التحصيل من طرف: المبلغ الذي دفعه الطرف (قبل رسم بنكنا على الوارد). التحويل الداخلي: المبلغ الخارج من الحساب المصدر دون الرسم."
+
+msgid "Amount credited to the target account."
+msgstr "المبلغ المضاف إلى الحساب المستهدف."
+
+msgid "Party Payment / Internal Transfer: amount plus fee. Party Receipt: amount less fee."
+msgstr "الدفع لطرف / التحويل الداخلي: المبلغ مضافاً إليه الرسم. التحصيل من طرف: المبلغ مخصوماً منه الرسم."
+
+msgid "Fee of the matching Transfer Fee Rule, correspondent fee included."
+msgstr "رسم قاعدة رسوم التحويل المطابقة، شاملاً رسم البنك المراسل."
+
+msgid "The fee booked on the Payment Entry, in the company currency."
+msgstr "الرسم المسجل في سند الدفع بعملة الشركة."
+
+msgid "Date the bank confirmed the transfer."
+msgstr "تاريخ تأكيد البنك للتحويل."
+
+msgid "Bank statement date."
+msgstr "تاريخ كشف الحساب البنكي."
+
+msgid "Status history of a Bank Transfer (append-only, written by the transfer actions)."
+msgstr "سجل حالات التحويل البنكي (إضافة فقط، يُكتب من إجراءات التحويل)."
+
+msgid "The date of the event itself (e.g. the execution, completion or return date)."
+msgstr "تاريخ الحدث نفسه (مثل تاريخ التنفيذ أو الإتمام أو الارتجاع)."
+
+# Bank Transfer Status Log fields
+msgctxt "Bank Transfer Status Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "Bank Transfer Status Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Bank Transfer Status Log"
+msgid "From Status"
+msgstr "من الحالة"
+
+msgctxt "Bank Transfer Status Log"
+msgid "To Status"
+msgstr "إلى الحالة"
+
+msgctxt "Bank Transfer Status Log"
+msgid "From Accounting Status"
+msgstr "من الحالة المحاسبية"
+
+msgctxt "Bank Transfer Status Log"
+msgid "To Accounting Status"
+msgstr "إلى الحالة المحاسبية"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Voucher Type"
+msgstr "نوع السند"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Voucher No"
+msgstr "رقم السند"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+# Bank Transfer Fee Rule fields and options
+msgctxt "Bank Transfer Fee Rule"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Method"
+msgstr "الطريقة"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Direction"
+msgstr "الاتجاه"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Scope"
+msgstr "النطاق"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Amount From"
+msgstr "المبلغ من"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Amount To"
+msgstr "المبلغ إلى"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Fixed Fee"
+msgstr "رسم ثابت"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Fee (%)"
+msgstr "نسبة الرسم (%)"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Min Fee"
+msgstr "الحد الأدنى للرسم"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Max Fee"
+msgstr "الحد الأقصى للرسم"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Charge Bearer"
+msgstr "متحمل الرسوم"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Correspondent Fee"
+msgstr "رسم البنك المراسل"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Expense Account"
+msgstr "حساب المصروف"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Normal"
+msgstr "عادي"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Fawran"
+msgstr "فوران"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "SWIFT"
+msgstr "سويفت"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Outgoing"
+msgstr "صادر"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Incoming"
+msgstr "وارد"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Any"
+msgstr "أي نطاق"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Same Bank"
+msgstr "نفس البنك"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "Other Bank"
+msgstr "بنك آخر"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "International"
+msgstr "دولي"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "OUR"
+msgstr "OUR - على المُحوِّل"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "SHA"
+msgstr "SHA - مشتركة"
+
+msgctxt "Bank Transfer Fee Rule"
+msgid "BEN"
+msgstr "BEN - على المستفيد"
+
+msgid "A fee the bank charges on a transfer of one bank account, method, direction, scope and amount range (Treasury Company Settings)."
+msgstr "رسم يتقاضاه البنك على تحويل لحساب بنكي وطريقة واتجاه ونطاق وشريحة مبالغ محددة (إعدادات الخزينة للشركة)."
+
+msgid "Incoming: fee our bank deducts from a received transfer."
+msgstr "وارد: رسم يخصمه بنكنا من تحويل وارد."
+
+msgid "In the bank account currency."
+msgstr "بعملة الحساب البنكي."
+
+msgid "0 = no upper limit."
+msgstr "0 = بدون حد أعلى."
+
+msgid "0 = no maximum."
+msgstr "0 = بدون حد أقصى."
+
+msgid "Empty: any."
+msgstr "فارغ: أي قيمة."
+
+msgid "Added when the charge bearer is OUR."
+msgstr "يُضاف عندما يكون متحمل الرسوم OUR."
+
+# Bank Transfer Limit fields
+msgctxt "Bank Transfer Limit"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Bank Transfer Limit"
+msgid "Method"
+msgstr "الطريقة"
+
+msgctxt "Bank Transfer Limit"
+msgid "Per Transaction Limit"
+msgstr "الحد لكل عملية"
+
+msgctxt "Bank Transfer Limit"
+msgid "Daily Limit"
+msgstr "الحد اليومي"
+
+msgctxt "Bank Transfer Limit"
+msgid "Normal"
+msgstr "عادي"
+
+msgctxt "Bank Transfer Limit"
+msgid "Fawran"
+msgstr "فوران"
+
+msgctxt "Bank Transfer Limit"
+msgid "SWIFT"
+msgstr "سويفت"
+
+msgid "Per-transaction and daily transfer limits of a bank account and method (Treasury Company Settings)."
+msgstr "حدود التحويل لكل عملية ويومياً لحساب بنكي وطريقة محددة (إعدادات الخزينة للشركة)."
+
+msgid "0 = none."
+msgstr "0 = بدون حد."
+
+# Treasury Company Settings (Bank Transfers)
+msgctxt "Treasury Company Settings"
+msgid "Bank Transfers"
+msgstr "التحويلات البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Transfer Method"
+msgstr "طريقة التحويل الافتراضية"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Charge Bearer"
+msgstr "متحمل الرسوم الافتراضي"
+
+msgctxt "Treasury Company Settings"
+msgid "Transfer Completion"
+msgstr "إتمام التحويل"
+
+msgctxt "Treasury Company Settings"
+msgid "Refund Fees on Return"
+msgstr "استرداد الرسوم عند الارتجاع"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Bank (Normal)"
+msgstr "البنك الافتراضي (عادي)"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Bank (Fawran)"
+msgstr "البنك الافتراضي (فوران)"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Bank (SWIFT)"
+msgstr "البنك الافتراضي (سويفت)"
+
+msgctxt "Treasury Company Settings"
+msgid "Transfer Limit Action"
+msgstr "الإجراء عند تجاوز حد التحويل"
+
+msgctxt "Treasury Company Settings"
+msgid "Transfer Approval Threshold"
+msgstr "حد اعتماد التحويلات"
+
+msgctxt "Treasury Company Settings"
+msgid "Transfer Fees"
+msgstr "رسوم التحويل"
+
+msgctxt "Treasury Company Settings"
+msgid "Transfer Fee Rules"
+msgstr "قواعد رسوم التحويل"
+
+msgctxt "Treasury Company Settings"
+msgid "Transfer Limits"
+msgstr "حدود التحويل"
+
+msgctxt "Treasury Company Settings"
+msgid "Normal"
+msgstr "عادي"
+
+msgctxt "Treasury Company Settings"
+msgid "Fawran"
+msgstr "فوران"
+
+msgctxt "Treasury Company Settings"
+msgid "SWIFT"
+msgstr "سويفت"
+
+msgctxt "Treasury Company Settings"
+msgid "OUR"
+msgstr "OUR - على المُحوِّل"
+
+msgctxt "Treasury Company Settings"
+msgid "SHA"
+msgstr "SHA - مشتركة"
+
+msgctxt "Treasury Company Settings"
+msgid "BEN"
+msgstr "BEN - على المستفيد"
+
+msgctxt "Treasury Company Settings"
+msgid "On Bank Confirmation"
+msgstr "عند تأكيد البنك"
+
+msgctxt "Treasury Company Settings"
+msgid "On Send for Fawran"
+msgstr "عند الإرسال لتحويلات فوران"
+
+msgctxt "Treasury Company Settings"
+msgid "On Send"
+msgstr "عند الإرسال"
+
+msgctxt "Treasury Company Settings"
+msgid "Warn"
+msgstr "تحذير"
+
+msgctxt "Treasury Company Settings"
+msgid "Block"
+msgstr "منع"
+
+msgid "When a sent transfer becomes Completed (its Payment Entry cleared)."
+msgstr "متى يصبح التحويل المرسل مكتملاً (ويُسجَّل صرف سند الدفع الخاص به)."
+
+msgid "Returned transfers: the bank refunds the transfer fee."
+msgstr "التحويلات المرتجعة: يرد البنك رسم التحويل."
+
+msgid "Company currency. Transfers above this amount can only be submitted by a Treasury Manager. 0 = no rule."
+msgstr "بعملة الشركة. التحويلات التي تزيد على هذا المبلغ لا يعتمدها إلا مدير الخزينة. 0 = بدون قاعدة."
+
+# PDC Clearing Match (transfer rows)
+msgctxt "PDC Clearing Match"
+msgid "Document Type"
+msgstr "نوع المستند"
+
+msgctxt "PDC Clearing Match"
+msgid "Bank Transfer"
+msgstr "التحويل البنكي"
+
+msgctxt "PDC Clearing Match"
+msgid "PDC Cheque"
+msgstr "شيك آجل"
+
+msgid "The bank reference of a Bank Transfer."
+msgstr "مرجع البنك للتحويل البنكي."
+
+# Voucher summary
+msgctxt "Treasury Voucher"
+msgid "Transfer"
+msgstr "التحويل"
+
+# Messages (posting service)
+msgid "Charges cannot be negative."
+msgstr "لا يمكن أن تكون المصاريف سالبة."
+
+msgid "An account for the charges is required."
+msgstr "يلزم تحديد حساب للمصاريف."
+
+msgid "Charges must be less than the amount."
+msgstr "يجب أن تكون المصاريف أقل من المبلغ."
+
+msgid "The Payment Entry {0} is not balanced (difference {1})."
+msgstr "سند الدفع {0} غير متوازن (الفرق {1})."
+
+msgid "Received Amount is required for a transfer between {0} and {1}."
+msgstr "المبلغ المستلم مطلوب للتحويل بين {0} و{1}."
+
+msgid "Only Payment Entry and Journal Entry can be cleared here."
+msgstr "يمكن هنا تسجيل صرف سندات الدفع وقيود اليومية فقط."
+
+msgid "The bank account {0} is not credited by the voucher to reverse."
+msgstr "الحساب البنكي {0} غير دائن في السند المراد عكسه."
+
+# Messages (Treasury Company Settings: Bank Transfers)
+msgid "{0} {1} must be a company bank account of {2}."
+msgstr "يجب أن يكون {0} {1} حساباً بنكياً للشركة {2}."
+
+msgid "The GL account of {0} {1} must have Account Type 'Bank'."
+msgstr "يجب أن يكون نوع الحساب في دفتر الأستاذ لـ {0} {1} هو 'بنك'."
+
+msgid "Row #{0}: Amount To must be 0 or not less than Amount From."
+msgstr "الصف #{0}: يجب أن يكون \"المبلغ إلى\" صفراً أو لا يقل عن \"المبلغ من\"."
+
+msgid "Row #{0}: {1} must be between 0 and 100."
+msgstr "الصف #{0}: يجب أن يكون {1} بين 0 و100."
+
+msgid "Row #{0}: Max Fee must be 0 or not less than Min Fee."
+msgstr "الصف #{0}: يجب أن يكون الحد الأقصى للرسم صفراً أو لا يقل عن الحد الأدنى."
+
+msgid "Row #{0}: Charge Bearer and Correspondent Fee apply to SWIFT only."
+msgstr "الصف #{0}: متحمل الرسوم ورسم البنك المراسل خاصان بتحويلات سويفت فقط."
+
+msgid "Row #{0}: Scope International is only for SWIFT."
+msgstr "الصف #{0}: النطاق الدولي خاص بتحويلات سويفت فقط."
+
+msgid "Rows #{0} and #{1} overlap for Bank Account {2}, {3}."
+msgstr "الصفان #{0} و#{1} متداخلان للحساب البنكي {2}، {3}."
+
+msgid "Row #{0}: Bank Account {1} already has a limit for {2}."
+msgstr "الصف #{0}: للحساب البنكي {1} حد بالفعل للطريقة {2}."
+
+# Messages (fees and limits)
+msgid "Charges borne by the beneficiary (BEN)."
+msgstr "الرسوم على المستفيد (BEN)."
+
+msgid "No fee rule matched."
+msgstr "لا توجد قاعدة رسوم مطابقة."
+
+msgid "Rule #{0}: {1} fixed + {2}% (min {3}, max {4}) + correspondent {5}"
+msgstr "القاعدة #{0}: {1} ثابت + {2}% (حد أدنى {3}، حد أقصى {4}) + رسم مراسل {5}"
+
+msgid "Amount {0} exceeds the per-transaction {1} limit {2} of Bank Account {3}."
+msgstr "المبلغ {0} يتجاوز حد العملية الواحدة لطريقة {1} البالغ {2} للحساب البنكي {3}."
+
+msgid "Transfers of {0} on {1} would reach {2}, above the daily {3} limit {4} of Bank Account {5}."
+msgstr "تحويلات بقيمة {0} في {1} ستصل إلى {2}، متجاوزة الحد اليومي لطريقة {3} البالغ {4} للحساب البنكي {5}."
+
+msgid "Row #{0}"
+msgstr "الصف #{0}"
+
+# Messages (Bank Transfer controller and lifecycle)
+msgid "Transfer Limit Exceeded"
+msgstr "تم تجاوز حد التحويل"
+
+msgid "Beneficiary SWIFT / BIC is required for a SWIFT transfer."
+msgstr "رمز سويفت / BIC للمستفيد مطلوب لتحويل سويفت."
+
+msgid "Beneficiary IBAN or Bank Account is required."
+msgstr "رقم آيبان المستفيد أو حسابه البنكي مطلوب."
+
+msgid "Bank Reference cannot be changed while the transfer is {0}."
+msgstr "لا يمكن تغيير مرجع البنك والتحويل في حالة {0}."
+
+msgid "The target Bank Account is required for an Internal Transfer."
+msgstr "الحساب البنكي المستهدف مطلوب للتحويل الداخلي."
+
+msgid "The source and target Bank Accounts must be different."
+msgstr "يجب أن يختلف الحساب البنكي المصدر عن الحساب البنكي المستهدف."
+
+msgid "The fee cannot be negative."
+msgstr "لا يمكن أن يكون الرسم سالباً."
+
+msgid "A reason is required to override the fee."
+msgstr "يلزم ذكر سبب لتعديل الرسم."
+
+msgid "Set the Expense Account of the fee (Transfer Fee Rule or Fee Account)."
+msgstr "حدد حساب مصروف الرسم (قاعدة رسوم التحويل أو حساب الرسوم)."
+
+msgid "The fee must be less than the amount."
+msgstr "يجب أن يكون الرسم أقل من المبلغ."
+
+msgid "The total allocated amount cannot be greater than the transfer amount."
+msgstr "لا يمكن أن يزيد إجمالي المبلغ المخصص على مبلغ التحويل."
+
+msgid "Bank Transfer {0} ({1})"
+msgstr "تحويل بنكي {0} ({1})"
+
+msgid "Transfers above {0} must be submitted by a Treasury Manager."
+msgstr "التحويلات التي تزيد على {0} يجب أن يعتمدها مدير الخزينة."
+
+msgid "Bank Transfer {0} is completed and cannot be cancelled. Return it instead."
+msgstr "التحويل البنكي {0} مكتمل ولا يمكن إلغاؤه. سجّل ارتجاعه بدلاً من ذلك."
+
+msgid "Bank Transfer {0} is returned and cannot be cancelled."
+msgstr "التحويل البنكي {0} مرتجع ولا يمكن إلغاؤه."
+
+msgid "{0} {1} could not be cancelled (see the message above)."
+msgstr "تعذر إلغاء {0} {1} (انظر الرسالة أعلاه)."
+
+msgid "Use Reschedule for a future date."
+msgstr "استخدم إعادة الجدولة لتاريخ مستقبلي."
+
+msgid "The new execution date must be in the future; use Send Now to send it today."
+msgstr "يجب أن يكون تاريخ التنفيذ الجديد في المستقبل؛ استخدم \"إرسال الآن\" لإرساله اليوم."
+
+msgid "{0} {1} cannot be in the future (see Treasury Settings)."
+msgstr "لا يمكن أن يكون {0} {1} في المستقبل (انظر إعدادات الخزينة)."
+
+msgid "A received transfer cannot be returned here; record the refund as a new Party Payment."
+msgstr "لا يمكن تسجيل ارتجاع تحويل وارد هنا؛ سجّل الرد كتحويل دفع جديد للطرف."
+
+msgid "Return of Bank Transfer {0}: {1}"
+msgstr "ارتجاع التحويل البنكي {0}: {1}"
+
+msgid "Only an Internal Transfer has a target bank account to confirm."
+msgstr "التحويل الداخلي وحده له حساب بنكي مستهدف يمكن تأكيده."
+
+# Messages (Bank Transfer API, job, forecast)
+msgid "Bank Transfer cannot be created from {0}."
+msgstr "لا يمكن إنشاء تحويل بنكي من {0}."
+
+msgid "Payment of {0} {1}"
+msgstr "سداد {0} {1}"
+
+msgid "Receipt of {0} {1}"
+msgstr "تحصيل {0} {1}"
+
+msgid "{0} {1} has nothing outstanding."
+msgstr "لا يوجد مبلغ مستحق على {0} {1}."
+
+msgid "You are not permitted to prepare Bank Transfers."
+msgstr "ليس لديك صلاحية إعداد التحويلات البنكية."
+
+msgid "Unknown transfer type {0}."
+msgstr "نوع تحويل غير معروف {0}."
+
+msgid "Scheduled bank transfer failed: {0}"
+msgstr "فشل إرسال التحويل البنكي المجدول: {0}"
+
+msgid "Bank Transfer ({0})"
+msgstr "تحويل بنكي ({0})"
+
+msgid "Transfers Sent, Awaiting Bank Confirmation"
+msgstr "تحويلات مرسلة بانتظار تأكيد البنك"
+
+# Messages (PDC Bank Clearing: transfers)
+msgid "You are not permitted to change Bank Transfers."
+msgstr "ليس لديك صلاحية تعديل التحويلات البنكية."
+
+msgid "The bank transfer or the bank transaction no longer exists."
+msgstr "التحويل البنكي أو الحركة البنكية لم يعد موجوداً."
+
+msgid "Bank Transfer {0} does not belong to Bank Account {1}."
+msgstr "التحويل البنكي {0} لا يخص الحساب البنكي {1}."
+
+msgid "Bank Transfer {0} is already completed or no longer open."
+msgstr "التحويل البنكي {0} مكتمل بالفعل أو لم يعد مفتوحاً."
+
+msgid "Bank Transaction {0} is in {1} but Bank Transfer {2} is in {3}."
+msgstr "الحركة البنكية {0} بعملة {1} لكن التحويل البنكي {2} بعملة {3}."
+
+msgid "The open amount of Bank Transaction {0} does not match Bank Transfer {1}."
+msgstr "المبلغ المفتوح في الحركة البنكية {0} لا يطابق التحويل البنكي {1}."
+
+msgid "Bank Transaction {0} is dated before the execution date of Bank Transfer {1}."
+msgstr "تاريخ الحركة البنكية {0} يسبق تاريخ تنفيذ التحويل البنكي {1}."
+
+msgid "{0} document(s) cleared and reconciled."
+msgstr "تم صرف ومطابقة {0} مستند."
+
+msgid "PDC Bank Clearing failed for Bank Transfer {0}"
+msgstr "فشلت المطابقة البنكية للتحويل البنكي {0}"
+
+# Reports
+msgid "Transfers"
+msgstr "التحويلات"
+
+msgid "Sent and Completed (Company Currency)"
+msgstr "المرسلة والمكتملة (بعملة الشركة)"
+
+msgid "Fees Booked (Company Currency)"
+msgstr "الرسوم المسجلة (بعملة الشركة)"
+
+msgctxt "Treasury Report"
+msgid "Group"
+msgstr "المجموعة"
+
+msgctxt "Treasury Report"
+msgid "Month"
+msgstr "الشهر"
+
+msgctxt "Treasury Report"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Treasury Report"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Treasury Report"
+msgid "Method"
+msgstr "الطريقة"
+
+# Bank Transfer form (bank_transfer.js)
+msgctxt "Bank Transfer"
+msgid "Send Now"
+msgstr "إرسال الآن"
+
+msgctxt "Bank Transfer"
+msgid "Reschedule"
+msgstr "إعادة الجدولة"
+
+msgctxt "Bank Transfer"
+msgid "Mark Completed"
+msgstr "تأكيد الإتمام"
+
+msgctxt "Bank Transfer"
+msgid "Mark Returned"
+msgstr "تسجيل الارتجاع"
+
+msgctxt "Bank Transfer"
+msgid "Actions"
+msgstr "الإجراءات"

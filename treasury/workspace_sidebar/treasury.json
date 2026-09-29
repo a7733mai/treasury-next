@@ -45,6 +45,51 @@
   {
    "child": 0,
    "collapsible": 1,
+   "icon": "arrow-left-right",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Bank Transfer",
+   "link_to": "Bank Transfer",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 1,
+   "keep_closed": 0,
+   "label": "Bank Transfer Reports",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Bank Transfer Register",
+   "link_to": "Bank Transfer Register",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Transfer Fees Analysis",
+   "link_to": "Transfer Fees Analysis",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
    "icon": "table",
    "indent": 1,
    "keep_closed": 0,
@@ -164,7 +209,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-29 18:00:00.000000",
+ "modified": "2026-09-30 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",

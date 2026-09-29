@@ -6,13 +6,21 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.naming import NamingSeries
-from frappe.utils import cint
+from frappe.utils import cint, flt
 
 from treasury.accounting import payment_modes
 from treasury.utils.context import elevated
 
 # Roles allowed to generate Modes of Payment from the settings.
 GENERATE_ROLES = ("Treasury Manager", "System Manager")
+# Bank Transfers: the default company bank account of each transfer method.
+TRANSFER_DEFAULT_BANK_FIELDS = {
+	"Normal": "default_normal_bank_account",
+	"Fawran": "default_fawran_bank_account",
+	"SWIFT": "default_swift_bank_account",
+}
+SWIFT = "SWIFT"
+INTERNATIONAL = "International"
 
 # PDC accounts must be of type "Bank" so that Payment Entry accepts them as the bank side,
 # and must sit on the correct side of the balance sheet.
@@ -32,6 +40,10 @@ class TreasuryCompanySettings(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		from treasury.treasury_setup.doctype.bank_transfer_fee_rule.bank_transfer_fee_rule import (
+			BankTransferFeeRule,
+		)
+		from treasury.treasury_setup.doctype.bank_transfer_limit.bank_transfer_limit import BankTransferLimit
 		from treasury.treasury_setup.doctype.pdc_account_mapping.pdc_account_mapping import PDCAccountMapping
 		from treasury.treasury_setup.doctype.treasury_payment_mode_map.treasury_payment_mode_map import (
 			TreasuryPaymentModeMap,
@@ -41,6 +53,11 @@ class TreasuryCompanySettings(Document):
 		bank_settlement_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bounce_charges_account: DF.Link | None
 		company: DF.Link
+		default_charge_bearer: DF.Literal["OUR", "SHA", "BEN"]
+		default_fawran_bank_account: DF.Link | None
+		default_normal_bank_account: DF.Link | None
+		default_swift_bank_account: DF.Link | None
+		default_transfer_method: DF.Literal["Normal", "Fawran", "SWIFT"]
 		incoming_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
 		incoming_party_posting: DF.Literal["On Receipt", "On Cheque Date", "Manual"]
 		incoming_under_collection: DF.Literal["On Deposit", "Disabled"]
@@ -50,6 +67,12 @@ class TreasuryCompanySettings(Document):
 		outgoing_party_posting: DF.Literal["On Handover", "On Cheque Date", "On Creation", "Manual"]
 		payment_modes: DF.Table[TreasuryPaymentModeMap]
 		pdc_accounts: DF.Table[PDCAccountMapping]
+		refund_fees_on_return: DF.Check
+		transfer_approval_threshold: DF.Currency
+		transfer_completion: DF.Literal["On Bank Confirmation", "On Send for Fawran", "On Send"]
+		transfer_fee_rules: DF.Table[BankTransferFeeRule]
+		transfer_limit_action: DF.Literal["Warn", "Block"]
+		transfer_limits: DF.Table[BankTransferLimit]
 		vouchers_help: DF.HTML | None
 	# end: auto-generated types
 
@@ -85,6 +108,91 @@ class TreasuryCompanySettings(Document):
 		).strip() or payment_modes.DEFAULT_NAME_TEMPLATE
 		payment_modes.validate_name_template(self.mode_name_template)
 		self.validate_payment_modes()
+		self.validate_transfer_settings()
+
+	# ------------------------------------------------------------------ bank transfers
+
+	def validate_transfer_settings(self):
+		"""Default banks per method, fee rules (ranges, percentages, SWIFT-only fields, overlaps) and limits."""
+		for fieldname in TRANSFER_DEFAULT_BANK_FIELDS.values():
+			if self.get(fieldname):
+				label = _(self.meta.get_label(fieldname))
+				self.validate_bank_account(frappe._dict(idx=0, bank_account=self.get(fieldname)), label)
+		for row in self.get("transfer_fee_rules"):
+			self.validate_fee_rule(row)
+		self.validate_fee_rule_overlaps()
+		self.validate_transfer_limits()
+
+	def validate_fee_rule(self, row):
+		self.validate_bank_account(row)
+		self.validate_expense_account(row.expense_account, _(row.meta.get_label("expense_account")), row.idx)
+		for fieldname in ("amount_from", "amount_to", "fixed_fee", "min_fee", "max_fee", "correspondent_fee"):
+			if flt(row.get(fieldname)) < 0:
+				frappe.throw(
+					_("Row #{0}: {1} cannot be negative.").format(row.idx, _(row.meta.get_label(fieldname)))
+				)
+		if flt(row.amount_to) and flt(row.amount_to) < flt(row.amount_from):
+			frappe.throw(_("Row #{0}: Amount To must be 0 or not less than Amount From.").format(row.idx))
+		if not 0 <= flt(row.fee_percent) <= 100:
+			frappe.throw(
+				_("Row #{0}: {1} must be between 0 and 100.").format(
+					row.idx, _(row.meta.get_label("fee_percent"))
+				)
+			)
+		if flt(row.max_fee) and flt(row.max_fee) < flt(row.min_fee):
+			frappe.throw(_("Row #{0}: Max Fee must be 0 or not less than Min Fee.").format(row.idx))
+		if row.method != SWIFT:
+			if flt(row.correspondent_fee):
+				frappe.throw(
+					_("Row #{0}: Charge Bearer and Correspondent Fee apply to SWIFT only.").format(row.idx)
+				)
+			if row.scope == INTERNATIONAL:
+				frappe.throw(_("Row #{0}: Scope International is only for SWIFT.").format(row.idx))
+			row.charge_bearer = None
+			row.correspondent_fee = 0
+
+	def validate_fee_rule_overlaps(self):
+		"""Two rules of the same bank, method, direction, scope and charge bearer may not share an amount."""
+		rows = list(self.get("transfer_fee_rules"))
+		for index, row in enumerate(rows):
+			for other in rows[index + 1 :]:
+				key = (row.bank_account, row.method, row.direction, row.scope, row.charge_bearer or "")
+				other_key = (
+					other.bank_account,
+					other.method,
+					other.direction,
+					other.scope,
+					other.charge_bearer or "",
+				)
+				if key == other_key and _ranges_overlap(row, other):
+					frappe.throw(
+						_("Rows #{0} and #{1} overlap for Bank Account {2}, {3}.").format(
+							row.idx,
+							other.idx,
+							frappe.bold(row.bank_account),
+							_(row.method, context=row.doctype),
+						)
+					)
+
+	def validate_transfer_limits(self):
+		seen = set()
+		for row in self.get("transfer_limits"):
+			key = (row.bank_account, row.method)
+			if key in seen:
+				frappe.throw(
+					_("Row #{0}: Bank Account {1} already has a limit for {2}.").format(
+						row.idx, frappe.bold(row.bank_account), _(row.method, context=row.doctype)
+					)
+				)
+			seen.add(key)
+			self.validate_bank_account(row)
+			for fieldname in ("per_transaction_limit", "daily_limit"):
+				if flt(row.get(fieldname)) < 0:
+					frappe.throw(
+						_("Row #{0}: {1} cannot be negative.").format(
+							row.idx, _(row.meta.get_label(fieldname))
+						)
+					)
 
 	def validate_payment_modes(self):
 		seen = set()
@@ -256,83 +364,112 @@ class TreasuryCompanySettings(Document):
 				)
 			)
 
-	def validate_bank_account(self, row) -> str:
+	def validate_bank_account(self, row, label: str | None = None) -> str:
+		"""A company bank account of the company with a GL account of type Bank. `row.idx` 0: a field of the
+		settings themselves (`label`), not a table row."""
 		bank_account = frappe.db.get_value(
 			"Bank Account",
 			row.bank_account,
 			["company", "is_company_account", "account"],
 			as_dict=True,
 		)
+		name, company = frappe.bold(row.bank_account), frappe.bold(self.company)
+		label = label or _("Bank Account", context="Treasury")
 		if not bank_account or not bank_account.is_company_account or bank_account.company != self.company:
-			frappe.throw(
-				_("Row #{0}: Bank Account {1} must be a company bank account of {2}.").format(
-					row.idx, frappe.bold(row.bank_account), frappe.bold(self.company)
+			if row.idx:
+				frappe.throw(
+					_("Row #{0}: Bank Account {1} must be a company bank account of {2}.").format(
+						row.idx, name, company
+					)
 				)
-			)
+			frappe.throw(_("{0} {1} must be a company bank account of {2}.").format(label, name, company))
 		if (
 			not bank_account.account
 			or frappe.get_cached_value("Account", bank_account.account, "account_type") != "Bank"
 		):
-			frappe.throw(
-				_("Row #{0}: The GL account of Bank Account {1} must have Account Type 'Bank'.").format(
-					row.idx, frappe.bold(row.bank_account)
+			if row.idx:
+				frappe.throw(
+					_("Row #{0}: The GL account of Bank Account {1} must have Account Type 'Bank'.").format(
+						row.idx, name
+					)
 				)
-			)
+			frappe.throw(_("The GL account of {0} {1} must have Account Type 'Bank'.").format(label, name))
 		return bank_account.account
 
 	def validate_expense_account(self, account: str, label: str, idx: int | None = None):
 		"""Charges accounts: Expense root type, in the company currency."""
-		details = self.validate_account_basics(account, label, idx)
-		if details.root_type != "Expense":
-			self.throw_for_row(
-				idx,
-				_("Row #{0}: {1} {2} must have Root Type '{3}'."),
-				_("{0} {1} must have Root Type '{2}'."),
-				label,
-				frappe.bold(account),
-				_("Expense"),
-			)
-		company_currency = erpnext.get_company_currency(self.company)
-		if details.account_currency != company_currency:
-			self.throw_for_row(
-				idx,
-				_("Row #{0}: {1} {2} must be in the company currency {3}."),
-				_("{0} {1} must be in the company currency {2}."),
-				label,
-				frappe.bold(account),
-				company_currency,
-			)
+		validate_expense_account(self.company, account, label, idx)
 
 	def validate_account_basics(self, account: str, label: str, idx: int | None = None) -> frappe._dict:
-		details = frappe.db.get_value(
-			"Account",
-			account,
-			["company", "is_group", "account_type", "root_type", "account_currency"],
-			as_dict=True,
-		)
-		if not details or details.company != self.company:
-			self.throw_for_row(
-				idx,
-				_("Row #{0}: {1} {2} does not belong to company {3}."),
-				_("{0} {1} does not belong to company {2}."),
-				label,
-				frappe.bold(account),
-				frappe.bold(self.company),
-			)
-		if details.is_group:
-			self.throw_for_row(
-				idx,
-				_("Row #{0}: {1} {2} cannot be a group account."),
-				_("{0} {1} cannot be a group account."),
-				label,
-				frappe.bold(account),
-			)
-		return details
+		return validate_account_basics(self.company, account, label, idx)
 
 	@staticmethod
 	def throw_for_row(idx: int | None, row_message: str, message: str, *args):
 		"""Throw the whole-sentence message that fits: with the row number (child table) or without."""
-		frappe.throw(row_message.format(idx, *args) if idx else message.format(*args))
+		throw_for_row(idx, row_message, message, *args)
+
+
+def validate_expense_account(company: str, account: str, label: str, idx: int | None = None):
+	"""Charges / fee accounts: a ledger account of `company`, Expense root type, in the company currency."""
+	details = validate_account_basics(company, account, label, idx)
+	if details.root_type != "Expense":
+		throw_for_row(
+			idx,
+			_("Row #{0}: {1} {2} must have Root Type '{3}'."),
+			_("{0} {1} must have Root Type '{2}'."),
+			label,
+			frappe.bold(account),
+			_("Expense"),
+		)
+	company_currency = erpnext.get_company_currency(company)
+	if details.account_currency != company_currency:
+		throw_for_row(
+			idx,
+			_("Row #{0}: {1} {2} must be in the company currency {3}."),
+			_("{0} {1} must be in the company currency {2}."),
+			label,
+			frappe.bold(account),
+			company_currency,
+		)
+
+
+def validate_account_basics(company: str, account: str, label: str, idx: int | None = None) -> frappe._dict:
+	details = frappe.db.get_value(
+		"Account",
+		account,
+		["company", "is_group", "account_type", "root_type", "account_currency"],
+		as_dict=True,
+	)
+	if not details or details.company != company:
+		throw_for_row(
+			idx,
+			_("Row #{0}: {1} {2} does not belong to company {3}."),
+			_("{0} {1} does not belong to company {2}."),
+			label,
+			frappe.bold(account),
+			frappe.bold(company),
+		)
+	if details.is_group:
+		throw_for_row(
+			idx,
+			_("Row #{0}: {1} {2} cannot be a group account."),
+			_("{0} {1} cannot be a group account."),
+			label,
+			frappe.bold(account),
+		)
+	return details
+
+
+def throw_for_row(idx: int | None, row_message: str, message: str, *args):
+	"""Throw the whole-sentence message that fits: with the row number (child table) or without."""
+	frappe.throw(row_message.format(idx, *args) if idx else message.format(*args))
+
+
+def _ranges_overlap(row, other) -> bool:
+	"""[amount_from, amount_to] ranges, amount_to 0 = no upper limit."""
+	first_end = flt(row.amount_to) or float("inf")
+	second_end = flt(other.amount_to) or float("inf")
+	return flt(row.amount_from) <= second_end and flt(other.amount_from) <= first_end
 
 
 def _parse_list(value) -> list[str] | None:

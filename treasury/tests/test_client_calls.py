@@ -89,6 +89,14 @@ class TestClientCalls(UnitTestCase):
 			TreasuryCompanySettings.add_series_to_payment_entry,
 			create_payee,
 		)
+		from treasury.bank_transfers.doctype.bank_transfer.bank_transfer import BankTransfer
+
+		methods += (
+			BankTransfer.send_now,
+			BankTransfer.reschedule,
+			BankTransfer.mark_completed,
+			BankTransfer.mark_returned,
+		)
 		previous = getattr(frappe.local, "request", None)
 		try:
 			for method in methods:
@@ -98,6 +106,24 @@ class TestClientCalls(UnitTestCase):
 					frappe.local.request = SimpleNamespace(method="GET")
 					self.assertRaises(frappe.PermissionError, is_valid_http_method, method)
 					frappe.local.request = SimpleNamespace(method="POST")
+					is_valid_http_method(method)
+		finally:
+			frappe.local.request = previous
+
+	def test_read_only_helpers_accept_get(self):
+		"""Phase 7b: the Bank Transfer form helpers only read (a GET is fine)."""
+		from types import SimpleNamespace
+
+		from frappe.handler import is_valid_http_method
+
+		from treasury.bank_transfers.api import get_fee_preview, make_bank_transfer
+
+		previous = getattr(frappe.local, "request", None)
+		try:
+			for method in (make_bank_transfer, get_fee_preview):
+				with self.subTest(method=method.__qualname__):
+					self.assertIn(method, frappe.whitelisted)
+					frappe.local.request = SimpleNamespace(method="GET")
 					is_valid_http_method(method)
 		finally:
 			frappe.local.request = previous

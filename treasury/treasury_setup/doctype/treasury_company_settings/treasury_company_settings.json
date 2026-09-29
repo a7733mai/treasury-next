@@ -28,6 +28,21 @@
   "payment_modes_section",
   "mode_name_template",
   "payment_modes",
+  "transfers_section",
+  "default_transfer_method",
+  "default_charge_bearer",
+  "transfer_completion",
+  "refund_fees_on_return",
+  "column_break_transfers",
+  "default_normal_bank_account",
+  "default_fawran_bank_account",
+  "default_swift_bank_account",
+  "transfer_limit_action",
+  "transfer_approval_threshold",
+  "transfer_fees_section",
+  "transfer_fee_rules",
+  "transfer_limits_section",
+  "transfer_limits",
   "facilities_section",
   "accrue_facility_interest"
  ],
@@ -178,6 +193,103 @@
    "options": "Treasury Payment Mode Map"
   },
   {
+   "fieldname": "transfers_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Transfers"
+  },
+  {
+   "default": "Normal",
+   "fieldname": "default_transfer_method",
+   "fieldtype": "Select",
+   "label": "Default Transfer Method",
+   "options": "Normal\nFawran\nSWIFT",
+   "reqd": 1
+  },
+  {
+   "default": "SHA",
+   "fieldname": "default_charge_bearer",
+   "fieldtype": "Select",
+   "label": "Default Charge Bearer",
+   "options": "OUR\nSHA\nBEN",
+   "reqd": 1
+  },
+  {
+   "default": "On Bank Confirmation",
+   "description": "When a sent transfer becomes Completed (its Payment Entry cleared).",
+   "fieldname": "transfer_completion",
+   "fieldtype": "Select",
+   "label": "Transfer Completion",
+   "options": "On Bank Confirmation\nOn Send for Fawran\nOn Send",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Returned transfers: the bank refunds the transfer fee.",
+   "fieldname": "refund_fees_on_return",
+   "fieldtype": "Check",
+   "label": "Refund Fees on Return"
+  },
+  {
+   "fieldname": "column_break_transfers",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_normal_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Bank (Normal)",
+   "options": "Bank Account"
+  },
+  {
+   "fieldname": "default_fawran_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Bank (Fawran)",
+   "options": "Bank Account"
+  },
+  {
+   "fieldname": "default_swift_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Bank (SWIFT)",
+   "options": "Bank Account"
+  },
+  {
+   "default": "Warn",
+   "fieldname": "transfer_limit_action",
+   "fieldtype": "Select",
+   "label": "Transfer Limit Action",
+   "options": "Warn\nBlock",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Company currency. Transfers above this amount can only be submitted by a Treasury Manager. 0 = no rule.",
+   "fieldname": "transfer_approval_threshold",
+   "fieldtype": "Currency",
+   "label": "Transfer Approval Threshold",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "transfer_fees_section",
+   "fieldtype": "Section Break",
+   "label": "Transfer Fees"
+  },
+  {
+   "fieldname": "transfer_fee_rules",
+   "fieldtype": "Table",
+   "label": "Transfer Fee Rules",
+   "options": "Bank Transfer Fee Rule"
+  },
+  {
+   "fieldname": "transfer_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Transfer Limits"
+  },
+  {
+   "fieldname": "transfer_limits",
+   "fieldtype": "Table",
+   "label": "Transfer Limits",
+   "options": "Bank Transfer Limit"
+  },
+  {
    "fieldname": "facilities_section",
    "fieldtype": "Section Break",
    "label": "Bank Facilities"
@@ -191,7 +303,7 @@
   }
  ],
  "links": [],
- "modified": "2026-09-29 18:00:00.000000",
+ "modified": "2026-09-30 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

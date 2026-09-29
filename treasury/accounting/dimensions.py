@@ -1,7 +1,8 @@
 """Accounting dimensions on the Treasury documents that carry them to their vouchers.
 
 ERPNext adds a Link field per Accounting Dimension to every doctype listed in the `accounting_dimension_doctypes`
-hook (merged across apps): Treasury lists PDC Cheque and Cheque Batch there (hooks.py), whose JSON has the
+hook (merged across apps): Treasury lists PDC Cheque, Cheque Batch and Bank Transfer there (hooks.py), whose
+JSON has the
 `accounting_dimensions_section` / `dimension_col_break` fields ERPNext inserts them after. Dimensions created
 after the app are added by ERPNext itself; the ones that existed before are added by `create_dimension_fields`
 (install). Their values are copied to every Payment Entry / Journal Entry built from the cheque.
@@ -14,7 +15,7 @@ from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_dimensions,
 )
 
-TREASURY_DIMENSION_DOCTYPES = ("PDC Cheque", "Cheque Batch")
+TREASURY_DIMENSION_DOCTYPES = ("PDC Cheque", "Cheque Batch", "Bank Transfer")
 
 
 def get_dimension_fieldnames() -> list[str]:

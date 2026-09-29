@@ -1,0 +1,704 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-30 12:00:00.000000",
+ "description": "A bank transfer order (Normal, Fawran or SWIFT): a payment to a party, a receipt from a party or an internal transfer between two company bank accounts, with its bank fee. Posted as one Payment Entry on the execution date.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "transfer_section",
+  "naming_series",
+  "transfer_type",
+  "method",
+  "company",
+  "column_break_transfer",
+  "request_date",
+  "execution_date",
+  "status",
+  "accounting_status",
+  "title",
+  "party_section",
+  "party_type",
+  "party",
+  "party_name",
+  "column_break_party",
+  "party_bank_account",
+  "beneficiary_iban",
+  "beneficiary_bank",
+  "beneficiary_swift",
+  "contact_person",
+  "bank_section",
+  "bank_account",
+  "bank",
+  "currency",
+  "column_break_bank",
+  "to_bank_account",
+  "to_bank",
+  "to_currency",
+  "scope",
+  "bank_reference",
+  "amount_section",
+  "amount",
+  "exchange_rate",
+  "base_amount",
+  "column_break_amount",
+  "received_amount",
+  "charge_bearer",
+  "bank_amount",
+  "fees_section",
+  "computed_fee",
+  "correspondent_fee",
+  "fee_rule",
+  "fee_basis",
+  "column_break_fees",
+  "override_fee",
+  "fee_amount",
+  "fee_account",
+  "fee_override_reason",
+  "base_fee_amount",
+  "fees_refunded",
+  "references_section",
+  "references",
+  "accounting_details_section",
+  "cost_center",
+  "project",
+  "column_break_accounting",
+  "mode_of_payment",
+  "accounting_dimensions_section",
+  "dimension_col_break",
+  "vouchers_section",
+  "payment_entry",
+  "reversal_payment_entry",
+  "reversal_journal",
+  "column_break_vouchers",
+  "completion_date",
+  "bank_transaction_date",
+  "return_date",
+  "return_reason",
+  "vouchers_html",
+  "status_log_section",
+  "status_log",
+  "more_info_section",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "transfer_section",
+   "fieldtype": "Section Break",
+   "label": "Transfer"
+  },
+  {
+   "default": "BT-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "BT-.YYYY.-.#####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Party Payment",
+   "fieldname": "transfer_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Transfer Type",
+   "options": "Party Payment\nParty Receipt\nInternal Transfer",
+   "reqd": 1
+  },
+  {
+   "default": "Normal",
+   "description": "A new transfer takes the company's Default Transfer Method (Treasury Company Settings).",
+   "fieldname": "method",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Method",
+   "options": "Normal\nFawran\nSWIFT",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_transfer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "description": "Date the transfer order is prepared.",
+   "fieldname": "request_date",
+   "fieldtype": "Date",
+   "label": "Request Date",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Today",
+   "description": "Value date: the bank executes the transfer; posting date of the Payment Entry. A future date schedules the transfer.",
+   "fieldname": "execution_date",
+   "fieldtype": "Date",
+   "in_standard_filter": 1,
+   "label": "Execution Date",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Draft\nScheduled\nSent\nCompleted\nReturned\nCancelled",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Not Posted",
+   "fieldname": "accounting_status",
+   "fieldtype": "Select",
+   "label": "Accounting Status",
+   "no_copy": 1,
+   "options": "Not Posted\nPosted\nReversed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Title",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.transfer_type!=='Internal Transfer'",
+   "fieldname": "party_section",
+   "fieldtype": "Section Break",
+   "label": "Party"
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "label": "Party Type",
+   "mandatory_depends_on": "eval:doc.transfer_type!=='Internal Transfer'",
+   "options": "Party Type"
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "in_standard_filter": 1,
+   "label": "Party",
+   "mandatory_depends_on": "eval:doc.transfer_type!=='Internal Transfer'",
+   "options": "party_type",
+   "search_index": 1
+  },
+  {
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "label": "Party Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_party",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "party_bank_account",
+   "fieldtype": "Link",
+   "label": "Beneficiary Bank Account",
+   "options": "Bank Account"
+  },
+  {
+   "fetch_from": "party_bank_account.iban",
+   "fetch_if_empty": 1,
+   "fieldname": "beneficiary_iban",
+   "fieldtype": "Data",
+   "label": "IBAN"
+  },
+  {
+   "fetch_from": "party_bank_account.bank",
+   "fetch_if_empty": 1,
+   "fieldname": "beneficiary_bank",
+   "fieldtype": "Link",
+   "label": "Beneficiary Bank",
+   "options": "Bank"
+  },
+  {
+   "depends_on": "eval:doc.method==='SWIFT'",
+   "fetch_from": "beneficiary_bank.swift_number",
+   "fetch_if_empty": 1,
+   "fieldname": "beneficiary_swift",
+   "fieldtype": "Data",
+   "label": "SWIFT / BIC"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Link",
+   "label": "Contact Person",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "bank_section",
+   "fieldtype": "Section Break",
+   "label": "Bank"
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "bank_account.bank",
+   "fieldname": "bank",
+   "fieldtype": "Link",
+   "label": "Bank",
+   "options": "Bank",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_bank",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.transfer_type==='Internal Transfer'",
+   "fieldname": "to_bank_account",
+   "fieldtype": "Link",
+   "label": "To Bank Account",
+   "mandatory_depends_on": "eval:doc.transfer_type==='Internal Transfer'",
+   "options": "Bank Account"
+  },
+  {
+   "depends_on": "eval:doc.transfer_type==='Internal Transfer'",
+   "fetch_from": "to_bank_account.bank",
+   "fieldname": "to_bank",
+   "fieldtype": "Link",
+   "label": "To Bank",
+   "options": "Bank",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.transfer_type==='Internal Transfer'",
+   "fieldname": "to_currency",
+   "fieldtype": "Link",
+   "label": "To Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "scope",
+   "fieldtype": "Select",
+   "label": "Scope",
+   "options": "Same Bank\nOther Bank\nInternational",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Bank / Fawran / SWIFT reference of the executed transfer.",
+   "fieldname": "bank_reference",
+   "fieldtype": "Data",
+   "label": "Bank Reference"
+  },
+  {
+   "fieldname": "amount_section",
+   "fieldtype": "Section Break",
+   "label": "Amount"
+  },
+  {
+   "description": "Party Payment: amount credited to the beneficiary. Party Receipt: amount the party paid (before our bank's incoming fee). Internal Transfer: amount leaving the source account, excluding the fee.",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.currency && doc.currency!==frappe.defaults.get_default('currency')",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate (to Company Currency)",
+   "precision": "9"
+  },
+  {
+   "fieldname": "base_amount",
+   "fieldtype": "Currency",
+   "label": "Amount (Company Currency)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amount",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.transfer_type==='Internal Transfer' && doc.to_currency && doc.to_currency!==doc.currency",
+   "description": "Amount credited to the target account.",
+   "fieldname": "received_amount",
+   "fieldtype": "Currency",
+   "label": "Received Amount",
+   "mandatory_depends_on": "eval:doc.transfer_type==='Internal Transfer' && doc.to_currency && doc.to_currency!==doc.currency",
+   "options": "to_currency"
+  },
+  {
+   "default": "SHA",
+   "depends_on": "eval:doc.method==='SWIFT'",
+   "fieldname": "charge_bearer",
+   "fieldtype": "Select",
+   "label": "Charge Bearer",
+   "options": "OUR\nSHA\nBEN"
+  },
+  {
+   "description": "Party Payment / Internal Transfer: amount plus fee. Party Receipt: amount less fee.",
+   "fieldname": "bank_amount",
+   "fieldtype": "Currency",
+   "label": "Bank Debit / Credit",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fees_section",
+   "fieldtype": "Section Break",
+   "label": "Fees"
+  },
+  {
+   "description": "Fee of the matching Transfer Fee Rule, correspondent fee included.",
+   "fieldname": "computed_fee",
+   "fieldtype": "Currency",
+   "label": "Computed Fee",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.method==='SWIFT'",
+   "fieldname": "correspondent_fee",
+   "fieldtype": "Currency",
+   "label": "Correspondent Fee",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fee_rule",
+   "fieldtype": "Data",
+   "label": "Fee Rule",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "fee_basis",
+   "fieldtype": "Small Text",
+   "label": "Fee Basis",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_fees",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "override_fee",
+   "fieldtype": "Check",
+   "label": "Override Fee"
+  },
+  {
+   "fieldname": "fee_amount",
+   "fieldtype": "Currency",
+   "label": "Fee Amount",
+   "options": "currency",
+   "read_only_depends_on": "eval:!doc.override_fee"
+  },
+  {
+   "fieldname": "fee_account",
+   "fieldtype": "Link",
+   "label": "Fee Account",
+   "mandatory_depends_on": "eval:doc.fee_amount>0",
+   "options": "Account",
+   "read_only_depends_on": "eval:!doc.override_fee"
+  },
+  {
+   "depends_on": "eval:doc.override_fee",
+   "fieldname": "fee_override_reason",
+   "fieldtype": "Small Text",
+   "label": "Fee Override Reason",
+   "mandatory_depends_on": "eval:doc.override_fee"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The fee booked on the Payment Entry, in the company currency.",
+   "fieldname": "base_fee_amount",
+   "fieldtype": "Currency",
+   "label": "Fee Booked (Company Currency)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "fees_refunded",
+   "fieldtype": "Check",
+   "label": "Fees Refunded",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.transfer_type!=='Internal Transfer'",
+   "fieldname": "references_section",
+   "fieldtype": "Section Break",
+   "label": "References"
+  },
+  {
+   "fieldname": "references",
+   "fieldtype": "Table",
+   "label": "References",
+   "options": "PDC Cheque Reference"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_details_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Details"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "column_break_accounting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Empty: taken from Treasury Company Settings (Modes of Payment).",
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "fieldname": "dimension_col_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "vouchers_section",
+   "fieldtype": "Section Break",
+   "label": "Payment Entries and Vouchers"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Payment Entry",
+   "no_copy": 1,
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "reversal_payment_entry",
+   "fieldtype": "Link",
+   "label": "Reversal Payment Entry",
+   "no_copy": 1,
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "reversal_journal",
+   "fieldtype": "Link",
+   "label": "Reversal Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_vouchers",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Date the bank confirmed the transfer.",
+   "fieldname": "completion_date",
+   "fieldtype": "Date",
+   "label": "Completion Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Bank statement date.",
+   "fieldname": "bank_transaction_date",
+   "fieldtype": "Date",
+   "label": "Bank Transaction Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "return_date",
+   "fieldtype": "Date",
+   "label": "Return Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "return_reason",
+   "fieldtype": "Small Text",
+   "label": "Return Reason",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "vouchers_html",
+   "fieldtype": "HTML",
+   "label": "Payment Entries and Vouchers"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "status_log_section",
+   "fieldtype": "Section Break",
+   "label": "Status Log"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status_log",
+   "fieldtype": "Table",
+   "label": "Status Log",
+   "no_copy": 1,
+   "options": "Bank Transfer Status Log",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Info"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Bank Transfer",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-30 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Transfers",
+ "name": "Bank Transfer",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "party_name,bank_reference,payment_entry",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

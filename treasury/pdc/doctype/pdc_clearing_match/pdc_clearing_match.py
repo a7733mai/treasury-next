@@ -15,6 +15,7 @@ class PDCClearingMatch(Document):
 
 		amount: DF.Currency
 		bank_transaction: DF.Link | None
+		bank_transfer: DF.Link | None
 		cheque: DF.Link | None
 		cheque_no: DF.Data | None
 		currency: DF.Link | None
@@ -25,6 +26,7 @@ class PDCClearingMatch(Document):
 		parentfield: DF.Data
 		parenttype: DF.Data
 		party: DF.Data | None
+		reference_doctype: DF.Literal["PDC Cheque", "Bank Transfer"]
 		result: DF.SmallText | None
 		selected: DF.Check
 		transaction_date: DF.Date | None

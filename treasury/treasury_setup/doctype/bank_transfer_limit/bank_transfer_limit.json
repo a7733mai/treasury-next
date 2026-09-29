@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-09-30 12:00:00.000000",
+ "description": "Per-transaction and daily transfer limits of a bank account and method (Treasury Company Settings).",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "bank_account",
+  "method",
+  "per_transaction_limit",
+  "daily_limit"
+ ],
+ "fields": [
+  {
+   "columns": 3,
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "default": "Fawran",
+   "fieldname": "method",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Method",
+   "options": "Normal\nFawran\nSWIFT",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "description": "0 = none.",
+   "fieldname": "per_transaction_limit",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Per Transaction Limit"
+  },
+  {
+   "columns": 2,
+   "description": "0 = none.",
+   "fieldname": "daily_limit",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Daily Limit"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-30 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Treasury Setup",
+ "name": "Bank Transfer Limit",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -455,6 +455,62 @@ maturity** (*Settle Cheques* on the batch or on the cheque, not before its due d
 Liability / Cr Bank, then the party posting is undone per *On Bounce*. Cancel only while no cheque is
 settled or bounced.
 
+#### Bank Transfers
+
+A **Bank Transfer** is a transfer order: a **Party Payment** (any Party Type), a **Party Receipt**, or an
+**Internal Transfer** between two company bank accounts, by method **Normal**, **Fawran** or **SWIFT**. It is
+posted as **one Payment Entry** on its **execution date** (the value date), with the bank fee inside it:
+
+| Type | Payment Entry | Bank | Party / target |
+|---|---|---|---|
+| Party Payment | Pay | Cr amount + fee | Dr amount (allocated to the references, the rest an advance) |
+| Party Receipt | Receive | Dr amount − fee | Cr amount |
+| Internal Transfer | Internal Transfer | Cr amount + fee | Dr amount (or the received amount) on the target bank |
+
+The fee is a deduction row on its expense account (company currency; a foreign-currency fee is converted at
+the transfer's rate, a rounding gap of up to 0.05 is absorbed by the fee row).
+
+**Fee rules** (Treasury Company Settings, *Transfer Fees*): per bank account, method, direction (Outgoing /
+Incoming: the fee our bank takes from a received transfer), scope and amount range (bank account currency;
+*Amount To* 0 = no upper limit): fixed fee + percentage, min / max, and for SWIFT the charge bearer and a
+correspondent fee added for OUR. The exact scope wins over *Any*, an exact charge bearer over an empty one,
+then the lowest row; overlapping rules are rejected. SWIFT with BEN books no fee (the beneficiary bears it).
+The user may override the fee with a reason (logged as "Fee Overridden").
+
+**Scope**: SWIFT is International; otherwise Same Bank when both sides are at the same Bank (the Bank links,
+else the bank codes), else Other Bank (also when nothing is known: the fee applies). An IBAN carries the bank
+code in characters 5-8 (e.g. `QA58DOHB…` = DOHB); IBANs are compared only within one country, an IBAN with
+a SWIFT code only for Qatar (the SWIFT code starts with the bank code), two SWIFT codes by their first four
+letters.
+
+**Limits** (*Transfer Limits*): per-transaction and daily limits of a bank account and method (the daily
+limit counts the submitted, not cancelled transfers of the same execution date). *Transfer Limit Action*
+Warn shows a message; Block rejects the submit (and a Reschedule onto a full day). **Approval**: above the
+*Transfer Approval Threshold* (company currency) only a Treasury Manager may submit.
+
+**Statuses**: Draft → *Scheduled* (future execution date; the daily job sends it on its date, catching up
+missed days; **Send Now** / **Reschedule**) → *Sent* (Payment Entry posted) → *Completed* (the bank
+confirmed it: **Mark Completed** or the PDC Bank Clearing tool; the Payment Entry gets its clearance date).
+*Transfer Completion* can complete on send (all, or Fawran only). **Mark Returned** (Treasury Manager; not
+for a receipt — refund it with a new Party Payment) reverses the Payment Entry on the return date: an
+Internal Transfer without fee by a reverse Payment Entry, anything else by a Journal Entry; the fee stays
+booked unless *Refund Fees on Return* is set. **Cancel** a Scheduled or Sent transfer (its Payment Entry is
+cancelled); a Completed or Returned one is returned instead. Every change is in the status log.
+
+**Internal Transfer between two currencies**: the rates are derived from the bank's own conversion (amount →
+received amount), so the Payment Entry books no exchange difference; later rate movements are left to
+Exchange Rate Revaluation.
+
+**Statement matching** (PDC Bank Clearing): a Sent transfer is matched on its bank's statement line of the
+full bank amount (fee included; strong when the line shows its bank reference or name). Clearing completes
+it and reconciles the line; the target bank's deposit of an internal transfer is reconciled and logged
+("Target Confirmed"). A statement showing the principal and the fee as two lines is reconciled in ERPNext's
+Bank Reconciliation Tool.
+
+Reports: **Bank Transfer Register** and **Transfer Fees Analysis** (per month, bank, bank account or method,
+with a chart). Scheduled transfers are expected flows of the Bank Position Forecast; Sent ones not yet
+confirmed show as a summary card (they are in the GL already).
+
 ### Reports and workspace
 
 The **Treasury** workspace (sidebar + desktop icon; shown to Treasury Manager / User, Accounts Manager /

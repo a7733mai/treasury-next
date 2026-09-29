@@ -38,6 +38,8 @@ INTERNAL_TRANSFER = "Internal Transfer"
 INVOICE_DOCTYPES = ("Sales Invoice", "Purchase Invoice")
 ORDER_DOCTYPES = ("Sales Order", "Purchase Order")
 REFERENCE_DOCTYPES = (*INVOICE_DOCTYPES, *ORDER_DOCTYPES, "Journal Entry")
+# Largest company-currency rounding gap a charges deduction row absorbs (see `_absorb_rounding`).
+ROUNDING_TOLERANCE = 0.05
 
 
 def _system_context(fn):
@@ -254,12 +256,18 @@ def create_payment_entry(
 	submit: bool = True,
 	clearance_date=None,
 	details: dict | None = None,
+	charges: float = 0,
+	charges_account: str | None = None,
 ) -> str:
 	"""Create (or return the existing) Payment Entry whose bank side is `bank_account_head`.
 
 	`amount` is expressed in the currency of `bank_account_head` (the cheque currency) and
 	`exchange_rate` converts that currency to the company currency. `clearance_date` (the bank already
 	moved the money) requires `submit=True`. `details`: see `_apply_details`.
+
+	`charges` (bank currency, e.g. a transfer fee) on `charges_account` (company currency): `amount` stays the
+	principal settled with the party; the bank moves `amount + charges` (Pay) or `amount - charges`
+	(Receive), and the charges are a normal deduction row (see `_charges_row`).
 	"""
 	if clearance_date and not submit:
 		frappe.throw(_("Clearance Date can only be set on a submitted Payment Entry."))
@@ -275,16 +283,25 @@ def create_payment_entry(
 	if payment_type not in ("Pay", "Receive"):
 		frappe.throw(_("Payment Type must be Pay or Receive."))
 
+	precision = frappe.get_precision("Payment Entry", "paid_amount")
+	charges = _validate_charges(company, amount, charges, charges_account, payment_type, precision)
+	principal = flt(amount, precision)
+	bank_amount = principal + charges if payment_type == "Pay" else principal - charges
 	amounts = _get_payment_amounts(
 		company=company,
 		posting_date=posting_date,
 		party_type=party_type,
 		party=party,
-		amount=amount,
+		amount=bank_amount,
 		bank_account_head=bank_account_head,
 		currency=currency,
 		exchange_rate=exchange_rate,
 	)
+	# the party is settled with the principal only (without charges: the same as `amounts.party_amount`)
+	if amounts.party_currency == amounts.bank_currency:
+		party_cap = principal
+	else:
+		party_cap = flt(principal * amounts.bank_rate, amounts.precision)
 
 	pe = frappe.new_doc("Payment Entry")
 	pe.payment_type = payment_type
@@ -323,7 +340,7 @@ def create_payment_entry(
 	pe.target_exchange_rate = target["rate"]
 
 	for ref in _allocate_references(
-		references, party_type, party, amounts.party_currency, amounts.party_amount, amounts.precision
+		references, party_type, party, amounts.party_currency, party_cap, amounts.precision
 	):
 		pe.append("references", ref)
 
@@ -331,16 +348,72 @@ def create_payment_entry(
 		pe.custom_remarks = 1
 		pe.remarks = remarks
 
+	if charges:
+		pe.append("deductions", _charges_row(company, charges_account, charges * amounts.bank_rate, details))
 	_apply_details(pe, details)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
 	pe.flags.ignore_permissions = True  # see module docstring
 	pe.insert()
+	if charges:
+		_absorb_rounding(pe, charges_account)
 	if submit:
 		pe.submit()
 		if clearance_date:
 			_set_clearance_date(pe.name, clearance_date, "Payment Entry")
 	_stamp_user("Payment Entry", pe.name, owner=True)
 	return pe.name
+
+
+def _validate_charges(
+	company: str, amount: float, charges, charges_account: str | None, payment_type: str, precision: int
+) -> float:
+	charges = flt(charges, precision)
+	if charges < 0:
+		frappe.throw(_("Charges cannot be negative."))
+	if not charges:
+		return 0.0
+	if not charges_account:
+		frappe.throw(_("An account for the charges is required."))
+	_company_currency_account(charges_account, company)
+	if payment_type == "Receive" and charges >= flt(amount, precision):
+		frappe.throw(_("Charges must be less than the amount."))
+	return charges
+
+
+def _charges_row(company: str, account: str, amount: float, details: dict | None) -> dict:
+	"""The charges of a Pay / Receive Payment Entry as a normal (unflagged) deduction row.
+
+	Spec 7b G1 / G2 (payment_entry.py:995-1001, 1103-1213): the bank side carries the charges (Pay: paid =
+	principal + charges; Receive: paid = received = principal - charges), so base_paid == base_received by
+	construction and ERPNext adds no flagged exchange row; `set_unallocated_amount` counts the unflagged row,
+	which balances the party side to the principal and leaves difference_amount at zero.
+	"""
+	details = frappe._dict(details or {})
+	row = {
+		"account": account,
+		"cost_center": details.cost_center or erpnext.get_default_cost_center(company),
+		"amount": flt(amount, frappe.get_precision("Payment Entry Deduction", "amount")),
+		"is_exchange_gain_loss": 0,
+	}
+	row.update(_dimension_values(frappe.get_meta("Payment Entry Deduction"), details.dimensions))
+	return row
+
+
+def _absorb_rounding(pe: Document, charges_account: str):
+	"""A company-currency rounding gap of a foreign-currency entry (the party side, the bank side and the
+	charges are rounded separately) goes into the charges row, up to ROUNDING_TOLERANCE."""
+	precision = frappe.get_precision("Payment Entry Deduction", "amount")
+	difference = flt(pe.difference_amount, precision)
+	row = next(
+		(d for d in pe.deductions if d.account == charges_account and not d.is_exchange_gain_loss), None
+	)
+	if difference and row and abs(difference) <= ROUNDING_TOLERANCE:
+		row.amount = flt(flt(row.amount) + difference, precision)
+		pe.save()
+	if flt(pe.difference_amount, precision):
+		frappe.throw(
+			_("The Payment Entry {0} is not balanced (difference {1}).").format(pe.name, pe.difference_amount)
+		)
 
 
 def _apply_details(pe: Document, details: dict | None):
@@ -405,13 +478,20 @@ def create_internal_transfer(
 	cycle: int = 1,
 	submit: bool = True,
 	clearance_date=None,
+	charges: float | None = None,
 ) -> str:
 	"""Create (or return the existing) Internal Transfer Payment Entry `paid_from` → `paid_to`.
 
-	Both accounts are in one currency; `paid_amount` / `received_amount` are in that currency and
-	`exchange_rate` converts it to the company currency (one rate for both sides: ERPNext forces the target
-	rate to the source rate when the currencies are equal). A `received_amount` below `paid_amount` books the
-	difference (e.g. bank charges) on `deduction_account`. `clearance_date` requires `submit=True`.
+	Same currency: `paid_amount` / `received_amount` are in that currency and `exchange_rate` converts it to
+	the company currency (one rate for both sides: ERPNext forces the target rate to the source rate when the
+	currencies are equal). A `received_amount` below `paid_amount` books the difference (e.g. bank charges) on
+	`deduction_account`; `charges` is ignored (it is paid - received).
+
+	Different currencies (spec 7b G4): `received_amount` (target currency) is required and `charges` (source
+	currency, included in `paid_amount`) go to `deduction_account`. The rates are derived from the bank's own
+	conversion of the principal (paid - charges) into the received amount, so the entry books no exchange
+	difference: the flagged deduction row holds only the charges (± 0.01 rounding). Later rate movements are
+	left to Exchange Rate Revaluation. `clearance_date` requires `submit=True`.
 	"""
 	if clearance_date and not submit:
 		frappe.throw(_("Clearance Date can only be set on a submitted Payment Entry."))
@@ -427,28 +507,48 @@ def create_internal_transfer(
 	if paid_from == paid_to:
 		frappe.throw(_("Paid From and Paid To accounts must be different for an Internal Transfer."))
 	source, target = _transfer_account(paid_from, company), _transfer_account(paid_to, company)
-	if source.account_currency != target.account_currency:
-		frappe.throw(_("Internal Transfer between accounts in different currencies is not supported."))
-
 	precision = frappe.get_precision("Payment Entry", "paid_amount")
-	paid = flt(paid_amount, precision)
-	received = flt(paid if received_amount is None else received_amount, precision)
-	if paid <= 0 or received <= 0:
-		frappe.throw(_("Amount must be greater than zero."))
-	if received > paid:
-		frappe.throw(_("Received Amount cannot be greater than Paid Amount"))
-
 	company_currency = erpnext.get_company_currency(company)
-	if source.account_currency == company_currency:
-		rate = 1.0
+	paid = flt(paid_amount, precision)
+	if source.account_currency != target.account_currency:
+		if received_amount in (None, ""):
+			frappe.throw(
+				_("Received Amount is required for a transfer between {0} and {1}.").format(
+					source.account_currency, target.account_currency
+				)
+			)
+		received = flt(received_amount, precision)
+		if paid <= 0 or received <= 0:
+			frappe.throw(_("Amount must be greater than zero."))
+		fee = flt(charges, precision)
+		if fee < 0:
+			frappe.throw(_("Charges cannot be negative."))
+		if fee >= paid:
+			frappe.throw(_("Charges must be less than the amount."))
+		rate, target_rate = _cross_currency_rates(
+			source, target, company_currency, flt(paid - fee, precision), received, exchange_rate, posting_date
+		)
+		difference = flt(fee * rate)
 	else:
-		rate = flt(exchange_rate) or flt(
-			get_exchange_rate(source.account_currency, company_currency, getdate(posting_date))
-		)
-	if rate <= 0:
-		frappe.throw(
-			_("Exchange rate from {0} to {1} is required.").format(source.account_currency, company_currency)
-		)
+		received = flt(paid if received_amount is None else received_amount, precision)
+		if paid <= 0 or received <= 0:
+			frappe.throw(_("Amount must be greater than zero."))
+		if received > paid:
+			frappe.throw(_("Received Amount cannot be greater than Paid Amount"))
+		if source.account_currency == company_currency:
+			rate = 1.0
+		else:
+			rate = flt(exchange_rate) or flt(
+				get_exchange_rate(source.account_currency, company_currency, getdate(posting_date))
+			)
+		if rate <= 0:
+			frappe.throw(
+				_("Exchange rate from {0} to {1} is required.").format(
+					source.account_currency, company_currency
+				)
+			)
+		target_rate = rate
+		difference = flt((paid - received) * rate) if received < paid else 0
 
 	details = frappe._dict(details or {})
 	pe = frappe.new_doc("Payment Entry")
@@ -464,15 +564,15 @@ def create_internal_transfer(
 	pe.paid_amount = paid
 	pe.received_amount = received
 	pe.source_exchange_rate = rate
-	pe.target_exchange_rate = rate
+	pe.target_exchange_rate = target_rate
 	pe.reference_no = reference_no
 	pe.reference_date = getdate(reference_date)
 	if remarks:
 		pe.custom_remarks = 1
 		pe.remarks = remarks
 
-	if received < paid:
-		_append_difference_row(pe, company, deduction_account, flt((paid - received) * rate), details)
+	if difference:
+		_append_difference_row(pe, company, deduction_account, difference, details)
 
 	_apply_details(pe, details)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
@@ -490,6 +590,25 @@ def create_internal_transfer(
 			_set_clearance_date(pe.name, clearance_date, "Payment Entry")
 	_stamp_user("Payment Entry", pe.name, owner=True)
 	return pe.name
+
+
+def _cross_currency_rates(
+	source, target, company_currency: str, principal: float, received: float, exchange_rate, posting_date
+) -> tuple[float, float]:
+	"""(source rate, target rate) of a transfer between two currencies from the bank's conversion of
+	`principal` (source currency) into `received` (target currency): base principal == base received."""
+	if source.account_currency == company_currency:
+		return 1.0, flt(principal / received, 9)
+	if target.account_currency == company_currency:
+		return flt(received / principal, 9), 1.0
+	rate = flt(exchange_rate) or flt(
+		get_exchange_rate(source.account_currency, company_currency, getdate(posting_date))
+	)
+	if rate <= 0:
+		frappe.throw(
+			_("Exchange rate from {0} to {1} is required.").format(source.account_currency, company_currency)
+		)
+	return rate, flt(flt(principal * rate, 2) / received, 9)
 
 
 def _transfer_account(account: str, company: str) -> frappe._dict:
@@ -515,14 +634,7 @@ def _append_difference_row(pe: Document, company: str, account: str | None, amou
 	"""
 	if not account:
 		frappe.throw(_("An account for the difference between the paid and the received amount is required."))
-	company_currency = erpnext.get_company_currency(company)
-	account_details = _transfer_account(account, company)
-	if account_details.account_currency != company_currency:
-		frappe.throw(
-			_("Account {0} must be in the company currency {1}.").format(
-				frappe.bold(account), company_currency
-			)
-		)
+	_company_currency_account(account, company)
 	row = {
 		"account": account,
 		"cost_center": details.get("cost_center") or erpnext.get_default_cost_center(company),
@@ -531,6 +643,19 @@ def _append_difference_row(pe: Document, company: str, account: str | None, amou
 	}
 	row.update(_dimension_values(frappe.get_meta("Payment Entry Deduction"), details.get("dimensions")))
 	pe.append("deductions", row)
+
+
+def _company_currency_account(account: str, company: str) -> frappe._dict:
+	"""A ledger account of `company` in the company currency (a deduction row is booked in it: G3)."""
+	details = _transfer_account(account, company)
+	company_currency = erpnext.get_company_currency(company)
+	if details.account_currency != company_currency:
+		frappe.throw(
+			_("Account {0} must be in the company currency {1}.").format(
+				frappe.bold(account), company_currency
+			)
+		)
+	return details
 
 
 def _get_payment_amounts(
@@ -800,7 +925,9 @@ def create_journal_entry(
 def _exchange_difference_row(company: str, accounts: list[dict]) -> dict | None:
 	"""Row on the Exchange Gain / Loss account that balances `accounts` in the company currency, if needed.
 
-	Company-currency amounts are rounded per row exactly as JournalEntry.set_amounts_in_company_currency does.
+	Company-currency amounts are rounded per row exactly as JournalEntry.set_amounts_in_company_currency does,
+	and a foreign-currency row against an invoice at the invoice's rate, which JournalEntry.set_exchange_rate
+	forces on it (e.g. the return of a payment made at another rate).
 	"""
 	precision = frappe.get_precision("Journal Entry Account", "debit")
 	company_currency = erpnext.get_company_currency(company)
@@ -808,6 +935,8 @@ def _exchange_difference_row(company: str, accounts: list[dict]) -> dict | None:
 	for row in accounts:
 		if get_account_currency(row["account"]) == company_currency:
 			rate = 1.0
+		elif row.get("reference_type") in INVOICE_DOCTYPES and row.get("reference_name"):
+			rate = flt(frappe.db.get_value(row["reference_type"], row["reference_name"], "conversion_rate"))
 		else:
 			rate = flt(row.get("exchange_rate"))
 			if not rate:
@@ -842,6 +971,20 @@ def _set_clearance_date(name: str, clearance_date, doctype: str = "Journal Entry
 	frappe.db.set_value(doctype, name, "clearance_date", getdate(clearance_date))
 
 
+def set_clearance_date(doctype: str, name: str, clearance_date):
+	"""Set (or, with an empty date, clear) the clearance date of a submitted Treasury voucher, e.g. when the
+	bank confirmed a transfer. The caller checked the user's permission on the Treasury source document."""
+	if doctype not in VOUCHER_DOCTYPES:
+		frappe.throw(_("Only Payment Entry and Journal Entry can be cleared here."))
+	voucher = frappe.db.get_value(doctype, name, ["docstatus", "treasury_source_name"], as_dict=True)
+	if not voucher or voucher.docstatus != 1 or not voucher.treasury_source_name:
+		frappe.throw(_("{0} {1} is not managed by Treasury.").format(_(doctype), name))
+	if clearance_date:
+		_set_clearance_date(name, clearance_date, doctype)
+	else:
+		frappe.db.set_value(doctype, name, "clearance_date", None)
+
+
 # ---------------------------------------------------------------------------
 # Cancellation and reversal
 # ---------------------------------------------------------------------------
@@ -869,9 +1012,19 @@ def cancel_voucher(doctype: str, name: str):
 
 @_system_context
 def make_reversal(
-	doctype: str, name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
+	doctype: str,
+	name: str,
+	posting_date,
+	event: str,
+	remarks: str | None = None,
+	cycle: int = 1,
+	kept_charges: dict | None = None,
 ) -> str:
-	"""Create a Journal Entry that mirrors a submitted voucher (debit <-> credit), linked to the same source."""
+	"""Create a Journal Entry that mirrors a submitted voucher (debit <-> credit), linked to the same source.
+
+	`kept_charges` (Payment Entry only): {"account", "bank_account_head", "amount_in_account_currency"} — the
+	charges the bank does not refund stay booked: their rows are not reversed and the bank row gets back the
+	amount less the charges (a foreign-currency difference goes to Exchange Gain / Loss)."""
 	original = frappe.get_doc(doctype, name)
 	if original.docstatus != 1:
 		frappe.throw(_("{0} {1} must be submitted to be reversed.").format(_(doctype), name))
@@ -888,6 +1041,8 @@ def make_reversal(
 		rows = _reverse_journal_rows(original)
 	else:
 		rows = _reverse_gl_rows(doctype, name)
+		if kept_charges:
+			rows = _keep_charges(rows, frappe._dict(kept_charges))
 
 	return create_journal_entry(
 		source_doctype=source_doctype,
@@ -902,7 +1057,34 @@ def make_reversal(
 		multi_currency=bool(original.get("multi_currency")),
 		reversal_of=name if doctype == "Journal Entry" else None,
 		cycle=cycle,
+		balance_exchange_difference=bool(kept_charges),
 	)
+
+
+def _keep_charges(rows: list[dict], kept: frappe._dict) -> list[dict]:
+	"""Reversal rows without the charges rows, the bank getting back its credit less the charges."""
+	precision = frappe.get_precision("Journal Entry Account", "debit_in_account_currency")
+	rows = [row for row in rows if row["account"] != kept.account]
+	bank_row = next(
+		(
+			row
+			for row in rows
+			if row["account"] == kept.bank_account_head and flt(row["debit_in_account_currency"]) > 0
+		),
+		None,
+	)
+	if not bank_row:
+		frappe.throw(
+			_("The bank account {0} is not credited by the voucher to reverse.").format(
+				frappe.bold(kept.bank_account_head)
+			)
+		)
+	bank_row["debit_in_account_currency"] = flt(
+		flt(bank_row["debit_in_account_currency"]) - flt(kept.amount_in_account_currency), precision
+	)
+	if bank_row["debit_in_account_currency"] <= 0:
+		rows.remove(bank_row)
+	return rows
 
 
 def reverse_journal_entry(
@@ -964,7 +1146,11 @@ def make_reverse_payment_entry(
 		paid_from=original.paid_to,
 		paid_to=original.paid_from,
 		paid_amount=original.received_amount,
-		exchange_rate=original.source_exchange_rate,
+		# a transfer between two currencies: the mirror converts back at the same bank conversion
+		received_amount=original.paid_amount
+		if original.paid_from_account_currency != original.paid_to_account_currency
+		else None,
+		exchange_rate=original.target_exchange_rate,
 		reference_no=original.reference_no,
 		reference_date=original.reference_date,
 		remarks=remarks or _("Reversal of Payment Entry {0}").format(name),
@@ -975,11 +1161,18 @@ def make_reverse_payment_entry(
 
 @_system_context
 def reverse_voucher(
-	doctype: str, name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
+	doctype: str,
+	name: str,
+	posting_date,
+	event: str,
+	remarks: str | None = None,
+	cycle: int = 1,
+	kept_charges: dict | None = None,
 ) -> tuple[str, str]:
 	"""Reverse a Treasury voucher with the fitting voucher: an Internal Transfer without deductions by a
-	reverse Payment Entry, anything else by a Journal Entry. Returns (doctype, name) of the reversal; the one
-	already created for (source, event, cycle), of either doctype, is returned as it is."""
+	reverse Payment Entry, anything else (and any reversal keeping charges, see `make_reversal`) by a Journal
+	Entry. Returns (doctype, name) of the reversal; the one already created for (source, event, cycle), of
+	either doctype, is returned as it is."""
 	if doctype not in VOUCHER_DOCTYPES:
 		frappe.throw(_("Only Payment Entries and Journal Entries can be reversed here."))
 	source = frappe.db.get_value(
@@ -993,9 +1186,13 @@ def reverse_voucher(
 			if existing:
 				return voucher_doctype, _return_existing(voucher_doctype, existing, True)
 
-	if doctype == "Payment Entry" and can_reverse_by_payment_entry(frappe.get_doc(doctype, name)):
+	if (
+		not kept_charges
+		and doctype == "Payment Entry"
+		and can_reverse_by_payment_entry(frappe.get_doc(doctype, name))
+	):
 		return "Payment Entry", make_reverse_payment_entry(name, posting_date, event, remarks, cycle)
-	return "Journal Entry", make_reversal(doctype, name, posting_date, event, remarks, cycle)
+	return "Journal Entry", make_reversal(doctype, name, posting_date, event, remarks, cycle, kept_charges)
 
 
 def _reverse_journal_rows(je: Document) -> list[dict]:

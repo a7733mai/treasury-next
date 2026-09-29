@@ -184,20 +184,26 @@ scheduler_events = {
 		"treasury.bank_facilities.scheduler.refresh_facilities",
 		"treasury.bank_facilities.interest.post_interest_accruals",
 		"treasury.bank_facilities.scheduler.send_facility_alerts",
+		# Bank Transfers whose execution date has come (catches up missed days on their own dates)
+		"treasury.bank_transfers.scheduler.post_scheduled_transfers",
 	],
 }
 
 # Accounting dimensions (Cost Center-like Link fields ERPNext adds per Accounting Dimension), merged with
 # ERPNext's own list; the doctypes have the `accounting_dimensions_section` / `dimension_col_break` fields.
-accounting_dimension_doctypes = ["PDC Cheque", "Cheque Batch"]
+accounting_dimension_doctypes = ["PDC Cheque", "Cheque Batch", "Bank Transfer"]
 
 # Extra expected cash flows and summary cards for the Bank Position Forecast report (dotted paths; see
 # treasury.pdc.forecast_sources).
 treasury_forecast_sources = [
 	"treasury.bank_facilities.forecast.get_flows",
 	"treasury.bank_facilities.lc.get_flows",
+	"treasury.bank_transfers.forecast.get_flows",
 ]
-treasury_forecast_summary_sources = ["treasury.bank_facilities.forecast.get_summary"]
+treasury_forecast_summary_sources = [
+	"treasury.bank_facilities.forecast.get_summary",
+	"treasury.bank_transfers.forecast.get_summary",
+]
 
 # Utilisation of Bank Facility sub-limits from other documents (Letters of Guarantee / Credit, Cheque
 # Discounting); see treasury.bank_facilities.utilisation.

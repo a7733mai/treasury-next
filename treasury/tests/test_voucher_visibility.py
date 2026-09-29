@@ -32,6 +32,7 @@ from treasury.tests.utils import (
 	ensure_instrument_accounts,
 	ensure_user,
 	make_bank_facility,
+	make_bank_transfer,
 	make_cheque_book,
 	make_cheque_discounting,
 	make_own_bank,
@@ -175,7 +176,26 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		cheque.run_method("onload")
 		self.assertEqual(cheque.get_onload().payment_entries, [])
 
+	def test_bank_transfer_summary(self):
+		"""Phase 7b: the Payment Entry of a transfer and its reversal, with the Transfer labels."""
+		transfer = make_bank_transfer(amount=900, execution_date=add_days(getdate(), -2))
+		transfer.mark_returned(return_date=add_days(getdate(), -1), reason="Returned")
+		transfer.reload()
+		html = self.load_summary(transfer)
+		self.assertIn(transfer.payment_entry, html)
+		self.assertIn(transfer.reversal_journal, html)
+		self.assertIn("Transfer", html)
+		self.assertIn("Reversal of Transfer", html)
+		self.assertEqual(
+			[pe["name"] for pe in transfer.get_onload().payment_entries], [transfer.payment_entry]
+		)
+		self.assertEqual([pe["name"] for pe in treasury_payment_entries(transfer)], [transfer.payment_entry])
+		with self.set_user(NO_ACCESS_USER):
+			self.assertEqual(treasury_payment_entries(transfer), [])
+
 	def test_event_labels(self):
+		self.assertEqual(voucher_summary.event_label("bt_transfer"), "Transfer")
+		self.assertEqual(voucher_summary.event_label("bt_transfer_reversal"), "Reversal of Transfer")
 		self.assertEqual(voucher_summary.event_label("pdc_bank_posting"), "Bank Settlement")
 		self.assertEqual(
 			voucher_summary.event_label("pdc_under_collection_reversal"), "Reversal of Under Collection"
