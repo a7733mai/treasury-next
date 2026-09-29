@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.1 — 2026-09-29
+
+Fixes found during UAT on a live ERPNext 16 site.
+
+- **Form action buttons**: every action button (PDC Cheque, Cheque Batch, Security Cheque, Bank Facility,
+  Facility Drawdown, Letter of Guarantee / Credit, Cheque Discounting) called `frm.call` without the document,
+  which Frappe resolves as a module function — the buttons failed in the browser ("Failed to get method").
+  All calls now pass `doc: frm.doc`; `tests/test_client_calls.py` scans every form script and checks each
+  called action exists and is whitelisted.
+- **Postpone** proposes the current due date + 1 month instead of today.
+- **Arabic terminology**: ERPNext's generic translations are wrong in a treasury context (e.g. "Amount" as
+  quantity, "Issue Date" as a lawsuit date). Field labels are now translated under each DocType's context
+  and report / dialog / print / e-mail words under a `Treasury` context, without overriding the core
+  translations elsewhere. `tests/test_translations.py` enforces it.
+- **Icon**: Treasury desktop / sidebar icon (solid + subtle) and `app_logo_url`.
+- **Deployment (frappe_docker)**: `sites/assets` is a per-container volume, so the public folder link and
+  the compiled Arabic `.mo` are now created in every container (workers and scheduler included, so alert
+  e-mails are translated too).
+
 ## 1.0.0 — 2026-09-29
 
 First release, for Frappe 16 / ERPNext 16 (Python 3.14). No Frappe / ERPNext file is modified: the app
