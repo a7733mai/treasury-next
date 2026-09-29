@@ -24,6 +24,7 @@ class SecurityChequeStatusLog(Document):
 			"Lost",
 			"Cancelled",
 			"Encashed",
+			"Expiry Extended",
 		]
 		event_date: DF.Date | None
 		from_status: DF.Data | None

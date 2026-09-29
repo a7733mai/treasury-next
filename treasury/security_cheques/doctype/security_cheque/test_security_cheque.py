@@ -9,11 +9,13 @@ the PDC Cheque it creates (and the PDC lifecycle's settings).
 """
 
 import re
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, formatdate, getdate, nowdate
 
+from treasury.pdc import lifecycle as pdc_lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import cancel_leaf
 from treasury.pdc.report.cheque_book_usage.cheque_book_usage import execute as cheque_book_usage
 from treasury.security_cheques.doctype.security_cheque.security_cheque import deposit_bank_accounts
@@ -201,20 +203,26 @@ class TestSecurityCheque(SecurityChequeTestCase):
 
 		cheque.receive(receipt_date=day(-50), custody_location=SAFE, custodian=CUSTODIAN)
 		cheque.reload()
-		self.assertEqual((cheque.status, cheque.custody_location, cheque.custodian), ("In Custody", SAFE, CUSTODIAN))
+		self.assertEqual(
+			(cheque.status, cheque.custody_location, cheque.custodian), ("In Custody", SAFE, CUSTODIAN)
+		)
 		self.assertEqual(getdate(cheque.handover_date), day(-50))
 		self.assert_no_accounting(cheque, before)
 
 		cheque.transfer_custody(transfer_date=day(-40), custody_location=VAULT, remarks="Moved to the vault")
 		cheque.reload()
-		self.assertEqual((cheque.status, cheque.custody_location, cheque.custodian), ("In Custody", VAULT, None))
+		self.assertEqual(
+			(cheque.status, cheque.custody_location, cheque.custodian), ("In Custody", VAULT, None)
+		)
 		self.assert_no_accounting(cheque, before)
 
 		cheque.return_cheque(return_date=day(-5), person="Customer's accountant", reason="Contract completed")
 		cheque.reload()
 		self.assertEqual(cheque.status, "Returned")
 		self.assertEqual((cheque.custody_location, cheque.custodian), (None, None))
-		self.assertEqual((getdate(cheque.return_date), cheque.return_person), (day(-5), "Customer's accountant"))
+		self.assertEqual(
+			(getdate(cheque.return_date), cheque.return_person), (day(-5), "Customer's accountant")
+		)
 		self.assert_no_accounting(cheque, before)
 
 		self.assertEqual(
@@ -383,7 +391,9 @@ class TestSecurityCheque(SecurityChequeTestCase):
 		self.assertRaises(frappe.ValidationError, doc.save)
 
 		cheque.reload()
-		self.assertEqual((cheque.status, cheque.custody_location, len(cheque.custody_log)), ("In Custody", SAFE, 1))
+		self.assertEqual(
+			(cheque.status, cheque.custody_location, len(cheque.custody_log)), ("In Custody", SAFE, 1)
+		)
 		# free fields remain editable
 		cheque.remarks = "Kept in the red folder"
 		cheque.save()
@@ -423,8 +433,66 @@ class TestSecurityCheque(SecurityChequeTestCase):
 				if fieldname == "amount_type":
 					doc.amount = 0
 				self.assertRaises(frappe.ValidationError, doc.save)
+		# the expiry moves only through the (logged) Extend Expiry action
 		doc = frappe.get_doc(DOCTYPE, cheque.name)
-		doc.expiry_date = day(400)  # the guarantee may be extended
+		doc.expiry_date = day(400)
+		self.assertRaisesRegex(frappe.ValidationError, "Extend Expiry", doc.save)
+		# what it guarantees stays editable while it is live
+		doc = frappe.get_doc(DOCTYPE, cheque.name)
+		doc.required_amount = 5000
+		doc.save()
+
+	def test_extend_expiry(self):
+		cheque = make_security_cheque(issue_date=day(-60), expiry_date=day(10))
+		cheque.receive(receipt_date=day(-50), custody_location=SAFE)
+		before = ledger_counts()
+
+		self.assertRaises(frappe.ValidationError, cheque.extend_expiry, day(40))  # no reason
+		self.assertRaises(frappe.ValidationError, cheque.extend_expiry, day(10), "Same date")
+		self.assertRaises(frappe.ValidationError, cheque.extend_expiry, day(5), "Shorter")
+		cheque.extend_expiry(new_date=day(40), reason="Contract extended")
+
+		cheque.reload()
+		self.assertEqual((getdate(cheque.expiry_date), cheque.status), (day(40), "In Custody"))
+		row = cheque.status_log[-1]
+		self.assertEqual(
+			(row.event, row.from_status, row.to_status, row.event_date),
+			("Expiry Extended", "In Custody", "In Custody", None),
+		)
+		self.assertIn(formatdate(day(10)), row.remarks)
+		self.assertIn(formatdate(day(40)), row.remarks)
+		self.assertIn("Contract extended", row.remarks)
+		self.assert_no_accounting(cheque, before)
+		# later actions keep their own dates (the extension has no event date)
+		cheque.return_cheque(return_date=day(-40), reason="Completed")
+
+		cheque.reload()
+		self.assertRaisesRegex(
+			frappe.ValidationError, "not allowed", cheque.extend_expiry, day(90), "Too late"
+		)
+
+	def test_final_cheque_keeps_what_it_guaranteed(self):
+		order = make_sales_order(20000, transaction_date=day(-70))
+		cheque = make_security_cheque(
+			issue_date=day(-60),
+			expiry_date=day(10),
+			required_amount=8000,
+			reference_doctype="Sales Order",
+			reference_name=order.name,
+		)
+		cheque.receive(receipt_date=day(-50))
+		cheque.return_cheque(return_date=day(-5), reason="Completed")
+		changes = {"required_amount": 9000, "reference_doctype": None, "expiry_date": day(20)}
+		for fieldname, value in changes.items():
+			with self.subTest(field=fieldname):
+				doc = frappe.get_doc(DOCTYPE, cheque.name)
+				doc.set(fieldname, value)
+				if fieldname == "reference_doctype":
+					doc.reference_name = None
+				self.assertRaises(frappe.ValidationError, doc.save)
+		# free fields remain editable
+		doc = frappe.get_doc(DOCTYPE, cheque.name)
+		doc.remarks = "Archived"
 		doc.save()
 
 	def test_delete_only_before_any_action(self):
@@ -535,7 +603,11 @@ class TestSecurityChequeEncashment(SecurityChequeTestCase):
 			encashment_date=day(-5),
 			bank_account=bank_account_name("EGP"),
 			references=[
-				{"reference_doctype": "Sales Invoice", "reference_name": invoice.name, "allocated_amount": 5000}
+				{
+					"reference_doctype": "Sales Invoice",
+					"reference_name": invoice.name,
+					"allocated_amount": 5000,
+				}
 			],
 			remarks="Customer defaulted",
 		)
@@ -648,6 +720,64 @@ class TestSecurityChequeEncashment(SecurityChequeTestCase):
 		self.assertFalse(frappe.db.exists("PDC Cheque", {"security_cheque": security.name}))
 		self.assertEqual(ledger_counts(), before)
 
+	def assert_encash_rolled_back(self, security, status: str, custody_rows: int, before: tuple, seen: dict):
+		"""After a failure once the PDC Cheque existed (`seen`: what the failing step saw): nothing kept."""
+		self.assertTrue(seen.get("pdc_cheque"), "the failure was not after the PDC Cheque insert")
+		self.assertFalse(frappe.db.exists("PDC Cheque", seen["pdc_cheque"]))
+		self.assertFalse(frappe.db.exists("PDC Cheque", {"security_cheque": security.name}))
+		self.assertEqual(get_voucher_count("PDC Cheque", seen["pdc_cheque"]), 0)
+		security.reload()
+		self.assertEqual((security.status, security.converted_pdc_cheque), (status, None))
+		self.assertEqual((security.encashment_date, flt(security.encashed_amount)), (None, 0))
+		self.assertEqual(len(security.custody_log), custody_rows)
+		self.assertNotIn("Encashed", [row.event for row in security.status_log])
+		self.assertEqual(ledger_counts(), before)
+
+	@staticmethod
+	def failing_step(seen: dict):
+		"""Stands in for the PDC receive / deliver: records the state it saw, then fails."""
+
+		def fail(name, *args, **kwargs):
+			seen["pdc_cheque"] = name
+			seen["security_status"] = frappe.db.get_value(
+				"Security Cheque", {"converted_pdc_cheque": name}, "status"
+			)
+			seen["vouchers"] = get_voucher_count("PDC Cheque", name)
+			frappe.throw("Simulated failure of the PDC step")
+
+		return fail
+
+	def test_encash_incoming_rolls_back_when_the_pdc_receive_fails(self):
+		security = self.received(1000)
+		custody_rows = len(security.custody_log)
+		before = ledger_counts()
+		seen = {}
+		with patch.object(pdc_lifecycle, "receive", side_effect=self.failing_step(seen)):
+			self.assertRaises(
+				frappe.ValidationError, security.encash, day(-5), None, None, bank_account_name("EGP")
+			)
+		# the step failed after the PDC Cheque was inserted and the security cheque saved as Encashed
+		self.assertEqual(seen["security_status"], "Encashed")
+		self.assert_encash_rolled_back(security, "In Custody", custody_rows, before, seen)
+
+		# nothing left behind: the encashment can be done again
+		security.encash(encashment_date=day(-5), bank_account=bank_account_name("EGP"))
+		self.assertEqual(frappe.db.get_value(DOCTYPE, security.name, "status"), "Encashed")
+
+	def test_encash_outgoing_rolls_back_when_the_pdc_delivery_fails(self):
+		self.use_company_settings(outgoing_party_posting="On Creation")
+		security = make_security_cheque("Outgoing", amount=2500, issue_date=day(-90))
+		security.issue(handover_date=day(-80))
+		security.reload()
+		custody_rows = len(security.custody_log)
+		before = ledger_counts()
+		seen = {}
+		with patch.object(pdc_lifecycle, "deliver", side_effect=self.failing_step(seen)):
+			self.assertRaises(frappe.ValidationError, security.encash, day(-5))
+		# On Creation: the PDC Cheque's insert had already posted its party Payment Entry
+		self.assertEqual((seen["security_status"], seen["vouchers"]), ("Encashed", 1))
+		self.assert_encash_rolled_back(security, "Issued", custody_rows, before, seen)
+
 	def test_encash_not_before_the_last_event(self):
 		security = self.received(1000)
 		self.assertRaises(
@@ -712,6 +842,20 @@ class TestSecurityChequeEncashment(SecurityChequeTestCase):
 		# a client cannot create a PDC Cheque claiming to come from a security cheque
 		forged = make_pdc_cheque("Incoming", security_cheque=security.name)
 		self.assertFalse(forged.security_cheque)
+
+	def test_replacement_keeps_the_back_link(self):
+		security = self.received(900)
+		security.encash(encashment_date=day(-5), bank_account=bank_account_name("EGP"))
+		pdc = self.pdc_of(security)
+		result = pdc.replace(
+			{"cheque_no": unique_cheque_no(), "replacement_date": day(-4), "reason": "Torn cheque"}
+		)
+		new = frappe.get_doc("PDC Cheque", result["replaced_by"])
+		self.assertEqual((new.security_cheque, new.replaces), (security.name, pdc.name))
+		# the security cheque keeps pointing at the first PDC Cheque; `replaced_by` leads on
+		security.reload()
+		self.assertEqual(security.converted_pdc_cheque, pdc.name)
+		self.assertEqual(frappe.db.count("PDC Cheque", {"security_cheque": security.name}), 2)
 
 
 class TestSecurityChequePrint(SecurityChequeTestCase):

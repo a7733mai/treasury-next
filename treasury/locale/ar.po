@@ -2267,6 +2267,49 @@ msgstr "اسم المرجع مطلوب."
 msgid "{0} cannot be changed after the security cheque is received or issued."
 msgstr "لا يمكن تغيير {0} بعد استلام شيك الضمان أو تسليمه."
 
+# Phase 4 fix round 2 — expiry extension, final locks, report totals and coverage
+msgid "{0} cannot be changed after the security cheque is received or issued. Use the Extend Expiry action."
+msgstr "لا يمكن تغيير {0} بعد استلام شيك الضمان أو تسليمه. استخدم إجراء تمديد الصلاحية."
+
+msgid "{0} cannot be changed once the security cheque is {1}."
+msgstr "لا يمكن تغيير {0} بعد أن أصبح شيك الضمان {1}."
+
+msgid "Extend Expiry"
+msgstr "تمديد الصلاحية"
+
+msgid "Expiry Extended"
+msgstr "تم تمديد الصلاحية"
+
+msgid "New Expiry Date"
+msgstr "تاريخ الانتهاء الجديد"
+
+msgid "Enter the new Expiry Date."
+msgstr "أدخل تاريخ الانتهاء الجديد."
+
+msgid "The new Expiry Date ({0}) must be after the current one ({1})."
+msgstr "يجب أن يكون تاريخ الانتهاء الجديد ({0}) بعد التاريخ الحالي ({1})."
+
+msgid "No Expiry Date"
+msgstr "بدون تاريخ انتهاء"
+
+msgid "Total Held from Others"
+msgstr "إجمالي الضمانات لدينا من الغير"
+
+msgid "Total Given to Others"
+msgstr "إجمالي الضمانات منا للغير"
+
+msgid "Several Parties"
+msgstr "عدة أطراف"
+
+msgid "Coverage"
+msgstr "التغطية"
+
+msgid "Covered"
+msgstr "مغطى"
+
+msgid "Covered by Open / Blank"
+msgstr "مغطى بشيك على بياض"
+
 msgid "Select the Custody Location too."
 msgstr "اختر مكان الحفظ أيضاً."
 

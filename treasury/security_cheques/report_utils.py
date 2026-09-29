@@ -11,7 +11,7 @@ from frappe import _
 from frappe.utils import date_diff, flt, getdate
 
 from treasury.pdc.report_utils import AmountConverter, as_list, column, get_precision
-from treasury.security_cheques.lifecycle import ALL_STATUSES, FINAL_STATUSES, OPEN
+from treasury.security_cheques.lifecycle import ALL_STATUSES, FINAL_STATUSES, OPEN, OTHER
 
 DOCTYPE = "Security Cheque"
 # Translation context of the generic words of these reports (see locale/ar.po)
@@ -66,13 +66,18 @@ def days_to_expiry(cheque, today) -> int | None:
 	return date_diff(getdate(cheque.expiry_date), today)
 
 
+def link_party_type(party_type: str | None) -> str | None:
+	"""The party type for the Dynamic Link Party column: "Other" is no DocType (the name is in Party Name)."""
+	return None if party_type == OTHER else party_type
+
+
 def make_row(cheque, converter: AmountConverter, today) -> frappe._dict:
 	"""A report row of one security cheque (amounts in its currency and in the company currency)."""
 	precision = get_precision()
 	return frappe._dict(
 		security_cheque=cheque.name,
 		direction=cheque.direction,
-		party_type=cheque.party_type,
+		party_type=link_party_type(cheque.party_type),
 		party=cheque.party,
 		party_name=cheque.party_name,
 		purpose=cheque.purpose,

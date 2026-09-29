@@ -44,6 +44,10 @@ LOCKED_FIELDS = (
 	"issue_date",
 	"cheque_date",
 )
+# The guarantee's end: after the first action it moves only through the Extend Expiry action (logged).
+EXPIRY_FIELDS = ("expiry_date",)
+# What the cheque guaranteed: editable while it is live, frozen once it is final (the reports' history).
+FINAL_LOCKED_FIELDS = ("required_amount", "reference_doctype", "reference_name")
 # Written only by treasury.security_cheques.lifecycle (flag `treasury_lifecycle`); `read_only` in the DocType
 # only affects the form, so any other save changing them is rejected (see validate_protected_fields).
 PROTECTED_FIELDS = (
@@ -178,9 +182,9 @@ class SecurityCheque(Document):
 	def on_trash(self):
 		if self.status != lifecycle.CREATED or self.cheque_book:
 			frappe.throw(
-				_("Security cheque {0} cannot be deleted once acted on or when it uses a cheque book leaf. Cancel it instead.").format(
-					frappe.bold(self.name)
-				)
+				_(
+					"Security cheque {0} cannot be deleted once acted on or when it uses a cheque book leaf. Cancel it instead."
+				).format(frappe.bold(self.name))
 			)
 
 	# ------------------------------------------------------------------ validation
@@ -238,7 +242,9 @@ class SecurityCheque(Document):
 		if self.direction != lifecycle.OUTGOING:
 			if self.bank_account or self.cheque_book:
 				frappe.throw(
-					_("Bank Account and Cheque Book apply to outgoing security cheques only. Enter the Drawer Bank instead.")
+					_(
+						"Bank Account and Cheque Book apply to outgoing security cheques only. Enter the Drawer Bank instead."
+					)
 				)
 			return
 		if not self.bank_account:
@@ -331,7 +337,11 @@ class SecurityCheque(Document):
 		if self.has_value_changed("cheque_no") or self.has_value_changed("bank_account"):
 			# serialise concurrent saves of cheque numbers on this bank account (see PDCCheque.validate_cheque_no)
 			frappe.db.get_value("Bank Account", self.bank_account, "name", for_update=True)
-		filters = {"direction": lifecycle.OUTGOING, "bank_account": self.bank_account, "cheque_no": self.cheque_no}
+		filters = {
+			"direction": lifecycle.OUTGOING,
+			"bank_account": self.bank_account,
+			"cheque_no": self.cheque_no,
+		}
 		duplicate = frappe.db.exists("Security Cheque", {**filters, "name": ["!=", self.name]})
 		if not duplicate:
 			pdc_cheques = frappe.get_all(
@@ -373,27 +383,48 @@ class SecurityCheque(Document):
 				)
 
 	def validate_locked_fields(self):
-		"""The cheque in the party's (or our) hands is what it is: fixed after the first action."""
+		"""The cheque in the party's (or our) hands is what it is: fixed after the first action. The expiry
+		then moves only through the Extend Expiry action, and what it guaranteed is frozen once it is final."""
 		if self.is_new() or self.flags.treasury_lifecycle:
 			return
 		before = self.get_doc_before_save()
 		if not before or before.status == lifecycle.CREATED:
 			return
-		changed = changed_fields(self, before, LOCKED_FIELDS)
+		self._throw_if_changed(
+			before, LOCKED_FIELDS, _("{0} cannot be changed after the security cheque is received or issued.")
+		)
+		if before.status in lifecycle.FINAL_STATUSES:
+			self._throw_if_changed(
+				before,
+				(*EXPIRY_FIELDS, *FINAL_LOCKED_FIELDS),
+				_("{0} cannot be changed once the security cheque is {1}."),
+				_(before.status, context=self.doctype),
+			)
+		self._throw_if_changed(
+			before,
+			EXPIRY_FIELDS,
+			_(
+				"{0} cannot be changed after the security cheque is received or issued. Use the Extend Expiry action."
+			),
+		)
+
+	def _throw_if_changed(self, before, fieldnames, message: str, *args):
+		"""`message` (translated): {0} = the labels of the changed fields, then `args`."""
+		changed = changed_fields(self, before, fieldnames)
 		if changed:
 			frappe.throw(
-				_("{0} cannot be changed after the security cheque is received or issued.").format(
-					", ".join(_(self.meta.get_label(f)) for f in changed)
-				),
+				message.format(", ".join(_(self.meta.get_label(f)) for f in changed), *args),
 				title=_("Not Allowed"),
 			)
 
-	# ------------------------------------------------------------------ actions (treasury.security_cheques.lifecycle)
+	# ------------------------------------------------------------------ actions (security_cheques.lifecycle)
 	# POST only: they change data, and Frappe checks the CSRF token only on POST requests.
 
 	@frappe.whitelist(methods=["POST"])
 	def receive(self, receipt_date=None, custody_location=None, custodian=None, remarks=None):
-		return lifecycle.receive(self.name, receipt_date, custody_location or None, custodian or None, remarks)
+		return lifecycle.receive(
+			self.name, receipt_date, custody_location or None, custodian or None, remarks
+		)
 
 	@frappe.whitelist(methods=["POST"])
 	def store(self, store_date=None, custody_location=None, custodian=None, remarks=None):
@@ -416,6 +447,10 @@ class SecurityCheque(Document):
 	@frappe.whitelist(methods=["POST"])
 	def mark_lost(self, lost_date=None, reason=None):
 		return lifecycle.mark_lost(self.name, lost_date, reason)
+
+	@frappe.whitelist(methods=["POST"])
+	def extend_expiry(self, new_date=None, reason=None):
+		return lifecycle.extend_expiry(self.name, new_date, reason)
 
 	@frappe.whitelist(methods=["POST"])
 	def cancel_cheque(self, reason=None):

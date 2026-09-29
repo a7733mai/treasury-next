@@ -14,10 +14,11 @@ from frappe.utils import add_days, cint, fmt_money, formatdate, getdate, today
 
 from treasury.pdc import scheduler as pdc_scheduler
 from treasury.security_cheques.lifecycle import INCOMING, LIVE_STATUSES, OPEN
+from treasury.utils.settings import stored_single_value
 
 DOCTYPE = "Security Cheque"
 ALERT_TEMPLATE = "treasury/templates/emails/security_expiry_alert.html"
-# Used when Treasury Settings has no value yet (the field default).
+# Used when Treasury Settings has no stored value (the field default; see alert_days).
 DEFAULT_ALERT_DAYS = 15
 
 
@@ -29,9 +30,7 @@ def send_security_expiry_alerts(as_of=None) -> dict:
 	that had such cheques.
 	"""
 	as_of = getdate(as_of or today())
-	days = frappe.db.get_single_value("Treasury Settings", "security_alert_days")
-	days = DEFAULT_ALERT_DAYS if days in (None, "") else cint(days)
-	until = add_days(as_of, days)
+	until = add_days(as_of, alert_days())
 
 	by_company: dict[str, list] = {}
 	for cheque in _alert_cheques(until):
@@ -47,6 +46,17 @@ def send_security_expiry_alerts(as_of=None) -> dict:
 				recipients.append(user)
 		result[company] = {"cheques": [c.name for c in cheques], "recipients": recipients}
 	return result
+
+
+def alert_days() -> int:
+	"""`Treasury Settings.security_alert_days`; DEFAULT_ALERT_DAYS only when the setting was never stored.
+
+	Read from the raw Singles row: `get_single_value` casts a missing Int to 0, and Frappe does not store the
+	default of a new Single field on migrate (treasury.install.set_default_settings does). An explicit 0
+	stays 0.
+	"""
+	value = stored_single_value("Treasury Settings", "security_alert_days")
+	return DEFAULT_ALERT_DAYS if value in (None, "") else cint(value)
 
 
 def _alert_cheques(until) -> list[frappe._dict]:

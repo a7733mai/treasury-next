@@ -40,7 +40,9 @@ frappe.query_reports["Security Cheque Register"] = {
 				return statuses
 					.filter(
 						(s) =>
-							!search || s.toLowerCase().includes(search) || __(s, null, "Security Cheque").includes(txt)
+							!search ||
+							s.toLowerCase().includes(search) ||
+							__(s, null, "Security Cheque").includes(txt)
 					)
 					.map((s) => ({ value: s, description: __(s, null, "Security Cheque") }));
 			},
@@ -79,11 +81,17 @@ frappe.query_reports["Security Cheque Register"] = {
 			options: [
 				{ value: "", label: "" },
 				{ value: "Tender", label: __("Tender", null, "Security Cheque") },
-				{ value: "Contract Performance", label: __("Contract Performance", null, "Security Cheque") },
+				{
+					value: "Contract Performance",
+					label: __("Contract Performance", null, "Security Cheque"),
+				},
 				{ value: "Advance Payment", label: __("Advance Payment", null, "Security Cheque") },
 				{ value: "Rent", label: __("Rent", null, "Security Cheque") },
 				{ value: "Employee Custody", label: __("Employee Custody", null, "Security Cheque") },
-				{ value: "Facility Collateral", label: __("Facility Collateral", null, "Security Cheque") },
+				{
+					value: "Facility Collateral",
+					label: __("Facility Collateral", null, "Security Cheque"),
+				},
 				{ value: "Other", label: __("Other", null, "Security Cheque") },
 			],
 		},
@@ -138,14 +146,16 @@ frappe.query_reports["Security Cheque Register"] = {
 
 	formatter: function (value, row, column, data, default_formatter) {
 		if (data && ["status", "direction", "purpose", "amount_type"].includes(column.fieldname)) {
-			value = value ? __(value, null, column.fieldname === "direction" ? null : "Security Cheque") : value;
+			const context = column.fieldname === "direction" ? null : "Security Cheque";
+			value = value ? __(value, null, context) : value;
 		}
 		let formatted = default_formatter(value, row, column, data);
 		if (!data) return formatted;
 		if (data.is_total) {
 			formatted = `<b>${formatted}</b>`;
 		}
-		if (column.fieldname === "days_to_expiry" && value !== null && value !== undefined && value < 0) {
+		const expired = value !== null && value !== undefined && value < 0;
+		if (column.fieldname === "days_to_expiry" && expired) {
 			formatted = `<span style="color: var(--red-600)">${formatted}</span>`;
 		}
 		return formatted;

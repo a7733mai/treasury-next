@@ -8,6 +8,7 @@ Settings like any other PDC cheque.
 Statuses:
   incoming  Created → Received → In Custody → Returned | Encashed | Lost   (Created → Cancelled)
   outgoing  Created → Issued → Returned | Encashed | Lost                   (Created → Cancelled)
+`extend_expiry` moves the expiry date of a cheque that is not final (no status change, logged).
 
 Every public action is reached through a whitelisted method of the Security Cheque controller. Each one locks
 the cheque row, reloads it, checks the user's permission (and role where required), validates the transition,
@@ -101,7 +102,9 @@ def receive(
 	return _save(doc)
 
 
-def store(name: str, store_date=None, custody_location=None, custodian=None, remarks: str | None = None) -> dict:
+def store(
+	name: str, store_date=None, custody_location=None, custodian=None, remarks: str | None = None
+) -> dict:
 	"""Put a received incoming security cheque into custody."""
 	doc = _begin(name)
 	_require_direction(doc, INCOMING)
@@ -170,6 +173,34 @@ def mark_lost(name: str, lost_date=None, reason: str | None = None) -> dict:
 	doc.lost_date = date
 	_release_custody(doc, date, reason)
 	_log(doc, "Lost", LOST, reason, date)
+	return _save(doc)
+
+
+def extend_expiry(name: str, new_date=None, reason: str | None = None) -> dict:
+	"""Move the expiry date of a cheque that is not final to a later date (status log row, old → new).
+
+	Once the cheque is received / issued this is the only way its expiry date changes; a final cheque's
+	expiry is history and never changes. No event date: the extension is not a movement of the cheque."""
+	doc = _begin(name)
+	_require_status(doc, (CREATED, *LIVE_STATUSES))
+	if not new_date:
+		frappe.throw(_("Enter the new Expiry Date."))
+	if not reason:
+		frappe.throw(_("A reason is required."))
+	new_date = getdate(new_date)
+	old_date = getdate(doc.expiry_date) if doc.expiry_date else None
+	if old_date and new_date <= old_date:
+		frappe.throw(
+			_("The new Expiry Date ({0}) must be after the current one ({1}).").format(
+				formatdate(new_date), formatdate(old_date)
+			)
+		)
+	if new_date < getdate(doc.issue_date):
+		frappe.throw(_("The Expiry Date cannot be before the Issue Date."))
+
+	doc.expiry_date = new_date
+	old_label = formatdate(old_date) if old_date else _("No Expiry Date")
+	_log(doc, "Expiry Extended", remarks=f"{old_label} → {formatdate(new_date)}: {reason}")
 	return _save(doc)
 
 

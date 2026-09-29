@@ -3,6 +3,7 @@
 
 // Business rules live in treasury/security_cheques/lifecycle.py; the buttons below only mirror them.
 const SEC_LIVE = ["Received", "In Custody", "Issued"];
+const SEC_FINAL = ["Returned", "Encashed", "Lost", "Cancelled"];
 
 frappe.ui.form.on("Security Cheque", {
 	setup(frm) {
@@ -106,6 +107,7 @@ frappe.ui.form.on("Security Cheque", {
 	lock_identity_fields(frm) {
 		// mirrors SecurityCheque.validate_locked_fields: fixed once received / issued
 		const locked = !frm.is_new() && frm.doc.status !== "Created";
+		const final = !frm.is_new() && SEC_FINAL.includes(frm.doc.status);
 		[
 			"direction",
 			"company",
@@ -121,8 +123,13 @@ frappe.ui.form.on("Security Cheque", {
 			"currency",
 			"issue_date",
 			"cheque_date",
+			"expiry_date", // then moved by the Extend Expiry action only
 		].forEach((fieldname) => frm.set_df_property(fieldname, "read_only", locked ? 1 : 0));
 		frm.set_df_property("currency", "read_only", locked || frm.doc.direction === "Outgoing" ? 1 : 0);
+		// what the cheque guaranteed is frozen once it is final
+		["required_amount", "reference_doctype", "reference_name"].forEach((fieldname) =>
+			frm.set_df_property(fieldname, "read_only", final ? 1 : 0)
+		);
 	},
 
 	translate_logs(frm) {
@@ -179,7 +186,12 @@ frappe.ui.form.on("Security Cheque", {
 			reqd,
 			get_query: () => ({ filters: { is_active: 1 } }),
 		});
-		const custodian = { fieldname: "custodian", label: __("Custodian"), fieldtype: "Link", options: "User" };
+		const custodian = {
+			fieldname: "custodian",
+			label: __("Custodian"),
+			fieldtype: "Link",
+			options: "User",
+		};
 
 		if (status === "Created") {
 			if (incoming) {
@@ -198,7 +210,12 @@ frappe.ui.form.on("Security Cheque", {
 			sec_action(frm, "cancel_cheque", __("Cancel Cheque"), [reason]);
 		}
 		if (incoming && status === "Received") {
-			sec_action(frm, "store", __("Put in Custody"), [date("store_date", __("Date")), location(1), custodian, remarks]);
+			sec_action(frm, "store", __("Put in Custody"), [
+				date("store_date", __("Date")),
+				location(1),
+				custodian,
+				remarks,
+			]);
 		}
 		if (incoming && status === "In Custody") {
 			sec_action(frm, "transfer_custody", __("Transfer Custody"), [
@@ -215,6 +232,16 @@ frappe.ui.form.on("Security Cheque", {
 					fieldname: "person",
 					label: incoming ? __("Returned To") : __("Received By"),
 					fieldtype: "Data",
+				},
+				reason,
+			]);
+			sec_action(frm, "extend_expiry", __("Extend Expiry"), [
+				{
+					fieldname: "new_date",
+					label: __("New Expiry Date"),
+					fieldtype: "Date",
+					reqd: 1,
+					default: doc.expiry_date,
 				},
 				reason,
 			]);
@@ -284,7 +311,12 @@ function sec_encash_prompt(frm, bank_accounts) {
 				read_only: doc.amount_type === "Fixed" ? 1 : 0,
 				reqd: 1,
 			},
-			{ fieldname: "due_date", label: __("Due Date"), fieldtype: "Date", default: frappe.datetime.get_today() },
+			{
+				fieldname: "due_date",
+				label: __("Due Date"),
+				fieldtype: "Date",
+				default: frappe.datetime.get_today(),
+			},
 			{
 				fieldname: "bank_account",
 				label: __("Deposit to Bank Account"),
@@ -299,7 +331,10 @@ function sec_encash_prompt(frm, bank_accounts) {
 				fieldname: "reference_doctype",
 				label: __("Settle Invoice Type"),
 				fieldtype: "Select",
-				options: ["", ...(incoming ? ["Sales Invoice", "Sales Order"] : ["Purchase Invoice", "Purchase Order"])],
+				options: [
+					"",
+					...(incoming ? ["Sales Invoice", "Sales Order"] : ["Purchase Invoice", "Purchase Order"]),
+				],
 				description: __("Optional. Without an invoice the amount is posted as an advance of the party."),
 			},
 			{

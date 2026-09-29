@@ -3,6 +3,8 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.permissions import reset_perms
 from frappe.utils import cint
 
+from treasury.utils.settings import set_missing_single_defaults
+
 TREASURY_ROLES = ("Treasury Manager", "Treasury User", "Cheque Approver")
 TREASURY_MODULE = "Treasury Setup"
 
@@ -87,6 +89,13 @@ def setup():
 	create_roles()
 	create_custom_fields(get_custom_fields(), update=True)
 	remove_legacy_permissions()
+	set_default_settings()
+
+
+def set_default_settings() -> list[str]:
+	"""Store the defaults of Treasury Settings fields a site has no value for yet (`bench migrate` does not
+	store the default of a Single field added after install). Values already set, 0 included, are kept."""
+	return set_missing_single_defaults("Treasury Settings")
 
 
 def create_module_defs():

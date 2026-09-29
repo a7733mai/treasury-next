@@ -8,10 +8,10 @@ Cheques are read with `frappe.get_list` (permissions and User Permissions apply)
 
 import frappe
 from frappe import _
-from frappe.utils import add_days
+from frappe.utils import add_days, cint, flt
 
 import erpnext
-from treasury.pdc.report_utils import report_today, validate_company
+from treasury.pdc.report_utils import get_precision, report_today, validate_company
 from treasury.security_cheques.lifecycle import INCOMING, LIVE_BY_DIRECTION, LIVE_STATUSES, OPEN, OUTGOING
 from treasury.security_cheques.report_utils import DOCTYPE, AmountConverter, get_security_cheques
 
@@ -51,7 +51,7 @@ def _total(company: str, direction: str) -> dict:
 	)
 	converter = AmountConverter(company)
 	return {
-		"value": sum(converter.company_amount(c) for c in cheques),
+		"value": flt(sum(converter.company_amount(c) for c in cheques), get_precision()),
 		"fieldtype": "Currency",
 		"options": converter.company_currency,
 		"route": REGISTER,
@@ -70,8 +70,10 @@ def _count(company: str, scope: str) -> dict:
 	else:
 		conditions["expiry_date"] = ["<", today]
 		route_options.update(expiry_to=str(add_days(today, -1)))
+	# counted by the database; `frappe.get_list`: permissions and User Permissions apply
+	count = frappe.get_list(DOCTYPE, filters=conditions, fields=[{"COUNT": "*", "as": "count"}])
 	return {
-		"value": len(get_security_cheques(conditions, fields=["name"])),
+		"value": cint(count[0].count) if count else 0,
 		"fieldtype": "Int",
 		"route": REGISTER,
 		"route_options": route_options,

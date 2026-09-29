@@ -1,7 +1,7 @@
 """Comparison helpers for fields only a Treasury lifecycle service may change.
 
 A lifecycle saves with `flags.treasury_lifecycle`; a controller compares the other saves with the document
-before the save (see PDCCheque.validate_protected_fields, which this mirrors for the Security Cheque).
+before the save (PDCCheque / SecurityCheque.validate_protected_fields).
 """
 
 import frappe

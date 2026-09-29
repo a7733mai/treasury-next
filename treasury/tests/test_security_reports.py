@@ -11,6 +11,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt
 
+from treasury.install import set_default_settings
 from treasury.security_cheques import dashboard, scheduler
 from treasury.security_cheques.report.expired_security_cheques_not_returned.expired_security_cheques_not_returned import (
 	execute as expired_not_returned,
@@ -38,6 +39,7 @@ from treasury.tests.utils import (
 	make_sales_order,
 	make_security_cheque,
 )
+from treasury.utils.settings import stored_single_value
 
 T = day(0)  # the reports' "today"
 DOCTYPE = "Security Cheque"
@@ -118,6 +120,7 @@ class TestSecurityChequeRegister(SecurityReportTestCase):
 		total = data[-1]
 		self.assertTrue(total.is_total)
 		self.assertEqual((total.cheque_count, flt(total.base_amount)), (4, 2000))
+		self.assertEqual((total.direction, total.cheque_no), ("Incoming", "Total Held from Others"))
 
 		_columns, data = security_register({**filters, "status": ["In Custody"]})
 		self.assertEqual(list(cheque_rows(data)), [in_custody.name])
@@ -129,6 +132,26 @@ class TestSecurityChequeRegister(SecurityReportTestCase):
 		self.assertEqual(list(cheque_rows(data)), [open_expired.name])
 
 		self.assertRaises(frappe.ValidationError, security_register, {**filters, "status": ["Bounced"]})
+
+	def test_totals_per_direction(self):
+		order = make_sales_order(50000, transaction_date=day(-70), customer=new_customer())
+		reference = {"reference_doctype": "Sales Order", "reference_name": order.name}
+		held(new_customer(), 1000, **reference)
+		held(new_customer(), 500, **reference)
+		given(new_supplier(), 4000, **reference)
+		_columns, data = security_register({"company": COMPANY, **reference})
+		totals = {r.direction: r for r in data if r.get("is_total")}
+		self.assertEqual(
+			{d: (t.cheque_count, flt(t.base_amount)) for d, t in totals.items()},
+			{"Incoming": (2, 1500), "Outgoing": (1, 4000)},
+		)
+		self.assertEqual(totals["Outgoing"].cheque_no, "Total Given to Others")
+
+		# nothing found: a single empty total
+		_columns, data = security_register(
+			{"company": COMPANY, "party_type": "Customer", "party": new_customer()}
+		)
+		self.assertEqual([(r.is_total, r.cheque_count) for r in data], [(1, 0)])
 		self.assertRaises(
 			frappe.ValidationError, security_register, {**filters, "expiry_from": day(5), "expiry_to": day(1)}
 		)
@@ -173,25 +196,39 @@ class TestSecurityExposure(SecurityReportTestCase):
 	def test_shortfall_per_reference_document(self):
 		customer = new_customer()
 		order = make_sales_order(50000, transaction_date=day(-70), customer=customer)
-		reference = {"reference_doctype": "Sales Order", "reference_name": order.name, "required_amount": 10000}
+		reference = {
+			"reference_doctype": "Sales Order",
+			"reference_name": order.name,
+			"required_amount": 10000,
+		}
 		held(customer, 3000, **reference)
 		held(customer, 2000, **reference)
 		held(customer, amount_type="Open / Blank", **reference)
 		lone = held(customer, 1000, required_amount=1500)  # no reference: its own row
 
 		_columns, data, _message, _chart, summary = exposure(
-			{"company": COMPANY, "group_by": "Reference Document", "party_type": "Customer", "party": customer}
+			{
+				"company": COMPANY,
+				"group_by": "Reference Document",
+				"party_type": "Customer",
+				"party": customer,
+			}
 		)
 		rows = {(r.reference_doctype, r.reference_name): r for r in data}
 		contract = rows[("Sales Order", order.name)]
 		self.assertEqual(
 			(contract.fixed_count, contract.open_count, flt(contract.amount)), (2, 1, 5000)
 		)
-		# the requirement is the document's (the highest on its cheques), not the sum of the cheques' fields
-		self.assertEqual((flt(contract.required_amount), flt(contract.shortfall)), (10000, 5000))
+		# the requirement is the document's (the highest on its cheques), not the sum of the cheques' fields;
+		# the Open / Blank cheque can be filled in for the rest: no shortfall is claimed
+		self.assertEqual(flt(contract.required_amount), 10000)
+		self.assertEqual((contract.shortfall, contract.coverage), (None, "Covered by Open / Blank"))
+		customer_name = frappe.db.get_value("Customer", customer, "customer_name")
+		self.assertEqual((contract.party, contract.party_name), (customer, customer_name))
 		own = rows[(DOCTYPE, lone.name)]
 		self.assertEqual((flt(own.required_amount), flt(own.amount), flt(own.shortfall)), (1500, 1000, 500))
-		self.assertEqual({s["label"]: s["value"] for s in summary}["Total Shortfall"], 5500)
+		self.assertEqual(own.coverage, "Shortfall")
+		self.assertEqual({s["label"]: s["value"] for s in summary}["Total Shortfall"], 500)
 
 		# covered: no shortfall, never negative
 		held(customer, 7000, **reference)
@@ -203,7 +240,43 @@ class TestSecurityExposure(SecurityReportTestCase):
 				"reference_name": order.name,
 			}
 		)
-		self.assertEqual((flt(data[0].amount), flt(data[0].shortfall)), (12000, 0))
+		self.assertEqual(
+			(flt(data[0].amount), flt(data[0].shortfall), data[0].coverage), (12000, 0, "Covered")
+		)
+
+	def test_several_parties_and_other_party(self):
+		first, second = new_customer(), new_customer()
+		order = make_sales_order(50000, transaction_date=day(-70), customer=first)
+		reference = {
+			"reference_doctype": "Sales Order",
+			"reference_name": order.name,
+			"required_amount": 5000,
+		}
+		held(first, 1000, **reference)
+		held(second, 2000, **reference)
+		_columns, data, *_rest = exposure(
+			{
+				"company": COMPANY,
+				"group_by": "Reference Document",
+				"reference_doctype": "Sales Order",
+				"reference_name": order.name,
+			}
+		)
+		self.assertEqual(len(data), 1)
+		self.assertEqual(
+			(data[0].party_type, data[0].party, data[0].party_name), (None, None, "Several Parties")
+		)
+		self.assertEqual((flt(data[0].amount), flt(data[0].shortfall)), (3000, 2000))
+
+		# a party of type Other is no DocType: no Party link, its name in Party Name
+		name = f"Tender Board {frappe.generate_hash(length=6)}"
+		other = held(None, 700, party_type="Other", party_name_other=name)
+		_columns, data, *_rest = exposure({"company": COMPANY, "party_type": "Other"})
+		row = next(r for r in data if r.party_name == name)
+		self.assertEqual((row.party_type, row.party), (None, None))
+		_columns, data = security_register({"company": COMPANY, "party_type": "Other"})
+		row = cheque_rows(data)[other.name]
+		self.assertEqual((row.party_type, row.party, row.party_name), (None, None, name))
 
 	def test_invalid_group_by(self):
 		self.assertRaises(frappe.ValidationError, exposure, {"company": COMPANY, "group_by": "Colour"})
@@ -288,6 +361,8 @@ class TestSecurityCards(SecurityReportTestCase):
 		returned.return_cheque(return_date=day(-1), reason="Completed")
 
 		self.assertEqual(flt(self.card("held") - before["held"], 2), 3500)
+		self.assertEqual(self.card("held"), flt(self.card("held"), 2))  # rounded to the currency precision
+		self.assertIsInstance(self.card("expiring"), int)
 		self.assertEqual(flt(self.card("given") - before["given"], 2), 4000)
 		self.assertEqual(self.card("expiring") - before["expiring"], 2)
 		self.assertEqual(self.card("expired") - before["expired"], 1)
@@ -295,7 +370,9 @@ class TestSecurityCards(SecurityReportTestCase):
 		result = dashboard.get_security_card({"company": COMPANY, "scope": "expiring"})
 		self.assertEqual(result["route"], ["query-report", "Security Cheque Register"])
 		self.assertEqual(result["route_options"]["expiry_to"], str(day(30)))
-		self.assertRaises(frappe.ValidationError, dashboard.get_security_card, {"company": COMPANY, "scope": "x"})
+		self.assertRaises(
+			frappe.ValidationError, dashboard.get_security_card, {"company": COMPANY, "scope": "x"}
+		)
 
 	def test_standard_records_exist(self):
 		for doctype, names in (
@@ -439,6 +516,23 @@ class TestSecurityExpiryAlerts(SecurityReportTestCase):
 		frappe.db.set_single_value("Treasury Settings", "security_alert_days", 10)
 		result = scheduler.send_security_expiry_alerts(as_of=day(2))
 		self.assertIn(cheque.name, result[COMPANY]["cheques"])
+
+	def test_alert_days_never_stored_defaults_to_15(self):
+		"""A site migrated after the field was added has no Singles row: 15 days, not 0."""
+		singles = {"doctype": "Treasury Settings", "field": "security_alert_days"}
+		frappe.db.delete("Singles", singles)
+		frappe.clear_document_cache("Treasury Settings", "Treasury Settings")
+		self.assertEqual(scheduler.alert_days(), scheduler.DEFAULT_ALERT_DAYS)
+		cheque = held(new_customer(), 1818, expiry=10)  # 14 days after as_of day(-4): inside 15 days
+		result = scheduler.send_security_expiry_alerts(as_of=day(-4))
+		self.assertIn(cheque.name, result[COMPANY]["cheques"])
+
+		# after_migrate stores the missing default and keeps a value that is set (0 included)
+		self.assertIn("security_alert_days", set_default_settings())
+		self.assertEqual(stored_single_value("Treasury Settings", "security_alert_days"), "15")
+		frappe.db.set_single_value("Treasury Settings", "security_alert_days", 0)
+		self.assertNotIn("security_alert_days", set_default_settings())
+		self.assertEqual(scheduler.alert_days(), 0)
 
 	def test_email_only_when_outgoing_email_is_set_up(self):
 		held(new_customer(), 1616, expiry=2)

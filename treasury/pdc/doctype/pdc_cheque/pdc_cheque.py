@@ -3,15 +3,15 @@
 
 import frappe
 from frappe import _
-from frappe.model import no_value_fields
 from frappe.model.document import Document
-from frappe.utils import cint, flt, get_datetime, getdate, money_in_words
+from frappe.utils import flt, getdate, money_in_words
 
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.pdc import lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
+from treasury.utils.protected_fields import changed_fields, changed_tables
 
 PARTY_TYPES = ("Customer", "Supplier")
 NAMING_SERIES = {"Outgoing": "PDC-OUT-.YYYY.-.#####", "Incoming": "PDC-IN-.YYYY.-.#####"}
@@ -30,7 +30,8 @@ LOCKED_DATE_FIELDS = ("issue_date", "original_due_date")
 # `treasury_cheque_batch`) or carried to a replacement by the lifecycle, never changed afterwards.
 BATCH_FIELDS = ("cheque_batch", "cheque_batch_row")
 # Back-link to the Security Cheque whose encashment created the cheque: set only on insert by
-# treasury.security_cheques.lifecycle (flag `treasury_security_cheque`), never changed afterwards.
+# treasury.security_cheques.lifecycle (flag `treasury_security_cheque`) or carried to a replacement by the
+# lifecycle, never changed afterwards.
 SECURITY_FIELDS = ("security_cheque",)
 # What a submitted Cheque Batch voucher states about each of its cheques: frozen outside the cheque actions
 # while the batch is submitted (replace or cancel the cheque instead), together with the references.
@@ -240,16 +241,10 @@ class PDCCheque(Document):
 		before = self.get_doc_before_save()
 		if not before:
 			return
-		lifecycle_save = self.flags.treasury_lifecycle
-
-		changed = []
-		if not lifecycle_save:
-			changed = [f for f in PROTECTED_FIELDS if self._normalized(before, f) != self._normalized(self, f)]
-		for table in PROTECTED_TABLES:
-			old_rows, new_rows = self._table_key(before, table), self._table_key(self, table)
-			# existing rows never change; only the lifecycle appends new ones
-			if new_rows[: len(old_rows)] != old_rows or (len(new_rows) != len(old_rows) and not lifecycle_save):
-				changed.append(table)
+		lifecycle_save = bool(self.flags.treasury_lifecycle)
+		changed = [] if lifecycle_save else changed_fields(self, before, PROTECTED_FIELDS)
+		# existing rows never change; only the lifecycle appends new ones
+		changed += changed_tables(self, before, PROTECTED_TABLES, lifecycle_save)
 		if changed:
 			frappe.throw(
 				_("{0} can only be changed by the cheque actions.").format(
@@ -257,32 +252,6 @@ class PDCCheque(Document):
 				),
 				title=_("Not Allowed"),
 			)
-
-	@staticmethod
-	def _normalize(value, fieldtype: str):
-		if fieldtype == "Date":
-			return getdate(value) if value else None
-		if fieldtype == "Datetime":
-			return get_datetime(value) if value else None
-		if fieldtype in ("Int", "Check"):
-			return cint(value)
-		if fieldtype in ("Currency", "Float", "Percent"):
-			return flt(value, 9)
-		return value or None
-
-	def _normalized(self, doc, fieldname: str):
-		return self._normalize(doc.get(fieldname), self.meta.get_field(fieldname).fieldtype)
-
-	def _table_key(self, doc, table: str) -> list[tuple]:
-		fields = [
-			df
-			for df in frappe.get_meta(self.meta.get_field(table).options).fields
-			if df.fieldtype not in no_value_fields
-		]
-		return [
-			tuple(self._normalize(row.get(df.fieldname), df.fieldtype) for df in fields)
-			for row in doc.get(table)
-		]
 
 	def validate_party(self):
 		if self.party_type not in PARTY_TYPES:

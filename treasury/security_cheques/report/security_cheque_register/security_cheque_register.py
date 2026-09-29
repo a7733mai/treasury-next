@@ -3,14 +3,22 @@
 
 """Security Cheque Register (PLAN.md §7): security cheques held and given, with every filter and status.
 
-`days_to_expiry` is shown for the cheques still held / given (negative once expired).
+`days_to_expiry` is shown for the cheques still held / given (negative once expired). The totals are per
+direction (held from others / given to others), never added together.
 """
 
 import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from treasury.pdc.report_utils import column, get_precision, report_today, validate_company, validate_date_range
+from treasury.pdc.report_utils import (
+	column,
+	get_precision,
+	report_today,
+	validate_company,
+	validate_date_range,
+)
+from treasury.security_cheques.lifecycle import INCOMING, OUTGOING
 from treasury.security_cheques.report_utils import (
 	CTX,
 	DOCTYPE,
@@ -31,8 +39,7 @@ def execute(filters=None):
 	converter = AmountConverter(company)
 	today = report_today()
 	rows = [make_row(c, converter, today) for c in get_security_cheques(get_filters(filters, company))]
-	rows.append(total_row(rows, converter.company_currency))
-	return get_columns(), rows
+	return get_columns(), rows + total_rows(rows, converter.company_currency)
 
 
 def get_filters(filters: frappe._dict, company: str) -> list:
@@ -60,11 +67,25 @@ def get_filters(filters: frappe._dict, company: str) -> list:
 	return conditions
 
 
-def total_row(rows: list[frappe._dict], company_currency: str) -> frappe._dict:
+def total_rows(rows: list[frappe._dict], company_currency: str) -> list[frappe._dict]:
+	"""One total per direction: security held from others and given to others are never added together."""
+	totals = []
+	for direction, label in (
+		(INCOMING, _("Total Held from Others")),
+		(OUTGOING, _("Total Given to Others")),
+	):
+		direction_rows = [r for r in rows if r.direction == direction]
+		if direction_rows:
+			totals.append(total_row(direction_rows, company_currency, label, direction))
+	return totals or [total_row([], company_currency, _("Total", context=CTX))]
+
+
+def total_row(rows: list[frappe._dict], company_currency: str, label: str, direction=None) -> frappe._dict:
 	return frappe._dict(
 		is_total=1,
 		indent=0,
-		cheque_no=_("Total", context=CTX),
+		direction=direction,
+		cheque_no=label,
 		cheque_count=len(rows),
 		base_amount=flt(sum(r.base_amount for r in rows), get_precision()),
 		company_currency=company_currency,

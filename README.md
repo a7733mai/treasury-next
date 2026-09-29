@@ -131,8 +131,11 @@ bench install-app treasury
   - The custody log (from / to location and custodian, date, user, remarks) is append-only; returning,
     encashing or losing a cheque closes it with a final row.
   - Once received / issued, the cheque itself (party, cheque no, bank, amount, amount type, currency, issue
-    and cheque dates) is locked; remarks, purpose, reference, required amount and expiry date (the
-    guarantee may be extended) stay editable.
+    and cheque dates) is locked. The expiry date then moves only through *Extend Expiry* (new date after
+    the current one, reason required; a status log row "Expiry Extended" records old → new date), which
+    works on any cheque that is not final. Remarks, purpose, reference and required amount stay editable
+    while the cheque is live; once it is final (Returned, Encashed, Lost, Cancelled) the reference,
+    required amount and expiry are frozen too, so the reports' history cannot be rewritten.
   - *Expired* (list / form indicator, virtual `is_expired` field): expiry date passed and still held /
     given. It is not a status.
 - **Currency.** Outgoing: the currency of the bank account's GL account (read-only). Incoming: the company
@@ -163,20 +166,30 @@ bench install-app treasury
   - The PDC Cheque's issue date is the encashment date (an `On Creation` posting is never back-dated). It
     links back through its read-only *Security Cheque* field (set only by the encashment), the security
     cheque becomes Encashed with *Converted PDC Cheque* set. All or nothing: if the PDC Cheque cannot be
-    created or received / delivered, nothing is kept.
+    created or received / delivered, nothing is kept (the PDC Cheque, its `On Creation` posting and the
+    security cheque's Encashed state are rolled back together).
+  - Replacing that PDC Cheque carries the *Security Cheque* link to the replacement; the security cheque's
+    *Converted PDC Cheque* keeps pointing at the first one, whose *Replaced By* leads on.
 - **Alerts.** A daily job (`treasury.security_cheques.scheduler.send_security_expiry_alerts`) sends each
   Treasury Manager / User one digest per company and day of the cheques still held / given that expired
   (not returned) or expire within *Security Cheque Alert Days* (Treasury Settings, default 15) — only the
   cheques they may read, in their language, as a notification and, if outgoing email is set up, by email.
+  A setting never stored counts as 15 (and `bench migrate` stores the missing Treasury Settings defaults);
+  an explicit 0 means "expired cheques only".
 - **Reports and cards** (Security Cheques section of the Treasury workspace): *Security Cheque Register*,
   *Security Exposure* (held from others vs given to others, by party or by reference document with Required
   / Actual / Shortfall — the requirement of a document is the highest Required Amount on its cheques, not
-  their sum; a cheque without a reference is its own row; Open / Blank cheques are counted, never summed),
+  their sum; a cheque without a reference is its own row; Open / Blank cheques are counted, never summed,
+  and when a document's fixed cheques fall short but it also has Open / Blank ones the shortfall is left
+  blank — "Covered by Open / Blank" — and not counted in the Total Shortfall; a document guaranteed by
+  several parties shows "Several Parties"),
   *Security Cheques by Custody*, *Expired Security Cheques Not Returned*; number cards *Security Held*
   (incoming Received + In Custody), *Security Given* (outgoing Issued), *Security Cheques Expiring in 30
   Days* (today to today + 30) and *Expired Security Cheques Not Returned*. Amounts are in the company
   currency (a cheque in another currency is converted at today's rate; company currency cheques are never
-  converted); reports and cards read with the user's permissions and User Permissions.
+  converted); reports and cards read with the user's permissions and User Permissions. The register totals
+  each direction separately (held and given are never added together). A party of type Other has no
+  Party link in the reports (its name is in Party Name).
 - **Print.** *Security Cheque Receipt*: receipt (incoming) / handover acknowledgment (outgoing) with the
   print date (today), party, cheque, amount or "Open / Blank", purpose, reference, expiry, custody location
   and signatures; right-to-left in Arabic.

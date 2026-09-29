@@ -873,7 +873,9 @@ def _apply_postponement(doc, new_due_date, reason: str | None, contact_person: s
 
 def _make_replacement(doc, values: frappe._dict, date):
 	new = frappe.new_doc(DOCTYPE)
-	# the replacement stands for the same installment of the cheque's batch, if any
+	# the replacement stands for the same installment of the cheque's batch, if any, and for the same
+	# security cheque encashment (the security cheque keeps pointing at the first PDC Cheque; `replaced_by`
+	# leads from there to the replacement)
 	for fieldname in (
 		"direction",
 		"company",
@@ -884,6 +886,7 @@ def _make_replacement(doc, values: frappe._dict, date):
 		"remarks",
 		"cheque_batch",
 		"cheque_batch_row",
+		"security_cheque",
 	):
 		new.set(fieldname, doc.get(fieldname))
 	new.cheque_no = values.cheque_no
@@ -899,7 +902,8 @@ def _make_replacement(doc, values: frappe._dict, date):
 	if flt(values.exchange_rate):
 		new.exchange_rate = flt(values.exchange_rate)
 	new.replaces = doc.name
-	new.flags.treasury_lifecycle = True  # keeps `replaces` (a lifecycle-only field) on insert
+	# keeps `replaces` and the carried batch / security cheque links (lifecycle-only fields) on insert
+	new.flags.treasury_lifecycle = True
 	for ref in doc.references:
 		new.append(
 			"references",
