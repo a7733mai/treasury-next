@@ -1,6 +1,8 @@
-"""Number Card source of the Bank Facilities section of the Treasury workspace (read only).
+"""Number Card sources of the Bank Facilities section of the Treasury workspace (read only).
 
-One method for the four cards (`scope`), in the company currency (today's rate):
+`get_instrument_card`: open Letters of Guarantee / Credit and outstanding discounted cheques (see there).
+
+`get_facility_card`: one method for the four facility cards (`scope`), in the company currency (today's rate):
 - limits: the total limits of the Active / Suspended facilities;
 - utilised: their utilisation, from the ledger (treasury.bank_facilities.utilisation);
 - due_30: the unpaid installments due from today to today + 30 days (sum);
@@ -64,6 +66,53 @@ def _facility_total(company: str, scope: str) -> dict:
 		"fieldtype": "Currency",
 		"options": converter.company_currency,
 		"route": UTILISATION,
+		"route_options": {"company": company},
+	}
+
+
+INSTRUMENT_SCOPES = {
+	# scope: (doctype, open statuses, amount field, report)
+	"open_lgs": ("Letter of Guarantee", ("Issued", "Extended", "Reduced"), "open_amount", "LG Register"),
+	"open_lcs": (
+		"Letter of Credit",
+		("Opened", "Amended", "Documents Received", "Accepted"),
+		"open_amount",
+		"LC Register",
+	),
+	"discounted": (
+		"Cheque Discounting",
+		("Discounted", "Partially Settled"),
+		"outstanding_amount",
+		"Discounted Cheques",
+	),
+}
+
+
+@frappe.whitelist()
+def get_instrument_card(filters: str | dict | None = None) -> dict:
+	"""filters: company (default: the user's default company) and scope: open_lgs (open amount of the open
+	Letters of Guarantee), open_lcs (open amount of the open Letters of Credit) or discounted (discounted
+	cheques not paid or bounced yet). Company currency at the reports' today rate."""
+	filters = frappe._dict(frappe.parse_json(filters) or {})
+	if filters.scope not in INSTRUMENT_SCOPES:
+		frappe.throw(_("Invalid scope: {0}").format(filters.scope))
+	doctype, statuses, amount_field, report = INSTRUMENT_SCOPES[filters.scope]
+	company = filters.company or erpnext.get_default_company()
+	if not company:
+		return {"value": 0, "fieldtype": "Currency"}
+	company = validate_company(company, doctype)
+	converter = CompanyConverter(company)
+	rows = frappe.get_list(
+		doctype,
+		filters={"company": company, "docstatus": 1, "status": ["in", statuses]},
+		fields=["currency", amount_field],
+	)
+	total = sum(converter.convert(row.get(amount_field), row.currency) for row in rows)
+	return {
+		"value": flt(total, get_precision()),
+		"fieldtype": "Currency",
+		"options": converter.company_currency,
+		"route": ["query-report", report],
 		"route_options": {"company": company},
 	}
 

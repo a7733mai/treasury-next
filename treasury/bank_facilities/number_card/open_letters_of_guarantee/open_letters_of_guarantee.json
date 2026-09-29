@@ -1,0 +1,23 @@
+{
+ "color": "#5E64FF",
+ "creation": "2026-10-20 09:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Letter of Guarantee",
+ "dynamic_filters_json": "{\"company\":\"frappe.defaults.get_user_default(\\\"Company\\\")\"}",
+ "filters_json": "{\"scope\":\"open_lgs\"}",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Open Letters of Guarantee",
+ "method": "treasury.bank_facilities.dashboard.get_instrument_card",
+ "modified": "2026-10-20 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Open Letters of Guarantee",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Custom"
+}

@@ -60,4 +60,37 @@
 		</tbody>
 	</table>
 	{% endif %}
+	{% if guarantees %}
+	<h4>{{ _("Letters of Guarantee") }}</h4>
+	<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+		<thead>
+			<tr>
+				<th>{{ _("Letter of Guarantee") }}</th>
+				<th>{{ _("LG No") }}</th>
+				<th>{{ _("Beneficiary", context="Letter of Guarantee") }}</th>
+				<th>{{ _("Bank") }}</th>
+				<th>{{ _("Amount") }}</th>
+				<th>{{ _("Margin Held") }}</th>
+				<th>{{ _("Effective Expiry Date") }}</th>
+				<th>{{ _("Days to Expiry") }}</th>
+				<th>{{ _("Action", context="Bank Facility") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in guarantees %}
+			<tr>
+				<td>{{ row.name | e }}</td>
+				<td>{{ (row.lg_no or "") | e }}</td>
+				<td>{{ (row.beneficiary_name or "") | e }}</td>
+				<td>{{ (row.bank or "") | e }}</td>
+				<td style="text-align: right;">{{ row.amount_formatted }}</td>
+				<td style="text-align: right;">{{ row.margin_formatted }}</td>
+				<td>{{ row.expiry }}</td>
+				<td style="text-align: right;">{{ row.days_to_expiry }}</td>
+				<td>{{ row.note | e }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% endif %}
 </div>

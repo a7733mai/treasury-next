@@ -3392,3 +3392,949 @@ msgstr "تحديث الحالة"
 
 msgid "The principal beyond the installments due up to the repayment date reduces the later installments; the tenor is kept."
 msgstr "ما يزيد من الأصل على الأقساط المستحقة حتى تاريخ السداد يخفض الأقساط اللاحقة مع الإبقاء على المدة."
+
+# ---------------------------------------------------------------------------
+# Phase 5b — Letters of Guarantee, Letters of Credit, Cheque Discounting
+# ---------------------------------------------------------------------------
+
+# DocTypes
+msgid "Bank Instrument Status Log"
+msgstr "سجل حالات الأدوات البنكية"
+
+msgid "Cheque Discounting Item"
+msgstr "شيك في دفعة الخصم"
+
+msgid "Status history of a Letter of Guarantee, Letter of Credit or Cheque Discounting batch (append-only, written by the instrument actions)."
+msgstr "سجل حالات خطاب ضمان أو اعتماد مستندي أو دفعة خصم شيكات (إضافة فقط، تكتبه إجراءات الأداة)."
+
+msgid "A Letter of Guarantee issued by the bank under a Bank Facility: cash margin and commission on issue, then extension, reduction, release or claim. The guaranteed amount itself is off-balance sheet (not booked)."
+msgstr "خطاب ضمان يصدره البنك بموجب تسهيل بنكي: تأمين نقدي وعمولة عند الإصدار، ثم تمديد أو تخفيض أو إفراج أو تسييل. مبلغ الضمان نفسه خارج الميزانية (لا يُقيَّد)."
+
+msgid "An import Letter of Credit opened by the bank under a Bank Facility: cash margin and commission on opening, amendments, documents, acceptance (usance) and settlement to the supplier."
+msgstr "اعتماد مستندي للاستيراد يفتحه البنك بموجب تسهيل بنكي: تأمين نقدي وعمولة عند الفتح، ثم التعديلات والمستندات والقبول (الآجل) والسداد للمورد."
+
+msgid "A batch of received customer cheques discounted at the bank under a Bank Facility: the bank credits the net proceeds now and collects the cheques at maturity (with recourse on the company if one bounces)."
+msgstr "دفعة من شيكات العملاء المستلمة تُخصم لدى البنك بموجب تسهيل بنكي: يضيف البنك صافي المتحصلات الآن ويحصّل الشيكات في استحقاقها (مع حق الرجوع على الشركة إذا ارتد أحدها)."
+
+# Status log fields
+msgid "The date of the event itself (e.g. the issue, extension or release date)."
+msgstr "تاريخ الحدث نفسه (مثل تاريخ الإصدار أو التمديد أو الإفراج)."
+
+msgid "Open Amount"
+msgstr "المبلغ القائم"
+
+msgid "The amount still open (counting against the facility) after the event, in the instrument currency."
+msgstr "المبلغ الذي لا يزال قائماً (محسوباً على التسهيل) بعد الحدث، بعملة الأداة."
+
+# Letter of Guarantee fields
+msgid "LG Type"
+msgstr "نوع خطاب الضمان"
+
+msgid "LG No"
+msgstr "رقم خطاب الضمان"
+
+msgid "The bank's reference number of the guarantee."
+msgstr "الرقم المرجعي للضمان لدى البنك."
+
+msgid "The company bank account the cash margin and the commission are paid from (default: the facility's), in the facility currency."
+msgstr "الحساب البنكي للشركة الذي يُدفع منه التأمين النقدي والعمولة (افتراضياً: حساب التسهيل) بعملة التسهيل."
+
+msgid "Facility currency to company currency, on the issue date."
+msgstr "من عملة التسهيل إلى عملة الشركة في تاريخ الإصدار."
+
+msgctxt "Letter of Guarantee"
+msgid "Beneficiary"
+msgstr "المستفيد"
+
+msgid "Beneficiary Type"
+msgstr "نوع المستفيد"
+
+msgid "Beneficiary Name"
+msgstr "اسم المستفيد"
+
+msgid "The name of the beneficiary (filled from the customer / supplier; entered for Other)."
+msgstr "اسم المستفيد (يُملأ من العميل / المورد، ويُدخل يدوياً للنوع أخرى)."
+
+msgid "Project, Contract, Sales Order, Purchase Order or Quotation the guarantee is for."
+msgstr "المشروع أو العقد أو أمر البيع أو أمر الشراء أو عرض السعر الذي صدر الضمان من أجله."
+
+msgid "ERPNext Bank Guarantee"
+msgstr "ضمان بنكي ERPNext"
+
+msgid "Optional link to ERPNext's own Bank Guarantee record, for reference only (it is not changed)."
+msgstr "ربط اختياري بسجل الضمان البنكي الخاص بـ ERPNext للمرجعية فقط (لا يتم تعديله)."
+
+msgid "Amount and Dates"
+msgstr "المبلغ والتواريخ"
+
+msgid "The guaranteed amount still open (after reductions); counts against the facility until released, claimed or expired."
+msgstr "مبلغ الضمان الذي لا يزال قائماً (بعد التخفيضات)؛ يُحسب على التسهيل حتى الإفراج أو التسييل أو الانتهاء."
+
+msgid "Original Expiry Date"
+msgstr "تاريخ الانتهاء الأصلي"
+
+msgid "The original expiry date of the guarantee."
+msgstr "تاريخ الانتهاء الأصلي للضمان."
+
+msgid "Effective Expiry Date"
+msgstr "تاريخ الانتهاء الفعلي"
+
+msgid "The current expiry date (moved by extensions)."
+msgstr "تاريخ الانتهاء الحالي (يتغير بالتمديد)."
+
+msgid "Release Date"
+msgstr "تاريخ الإفراج"
+
+msgid "Claim Date"
+msgstr "تاريخ التسييل"
+
+msgid "Cash Margin and Commission"
+msgstr "التأمين النقدي والعمولة"
+
+msgid "Default: the Cash Margin (%) of the facility's Letter of Guarantee sub-limit."
+msgstr "افتراضياً: نسبة التأمين النقدي في حد خطابات الضمان بالتسهيل."
+
+msgid "Cash Margin Amount"
+msgstr "مبلغ التأمين النقدي"
+
+msgid "Margin Account"
+msgstr "حساب التأمينات النقدية"
+
+msgid "Asset account holding the cash margins (e.g. \"LG cash margins\"), in the facility currency."
+msgstr "حساب أصول يحتفظ بالتأمينات النقدية (مثل \"تأمينات خطابات الضمان\") بعملة التسهيل."
+
+msgid "Margin Held"
+msgstr "التأمين المحتجز"
+
+msgid "The cash margin still held by the bank."
+msgstr "التأمين النقدي الذي لا يزال البنك يحتجزه."
+
+msgid "Default: the Commission Rate (%) of the sub-limit. When set, the commission is the amount x the rate."
+msgstr "افتراضياً: نسبة عمولة الحد الفرعي. عند تحديدها تكون العمولة = المبلغ × النسبة."
+
+msgid "Commission Amount"
+msgstr "مبلغ العمولة"
+
+msgid "Commission Account"
+msgstr "حساب العمولات"
+
+msgid "Expense account of the commissions (default: the facility's Commission Expense Account)."
+msgstr "حساب مصروف العمولات (افتراضياً: حساب مصروف العمولات في التسهيل)."
+
+msgctxt "Letter of Guarantee"
+msgid "Claim"
+msgstr "التسييل"
+
+msgid "Claim Amount"
+msgstr "مبلغ التسييل"
+
+msgid "Claim Account"
+msgstr "حساب التسييل"
+
+msgid "The account debited with the claim."
+msgstr "الحساب المدين بمبلغ التسييل."
+
+msgid "Claim Owed to the Bank"
+msgstr "المستحق للبنك من التسييل"
+
+msgid "The part of the claim the bank paid beyond the cash margin, still owed to the bank (on the Liability Account of the sub-limit)."
+msgstr "جزء التسييل الذي دفعه البنك زيادة على التأمين النقدي ولا يزال مستحقاً له (على حساب التزام الحد الفرعي)."
+
+msgid "Margin Journal Entry"
+msgstr "قيد التأمين النقدي"
+
+msgid "Commission Journal Entry"
+msgstr "قيد العمولة"
+
+msgctxt "Letter of Guarantee"
+msgid "Accounting"
+msgstr "المحاسبة"
+
+msgctxt "Letter of Credit"
+msgid "Accounting"
+msgstr "المحاسبة"
+
+msgctxt "Cheque Discounting"
+msgid "Accounting"
+msgstr "المحاسبة"
+
+# Letter of Guarantee types, statuses and events
+msgctxt "Letter of Guarantee"
+msgid "Bid Bond"
+msgstr "ضمان ابتدائي"
+
+msgctxt "Letter of Guarantee"
+msgid "Performance"
+msgstr "ضمان نهائي (حسن التنفيذ)"
+
+msgctxt "Letter of Guarantee"
+msgid "Advance Payment"
+msgstr "ضمان دفعة مقدمة"
+
+msgctxt "Letter of Guarantee"
+msgid "Retention"
+msgstr "ضمان محتجزات"
+
+msgctxt "Letter of Guarantee"
+msgid "Financial"
+msgstr "ضمان مالي"
+
+msgctxt "Letter of Guarantee"
+msgid "Customs"
+msgstr "ضمان جمركي"
+
+msgctxt "Letter of Guarantee"
+msgid "Other"
+msgstr "أخرى"
+
+msgctxt "Letter of Guarantee"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Letter of Guarantee"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Letter of Guarantee"
+msgid "Issued"
+msgstr "صادر"
+
+msgctxt "Letter of Guarantee"
+msgid "Extended"
+msgstr "ممدد"
+
+msgctxt "Letter of Guarantee"
+msgid "Reduced"
+msgstr "مخفض"
+
+msgctxt "Letter of Guarantee"
+msgid "Released"
+msgstr "مُفرج عنه"
+
+msgctxt "Letter of Guarantee"
+msgid "Claimed"
+msgstr "مُسيَّل"
+
+msgctxt "Letter of Guarantee"
+msgid "Claim Repaid"
+msgstr "تم سداد التسييل"
+
+msgctxt "Letter of Guarantee"
+msgid "Expired"
+msgstr "منتهي"
+
+msgctxt "Letter of Guarantee"
+msgid "Cancelled"
+msgstr "ملغي"
+
+# Letter of Credit fields
+msgid "LC Type"
+msgstr "نوع الاعتماد"
+
+msgid "LC No"
+msgstr "رقم الاعتماد"
+
+msgid "The bank's reference number of the credit."
+msgstr "الرقم المرجعي للاعتماد لدى البنك."
+
+msgid "The company bank account the margin, the charges and the settlement are paid from (default: the facility's), in the facility currency."
+msgstr "الحساب البنكي للشركة الذي يُدفع منه التأمين والمصاريف والسداد (افتراضياً: حساب التسهيل) بعملة التسهيل."
+
+msgid "Facility currency to company currency, on the opening date."
+msgstr "من عملة التسهيل إلى عملة الشركة في تاريخ الفتح."
+
+msgid "Supplier and Shipment"
+msgstr "المورد والشحن"
+
+msgid "Tolerance (%)"
+msgstr "نسبة التجاوز المسموح (%)"
+
+msgid "The documents may exceed the amount by this percentage."
+msgstr "يجوز أن تتجاوز المستندات المبلغ بهذه النسبة."
+
+msgid "Latest Shipment Date"
+msgstr "آخر موعد للشحن"
+
+msgid "Usance Days"
+msgstr "أيام الأجل"
+
+msgid "Days from the acceptance to the maturity (the default maturity date)."
+msgstr "الأيام من القبول حتى الاستحقاق (تاريخ الاستحقاق الافتراضي)."
+
+msgid "Current Amount"
+msgstr "المبلغ الحالي"
+
+msgid "The amount after amendments."
+msgstr "المبلغ بعد التعديلات."
+
+msgid "The amount still open (current amount, or the documents amount once received); counts against the facility until settled or expired."
+msgstr "المبلغ الذي لا يزال قائماً (المبلغ الحالي، أو مبلغ المستندات بعد استلامها)؛ يُحسب على التسهيل حتى السداد أو الانتهاء."
+
+msgid "Opening Date"
+msgstr "تاريخ الفتح"
+
+msgid "The original expiry date of the credit."
+msgstr "تاريخ الانتهاء الأصلي للاعتماد."
+
+msgid "The current expiry date (moved by amendments)."
+msgstr "تاريخ الانتهاء الحالي (يتغير بالتعديلات)."
+
+msgid "Documents and Settlement"
+msgstr "المستندات والسداد"
+
+msgid "Documents Received Date"
+msgstr "تاريخ استلام المستندات"
+
+msgid "Documents Amount"
+msgstr "مبلغ المستندات"
+
+msgid "Acceptance Date"
+msgstr "تاريخ القبول"
+
+msgid "Maturity Date"
+msgstr "تاريخ الاستحقاق"
+
+msgid "Usance: the date the bank pays the supplier (expected outflow in the Bank Position Forecast)."
+msgstr "الآجل: التاريخ الذي يدفع فيه البنك للمورد (صادر متوقع في تقرير مركز البنك)."
+
+msgid "Settlement Date"
+msgstr "تاريخ السداد"
+
+msgid "Settled Amount"
+msgstr "المبلغ المسدد"
+
+msgid "Settlement Payment Entry"
+msgstr "قيد دفع السداد"
+
+msgid "Cash Margin, Commission and Charges"
+msgstr "التأمين النقدي والعمولة والمصاريف"
+
+msgid "Default: the Cash Margin (%) of the facility's Letter of Credit sub-limit."
+msgstr "افتراضياً: نسبة التأمين النقدي في حد الاعتمادات المستندية بالتسهيل."
+
+msgid "Asset account holding the cash margins (e.g. \"LC cash margins\"), in the facility currency."
+msgstr "حساب أصول يحتفظ بالتأمينات النقدية (مثل \"تأمينات الاعتمادات\") بعملة التسهيل."
+
+msgid "Charges Account"
+msgstr "حساب المصاريف"
+
+msgid "Expense account of the amendment and documents charges (default: the Commission Account)."
+msgstr "حساب مصروف مصاريف التعديل والمستندات (افتراضياً: حساب العمولات)."
+
+# Letter of Credit types, statuses and events
+msgctxt "Letter of Credit"
+msgid "Sight"
+msgstr "اطلاع"
+
+msgctxt "Letter of Credit"
+msgid "Usance"
+msgstr "آجل"
+
+msgctxt "Letter of Credit"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Letter of Credit"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Letter of Credit"
+msgid "Opened"
+msgstr "مفتوح"
+
+msgctxt "Letter of Credit"
+msgid "Amended"
+msgstr "معدَّل"
+
+msgctxt "Letter of Credit"
+msgid "Documents Received"
+msgstr "تم استلام المستندات"
+
+msgctxt "Letter of Credit"
+msgid "Accepted"
+msgstr "مقبول"
+
+msgctxt "Letter of Credit"
+msgid "Settled"
+msgstr "مسدد"
+
+msgctxt "Letter of Credit"
+msgid "Margin Released"
+msgstr "تم الإفراج عن التأمين"
+
+msgctxt "Letter of Credit"
+msgid "Expired"
+msgstr "منتهي"
+
+msgctxt "Letter of Credit"
+msgid "Cancelled"
+msgstr "ملغي"
+
+# Cheque Discounting fields
+msgid "Discount Date"
+msgstr "تاريخ الخصم"
+
+msgid "The date the cheque was discounted at the bank (Cheque Discounting)."
+msgstr "تاريخ خصم الشيك لدى البنك (خصم الأوراق التجارية)."
+
+msgid "The Cheque Discounting batch the cheque is currently discounted with."
+msgstr "دفعة خصم الشيكات المخصوم بها الشيك حالياً."
+
+msgid "Facility currency to company currency, on the discount date."
+msgstr "من عملة التسهيل إلى عملة الشركة في تاريخ الخصم."
+
+msgid "The company bank account credited with the net proceeds (default: the facility's), in the facility currency."
+msgstr "الحساب البنكي للشركة الذي يُضاف إليه صافي المتحصلات (افتراضياً: حساب التسهيل) بعملة التسهيل."
+
+msgid "Discount Rate (% p.a.)"
+msgstr "سعر الخصم (% سنوياً)"
+
+msgid "Per annum (default: the rate of the facility's Cheque Discounting sub-limit). Charges per cheque = amount x rate x days to the due date / 365 or 360."
+msgstr "سنوياً (افتراضياً: سعر حد خصم الأوراق التجارية بالتسهيل). مصاريف كل شيك = المبلغ × السعر × الأيام حتى الاستحقاق / 365 أو 360."
+
+msgid "Default: the Day Count of the sub-limit."
+msgstr "افتراضياً: أساس حساب الأيام في الحد الفرعي."
+
+msgid "Bank commission of the batch (default: the sub-limit's Commission Rate x the total)."
+msgstr "عمولة البنك على الدفعة (افتراضياً: نسبة عمولة الحد الفرعي × الإجمالي)."
+
+msgid "Discounted Liability Account"
+msgstr "حساب التزام الأوراق المخصومة"
+
+msgid "The Liability Account of the Cheque Discounting sub-limit (\"Discounted cheques\"), credited with the total until the cheques are paid."
+msgstr "حساب التزام حد خصم الأوراق التجارية (\"أوراق مخصومة\")، يُقيَّد دائناً بالإجمالي حتى سداد الشيكات."
+
+msgid "Discount Expense Account"
+msgstr "حساب مصروف الخصم"
+
+msgid "Expense account of the discount charges and the commission (default: the facility's Interest Expense Account)."
+msgstr "حساب مصروف مصاريف الخصم والعمولة (افتراضياً: حساب مصروف الفوائد في التسهيل)."
+
+msgid "Incoming cheques Received and posted to the party (in PDC Receivable), due after the discount date, in the facility currency."
+msgstr "شيكات واردة مستلمة ومرحّلة على الطرف (في أوراق القبض)، تستحق بعد تاريخ الخصم، بعملة التسهيل."
+
+msgid "Discount Charges"
+msgstr "مصاريف الخصم"
+
+msgid "Total Charges and Commission"
+msgstr "إجمالي المصاريف والعمولة"
+
+msgid "Net Proceeds"
+msgstr "صافي المتحصلات"
+
+msgid "Outstanding Amount"
+msgstr "المبلغ القائم"
+
+msgid "The discounted cheques not paid or bounced yet (counting against the facility)."
+msgstr "الشيكات المخصومة التي لم تُسدَّد أو ترتد بعد (محسوبة على التسهيل)."
+
+msgid "Discounting Journal Entry"
+msgstr "قيد الخصم"
+
+msgid "The effective due date of the cheque on the discount date."
+msgstr "تاريخ الاستحقاق الفعلي للشيك في تاريخ الخصم."
+
+msgctxt "Cheque Discounting Item"
+msgid "Days"
+msgstr "الأيام"
+
+msgid "Days from the discount date to the due date."
+msgstr "الأيام من تاريخ الخصم حتى تاريخ الاستحقاق."
+
+msgid "Closed Date"
+msgstr "تاريخ الإقفال"
+
+msgid "The date the cheque was paid to the bank (Settled) or taken back by the bank (Bounced)."
+msgstr "تاريخ سداد الشيك للبنك (مسدد) أو استرداد البنك لقيمته (مرتد)."
+
+msgid "Closing Journal Entry"
+msgstr "قيد الإقفال"
+
+# Cheque Discounting statuses and events
+msgctxt "Cheque Discounting"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Cheque Discounting"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Cheque Discounting"
+msgid "Discounted"
+msgstr "مخصومة"
+
+msgctxt "Cheque Discounting"
+msgid "Partially Settled"
+msgstr "مسددة جزئياً"
+
+msgctxt "Cheque Discounting"
+msgid "Settled"
+msgstr "مسددة"
+
+msgctxt "Cheque Discounting"
+msgid "Cheque Closed"
+msgstr "تم إقفال شيك"
+
+msgctxt "Cheque Discounting"
+msgid "Cancelled"
+msgstr "ملغاة"
+
+msgctxt "Cheque Discounting Item"
+msgid "Discounted"
+msgstr "مخصوم"
+
+msgctxt "Cheque Discounting Item"
+msgid "Settled"
+msgstr "مسدد"
+
+msgctxt "Cheque Discounting Item"
+msgid "Bounced"
+msgstr "مرتد"
+
+# PDC Cheque status log events (discounting)
+msgid "Discount Cancelled"
+msgstr "تم إلغاء الخصم"
+
+msgid "Discount Settled"
+msgstr "تم سداد الشيك المخصوم"
+
+msgid "Discount Recourse Posted"
+msgstr "تم ترحيل رجوع البنك على الشيك المخصوم"
+
+# Messages (shared instrument services)
+msgid "Bank Facility is required."
+msgstr "التسهيل البنكي مطلوب."
+
+msgid "{0} must be between 0 and 100."
+msgstr "يجب أن تكون {0} بين 0 و100."
+
+msgid "Margin Account is required for the cash margin."
+msgstr "حساب التأمينات النقدية مطلوب للتأمين النقدي."
+
+msgid "The Margin Account cannot be a Bank or Cash account."
+msgstr "لا يمكن أن يكون حساب التأمينات النقدية حساب بنك أو نقدية."
+
+msgid "Commission Account is required for the commission."
+msgstr "حساب العمولات مطلوب للعمولة."
+
+msgid "The commission cannot be negative."
+msgstr "لا يمكن أن تكون العمولة سالبة."
+
+msgid "Bank Facility {0} is {1}: a {2} needs an Active facility."
+msgstr "التسهيل البنكي {0} {1}: يتطلب {2} تسهيلاً سارياً."
+
+msgid "The date {0} is outside the facility period {1} - {2}."
+msgstr "التاريخ {0} خارج فترة التسهيل {1} - {2}."
+
+msgid "{0} of {1} exceeds the available {2} limit of Bank Facility {3}: available {4} (total available {5})."
+msgstr "{0} بمبلغ {1} يتجاوز المتاح من حد {2} في التسهيل البنكي {3}: المتاح {4} (إجمالي المتاح {5})."
+
+msgid "{0} {1} must be submitted first."
+msgstr "يجب اعتماد {0} {1} أولاً."
+
+msgid "{0} can only be changed by the {1} actions."
+msgstr "لا يمكن تغيير {0} إلا من خلال إجراءات {1}."
+
+msgid "{0} {1} is already {2}."
+msgstr "{0} {1} بالفعل {2}."
+
+msgid "This action is not allowed while {0} {1} is {2}."
+msgstr "هذا الإجراء غير مسموح به بينما {0} {1} {2}."
+
+msgid "Cash margin of {0} {1}"
+msgstr "التأمين النقدي لـ {0} {1}"
+
+msgid "Cash margin released of {0} {1}"
+msgstr "الإفراج عن التأمين النقدي لـ {0} {1}"
+
+msgid "Commission of {0} {1}"
+msgstr "عمولة {0} {1}"
+
+# Messages (Letter of Guarantee)
+msgid "The new Expiry Date cannot be before the extension date."
+msgstr "لا يمكن أن يكون تاريخ الانتهاء الجديد قبل تاريخ التمديد."
+
+msgid "Extension commission of {0} {1}"
+msgstr "عمولة تمديد {0} {1}"
+
+msgid "The new amount must be greater than zero and less than the open amount {0}."
+msgstr "يجب أن يكون المبلغ الجديد أكبر من صفر وأقل من المبلغ القائم {0}."
+
+msgid "The claim amount must be greater than zero and at most the open amount {0}."
+msgstr "يجب أن يكون مبلغ التسييل أكبر من صفر وألا يتجاوز المبلغ القائم {0}."
+
+msgid "Select the account to debit with the claim."
+msgstr "اختر الحساب المدين بمبلغ التسييل."
+
+msgid "Claim of {0} {1}"
+msgstr "تسييل {0} {1}"
+
+msgid "Nothing of the claim of {0} is owed to the bank."
+msgstr "لا يوجد مستحق للبنك من تسييل {0}."
+
+msgid "The amount must be greater than zero and at most the amount owed {0}."
+msgstr "يجب أن يكون المبلغ أكبر من صفر وألا يتجاوز المبلغ المستحق {0}."
+
+msgid "Repayment of the claim of {0} {1}"
+msgstr "سداد تسييل {0} {1}"
+
+msgid "Set the Liability Account of the {0} sub-limit of Bank Facility {1}: the bank-funded part of a claim is booked on it."
+msgstr "حدد حساب الالتزام للحد الفرعي {0} في التسهيل البنكي {1}: يُقيَّد عليه جزء التسييل الذي يموله البنك."
+
+msgid "The Claim Account must be in {0} or in the company currency {1}."
+msgstr "يجب أن يكون حساب التسييل بعملة {0} أو بعملة الشركة {1}."
+
+msgid "Select the party of the Claim Account {0}."
+msgstr "اختر الطرف لحساب التسييل {0}."
+
+msgid "A party can only be given with a Payable or Receivable Claim Account."
+msgstr "لا يمكن تحديد طرف إلا مع حساب تسييل من نوع دائنين أو مدينين."
+
+msgid "Letter of Guarantee {0} was claimed and cannot be cancelled."
+msgstr "تم تسييل خطاب الضمان {0} ولا يمكن إلغاؤه."
+
+msgid "The Expiry Date must be after the Issue Date."
+msgstr "يجب أن يكون تاريخ الانتهاء بعد تاريخ الإصدار."
+
+msgid "Enter the Beneficiary Name."
+msgstr "أدخل اسم المستفيد."
+
+msgid "Select the Beneficiary."
+msgstr "اختر المستفيد."
+
+msgid "Bank Guarantee {0} is cancelled."
+msgstr "الضمان البنكي {0} ملغي."
+
+msgid "Reference Type must be one of: {0}."
+msgstr "يجب أن يكون نوع المرجع أحد: {0}."
+
+msgid "Select the Reference Name."
+msgstr "اختر اسم المرجع."
+
+# Messages (Letter of Credit)
+msgid "The new Expiry Date cannot be before the current one."
+msgstr "لا يمكن أن يكون تاريخ الانتهاء الجديد قبل التاريخ الحالي."
+
+msgid "The new Expiry Date cannot be before the amendment date."
+msgstr "لا يمكن أن يكون تاريخ الانتهاء الجديد قبل تاريخ التعديل."
+
+msgid "The charges cannot be negative."
+msgstr "لا يمكن أن تكون المصاريف سالبة."
+
+msgid "Nothing to amend: enter a new amount, a new expiry date or charges."
+msgstr "لا يوجد ما يُعدَّل: أدخل مبلغاً جديداً أو تاريخ انتهاء جديداً أو مصاريف."
+
+msgid "The increase"
+msgstr "الزيادة"
+
+msgid "Amendment charges of {0} {1}"
+msgstr "مصاريف تعديل {0} {1}"
+
+msgid "The documents amount must be greater than zero and at most {0} (amount plus tolerance)."
+msgstr "يجب أن يكون مبلغ المستندات أكبر من صفر وألا يتجاوز {0} (المبلغ مع نسبة التجاوز)."
+
+msgid "Documents charges of {0} {1}"
+msgstr "مصاريف مستندات {0} {1}"
+
+msgid "Only a Usance Letter of Credit is accepted; settle a Sight credit directly."
+msgstr "القبول للاعتماد الآجل فقط؛ اعتماد الاطلاع يُسدَّد مباشرة."
+
+msgid "The Maturity Date must be after the Acceptance Date."
+msgstr "يجب أن يكون تاريخ الاستحقاق بعد تاريخ القبول."
+
+msgid "The settlement amount must be greater than zero and at most the documents amount {0}."
+msgstr "يجب أن يكون مبلغ السداد أكبر من صفر وألا يتجاوز مبلغ المستندات {0}."
+
+msgid "Settlement of {0} {1}"
+msgstr "سداد {0} {1}"
+
+msgid "{0} {1} holds no cash margin."
+msgstr "لا يوجد تأمين نقدي محتجز على {0} {1}."
+
+msgid "Set the Charges Account (or the Commission Account) of {0}."
+msgstr "حدد حساب المصاريف (أو حساب العمولات) لـ {0}."
+
+msgid "Purchase Invoice {0} must be a submitted invoice of supplier {1} in company {2}."
+msgstr "يجب أن تكون فاتورة الشراء {0} فاتورة معتمدة للمورد {1} في الشركة {2}."
+
+msgid "Letter of Credit maturity"
+msgstr "استحقاق اعتماد مستندي"
+
+msgid "Letter of Credit {0} is settled and cannot be cancelled."
+msgstr "الاعتماد المستندي {0} مسدد ولا يمكن إلغاؤه."
+
+msgid "The Expiry Date must be after the Opening Date."
+msgstr "يجب أن يكون تاريخ الانتهاء بعد تاريخ الفتح."
+
+msgid "The Latest Shipment Date cannot be after the Expiry Date."
+msgstr "لا يمكن أن يكون آخر موعد للشحن بعد تاريخ الانتهاء."
+
+msgid "Usance Days are required for a Usance Letter of Credit."
+msgstr "أيام الأجل مطلوبة للاعتماد الآجل."
+
+msgid "Select the Supplier."
+msgstr "اختر المورد."
+
+msgid "Purchase Order {0} must be a submitted order of supplier {1} in company {2}."
+msgstr "يجب أن يكون أمر الشراء {0} أمراً معتمداً للمورد {1} في الشركة {2}."
+
+# Messages (Cheque Discounting)
+msgid "Cheque Discounting {0} of Bank Facility {1}"
+msgstr "خصم الشيكات {0} من التسهيل البنكي {1}"
+
+msgid "Cheque Discounting {0} cannot be cancelled: cheques {1} are already settled or bounced."
+msgstr "لا يمكن إلغاء خصم الشيكات {0}: الشيكات {1} تم سدادها أو ارتدت بالفعل."
+
+msgid "Cheque Discounting {0} cancelled"
+msgstr "تم إلغاء خصم الشيكات {0}"
+
+msgid "Cheques {0} are not discounted and open in {1}."
+msgstr "الشيكات {0} ليست مخصومة وقائمة في {1}."
+
+msgid "No discounted cheque of {0} is due by {1}."
+msgstr "لا يوجد شيك مخصوم في {0} مستحق حتى {1}."
+
+msgid "Cheque {0} is not linked to a Cheque Discounting."
+msgstr "الشيك {0} غير مرتبط بدفعة خصم شيكات."
+
+msgid "Discounted cheque {0} ({1}) paid at maturity, {2}"
+msgstr "الشيك المخصوم {0} ({1}) سُدِّد في استحقاقه، {2}"
+
+msgid "Recourse of the bounced discounted cheque {0} ({1}), {2}"
+msgstr "رجوع البنك بالشيك المخصوم المرتد {0} ({1})، {2}"
+
+msgid "Cheque {0} is not open in Cheque Discounting {1}."
+msgstr "الشيك {0} ليس قائماً في خصم الشيكات {1}."
+
+msgid "The cheques of a submitted Cheque Discounting cannot be changed."
+msgstr "لا يمكن تغيير شيكات دفعة خصم معتمدة."
+
+msgid "Set the Liability Account (discounted cheques) of the {0} sub-limit of Bank Facility {1}."
+msgstr "حدد حساب الالتزام (الأوراق المخصومة) للحد الفرعي {0} في التسهيل البنكي {1}."
+
+msgid "The discount rate cannot be negative."
+msgstr "لا يمكن أن يكون سعر الخصم سالباً."
+
+msgid "Add at least one cheque."
+msgstr "أضف شيكاً واحداً على الأقل."
+
+msgid "Row #{0}: Cheque {1} appears more than once."
+msgstr "الصف رقم {0}: الشيك {1} مكرر."
+
+msgid "Row #{0}: Cheque {1} does not belong to company {2}."
+msgstr "الصف رقم {0}: الشيك {1} لا يخص الشركة {2}."
+
+msgid "Row #{0}: Cheque {1} is in {2}, but the facility is in {3}."
+msgstr "الصف رقم {0}: الشيك {1} بعملة {2}، لكن التسهيل بعملة {3}."
+
+msgid "The discount charges and the commission leave no net proceeds."
+msgstr "مصاريف الخصم والعمولة لا تترك صافي متحصلات."
+
+msgid "Discount Expense Account is required for the charges."
+msgstr "حساب مصروف الخصم مطلوب للمصاريف."
+
+msgid "Cheques must be given as a list."
+msgstr "يجب إدخال الشيكات كقائمة."
+
+msgid "Cheque {0} is not an incoming cheque."
+msgstr "الشيك {0} ليس شيكاً وارداً."
+
+msgid "Cheque {0} is {1}: only Received cheques can be discounted."
+msgstr "الشيك {0} {1}: لا يمكن خصم إلا الشيكات المستلمة."
+
+msgid "Cheque {0} must be posted to the party (in PDC Receivable) before it can be discounted; it is {1}."
+msgstr "يجب ترحيل الشيك {0} على الطرف (في أوراق القبض) قبل خصمه؛ حالته {1}."
+
+msgid "The Discount Date ({0}) of cheque {1} cannot be before {2}."
+msgstr "لا يمكن أن يكون تاريخ خصم ({0}) الشيك {1} قبل {2}."
+
+msgid "Cheque {0} is due on {1}: only cheques due after the Discount Date can be discounted."
+msgstr "الشيك {0} يستحق في {1}: لا يمكن خصم إلا الشيكات المستحقة بعد تاريخ الخصم."
+
+msgid "Cheque {0} is not discounted with {1}."
+msgstr "الشيك {0} ليس مخصوماً في {1}."
+
+# Jobs and alerts
+msgid "Letters of Guarantee"
+msgstr "خطابات الضمان"
+
+msgctxt "Bank Facility"
+msgid "Action"
+msgstr "الإجراء"
+
+msgid "Expired: release the cash margin"
+msgstr "منتهي: أفرج عن التأمين النقدي"
+
+msgid "Expiring soon"
+msgstr "ينتهي قريباً"
+
+# Reports and number cards
+msgid "LG Register"
+msgstr "سجل خطابات الضمان"
+
+msgid "LC Register"
+msgstr "سجل الاعتمادات المستندية"
+
+msgid "Discounted Cheques"
+msgstr "الشيكات المخصومة"
+
+msgid "Open Letters of Guarantee"
+msgstr "خطابات الضمان القائمة"
+
+msgid "Open Letters of Credit"
+msgstr "الاعتمادات المستندية القائمة"
+
+msgid "Discounted Cheques Outstanding"
+msgstr "الشيكات المخصومة القائمة"
+
+msgid "Open Guarantees"
+msgstr "الضمانات القائمة"
+
+msgid "Cash Margins Held"
+msgstr "التأمينات النقدية المحتجزة"
+
+msgid "Expiring in 30 Days"
+msgstr "تنتهي خلال 30 يوماً"
+
+msgid "Open (Company Currency)"
+msgstr "القائم (بعملة الشركة)"
+
+msgid "Margin (Company Currency)"
+msgstr "التأمين (بعملة الشركة)"
+
+msgid "Open Only"
+msgstr "القائمة فقط"
+
+msgid "Expiring Within (Days)"
+msgstr "تنتهي خلال (أيام)"
+
+msgid "Open Credits"
+msgstr "الاعتمادات القائمة"
+
+msgid "Accepted, to Pay"
+msgstr "مقبولة، مستحقة الدفع"
+
+msgid "Days to Maturity"
+msgstr "الأيام حتى الاستحقاق"
+
+msgid "Batch / Cheque No"
+msgstr "الدفعة / رقم الشيك"
+
+msgid "Outstanding (Company Currency)"
+msgstr "القائم (بعملة الشركة)"
+
+msgid "Discounted, Outstanding"
+msgstr "مخصومة وقائمة"
+
+msgid "Paid at Maturity"
+msgstr "سُدِّدت في الاستحقاق"
+
+msgid "Bounced (Recourse)"
+msgstr "مرتدة (رجوع البنك)"
+
+msgid "Due From"
+msgstr "الاستحقاق من"
+
+msgid "Due To"
+msgstr "الاستحقاق إلى"
+
+msgctxt "Treasury Report"
+msgid "Days"
+msgstr "الأيام"
+
+msgctxt "Treasury Report"
+msgid "Outstanding"
+msgstr "القائم"
+
+msgctxt "Cheque Discounting"
+msgid "Totals"
+msgstr "الإجماليات"
+
+# Form buttons and dialogs
+msgctxt "Letter of Guarantee"
+msgid "Extend"
+msgstr "تمديد"
+
+msgid "Extension Date"
+msgstr "تاريخ التمديد"
+
+msgid "Extension Commission"
+msgstr "عمولة التمديد"
+
+msgctxt "Letter of Guarantee"
+msgid "Reduce"
+msgstr "تخفيض"
+
+msgid "New Amount"
+msgstr "المبلغ الجديد"
+
+msgid "Reduction Date"
+msgstr "تاريخ التخفيض"
+
+msgctxt "Letter of Guarantee"
+msgid "Release"
+msgstr "إفراج"
+
+msgid "Claim (Liquidation)"
+msgstr "تسييل"
+
+msgid "Account to Debit"
+msgstr "الحساب المدين"
+
+msgid "Only for a Payable / Receivable account."
+msgstr "فقط لحساب دائنين / مدينين."
+
+msgid "Repay Claim"
+msgstr "سداد التسييل"
+
+msgctxt "Letter of Credit"
+msgid "Amend"
+msgstr "تعديل"
+
+msgid "Amendment Date"
+msgstr "تاريخ التعديل"
+
+msgid "Amendment Charges"
+msgstr "مصاريف التعديل"
+
+msgid "Receive Documents"
+msgstr "استلام المستندات"
+
+msgid "Documents Date"
+msgstr "تاريخ المستندات"
+
+msgid "Documents Charges"
+msgstr "مصاريف المستندات"
+
+msgctxt "Letter of Credit"
+msgid "Accept"
+msgstr "قبول"
+
+msgid "Default: the acceptance date plus the usance days."
+msgstr "افتراضياً: تاريخ القبول مضافاً إليه أيام الأجل."
+
+msgctxt "Letter of Credit"
+msgid "Settle"
+msgstr "سداد"
+
+msgid "Release Margin"
+msgstr "الإفراج عن التأمين"
+
+msgid "Foreign currency only. Default: the exchange rate of the date."
+msgstr "للعملات الأجنبية فقط. افتراضياً: سعر الصرف في التاريخ."
+
+msgid "Settle Cheques"
+msgstr "سداد الشيكات"
+
+msgctxt "Cheque Discounting"
+msgid "Settle"
+msgstr "سداد"
+
+msgid "Tick the cheques the drawers paid to the bank at maturity. A bounced cheque is bounced from the cheque itself (the bank takes the amount back)."
+msgstr "حدد الشيكات التي سددها الساحبون للبنك في استحقاقها. الشيك المرتد يُسجَّل ارتداده من شاشة الشيك نفسه (يسترد البنك المبلغ)."
+
+msgid "Select at least one cheque."
+msgstr "اختر شيكاً واحداً على الأقل."
+
+msgid "Paid at Maturity (Discounted)"
+msgstr "سُدِّد في الاستحقاق (مخصوم)"

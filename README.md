@@ -228,7 +228,7 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   account on the Journal Entries linked to the drawdown or its repayments (other postings on the same
   account never count); Overdraft = max(0, − GL balance of the Default Bank Account's GL account). Available
   = min(sub-limit − its utilisation, total limit − total utilisation). Other documents (Letters of Guarantee
-  / Credit, Cheque Discounting — Phase 5b) add utilisation through the hook
+  / Credit, Cheque Discounting — see below) add utilisation through the hook
   `treasury_facility_utilisation_sources` (functions `(facility_doc, as_on) -> [{"limit_type", "amount"}]`).
   The *Utilised* / *Available* fields on the facility are display only (refreshed after every action and
   daily); reports, cards and the drawdown limit check use the API.
@@ -292,8 +292,107 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
 - **Alerts**: a daily digest per company and recipient (Treasury Manager / User) of the unpaid installments
   due within *Facility Alert Days* (Treasury Settings, default 7; overdue ones included) and of the
   facilities expiring within 30 days, as a notification and, if outgoing email is set up, by email.
-- **Out of scope (Phase 5b)**: Letters of Guarantee, Letters of Credit and Cheque Discounting documents
-  (the sub-limits and the utilisation hook are ready for them).
+
+#### Letters of Guarantee, Letters of Credit (shared rules)
+
+- Both are submittable documents under a facility's *Letter of Guarantee* / *Letter of Credit* sub-limit.
+  Company, bank and currency come from the facility; the bank account (default: the facility's) is in the
+  facility currency. **Submit = issue / open**: the facility row is locked (same stamp check as drawdowns),
+  the facility must be Active on the issue date, and the amount must fit the available sub-limit and total.
+  Journal Entries (source = the LG / LC, cleared on their date): cash margin **Dr Margin Account / Cr Bank**
+  (margin = amount × *Cash Margin (%)*, default from the sub-limit; the margin account is an Asset account in
+  the facility currency, e.g. "LG cash margins") and commission **Dr Commission Account / Cr Bank**
+  (*Commission Rate (%)* × amount when a rate is set — default from the sub-limit —, else the amount
+  entered; the account defaults to the facility's Commission Expense Account).
+- After submit, the status (and the open amount, margin held, dates) changes **only through the actions**
+  (Treasury Manager + write permission); every action appends a row to the status log (*Bank Instrument
+  Status Log*: event date, from / to status, open amount after the event, voucher). An action may not be
+  dated before the issue date or the latest logged event. Foreign currency: the margin is carried at the
+  issue rate; the bank moves at the event's rate (entered, or the rate of the date); the difference goes to
+  the company's Exchange Gain / Loss account.
+- Utilisation = the open amount of the open documents; for a past date it is read from the status log. The
+  daily job sets documents past their **effective** expiry date (moved by extensions / amendments) to Expired
+  the day after (no accounting). Cancel cancels every voucher of the document (not once Claimed / Settled).
+
+#### Letter of Guarantee
+
+- Fields: LG type (Bid Bond, Performance, Advance Payment, Retention, Financial, Customs, Other), bank
+  reference, beneficiary (Customer / Supplier / Other with a name), reference document (Project, Contract,
+  Sales Order, Purchase Order, Quotation), issue / original expiry / effective expiry / release / claim dates.
+- **Off-balance sheet**: the guaranteed amount itself is never booked (no memo accounts); only the margin,
+  commissions and claims are.
+- **ERPNext Bank Guarantee**: an optional read-only *link* to ERPNext's own `Bank Guarantee` record (for
+  users who already keep them); Treasury never creates or changes it.
+- Actions: *Extend* (later expiry date; optional extension commission Dr Commission / Cr Bank), *Reduce*
+  (lower open amount; the margin held is released pro rata Dr Bank / Cr Margin), *Release* (the whole
+  remaining margin back: Dr Bank / Cr Margin; status Released), *Claim (Liquidation)* (amount ≤ open amount,
+  debited to an account the user chooses — an expense / claim account, or the beneficiary's party account
+  with the party; one Journal Entry: Dr that account; Cr Margin for the whole margin held — used first —;
+  Cr the **Liability Account of the LG sub-limit** for what the bank paid beyond the margin; Dr Bank for any
+  margin left over. Status Claimed.), *Repay Claim* (Dr Liability / Cr Bank). The bank-funded part of a claim
+  counts in the LG utilisation (GL balance of that liability account on the LG's vouchers) until repaid; the
+  sub-limit needs a liability account for such claims.
+- Expired guarantees keep their margin until the user releases it: the facility digest lists guarantees
+  expiring within *Facility Alert Days* and expired ones whose margin is still held.
+
+#### Letter of Credit (import)
+
+- Fields: Sight / Usance (usance days), supplier (+ optional Purchase Order of that supplier), bank
+  reference, tolerance %, latest shipment date, opening / original expiry / effective expiry dates.
+- Actions: *Amend* (Opened / Amended: new amount and / or later expiry date, charges Dr Charges / Cr Bank;
+  an increase is checked against the available limit under the facility lock; the margin follows the new
+  amount — top-up Dr Margin / Cr Bank or release Dr Bank / Cr Margin), *Receive Documents* (documents amount
+  ≤ amount + tolerance becomes the open amount; charges), *Accept* (Usance only: maturity date, default
+  acceptance + usance days), *Settle* (Sight after the documents, Usance after the acceptance), *Release
+  Margin* (Expired only).
+- **Settlement accounting** (two vouchers): the whole margin held returns to the bank (Dr Bank / Cr Margin
+  at the settlement rate), and a standard **Payment Entry** pays the supplier from the bank (optionally
+  allocated to one of the supplier's Purchase Invoices). ERPNext's Payment Entry allocates the invoice and
+  books the exchange gain / loss of a foreign currency invoice itself; a single Journal Entry was not used
+  because ERPNext forces a Journal Entry row that references an invoice to the invoice's exchange rate.
+  Economically this equals "margin first, bank for the rest".
+- **Import loans are manual**: settlement is always paid from the bank account. When the bank finances the
+  settlement, record a *Facility Drawdown* for the loan (the LC does not create it).
+- Forecast: an accepted Usance credit is an expected outflow on its maturity date (documents amount less the
+  margin held) on its bank account in the Bank Position Forecast. Sight credits are not forecast (the
+  documents' arrival date is unknown).
+- Expiry: only credits without documents (Opened / Amended) expire; received documents are settled.
+
+#### Cheque Discounting (خصم أوراق تجارية)
+
+- *Cheque Discounting* (submittable batch) under the facility's *Cheque Discounting* sub-limit, which needs a
+  **Liability Account** ("Discounted cheques"). Rows: incoming PDC Cheques that are **Received** and **Party
+  Posted** (in PDC Receivable — not deposited, not under collection), due after the discount date, in the
+  facility currency. Discount rate (default: the sub-limit rate), day count (default: the sub-limit's).
+  **Charges per cheque = amount × rate / 100 × days to its effective due date / 365 (Actual/365) or 360
+  (Actual/360)**, rounded per cheque; commission (default: the sub-limit commission rate × total); net
+  proceeds = total − charges − commission; expense account default: the facility's Interest Expense Account.
+- **Submit**: limit check (facility lock), then one Journal Entry **Dr Bank (net) + Dr Discount Expense
+  (charges + commission) / Cr Discounted Liability (total)**, and each cheque → PDC action `discount`:
+  operational status **Discounted**, accounting status unchanged (still Party Posted, in PDC Receivable);
+  the cheque records the batch and the discount date. A discounted cheque cannot be postponed, deposited,
+  cleared, returned or replaced.
+- **Paid at maturity** (*Settle Cheques* on the batch — ticks the ones due by the date — or *Paid at
+  Maturity (Discounted)* on the cheque): Journal Entry (source = the cheque) **Dr Discounted Liability / Cr
+  PDC Receivable**; the cheque becomes **Cleared / Bank Posted** and its *Bank Journal* is this entry (the
+  voucher that took it out of PDC Receivable; the bank itself credited the company at the discount, so there
+  is no bank row and nothing to reconcile). Settling is always a user action (no daily job): whether the
+  drawer paid is only known from the bank.
+- **Bounce of a discounted cheque** (recourse): Journal Entry **Dr Discounted Liability / Cr Bank** (the bank
+  debits the company; cleared on the bounce date), then the party posting is undone exactly like any bounce
+  according to *On Bounce* (reversal Journal Entry, or cancel of the Payment Entry): the customer owes the
+  amount again and PDC Receivable is cleared. The batch row records Settled / Bounced with the date and
+  Journal Entry; the batch status follows (Discounted → Partially Settled → Settled).
+- **Cancel** the batch only while no cheque is settled or bounced: the cheques go back to Received (logged)
+  and the batch Journal Entry is cancelled.
+- Utilisation: the discounted cheques not settled / bounced (for a past date: discounted by then and not
+  closed by then). **Forecast**: discounted cheques are never expected inflows (the money came at the
+  discount); the Projected Party Statement still lists them as posted, not cleared (the drawer has not paid).
+- Reports and cards: *LG Register* (open / expiring guarantees, margins held), *LC Register* (status,
+  amounts, maturity), *Discounted Cheques* (per batch: maturity, charges, outcome); number cards *Open
+  Letters of Guarantee*, *Open Letters of Credit*, *Discounted Cheques Outstanding* (company currency).
+  *Facility Utilisation* shows the LG / LC / Cheque Discounting sub-limits through the utilisation hook.
+- No print formats are shipped for these documents (the standard print view applies).
 
 ### Contributing
 

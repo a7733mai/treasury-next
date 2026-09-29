@@ -1,14 +1,17 @@
 """Daily Bank Facilities jobs (hooks.py `scheduler_events`, PLAN.md §8).
 
-- `refresh_facilities`: Active / Suspended facilities past their expiry date become Expired, the repayment
-  schedule statuses of the open drawdowns are refreshed (Overdue moves with the calendar) and the display
-  utilisation of every facility not Closed is stored again. Each facility / drawdown runs in its own savepoint
-  and is committed on its own; a failing one is rolled back and logged once per day.
+- `refresh_facilities`: Active / Suspended facilities past their expiry date become Expired, so do the open
+  Letters of Guarantee and the Letters of Credit without documents past their effective expiry date (no
+  accounting: a held cash margin is released by the user), the repayment schedule statuses of the open
+  drawdowns are refreshed (Overdue moves with the calendar) and the display utilisation of every facility not
+  Closed is stored again. Each document runs in its own savepoint and is committed on its own; a failing one
+  is rolled back and logged once per day.
 - `post_interest_accruals`: treasury.bank_facilities.interest (month-end accruals, catch-up included).
 - `send_facility_alerts`: one digest per company, recipient and day (the PDC due alert pattern): unpaid
-  installments due within `Treasury Settings.facility_alert_days` (overdue ones included) and facilities
-  expiring within EXPIRY_ALERT_DAYS days; each recipient gets only the documents they may read, in their
-  own language.
+  installments due within `Treasury Settings.facility_alert_days` (overdue ones included), facilities
+  expiring within EXPIRY_ALERT_DAYS days, Letters of Guarantee expiring within the alert days and expired
+  ones whose cash margin is still held; each recipient gets only the documents they may read, in their own
+  language.
 """
 
 from urllib.parse import quote
@@ -19,6 +22,7 @@ from frappe.translate import get_user_lang, print_language
 from frappe.utils import add_days, cint, date_diff, flt, fmt_money, formatdate, getdate, today
 
 from treasury.bank_facilities import facility as lifecycle
+from treasury.bank_facilities import lc, lg
 from treasury.bank_facilities.repayment import PAID, refresh_repayment_status
 from treasury.bank_facilities.utilisation import refresh_utilisation
 from treasury.pdc import scheduler as pdc_scheduler
@@ -40,9 +44,9 @@ SAVEPOINT = "treasury_facility_refresh"
 
 
 def refresh_facilities(as_of=None) -> dict:
-	"""Returns {"expired": [facilities], "failed": [names]}."""
+	"""Returns {"expired": [facilities], "expired_instruments": [LGs / LCs], "failed": [names]}."""
 	as_of = getdate(as_of or today())
-	result = {"expired": [], "failed": []}
+	result = {"expired": [], "expired_instruments": [], "failed": []}
 	for name in frappe.get_all(
 		FACILITY,
 		filters={"status": ["in", lifecycle.OPEN_STATUSES], "expiry_date": ["<", as_of]},
@@ -51,6 +55,20 @@ def refresh_facilities(as_of=None) -> dict:
 	):
 		if _isolated(name, FACILITY, lambda n=name: lifecycle.expire(n, as_of), result["failed"]):
 			result["expired"].append(name)
+
+	for doctype, module, statuses in (
+		(lg.DOCTYPE, lg, lg.OPEN_STATUSES),
+		(lc.DOCTYPE, lc, lc.AMENDABLE_STATUSES),
+	):
+		for name in frappe.get_all(
+			doctype,
+			filters={"docstatus": 1, "status": ["in", statuses], "effective_expiry_date": ["<", as_of]},
+			order_by="effective_expiry_date asc, name asc",
+			pluck="name",
+		):
+			expire = module.expire
+			if _isolated(name, doctype, lambda n=name, fn=expire: fn(n, as_of), result["failed"]):
+				result["expired_instruments"].append(name)
 
 	for name in frappe.get_all(
 		DRAWDOWN, filters={"docstatus": 1, "repayment_status": "Open"}, order_by="name asc", pluck="name"
@@ -156,13 +174,21 @@ def get_expiring_facilities(as_of, days: int = EXPIRY_ALERT_DAYS) -> list[frappe
 
 def send_facility_alerts(as_of=None) -> dict:
 	"""Returns {company: {"installments": [(drawdown, installment no)], "facilities": [names],
-	"recipients": [users notified by this run]}} for the companies with something to report."""
+	"guarantees": [Letters of Guarantee], "recipients": [users notified by this run]}} for the companies with
+	something to report."""
 	as_of = getdate(as_of or today())
+	days = alert_days()
 	by_company: dict[str, frappe._dict] = {}
-	for row in get_alert_installments(add_days(as_of, alert_days())):
-		by_company.setdefault(row.company, frappe._dict(installments=[], facilities=[])).installments.append(row)
+
+	def items_of(company):
+		return by_company.setdefault(company, frappe._dict(installments=[], facilities=[], guarantees=[]))
+
+	for row in get_alert_installments(add_days(as_of, days)):
+		items_of(row.company).installments.append(row)
 	for row in get_expiring_facilities(as_of):
-		by_company.setdefault(row.company, frappe._dict(installments=[], facilities=[])).facilities.append(row)
+		items_of(row.company).facilities.append(row)
+	for row in lg.get_expiring(as_of, days):
+		items_of(row.company).guarantees.append(row)
 
 	result = {}
 	users = pdc_scheduler._alert_users()
@@ -177,17 +203,23 @@ def send_facility_alerts(as_of=None) -> dict:
 			facilities = [
 				f for f in items.facilities if frappe.has_permission(FACILITY, "read", doc=f.name, user=user)
 			]
-			if (installments or facilities) and _send_digest(company, installments, facilities, user, as_of):
+			guarantees = [
+				g for g in items.guarantees if frappe.has_permission(lg.DOCTYPE, "read", doc=g.name, user=user)
+			]
+			if (installments or facilities or guarantees) and _send_digest(
+				company, installments, facilities, user, as_of, guarantees
+			):
 				recipients.append(user)
 		result[company] = {
 			"installments": [(r.drawdown, r.installment_no) for r in items.installments],
 			"facilities": [f.name for f in items.facilities],
+			"guarantees": [g.name for g in items.guarantees],
 			"recipients": recipients,
 		}
 	return result
 
 
-def render_digest(company: str, installments: list, facilities: list, as_of) -> str:
+def render_digest(company: str, installments: list, facilities: list, as_of, guarantees=None) -> str:
 	"""The digest HTML (also the email body), in the current language."""
 	as_of = getdate(as_of)
 	overdue = [r for r in installments if getdate(r.due_date) < as_of]
@@ -203,7 +235,19 @@ def render_digest(company: str, installments: list, facilities: list, as_of) -> 
 			"as_of": formatdate(as_of),
 			"groups": groups,
 			"facilities": [_facility_row(f, as_of) for f in facilities],
+			"guarantees": [_guarantee_row(g, as_of) for g in guarantees or []],
 		},
+	)
+
+
+def _guarantee_row(row, as_of) -> frappe._dict:
+	return frappe._dict(
+		row,
+		expiry=formatdate(row.effective_expiry_date),
+		days_to_expiry=date_diff(row.effective_expiry_date, as_of),
+		amount_formatted=fmt_money(row.open_amount or row.amount, currency=row.currency),
+		margin_formatted=fmt_money(row.margin_held, currency=row.currency),
+		note=_("Expired: release the cash margin") if row.status == lg.EXPIRED else _("Expiring soon"),
 	)
 
 
@@ -226,13 +270,15 @@ def _facility_row(row, as_of) -> frappe._dict:
 	)
 
 
-def _send_digest(company: str, installments: list, facilities: list, user: str, as_of) -> bool:
+def _send_digest(
+	company: str, installments: list, facilities: list, user: str, as_of, guarantees=None
+) -> bool:
 	"""Notify `user` in their language; False if they already got this company's digest for `as_of`."""
 	with print_language(get_user_lang(user)):
 		subject = _("Bank facility installments and expiries for {0} as of {1}").format(
 			company, formatdate(as_of)
 		)
-		message = render_digest(company, installments, facilities, as_of)
+		message = render_digest(company, installments, facilities, as_of, guarantees)
 	if frappe.db.exists("Notification Log", {"for_user": user, "document_type": DRAWDOWN, "subject": subject}):
 		return False
 	frappe.get_doc(

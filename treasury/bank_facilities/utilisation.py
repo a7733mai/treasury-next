@@ -7,9 +7,10 @@ Per limit type:
   liability account in the GL rows of the Journal Entries linked to the drawdown or to its repayments
   (`treasury_source_*`). Other postings on the same liability account never count.
 - Overdraft: max(0, - GL balance of the GL account of the facility's Default Bank Account), in its currency.
-- Anything else (Letter of Guarantee, Letter of Credit, Cheque Discounting — Phase 5b): the functions listed
-  in the `treasury_facility_utilisation_sources` hook of any app. Each receives (facility doc, as_on date or
-  None) and returns a list of {"limit_type": ..., "amount": ...} in the facility currency:
+- Anything else: the functions listed in the `treasury_facility_utilisation_sources` hook of any app. Each
+  receives (facility doc, as_on date or None) and returns a list of {"limit_type": ..., "amount": ...} in the
+  facility currency. Treasury registers the Letters of Guarantee (lg.py), Letters of Credit (lc.py) and
+  Cheque Discounting (discounting.py) — see their docstrings:
 
 	treasury_facility_utilisation_sources = ["treasury.bank_facilities.lg.get_lg_utilisation"]
 

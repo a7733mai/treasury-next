@@ -45,6 +45,10 @@ EVENT_UNDER_COLLECTION = "pdc_under_collection"
 EVENT_BANK = "pdc_bank_posting"
 EVENT_BANK_CHARGES = "pdc_bank_charges"
 EVENT_BOUNCE_CHARGES = "pdc_bounce_charges"
+# Discounted cheques (treasury.bank_facilities.discounting): the drawer paid the bank at maturity, or the
+# bank took its money back from the company when the cheque bounced (recourse).
+EVENT_DISCOUNT_SETTLEMENT = "pdc_discount_settlement"
+EVENT_DISCOUNT_RECOURSE = "pdc_discount_recourse"
 REVERSAL_SUFFIX = "_reversal"
 # Vouchers undone (in reverse order) when a cheque bounces, is returned or replaced.
 UNDOABLE_EVENTS = (EVENT_PARTY, EVENT_UNDER_COLLECTION, EVENT_BANK, EVENT_BANK_CHARGES)
@@ -67,6 +71,8 @@ CYCLE_FIELDS = (
 	"reversal_journal",
 	"bounce_charges_journal",
 	"deposit_date",
+	"discount_date",
+	"cheque_discounting",
 	"actual_clearance_date",
 	"bank_transaction_date",
 	"party_posting_date",
@@ -307,8 +313,10 @@ def postpone(name: str, new_due_date, reason: str | None = None, contact_person:
 
 
 def bounce(name: str, bounce_date=None, reason: str | None = None, charges=0) -> dict:
+	"""A discounted cheque that bounces is first taken back by the bank from the company (recourse: Dr
+	Discounted Liability / Cr Bank), then its party posting is undone like any other bounce."""
 	doc = _begin(name, roles=(MANAGER,))
-	_require_status(doc, ("Delivered", "Received", "Deposited"), "Bounced")
+	_require_status(doc, ("Delivered", "Received", "Deposited", "Discounted"), "Bounced")
 	if not reason:
 		frappe.throw(_("A reason is required."))
 	if flt(charges) < 0:
@@ -316,13 +324,135 @@ def bounce(name: str, bounce_date=None, reason: str | None = None, charges=0) ->
 	if flt(charges) and doc.direction != INCOMING:
 		frappe.throw(_("Bounce charges can only be charged on incoming cheques."))
 	date = _date(bounce_date)
-	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
+	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date", "discount_date"))
 
+	discounted = doc.operational_status == "Discounted"
 	_log(doc, "Bounced", operational="Bounced", remarks=reason, event_date=date)
+	if discounted:
+		_post_discount_recourse(doc, date, reason)
 	_undo_postings(doc, date, reason)
 	if flt(charges) > 0:
 		_post_bounce_charges(doc, date, charges)
+	result = _save(doc)
+	if discounted:
+		_refresh_discounting(doc)
+	return result
+
+
+# ---------------------------------------------------------------------------
+# Cheque Discounting (treasury.bank_facilities.discounting)
+# ---------------------------------------------------------------------------
+
+
+def discount(name: str, discount_date, cheque_discounting: str, journal: str | None = None) -> dict:
+	"""Received → Discounted, called by the submit of a Cheque Discounting batch. No accounting on the cheque:
+	it stays in PDC Receivable (the batch posts Dr Bank + Dr Discount Expense / Cr Discounted Liability)."""
+	doc = _begin(name, roles=(MANAGER,))
+	if error := discount_error(doc, discount_date):
+		frappe.throw(error)
+	date = getdate(discount_date)
+	doc.discount_date = date
+	doc.cheque_discounting = cheque_discounting
+	voucher = ("Journal Entry", journal) if journal else ("Cheque Discounting", cheque_discounting)
+	_log(
+		doc,
+		"Discounted",
+		operational="Discounted",
+		voucher=voucher,
+		remarks=cheque_discounting,
+		event_date=date,
+	)
 	return _save(doc)
+
+
+def discount_error(doc, discount_date) -> str | None:
+	"""Why cheque `doc` cannot be discounted on `discount_date` (None if it can)."""
+	if doc.direction != INCOMING:
+		return _("Cheque {0} is not an incoming cheque.").format(frappe.bold(doc.name))
+	if doc.operational_status != "Received":
+		return _("Cheque {0} is {1}: only Received cheques can be discounted.").format(
+			frappe.bold(doc.name), _(doc.operational_status)
+		)
+	if doc.accounting_status != PARTY_POSTED:
+		return _(
+			"Cheque {0} must be posted to the party (in PDC Receivable) before it can be discounted; it is {1}."
+		).format(frappe.bold(doc.name), _(doc.accounting_status))
+	date = getdate(discount_date)
+	latest = _latest_date(doc, "handover_date")
+	if date < latest:
+		return _("The Discount Date ({0}) of cheque {1} cannot be before {2}.").format(
+			formatdate(date), frappe.bold(doc.name), formatdate(latest)
+		)
+	if getdate(doc.effective_due_date) <= date:
+		return _("Cheque {0} is due on {1}: only cheques due after the Discount Date can be discounted.").format(
+			frappe.bold(doc.name), formatdate(doc.effective_due_date)
+		)
+	return None
+
+
+def undiscount(name: str, cheque_discounting: str, remarks: str | None = None) -> dict:
+	"""Discounted → Received, called by the cancellation of the Cheque Discounting batch (whose Journal Entry
+	is cancelled by the batch). Nothing else was posted on the cheque."""
+	doc = _begin(name, roles=(MANAGER,))
+	_require_status(doc, ("Discounted",))
+	if doc.cheque_discounting != cheque_discounting:
+		frappe.throw(
+			_("Cheque {0} is not discounted with {1}.").format(frappe.bold(doc.name), frappe.bold(cheque_discounting))
+		)
+	doc.discount_date = None
+	doc.cheque_discounting = None
+	_log(doc, "Discount Cancelled", operational="Received", remarks=remarks or cheque_discounting)
+	return _save(doc)
+
+
+def settle_discounted(name: str, settlement_date=None, remarks: str | None = None) -> dict:
+	"""The drawer paid the discounted cheque to the bank at maturity: Dr Discounted Liability / Cr PDC
+	Receivable. The cheque is Cleared and Bank Posted; `bank_journal` holds this Journal Entry (the voucher
+	that took the cheque out of PDC Receivable — the bank itself credited the company at the discount)."""
+	doc = _begin(name, roles=(MANAGER,))
+	_require_status(doc, ("Discounted",), "Cleared")
+	date = _date(settlement_date)
+	_validate_clearance_date(doc, date, _latest_date(doc, "handover_date", "discount_date"))
+	from treasury.bank_facilities import discounting
+
+	journal = discounting.post_settlement(doc, date)
+	doc.actual_clearance_date = date
+	doc.bank_journal = journal
+	doc.bank_posting_date = date
+	_log(
+		doc,
+		"Discount Settled",
+		operational="Cleared",
+		accounting=BANK_POSTED,
+		voucher=("Journal Entry", journal),
+		remarks=remarks,
+		event_date=date,
+	)
+	discounting.close_item(doc.cheque_discounting, doc.name, discounting.ITEM_SETTLED, date, journal)
+	result = _save(doc)
+	_refresh_discounting(doc)
+	return result
+
+
+def _post_discount_recourse(doc, posting_date, remarks=None):
+	from treasury.bank_facilities import discounting
+
+	journal = discounting.post_recourse(doc, posting_date)
+	_log(
+		doc,
+		"Discount Recourse Posted",
+		voucher=("Journal Entry", journal),
+		remarks=remarks,
+		event_date=posting_date,
+	)
+	discounting.close_item(doc.cheque_discounting, doc.name, discounting.ITEM_BOUNCED, posting_date, journal)
+
+
+def _refresh_discounting(doc):
+	from treasury.bank_facilities import discounting
+
+	if doc.cheque_discounting:
+		discounting.refresh_batch(doc.cheque_discounting)
 
 
 def represent(name: str, represent_date=None, new_due_date=None, remarks: str | None = None) -> dict:

@@ -1,0 +1,148 @@
+{
+ "actions": [],
+ "creation": "2026-10-20 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pdc_cheque",
+  "cheque_no",
+  "party_type",
+  "party",
+  "party_name",
+  "column_break_amounts",
+  "due_date",
+  "days",
+  "amount",
+  "discount_charges",
+  "column_break_status",
+  "status",
+  "closed_date",
+  "closing_journal"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "pdc_cheque",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "PDC Cheque",
+   "options": "PDC Cheque",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "cheque_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Cheque No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "label": "Party Type",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "label": "Party",
+   "options": "party_type",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Party Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amounts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "description": "The effective due date of the cheque on the discount date.",
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "Days from the discount date to the due date.",
+   "fieldname": "days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Days",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "discount_charges",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Discount Charges",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "default": "Discounted",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Discounted\nSettled\nBounced",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The date the cheque was paid to the bank (Settled) or taken back by the bank (Bounced).",
+   "fieldname": "closed_date",
+   "fieldtype": "Date",
+   "label": "Closed Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "closing_journal",
+   "fieldtype": "Link",
+   "label": "Closing Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-20 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Cheque Discounting Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

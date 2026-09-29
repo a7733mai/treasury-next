@@ -10,7 +10,7 @@
    "label": "PDC by Status"
   }
  ],
- "content": "[{\"id\":\"trsHdrShct\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"trsShOutNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Outgoing Cheque\",\"col\":3}},{\"id\":\"trsShInNew\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Incoming Cheque\",\"col\":3}},{\"id\":\"trsShClear\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PDC Bank Clearing\",\"col\":3}},{\"id\":\"trsShSetng\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Treasury Company Settings\",\"col\":3}},{\"id\":\"trsNcOutTd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outgoing Cheques Due Today\",\"col\":3}},{\"id\":\"trsNcInTdy\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Incoming Cheques Due Today\",\"col\":3}},{\"id\":\"trsNcOutOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Outgoing Cheques\",\"col\":3}},{\"id\":\"trsNcInOvd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Incoming Cheques\",\"col\":3}},{\"id\":\"trsNcOut7d\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outgoing Cheques Due in 7 Days\",\"col\":3}},{\"id\":\"trsNcIn7dy\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Incoming Cheques Due in 7 Days\",\"col\":3}},{\"id\":\"trsNcPayab\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outstanding PDC Payable\",\"col\":3}},{\"id\":\"trsNcRecvb\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outstanding PDC Receivable\",\"col\":3}},{\"id\":\"trsChCashF\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Expected Cash Flow\",\"col\":8}},{\"id\":\"trsChStats\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PDC by Status\",\"col\":4}},{\"id\":\"trsHdrRprt\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"trsCdCheqs\",\"type\":\"card\",\"data\":{\"card_name\":\"Cheques\",\"col\":4}},{\"id\":\"trsCdRprts\",\"type\":\"card\",\"data\":{\"card_name\":\"PDC Reports\",\"col\":4}},{\"id\":\"trsCdMastr\",\"type\":\"card\",\"data\":{\"card_name\":\"Treasury Masters\",\"col\":4}},{\"id\":\"trsHdrSecq\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Security Cheques</b></span>\",\"col\":12}},{\"id\":\"trsShSecNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Security Cheque\",\"col\":3}},{\"id\":\"trsNcSecHd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Security Held\",\"col\":3}},{\"id\":\"trsNcSecGv\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Security Given\",\"col\":3}},{\"id\":\"trsNcSecEx\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Security Cheques Expiring in 30 Days\",\"col\":3}},{\"id\":\"trsNcSecOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Expired Security Cheques Not Returned\",\"col\":3}},{\"id\":\"trsCdSecCq\",\"type\":\"card\",\"data\":{\"card_name\":\"Security Cheques\",\"col\":4}},{\"id\":\"trsHdrFacl\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Bank Facilities</b></span>\",\"col\":12}},{\"id\":\"trsShFacNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Facility Drawdown\",\"col\":3}},{\"id\":\"trsShFacRp\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Facility Repayment\",\"col\":3}},{\"id\":\"trsNcFacLm\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Facility Limits\",\"col\":3}},{\"id\":\"trsNcFacUt\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Facility Utilised\",\"col\":3}},{\"id\":\"trsNcFacDu\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Installments Due in 30 Days\",\"col\":3}},{\"id\":\"trsNcFacOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Facility Installments\",\"col\":3}},{\"id\":\"trsCdFacil\",\"type\":\"card\",\"data\":{\"card_name\":\"Bank Facilities\",\"col\":4}}]",
+ "content": "[{\"id\":\"trsHdrShct\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"trsShOutNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Outgoing Cheque\",\"col\":3}},{\"id\":\"trsShInNew\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Incoming Cheque\",\"col\":3}},{\"id\":\"trsShClear\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PDC Bank Clearing\",\"col\":3}},{\"id\":\"trsShSetng\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Treasury Company Settings\",\"col\":3}},{\"id\":\"trsNcOutTd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outgoing Cheques Due Today\",\"col\":3}},{\"id\":\"trsNcInTdy\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Incoming Cheques Due Today\",\"col\":3}},{\"id\":\"trsNcOutOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Outgoing Cheques\",\"col\":3}},{\"id\":\"trsNcInOvd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Incoming Cheques\",\"col\":3}},{\"id\":\"trsNcOut7d\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outgoing Cheques Due in 7 Days\",\"col\":3}},{\"id\":\"trsNcIn7dy\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Incoming Cheques Due in 7 Days\",\"col\":3}},{\"id\":\"trsNcPayab\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outstanding PDC Payable\",\"col\":3}},{\"id\":\"trsNcRecvb\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outstanding PDC Receivable\",\"col\":3}},{\"id\":\"trsChCashF\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Expected Cash Flow\",\"col\":8}},{\"id\":\"trsChStats\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PDC by Status\",\"col\":4}},{\"id\":\"trsHdrRprt\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"trsCdCheqs\",\"type\":\"card\",\"data\":{\"card_name\":\"Cheques\",\"col\":4}},{\"id\":\"trsCdRprts\",\"type\":\"card\",\"data\":{\"card_name\":\"PDC Reports\",\"col\":4}},{\"id\":\"trsCdMastr\",\"type\":\"card\",\"data\":{\"card_name\":\"Treasury Masters\",\"col\":4}},{\"id\":\"trsHdrSecq\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Security Cheques</b></span>\",\"col\":12}},{\"id\":\"trsShSecNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Security Cheque\",\"col\":3}},{\"id\":\"trsNcSecHd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Security Held\",\"col\":3}},{\"id\":\"trsNcSecGv\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Security Given\",\"col\":3}},{\"id\":\"trsNcSecEx\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Security Cheques Expiring in 30 Days\",\"col\":3}},{\"id\":\"trsNcSecOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Expired Security Cheques Not Returned\",\"col\":3}},{\"id\":\"trsCdSecCq\",\"type\":\"card\",\"data\":{\"card_name\":\"Security Cheques\",\"col\":4}},{\"id\":\"trsHdrFacl\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Bank Facilities</b></span>\",\"col\":12}},{\"id\":\"trsShFacNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Facility Drawdown\",\"col\":3}},{\"id\":\"trsShFacRp\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Facility Repayment\",\"col\":3}},{\"id\":\"trsNcFacLm\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Facility Limits\",\"col\":3}},{\"id\":\"trsNcFacUt\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Facility Utilised\",\"col\":3}},{\"id\":\"trsNcFacDu\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Installments Due in 30 Days\",\"col\":3}},{\"id\":\"trsNcFacOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Facility Installments\",\"col\":3}},{\"id\":\"trsNcFacLg\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Open Letters of Guarantee\",\"col\":3}},{\"id\":\"trsNcFacLc\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Open Letters of Credit\",\"col\":3}},{\"id\":\"trsNcFacCd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Discounted Cheques Outstanding\",\"col\":3}},{\"id\":\"trsCdFacil\",\"type\":\"card\",\"data\":{\"card_name\":\"Bank Facilities\",\"col\":4}}]",
  "creation": "2026-09-29 18:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -261,7 +261,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Bank Facilities",
-   "link_count": 6,
+   "link_count": 12,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -331,9 +331,75 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "dependencies": "Bank Facility",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Letter of Guarantee",
+   "link_count": 0,
+   "link_to": "Letter of Guarantee",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Bank Facility",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Letter of Credit",
+   "link_count": 0,
+   "link_to": "Letter of Credit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Bank Facility",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cheque Discounting",
+   "link_count": 0,
+   "link_to": "Cheque Discounting",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Letter of Guarantee",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "LG Register",
+   "link_count": 0,
+   "link_to": "LG Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Letter of Credit",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "LC Register",
+   "link_count": 0,
+   "link_to": "LC Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Cheque Discounting",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Discounted Cheques",
+   "link_count": 0,
+   "link_to": "Discounted Cheques",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-10-12 09:00:00.000000",
+ "modified": "2026-10-20 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",
@@ -401,6 +467,18 @@
   {
    "label": "Overdue Facility Installments",
    "number_card_name": "Overdue Facility Installments"
+  },
+  {
+   "label": "Open Letters of Guarantee",
+   "number_card_name": "Open Letters of Guarantee"
+  },
+  {
+   "label": "Open Letters of Credit",
+   "number_card_name": "Open Letters of Credit"
+  },
+  {
+   "label": "Discounted Cheques Outstanding",
+   "number_card_name": "Discounted Cheques Outstanding"
   }
  ],
  "owner": "Administrator",

@@ -316,6 +316,15 @@ frappe.ui.form.on("PDC Cheque", {
 			}
 		}
 
+		if (status === "Discounted" && is_manager) {
+			// the bank collects a discounted cheque: paid at maturity, or bounced (recourse on the company)
+			pdc_action(frm, "settle_discounted", __("Paid at Maturity (Discounted)"), [
+				date("settlement_date", __("Settlement Date")),
+				remarks,
+			]);
+			pdc_action(frm, "bounce", __("Bounce"), [date("bounce_date", __("Bounce Date")), reason]);
+		}
+
 		if (status === "Cleared" && !["Bank Posted", "Reversed"].includes(doc.accounting_status)) {
 			pdc_action(frm, "post_bank", __("Post to Bank"), [
 				{

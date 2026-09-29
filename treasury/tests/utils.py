@@ -670,6 +670,83 @@ def make_repayment(drawdown, repayment_date, submit: bool = True, **values):
 	return doc
 
 
+def ensure_instrument_accounts() -> frappe._dict:
+	"""Accounts of the Letters of Guarantee / Credit and Cheque Discounting tests (Phase 5b)."""
+	return frappe._dict(
+		lg_margin=ensure_account("Treasury LG Margins EGP", "Current Assets"),
+		lc_margin=ensure_account("Treasury LC Margins EGP", "Current Assets"),
+		lc_margin_usd=ensure_account("Treasury LC Margins USD", "Current Assets", currency="USD"),
+		lg_liability=ensure_account("Treasury LG Claims Funded EGP", "Current Liabilities"),
+		discounted=ensure_account("Treasury Discounted Cheques EGP", "Current Liabilities"),
+		claims_expense=ensure_account("Treasury LG Claims Expense", "Indirect Expenses"),
+		discount_expense=ensure_account("Treasury Discount Expense", "Indirect Expenses"),
+		lc_charges=ensure_account("Treasury LC Charges", "Indirect Expenses"),
+	)
+
+
+def make_letter_of_guarantee(facility, amount: float = 100_000, submit: bool = True, **values):
+	accounts = ensure_instrument_accounts()
+	doc = frappe.get_doc(
+		{
+			"doctype": "Letter of Guarantee",
+			"facility": facility if isinstance(facility, str) else facility.name,
+			"lg_type": "Performance",
+			"lg_no": f"LG-{frappe.generate_hash(length=6)}",
+			"beneficiary_type": "Customer",
+			"beneficiary": CUSTOMER,
+			"amount": amount,
+			"issue_date": getdate("2025-03-01"),
+			"expiry_date": getdate("2025-12-31"),
+			"margin_account": accounts.lg_margin,
+			**values,
+		}
+	).insert()
+	if submit:
+		doc.submit()
+	return doc
+
+
+def make_letter_of_credit(facility, amount: float = 100_000, submit: bool = True, **values):
+	accounts = ensure_instrument_accounts()
+	doc = frappe.get_doc(
+		{
+			"doctype": "Letter of Credit",
+			"facility": facility if isinstance(facility, str) else facility.name,
+			"lc_type": "Sight",
+			"lc_no": f"LC-{frappe.generate_hash(length=6)}",
+			"supplier": SUPPLIER,
+			"amount": amount,
+			"issue_date": getdate("2025-02-01"),
+			"expiry_date": getdate("2025-08-31"),
+			"margin_account": accounts.lc_margin,
+			"charges_account": accounts.lc_charges,
+			**values,
+		}
+	).insert()
+	if submit:
+		doc.submit()
+	return doc
+
+
+def make_cheque_discounting(
+	facility, cheques: list, discount_date="2025-03-31", submit: bool = True, **values
+):
+	accounts = ensure_instrument_accounts()
+	doc = frappe.get_doc(
+		{
+			"doctype": "Cheque Discounting",
+			"facility": facility if isinstance(facility, str) else facility.name,
+			"discount_date": getdate(discount_date),
+			"discount_expense_account": accounts.discount_expense,
+			"items": [{"pdc_cheque": c if isinstance(c, str) else c.name} for c in cheques],
+			**values,
+		}
+	).insert()
+	if submit:
+		doc.submit()
+	return doc
+
+
 # ---------------------------------------------------------------------------
 # Invoice factories
 # ---------------------------------------------------------------------------
@@ -706,6 +783,42 @@ def make_purchase_invoice(amount: float, posting_date=None, supplier: str = SUPP
 	pi.insert(ignore_permissions=True)
 	if submit:
 		pi.submit()
+	return pi
+
+
+def make_usd_purchase_invoice(
+	amount: float, posting_date=None, conversion_rate: float = USD_RATE, supplier: str = USD_SUPPLIER
+):
+	"""Purchase Invoice in USD of the USD supplier (party account in USD), at `conversion_rate`."""
+	posting_date = getdate(posting_date or today())
+	pi = frappe.get_doc(
+		{
+			"doctype": "Purchase Invoice",
+			"company": COMPANY,
+			"supplier": supplier,
+			"posting_date": posting_date,
+			"set_posting_time": 1,
+			"due_date": add_days(posting_date, 30),
+			"currency": "USD",
+			"conversion_rate": conversion_rate,
+			"buying_price_list": BUYING_PRICE_LIST,
+			"plc_conversion_rate": 1,
+			"credit_to": acc("Treasury Creditors USD"),
+			"update_stock": 0,
+			"ignore_pricing_rule": 1,
+			"items": [
+				{
+					"item_code": ITEM,
+					"qty": 1,
+					"rate": amount,
+					"expense_account": acc("Cost of Goods Sold"),
+					"cost_center": acc("Main"),
+				}
+			],
+		}
+	)
+	pi.insert(ignore_permissions=True)
+	pi.submit()
 	return pi
 
 

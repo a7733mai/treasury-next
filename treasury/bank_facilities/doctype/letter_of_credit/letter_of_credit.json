@@ -1,0 +1,549 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-20 09:00:00.000000",
+ "description": "An import Letter of Credit opened by the bank under a Bank Facility: cash margin and commission on opening, amendments, documents, acceptance (usance) and settlement to the supplier.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "facility",
+  "company",
+  "bank",
+  "lc_type",
+  "lc_no",
+  "column_break_main",
+  "status",
+  "bank_account",
+  "currency",
+  "exchange_rate",
+  "supplier_section",
+  "supplier",
+  "supplier_name",
+  "purchase_order",
+  "column_break_supplier",
+  "tolerance_percent",
+  "latest_shipment_date",
+  "usance_days",
+  "amount_section",
+  "amount",
+  "current_amount",
+  "open_amount",
+  "column_break_amount",
+  "issue_date",
+  "expiry_date",
+  "effective_expiry_date",
+  "documents_section",
+  "documents_date",
+  "documents_amount",
+  "acceptance_date",
+  "maturity_date",
+  "column_break_documents",
+  "settlement_date",
+  "settled_amount",
+  "payment_entry",
+  "margin_section",
+  "cash_margin_percent",
+  "cash_margin_amount",
+  "margin_account",
+  "margin_held",
+  "column_break_margin",
+  "commission_rate",
+  "commission_amount",
+  "commission_account",
+  "charges_account",
+  "accounting_section",
+  "margin_journal",
+  "column_break_accounting",
+  "commission_journal",
+  "status_log_section",
+  "status_log",
+  "more_info_section",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "no_copy": 1,
+   "options": "LC-.YYYY.-.#####",
+   "print_hide": 1
+  },
+  {
+   "fieldname": "facility",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bank Facility",
+   "options": "Bank Facility",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "facility.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "facility.bank",
+   "fieldname": "bank",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Bank",
+   "options": "Bank",
+   "read_only": 1
+  },
+  {
+   "default": "Sight",
+   "fieldname": "lc_type",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "LC Type",
+   "options": "Sight\nUsance",
+   "reqd": 1
+  },
+  {
+   "description": "The bank's reference number of the credit.",
+   "fieldname": "lc_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "LC No",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Draft\nOpened\nAmended\nDocuments Received\nAccepted\nSettled\nExpired\nCancelled",
+   "read_only": 1
+  },
+  {
+   "description": "The company bank account the margin, the charges and the settlement are paid from (default: the facility's), in the facility currency.",
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "facility.currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "description": "Facility currency to company currency, on the opening date.",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "precision": "9"
+  },
+  {
+   "fieldname": "supplier_section",
+   "fieldtype": "Section Break",
+   "label": "Supplier and Shipment"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "label": "Purchase Order",
+   "options": "Purchase Order"
+  },
+  {
+   "fieldname": "column_break_supplier",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The documents may exceed the amount by this percentage.",
+   "fieldname": "tolerance_percent",
+   "fieldtype": "Percent",
+   "label": "Tolerance (%)"
+  },
+  {
+   "fieldname": "latest_shipment_date",
+   "fieldtype": "Date",
+   "label": "Latest Shipment Date"
+  },
+  {
+   "depends_on": "eval:doc.lc_type=='Usance'",
+   "description": "Days from the acceptance to the maturity (the default maturity date).",
+   "fieldname": "usance_days",
+   "fieldtype": "Int",
+   "label": "Usance Days",
+   "mandatory_depends_on": "eval:doc.lc_type=='Usance'",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "amount_section",
+   "fieldtype": "Section Break",
+   "label": "Amount and Dates"
+  },
+  {
+   "bold": 1,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "non_negative": 1,
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The amount after amendments.",
+   "fieldname": "current_amount",
+   "fieldtype": "Currency",
+   "label": "Current Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The amount still open (current amount, or the documents amount once received); counts against the facility until settled or expired.",
+   "fieldname": "open_amount",
+   "fieldtype": "Currency",
+   "label": "Open Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amount",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "issue_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Opening Date",
+   "reqd": 1
+  },
+  {
+   "description": "The original expiry date of the credit.",
+   "fieldname": "expiry_date",
+   "fieldtype": "Date",
+   "label": "Original Expiry Date",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The current expiry date (moved by amendments).",
+   "fieldname": "effective_expiry_date",
+   "fieldtype": "Date",
+   "label": "Effective Expiry Date",
+   "no_copy": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.documents_date",
+   "fieldname": "documents_section",
+   "fieldtype": "Section Break",
+   "label": "Documents and Settlement"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "documents_date",
+   "fieldtype": "Date",
+   "label": "Documents Received Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "documents_amount",
+   "fieldtype": "Currency",
+   "label": "Documents Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "acceptance_date",
+   "fieldtype": "Date",
+   "label": "Acceptance Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Usance: the date the bank pays the supplier (expected outflow in the Bank Position Forecast).",
+   "fieldname": "maturity_date",
+   "fieldtype": "Date",
+   "label": "Maturity Date",
+   "no_copy": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_documents",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "settlement_date",
+   "fieldtype": "Date",
+   "label": "Settlement Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "settled_amount",
+   "fieldtype": "Currency",
+   "label": "Settled Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Settlement Payment Entry",
+   "no_copy": 1,
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "margin_section",
+   "fieldtype": "Section Break",
+   "label": "Cash Margin, Commission and Charges"
+  },
+  {
+   "description": "Default: the Cash Margin (%) of the facility's Letter of Credit sub-limit.",
+   "fieldname": "cash_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Cash Margin (%)"
+  },
+  {
+   "fieldname": "cash_margin_amount",
+   "fieldtype": "Currency",
+   "label": "Cash Margin Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "description": "Asset account holding the cash margins (e.g. \"LC cash margins\"), in the facility currency.",
+   "fieldname": "margin_account",
+   "fieldtype": "Link",
+   "label": "Margin Account",
+   "mandatory_depends_on": "eval:doc.cash_margin_percent",
+   "options": "Account"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The cash margin still held by the bank.",
+   "fieldname": "margin_held",
+   "fieldtype": "Currency",
+   "label": "Margin Held",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_margin",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default: the Commission Rate (%) of the sub-limit. When set, the commission is the amount x the rate.",
+   "fieldname": "commission_rate",
+   "fieldtype": "Percent",
+   "label": "Commission Rate (%)"
+  },
+  {
+   "fieldname": "commission_amount",
+   "fieldtype": "Currency",
+   "label": "Commission Amount",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "description": "Expense account of the commissions (default: the facility's Commission Expense Account).",
+   "fieldname": "commission_account",
+   "fieldtype": "Link",
+   "label": "Commission Account",
+   "options": "Account"
+  },
+  {
+   "description": "Expense account of the amendment and documents charges (default: the Commission Account).",
+   "fieldname": "charges_account",
+   "fieldtype": "Link",
+   "label": "Charges Account",
+   "options": "Account"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "margin_journal",
+   "fieldtype": "Link",
+   "label": "Margin Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_accounting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "commission_journal",
+   "fieldtype": "Link",
+   "label": "Commission Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "status_log_section",
+   "fieldtype": "Section Break",
+   "label": "Status Log"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status_log",
+   "fieldtype": "Table",
+   "label": "Status Log",
+   "no_copy": 1,
+   "options": "Bank Instrument Status Log",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Information"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Letter of Credit",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-20 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Letter of Credit",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "lc_no,supplier_name,facility",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}

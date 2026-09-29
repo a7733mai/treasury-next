@@ -1,0 +1,23 @@
+{
+ "color": "#29CD42",
+ "creation": "2026-10-20 09:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Cheque Discounting",
+ "dynamic_filters_json": "{\"company\":\"frappe.defaults.get_user_default(\\\"Company\\\")\"}",
+ "filters_json": "{\"scope\":\"discounted\"}",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Discounted Cheques Outstanding",
+ "method": "treasury.bank_facilities.dashboard.get_instrument_card",
+ "modified": "2026-10-20 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Discounted Cheques Outstanding",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Custom"
+}

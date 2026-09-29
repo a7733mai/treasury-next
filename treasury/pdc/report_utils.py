@@ -28,7 +28,9 @@ BANK_POSTED = "Bank Posted"
 NOT_POSTED = "Not Posted"
 
 # Cheques whose money has not reached the bank GL yet (their bank posting is still to come). `Cleared`
-# covers the bank posting mode `Manual`: cleared by the bank, bank Journal Entry not posted yet.
+# covers the bank posting mode `Manual`: cleared by the bank, bank Journal Entry not posted yet. A
+# `Discounted` cheque is never expected: the bank already credited its proceeds on the discount date
+# (treasury.bank_facilities.discounting); its settlement at maturity never touches the bank account.
 EXPECTED_STATUSES = {
 	OUTGOING: ("Delivered", "Cleared"),
 	INCOMING: ("Received", "Deposited", "Cleared"),
@@ -39,7 +41,8 @@ OPEN_STATUSES = ("Created", "Delivered", "Received", "Deposited")
 # Handed over / received but not posted to the party yet (projected party statement).
 UNPOSTED_STATUSES = ("Delivered", "Received", "Deposited")
 # Posted to the party (PDC account) and not cleared by the bank yet; `Created` covers `On Creation` mode.
-POSTED_NOT_CLEARED_STATUSES = ("Created", "Delivered", "Received", "Deposited")
+# A discounted cheque stays in PDC Receivable until the drawer pays the bank at maturity.
+POSTED_NOT_CLEARED_STATUSES = ("Created", "Delivered", "Received", "Deposited", "Discounted")
 POSTED_NOT_CLEARED_ACCOUNTING = ("Party Posted", "Under Collection Posted")
 
 ALL_OPERATIONAL_STATUSES = (

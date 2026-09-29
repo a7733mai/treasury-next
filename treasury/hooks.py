@@ -185,12 +185,19 @@ scheduler_events = {
 
 # Extra expected cash flows and summary cards for the Bank Position Forecast report (dotted paths; see
 # treasury.pdc.forecast_sources).
-treasury_forecast_sources = ["treasury.bank_facilities.forecast.get_flows"]
+treasury_forecast_sources = [
+	"treasury.bank_facilities.forecast.get_flows",
+	"treasury.bank_facilities.lc.get_flows",
+]
 treasury_forecast_summary_sources = ["treasury.bank_facilities.forecast.get_summary"]
 
 # Utilisation of Bank Facility sub-limits from other documents (Letters of Guarantee / Credit, Cheque
-# Discounting — Phase 5b); see treasury.bank_facilities.utilisation.
-treasury_facility_utilisation_sources = []
+# Discounting); see treasury.bank_facilities.utilisation.
+treasury_facility_utilisation_sources = [
+	"treasury.bank_facilities.lg.get_lg_utilisation",
+	"treasury.bank_facilities.lc.get_lc_utilisation",
+	"treasury.bank_facilities.discounting.get_discounting_utilisation",
+]
 
 # scheduler_events = {
 # 	"all": [

@@ -48,11 +48,13 @@ PROTECTED_FIELDS = (
 	"effective_due_date",
 	"handover_date",
 	"deposit_date",
+	"discount_date",
 	"actual_clearance_date",
 	"bank_transaction_date",
 	"party_posting_date",
 	"bank_posting_date",
 	"bank_charges",
+	"cheque_discounting",
 	"party_payment_entry",
 	"under_collection_journal",
 	"bank_journal",
@@ -99,6 +101,7 @@ class PDCCheque(Document):
 		cheque_batch: DF.Link | None
 		cheque_batch_row: DF.Data | None
 		cheque_book: DF.Link | None
+		cheque_discounting: DF.Link | None
 		cheque_image: DF.AttachImage | None
 		cheque_no: DF.Data | None
 		company: DF.Link
@@ -106,6 +109,7 @@ class PDCCheque(Document):
 		cycle: DF.Int
 		deposit_date: DF.Date | None
 		direction: DF.Literal["Outgoing", "Incoming"]
+		discount_date: DF.Date | None
 		drawer_bank: DF.Data | None
 		effective_due_date: DF.Date | None
 		exchange_rate: DF.Float
@@ -596,6 +600,10 @@ class PDCCheque(Document):
 	@frappe.whitelist(methods=["POST"])
 	def return_to_party(self, return_date=None, reason=None):
 		return lifecycle.return_to_party(self.name, return_date, reason)
+
+	@frappe.whitelist(methods=["POST"])
+	def settle_discounted(self, settlement_date=None, remarks=None):
+		return lifecycle.settle_discounted(self.name, settlement_date, remarks)
 
 
 def on_doctype_update():
