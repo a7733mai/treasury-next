@@ -17,6 +17,9 @@ Expected flows dated before today are overdue: with "Include Overdue" they are s
 counted as expected today (placed just before the period containing today, i.e. first when From Date is
 today); otherwise they are left out. Other modules add flows through `treasury_forecast_sources`
 (treasury.pdc.forecast_sources).
+
+`horizon_weeks` (not shown in the filter bar) replaces To Date by From Date + that many weeks; the
+"Expected Cash Flow" dashboard chart uses it for its 12-week horizon.
 """
 
 from bisect import bisect_right
@@ -28,6 +31,7 @@ from frappe.utils import add_days, cint, flt, formatdate, get_last_day, getdate
 from treasury.pdc import forecast_sources
 from treasury.pdc.report_utils import (
 	BANK_POSTED,
+	CTX,
 	DOCTYPE,
 	INCOMING,
 	OUTGOING,
@@ -80,10 +84,14 @@ class BankPositionForecast:
 		self.today = report_today()
 		self.from_date = getdate(filters.from_date or self.today)
 		self.to_date = getdate(filters.to_date or add_days(self.from_date, DEFAULT_DAYS))
+		if cint(filters.horizon_weeks) > 0:
+			# fixed horizon (dashboard chart "Expected Cash Flow"): overrides To Date
+			self.to_date = getdate(add_days(self.from_date, 7 * cint(filters.horizon_weeks) - 1))
 		validate_date_range(self.from_date, self.to_date)
 		self.periodicity = filters.periodicity or WEEKLY
 		if self.periodicity not in (DAILY, WEEKLY, MONTHLY):
-			frappe.throw(_("Periodicity must be one of: {0}.").format(", ".join((_(DAILY), _(WEEKLY), _(MONTHLY)))))
+			labels = ", ".join(_(p, context=CTX) for p in (DAILY, WEEKLY, MONTHLY))
+			frappe.throw(_("Periodicity must be one of: {0}.").format(labels))
 		self.include_created = cint(filters.include_created)
 		self.include_overdue = 1 if filters.get("include_overdue") is None else cint(filters.include_overdue)
 		self.show_details = cint(filters.show_details)
@@ -313,8 +321,8 @@ class BankPositionForecast:
 			}
 
 		columns = [
-			{"fieldname": "period", "label": _("Period"), "fieldtype": "Data", "width": 210},
-			currency("opening", _("Opening Balance")),
+			{"fieldname": "period", "label": _("Period", context=CTX), "fieldtype": "Data", "width": 210},
+			currency("opening", _("Opening Balance", context=CTX)),
 			currency("actual_in", _("Actual In")),
 			currency("actual_out", _("Actual Out")),
 			currency("expected_in", _("Expected In")),

@@ -100,6 +100,9 @@ def after_insert(doc):
 	settings = posting.get_company_settings(doc.company)
 	if doc.direction != OUTGOING or settings.outgoing_party_posting != "On Creation":
 		return
+	# No `_begin` permission check here: the user's *create* permission on PDC Cheque, checked by
+	# `Document.insert` before this hook runs, is what authorises this posting. Only after it does the
+	# posting service build the Payment Entry in its elevated context (treasury.utils.context.elevated).
 	_post_party(doc, doc.issue_date)
 	# The parent insert is still running: write the changes in place instead of a nested save.
 	# This relies on Frappe's insert order (the parent row and its existing children are already in the

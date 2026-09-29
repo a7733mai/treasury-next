@@ -5,7 +5,8 @@
 
 Bounced: one row per bounce (a re-presented cheque may bounce again), from the status log. The bounce date
 is the posting date of the reversal (or bounce charges) Journal Entry of that bounce — the date the user
-gave — and the date the bounce was recorded when nothing was posted (a cheque bounced before posting).
+gave — and the date the bounce was recorded when no dated voucher exists (a cheque bounced before posting,
+or On Bounce = Cancel Payment Entry without bounce charges).
 
 Postponed: one row per postponement (PDC Postponement), dated when it was recorded, with the number of
 postponements of the same party in the result as a frequency indicator.
@@ -17,8 +18,9 @@ import frappe
 from frappe import _
 from frappe.utils import add_months, date_diff, flt, getdate
 
+import erpnext
 from treasury.pdc.report_utils import (
-	CHEQUE_FIELDS,
+	CTX,
 	DOCTYPE,
 	cheque_columns,
 	column,
@@ -56,18 +58,23 @@ def execute(filters=None):
 	if view == POSTPONED:
 		conditions["postponement_count"] = [">", 0]
 
-	cheques = {c.name: c for c in get_cheques(conditions, [*CHEQUE_FIELDS, "bounce_charges_journal"])}
+	cheques = {c.name: c for c in get_cheques(conditions)}
 	if view == BOUNCED:
-		return get_bounced_columns(), get_bounced_rows(cheques, from_date, to_date)
+		rows = get_bounced_rows(cheques, from_date, to_date)
+		company_currency = erpnext.get_company_currency(company)
+		for row in rows:
+			row.company_currency = company_currency
+		return get_bounced_columns(), rows
 	return get_postponed_columns(), get_postponed_rows(cheques, from_date, to_date)
 
 
-def get_child_rows(doctype: str, parentfield: str, cheque_names: list[str], fields: list[str]):
+def get_child_rows(doctype: str, parentfield: str, cheque_names: list[str], fields: list[str], **filters):
+	"""History rows of cheques the user may read (the parents come from `frappe.get_list`)."""
 	if not cheque_names:
 		return []
 	return frappe.get_all(
 		doctype,
-		filters={"parenttype": DOCTYPE, "parentfield": parentfield, "parent": ["in", cheque_names]},
+		filters={"parenttype": DOCTYPE, "parentfield": parentfield, "parent": ["in", cheque_names], **filters},
 		fields=["parent", "idx", *fields],
 		order_by="parent asc, idx asc",
 	)
@@ -79,11 +86,15 @@ def get_child_rows(doctype: str, parentfield: str, cheque_names: list[str], fiel
 
 
 def get_bounced_rows(cheques: dict, from_date, to_date) -> list[frappe._dict]:
+	bounced = {
+		log.parent
+		for log in get_child_rows("PDC Status Log", "status_log", list(cheques), [], event="Bounced")
+	}
 	logs: dict[str, list] = {}
 	for log in get_child_rows(
 		"PDC Status Log",
 		"status_log",
-		list(cheques),
+		sorted(bounced),
 		["event", "datetime", "remarks", "voucher_type", "voucher_no"],
 	):
 		logs.setdefault(log.parent, []).append(log)
@@ -129,12 +140,14 @@ def bounce_details(log, following: list) -> tuple:
 			break
 		if row.voucher_type != "Journal Entry" or row.event not in DATED_BOUNCE_VOUCHER_EVENTS:
 			continue
-		posting_date, total = frappe.db.get_value(
-			"Journal Entry", row.voucher_no, ["posting_date", "total_debit"]
+		journal = frappe.db.get_value(
+			"Journal Entry", row.voucher_no, ["posting_date", "total_debit"], as_dict=True
 		)
-		bounce_date = bounce_date or getdate(posting_date)
+		if not journal:
+			continue
+		bounce_date = bounce_date or getdate(journal.posting_date)
 		if row.event == "Bounce Charges Posted":
-			charges += flt(total)
+			charges += flt(journal.total_debit)
 	return bounce_date or getdate(log.datetime), charges
 
 
@@ -144,9 +157,10 @@ def get_bounced_columns() -> list[dict]:
 		column("effective_due_date", _("Effective Due Date"), "Date"),
 		column("bounce_date", _("Bounce Date"), "Date"),
 		column("reason", _("Reason"), width=220),
-		column("charges", _("Bounce Charges"), "Currency", 120),
+		column("charges", _("Bounce Charges"), "Currency", 120, options="company_currency"),
 		column("represented", _("Re-presented"), "Check", 100),
 		column("operational_status", _("Operational Status"), width=120),
+		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
 	]
 
 

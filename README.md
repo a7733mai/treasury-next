@@ -36,6 +36,20 @@ bench install-app treasury
 - Uninstalling the app keeps the three roles and their assignment to users (they have no permission left);
   delete them in *Role* if they are no longer wanted.
 
+### Reports and workspace
+
+- The **Treasury** workspace (sidebar + desktop icon) holds the PDC number cards, the *Expected Cash Flow*
+  and *PDC by Status* charts and links to the six PDC reports: Bank Position Forecast, Projected Party
+  Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage.
+- Reports only read data. Cheques are read with the user's permissions and User Permissions; a user
+  restricted to other companies gets a permission error for a forbidden Company filter.
+- **Bank Position Forecast**: opening and actual movements come from the bank GL only (it moves on the
+  bank posting of a cheque); every cheque whose bank posting is still to come is an expected flow on its
+  effective (possibly postponed) due date. Other modules add flows through the `treasury_forecast_sources`
+  hook (see `treasury/pdc/forecast_sources.py`).
+- Generic words of the reports are translated with the context `Treasury Report` (see `locale/ar.po`),
+  so the app never changes ERPNext's own translation of the same words.
+
 ### Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:

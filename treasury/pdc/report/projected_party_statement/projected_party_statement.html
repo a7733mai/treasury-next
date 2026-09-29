@@ -1,0 +1,76 @@
+<style>
+	.pps-title { text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+	.pps-meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 13px; }
+	.pps-meta strong { color: #7c7c7c; font-weight: 500; }
+	.pps-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+	.pps-table th { background: #f8f8f8; color: #7c7c7c; font-weight: 500; padding: 5px 6px; border: 1px solid #ededed; }
+	.pps-table td { padding: 5px 6px; border: 1px solid #ededed; vertical-align: top; word-wrap: break-word; }
+	.pps-right { text-align: right; font-variant-numeric: tabular-nums; }
+	.pps-bold td { font-weight: 700; }
+	.pps-projected td { color: #555; font-style: italic; }
+	.pps-summary { margin-top: 14px; width: 60%; border-collapse: collapse; font-size: 13px; }
+	.pps-summary td { padding: 4px 6px; border-bottom: 1px solid #ededed; }
+	@media print { thead { display: table-header-group; } tr { page-break-inside: avoid; } }
+</style>
+
+{% var currency = (data.length && data[0].currency) || frappe.boot.sysdefaults.currency; %}
+{% var summary = (report && report.raw_data && report.raw_data.report_summary) || []; %}
+
+<div class="pps-title">{%= __("Projected Party Statement") %}</div>
+
+<div class="pps-meta">
+	<div>
+		<div><strong>{%= __(filters.party_type) %}:</strong> {%= filters.party %}</div>
+		<div><strong>{%= __("Company") %}:</strong> {%= filters.company %}</div>
+	</div>
+	<div class="pps-right">
+		<div>
+			<strong>{%= __("Statement Period", null, "Treasury Report") %}:</strong>
+			{%= __("{0} to {1}", [frappe.datetime.str_to_user(filters.from_date), frappe.datetime.str_to_user(filters.to_date)], "Treasury Report") %}
+		</div>
+		<div><strong>{%= __("Print Date") %}:</strong> {%= frappe.datetime.str_to_user(frappe.datetime.get_today()) %}</div>
+	</div>
+</div>
+
+<table class="pps-table">
+	<thead>
+		<tr>
+			<th style="width: 8em">{%= __("Date") %}</th>
+			<th>{%= __("Voucher", null, "Treasury Report") %}</th>
+			<th>{%= __("Description", null, "Treasury Report") %}</th>
+			<th class="pps-right" style="width: 9em">{%= __("Debit", null, "Treasury Report") %}</th>
+			<th class="pps-right" style="width: 9em">{%= __("Credit", null, "Treasury Report") %}</th>
+			<th class="pps-right" style="width: 10em">{%= __("Actual Balance") %}</th>
+			<th class="pps-right" style="width: 10em">{%= __("Projected Balance") %}</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for (var i = 0; i < data.length; i++) { %}
+			{% var row = data[i]; %}
+			<tr class="{% if (row.bold) { %}pps-bold{% } %} {% if (row.row_type === 'projected') { %}pps-projected{% } %}">
+				<td>{%= row.posting_date ? frappe.datetime.str_to_user(row.posting_date) : "" %}</td>
+				<td>{%= row.voucher_type ? __(row.voucher_type) + " " + (row.voucher_no || "") : "" %}</td>
+				<td>{%= row.description || "" %}</td>
+				<td class="pps-right">{%= row.debit ? format_currency(row.debit, currency) : "" %}</td>
+				<td class="pps-right">{%= row.credit ? format_currency(row.credit, currency) : "" %}</td>
+				<td class="pps-right">{%= (row.balance !== null && row.balance !== undefined) ? format_currency(row.balance, currency) : "" %}</td>
+				<td class="pps-right">{%= (row.projected_balance !== null && row.projected_balance !== undefined) ? format_currency(row.projected_balance, currency) : "" %}</td>
+			</tr>
+		{% } %}
+	</tbody>
+</table>
+
+{% if (summary.length) { %}
+	<table class="pps-summary">
+		{% for (var j = 0; j < summary.length; j++) { %}
+			<tr>
+				<td>{%= summary[j].label %}</td>
+				<td class="pps-right"><b>{%= format_currency(summary[j].value, summary[j].currency || currency) %}</b></td>
+			</tr>
+		{% } %}
+	</table>
+{% } %}
+
+<p class="pps-right" style="margin-top: 10px; font-size: 11px">
+	{%= __("Positive balances are owed by the party (Dr); negative balances are owed to the party (Cr).") %}
+</p>

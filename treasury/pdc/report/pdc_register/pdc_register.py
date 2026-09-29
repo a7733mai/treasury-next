@@ -15,6 +15,7 @@ from treasury.pdc.report_utils import (
 	ALL_OPERATIONAL_STATUSES,
 	BANK_POSTED,
 	CHEQUE_FIELDS,
+	CTX,
 	INCOMING,
 	OUTGOING,
 	AmountConverter,
@@ -184,7 +185,7 @@ def total_row(rows: list[frappe._dict], group_field: str | None) -> frappe._dict
 		base_amount=flt(sum(r.base_amount for r in rows), get_precision()),
 		company_currency=rows[0].company_currency if rows else None,
 	)
-	row["group_label" if group_field else "cheque_no"] = _("Total")
+	row["group_label" if group_field else "cheque_no"] = _("Total", context=CTX)
 	return row
 
 
@@ -217,6 +218,6 @@ def get_columns(group_field: str | None) -> list[dict]:
 		column("accounting_status", _("Accounting Status"), width=130),
 		column("postponement_count", _("Postponement Count"), "Int", 90),
 		column("vouchers", _("Linked Vouchers"), width=260),
-		column("company_currency", _("Company Currency"), "Link", 80, options="Currency", hidden=1),
+		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
 	]
 	return columns

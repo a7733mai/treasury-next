@@ -5,12 +5,15 @@ in an elevated context (treasury.utils.context.elevated) after the lifecycle che
 on the cheque. Also covers the one-time removal of the Custom DocPerm grants of earlier versions.
 """
 
+from unittest.mock import patch
+
 import frappe
 from frappe.cache_manager import clear_user_cache
 from frappe.permissions import add_permission
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
 
+from erpnext.accounts.doctype.payment_entry.payment_entry import PaymentEntry
 from treasury.install import (
 	LEGACY_CLEANUP_DONE_KEY,
 	LEGACY_PERMISSION_DOCTYPES,
@@ -30,10 +33,12 @@ from treasury.tests.utils import (
 	make_purchase_invoice,
 	make_sales_invoice,
 )
+from treasury.utils.context import REAL_USER_FLAG, elevated, real_user
 
 TREASURY_USER = "treasury-perm-user@example.com"
 TREASURY_MANAGER = "treasury-perm-manager@example.com"
 SAVEPOINT = "treasury_legacy_permissions_test"
+SAVEPOINT_FAILED_POSTING = "treasury_failed_posting_test"
 
 
 class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
@@ -56,10 +61,41 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual((owner, modified_by), (user, user), (doctype, name))
 
 	def test_no_custom_docperm_on_core_doctypes(self):
-		# after_migrate removed the legacy grants and reset the copied standard permissions
+		# after_migrate removed the legacy grants; other Custom DocPerm rows (an administrator's own
+		# customisations of other roles) are none of the app's business
 		self.assertTrue(frappe.db.get_global(LEGACY_CLEANUP_DONE_KEY))
 		for doctype in LEGACY_PERMISSION_DOCTYPES:
-			self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": doctype}), doctype)
+			self.assertFalse(
+				frappe.db.exists(
+					"Custom DocPerm", {"parent": doctype, "role": ["in", LEGACY_PERMISSION_ROLES]}
+				),
+				doctype,
+			)
+
+	def test_elevated_restores_user_after_exception(self):
+		with self.set_user(TREASURY_USER):
+			with self.assertRaises(ValueError):
+				with elevated():
+					self.assertEqual(frappe.session.user, "Administrator")
+					self.assertEqual(real_user(), TREASURY_USER)
+					raise ValueError("forced")
+			self.assertEqual(frappe.session.user, TREASURY_USER)
+			self.assertIsNone(frappe.flags.get(REAL_USER_FLAG))
+			self.assertEqual(real_user(), TREASURY_USER)
+
+	def test_failed_posting_restores_user(self):
+		# the voucher fails inside the posting service's elevated block (as a closed period would)
+		cheque = make_pdc_cheque(amount=1111, issue_date=day(-60), due_date=day(-30))
+		frappe.db.savepoint(SAVEPOINT_FAILED_POSTING)
+		self.addCleanup(frappe.db.rollback, save_point=SAVEPOINT_FAILED_POSTING)
+		with (
+			self.set_user(TREASURY_USER),
+			patch.object(PaymentEntry, "on_submit", side_effect=frappe.ValidationError("forced")),
+		):
+			self.assertRaises(frappe.ValidationError, cheque.deliver, day(-59))
+			self.assertEqual(frappe.session.user, TREASURY_USER)
+			self.assertIsNone(frappe.flags.get(REAL_USER_FLAG))
+		self.assertEqual(frappe.db.get_value("PDC Cheque", cheque.name, "operational_status"), "Created")
 
 	def test_roles_hold_no_voucher_permission(self):
 		for user in (TREASURY_USER, TREASURY_MANAGER):

@@ -19,6 +19,9 @@ from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 
 DOCTYPE = "PDC Cheque"
+# Translation context of generic words in the reports (e.g. "Party", "Total"), so their Arabic entries in
+# locale/ar.po never change the translation of the same words elsewhere in ERPNext.
+CTX = "Treasury Report"
 OUTGOING = "Outgoing"
 INCOMING = "Incoming"
 BANK_POSTED = "Bank Posted"
@@ -35,8 +38,8 @@ EXPECTED_STATUSES = {
 OPEN_STATUSES = ("Created", "Delivered", "Received", "Deposited")
 # Handed over / received but not posted to the party yet (projected party statement).
 UNPOSTED_STATUSES = ("Delivered", "Received", "Deposited")
-# Posted to the PDC account and not settled by the bank yet.
-POSTED_NOT_CLEARED_STATUSES = ("Created", "Delivered", "Received", "Deposited", "Cleared")
+# Posted to the party (PDC account) and not cleared by the bank yet; `Created` covers `On Creation` mode.
+POSTED_NOT_CLEARED_STATUSES = ("Created", "Delivered", "Received", "Deposited")
 POSTED_NOT_CLEARED_ACCOUNTING = ("Party Posted", "Under Collection Posted")
 
 ALL_OPERATIONAL_STATUSES = (
@@ -109,7 +112,7 @@ def cheque_columns() -> list[dict]:
 		column("cheque", _("PDC Cheque"), "Link", 160, options=DOCTYPE),
 		column("direction", _("Direction"), width=90),
 		column("party_type", _("Party Type"), width=90, hidden=1),
-		column("party", _("Party"), "Dynamic Link", 150, options="party_type"),
+		column("party", _("Party", context=CTX), "Dynamic Link", 150, options="party_type"),
 		column("party_name", _("Party Name"), width=160),
 		column("bank_account", _("Bank Account"), "Link", 170, options="Bank Account"),
 		column("cheque_no", _("Cheque No")),
@@ -133,14 +136,15 @@ def is_permitted_value(doctype: str, value: str, applicable_for: str = DOCTYPE) 
 	return not restrictions or value in {p.get("doc") for p in restrictions}
 
 
-def validate_company(company: str | None) -> str:
-	"""The company filter is required, and the user must be allowed to read its PDC cheques."""
+def validate_company(company: str | None, doctype: str = DOCTYPE) -> str:
+	"""The company filter is required, and the user must be allowed to read the company's `doctype`
+	records (PDC cheques by default): read permission plus no User Permission excluding the company."""
 	if not company:
 		frappe.throw(_("Company is required."))
 	if not frappe.db.exists("Company", company):
 		frappe.throw(_("{0} {1} does not exist").format(_("Company"), company), frappe.DoesNotExistError)
-	frappe.has_permission(DOCTYPE, "read", throw=True)
-	if not is_permitted_value("Company", company):
+	frappe.has_permission(doctype, "read", throw=True)
+	if not is_permitted_value("Company", company, doctype):
 		frappe.throw(
 			_("You are not permitted to view the cheques of company {0}.").format(frappe.bold(company)),
 			frappe.PermissionError,

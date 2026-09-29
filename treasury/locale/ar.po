@@ -1231,3 +1231,329 @@ msgstr "اختر المطابقات المراد صرفها."
 
 msgid "Clear {0} cheque(s) and reconcile their bank transactions?"
 msgstr "صرف {0} شيك وتسوية حركاتها البنكية؟"
+
+# Phase 2 — reports
+msgid "Bank Position Forecast"
+msgstr "مركز البنك المتوقع"
+
+msgid "Projected Party Statement"
+msgstr "كشف حساب استباقي"
+
+msgid "PDC Register"
+msgstr "سجل الشيكات الآجلة"
+
+msgid "PDC Maturity"
+msgstr "استحقاقات الشيكات الآجلة"
+
+msgid "Bounced and Postponed Cheques"
+msgstr "الشيكات المرتدة والمؤجلة"
+
+msgid "Cheque Book Usage"
+msgstr "استخدام دفاتر الشيكات"
+
+# Phase 2 — shared report messages (treasury.pdc.report_utils)
+msgid "Company is required."
+msgstr "الشركة مطلوبة."
+
+msgid "You are not permitted to view the cheques of company {0}."
+msgstr "غير مسموح لك بعرض شيكات الشركة {0}."
+
+msgid "You are not permitted to view {0} {1}."
+msgstr "غير مسموح لك بعرض {0} {1}."
+
+msgid "Unassigned Bank"
+msgstr "بدون بنك محدد"
+
+msgid "Cheques"
+msgstr "الشيكات"
+
+msgid "Include Created Outgoing Cheques"
+msgstr "تضمين الشيكات الصادرة غير المسلّمة"
+
+msgid "Please select Party Type first"
+msgstr "من فضلك اختر نوع الطرف أولاً"
+
+# Phase 2 — Bank Position Forecast
+msgid "Periodicity must be one of: {0}."
+msgstr "التجميع يجب أن يكون أحد: {0}."
+
+msgid "The bank accounts are in different currencies ({0}). Select one currency's bank accounts or the Company Currency view."
+msgstr "الحسابات البنكية بعملات مختلفة ({0}). اختر حسابات بنكية بعملة واحدة أو اعرض بعملة الشركة."
+
+msgid "Actual In"
+msgstr "الوارد الفعلي"
+
+msgid "Actual Out"
+msgstr "الصادر الفعلي"
+
+msgid "Expected In"
+msgstr "الوارد المتوقع"
+
+msgid "Expected Out"
+msgstr "الصادر المتوقع"
+
+msgid "Net Flow"
+msgstr "صافي التدفق"
+
+msgid "Projected Closing Balance"
+msgstr "الرصيد الختامي المتوقع"
+
+msgid "Current Actual Balance"
+msgstr "الرصيد الفعلي الحالي"
+
+msgid "Total Expected In"
+msgstr "إجمالي الوارد المتوقع"
+
+msgid "Total Expected Out"
+msgstr "إجمالي الصادر المتوقع"
+
+msgid "Lowest Projected Balance ({0})"
+msgstr "أدنى رصيد متوقع ({0})"
+
+msgid "Projected Closing on {0}"
+msgstr "الرصيد المتوقع في {0}"
+
+msgid "Currency View"
+msgstr "عرض العملة"
+
+msgid "Bank Currency"
+msgstr "عملة البنك"
+
+msgid "Include Overdue"
+msgstr "تضمين المتأخر"
+
+msgid "Show Cheques"
+msgstr "عرض الشيكات"
+
+msgid "Open in PDC Register"
+msgstr "فتح في سجل الشيكات الآجلة"
+
+# Phase 2 — PDC Register
+msgid "Invalid Operational Status: {0}"
+msgstr "حالة تشغيلية غير صحيحة: {0}"
+
+msgid "Invalid Date Based On: {0}"
+msgstr "أساس تاريخ غير صحيح: {0}"
+
+msgid "Amount (Company Currency)"
+msgstr "المبلغ (بعملة الشركة)"
+
+msgid "Days to Due"
+msgstr "أيام حتى الاستحقاق"
+
+msgid "Date Based On"
+msgstr "التاريخ حسب"
+
+msgid "Postponed Only"
+msgstr "المؤجلة فقط"
+
+msgid "Expected in Bank Position Only"
+msgstr "المتوقعة في مركز البنك فقط"
+
+# Phase 2 — PDC Maturity
+msgid "0-7 Days"
+msgstr "0-7 أيام"
+
+msgid "8-30 Days"
+msgstr "8-30 يوم"
+
+msgid "31-60 Days"
+msgstr "31-60 يوم"
+
+msgid "61-90 Days"
+msgstr "61-90 يوم"
+
+msgid "Over 90 Days"
+msgstr "أكثر من 90 يوم"
+
+msgid "As On"
+msgstr "في تاريخ"
+
+# Phase 2 — Bounced and Postponed Cheques
+msgid "View must be one of: {0}."
+msgstr "العرض يجب أن يكون أحد: {0}."
+
+msgid "Postponed On"
+msgstr "تاريخ التأجيل"
+
+msgid "Days Postponed"
+msgstr "أيام التأجيل"
+
+msgid "Party Postponements"
+msgstr "عدد تأجيلات الطرف"
+
+# Phase 2 — Projected Party Statement
+msgid "Actual Closing Balance"
+msgstr "الرصيد الختامي الفعلي"
+
+msgid "{0} cheque {1} ({2})"
+msgstr "شيك {0} رقم {1} ({2})"
+
+msgid "Actual Balance"
+msgstr "الرصيد الفعلي"
+
+msgid "Projected Balance"
+msgstr "الرصيد المتوقع"
+
+msgid "Cheques Handed Over / Received, Not Posted"
+msgstr "شيكات مسلّمة / مستلمة لم تُرحّل"
+
+msgid "Cheques Posted, Not Cleared"
+msgstr "شيكات مُرحّلة لم تُصرف"
+
+msgid "Balance Excluding Uncleared Cheques"
+msgstr "الرصيد بدون الشيكات غير المصروفة"
+
+msgid "Net Balance After Cheques"
+msgstr "صافي الرصيد بعد الشيكات"
+
+msgid "Positive balances are owed by the party (Dr); negative balances are owed to the party (Cr)."
+msgstr "الرصيد الموجب مستحق على الطرف (مدين)، والرصيد السالب مستحق للطرف (دائن)."
+
+# Phase 2 — Cheque Book Usage
+msgid "Invalid Status: {0}"
+msgstr "حالة غير صحيحة: {0}"
+
+msgid "Total Leaves"
+msgstr "إجمالي الأوراق"
+
+msgid "% Used"
+msgstr "نسبة الاستخدام %"
+
+# Phase 2 — number cards (treasury.pdc.dashboard), dashboard charts, workspace
+msgid "Direction must be one of: {0}."
+msgstr "الاتجاه يجب أن يكون أحد: {0}."
+
+msgid "Invalid scope: {0}"
+msgstr "نطاق غير صحيح: {0}"
+
+msgid "Outgoing Cheques Due Today"
+msgstr "شيكات صادرة مستحقة اليوم"
+
+msgid "Incoming Cheques Due Today"
+msgstr "شيكات واردة مستحقة اليوم"
+
+msgid "Overdue Outgoing Cheques"
+msgstr "شيكات صادرة متأخرة"
+
+msgid "Overdue Incoming Cheques"
+msgstr "شيكات واردة متأخرة"
+
+msgid "Outgoing Cheques Due in 7 Days"
+msgstr "شيكات صادرة مستحقة خلال 7 أيام"
+
+msgid "Incoming Cheques Due in 7 Days"
+msgstr "شيكات واردة مستحقة خلال 7 أيام"
+
+msgid "Outstanding PDC Payable"
+msgstr "أوراق الدفع القائمة"
+
+msgid "Outstanding PDC Receivable"
+msgstr "أوراق القبض القائمة"
+
+msgid "Expected Cash Flow"
+msgstr "التدفق النقدي المتوقع"
+
+msgid "PDC by Status"
+msgstr "الشيكات الآجلة حسب الحالة"
+
+msgid "PDC Reports"
+msgstr "تقارير الشيكات الآجلة"
+
+msgid "Treasury Masters"
+msgstr "بيانات الخزينة الأساسية"
+
+msgid "New Outgoing Cheque"
+msgstr "شيك صادر جديد"
+
+msgid "New Incoming Cheque"
+msgstr "شيك وارد جديد"
+
+# Phase 2 — generic words of the reports (context: treasury.pdc.report_utils.CTX)
+msgctxt "Treasury Report"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "Treasury Report"
+msgid "Period"
+msgstr "الفترة"
+
+msgctxt "Treasury Report"
+msgid "Opening Balance"
+msgstr "الرصيد الافتتاحي"
+
+msgctxt "Treasury Report"
+msgid "Periodicity"
+msgstr "التجميع"
+
+msgctxt "Treasury Report"
+msgid "Daily"
+msgstr "يومي"
+
+msgctxt "Treasury Report"
+msgid "Weekly"
+msgstr "أسبوعي"
+
+msgctxt "Treasury Report"
+msgid "Monthly"
+msgstr "شهري"
+
+msgctxt "Treasury Report"
+msgid "Company Currency"
+msgstr "عملة الشركة"
+
+msgctxt "Treasury Report"
+msgid "From Date"
+msgstr "من تاريخ"
+
+msgctxt "Treasury Report"
+msgid "To Date"
+msgstr "إلى تاريخ"
+
+msgctxt "Treasury Report"
+msgid "Group By"
+msgstr "تجميع حسب"
+
+msgctxt "Treasury Report"
+msgid "Total"
+msgstr "الإجمالي"
+
+msgctxt "Treasury Report"
+msgid "View"
+msgstr "العرض"
+
+msgctxt "Treasury Report"
+msgid "Description"
+msgstr "البيان"
+
+msgctxt "Treasury Report"
+msgid "Debit"
+msgstr "مدين"
+
+msgctxt "Treasury Report"
+msgid "Credit"
+msgstr "دائن"
+
+msgctxt "Treasury Report"
+msgid "Voucher"
+msgstr "المستند"
+
+msgctxt "Treasury Report"
+msgid "Statement Period"
+msgstr "فترة الكشف"
+
+msgctxt "Treasury Report"
+msgid "{0} to {1}"
+msgstr "من {0} إلى {1}"
+
+msgctxt "Treasury Report"
+msgid "Range"
+msgstr "النطاق"
+
+msgctxt "Treasury Report"
+msgid "Used"
+msgstr "المستخدم"
+
+msgctxt "Treasury Report"
+msgid "Remaining"
+msgstr "المتبقي"

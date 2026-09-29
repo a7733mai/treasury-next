@@ -1,0 +1,248 @@
+{
+ "app": "treasury",
+ "charts": [
+  {
+   "chart_name": "Expected Cash Flow",
+   "label": "Expected Cash Flow"
+  },
+  {
+   "chart_name": "PDC by Status",
+   "label": "PDC by Status"
+  }
+ ],
+ "content": "[{\"id\":\"trsHdrShct\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"trsShOutNw\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Outgoing Cheque\",\"col\":3}},{\"id\":\"trsShInNew\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Incoming Cheque\",\"col\":3}},{\"id\":\"trsShClear\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PDC Bank Clearing\",\"col\":3}},{\"id\":\"trsShSetng\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Treasury Company Settings\",\"col\":3}},{\"id\":\"trsNcOutTd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outgoing Cheques Due Today\",\"col\":3}},{\"id\":\"trsNcInTdy\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Incoming Cheques Due Today\",\"col\":3}},{\"id\":\"trsNcOutOd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Outgoing Cheques\",\"col\":3}},{\"id\":\"trsNcInOvd\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Overdue Incoming Cheques\",\"col\":3}},{\"id\":\"trsNcOut7d\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outgoing Cheques Due in 7 Days\",\"col\":3}},{\"id\":\"trsNcIn7dy\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Incoming Cheques Due in 7 Days\",\"col\":3}},{\"id\":\"trsNcPayab\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outstanding PDC Payable\",\"col\":3}},{\"id\":\"trsNcRecvb\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Outstanding PDC Receivable\",\"col\":3}},{\"id\":\"trsChCashF\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Expected Cash Flow\",\"col\":8}},{\"id\":\"trsChStats\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PDC by Status\",\"col\":4}},{\"id\":\"trsHdrRprt\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"trsCdCheqs\",\"type\":\"card\",\"data\":{\"card_name\":\"Cheques\",\"col\":4}},{\"id\":\"trsCdRprts\",\"type\":\"card\",\"data\":{\"card_name\":\"PDC Reports\",\"col\":4}},{\"id\":\"trsCdMastr\",\"type\":\"card\",\"data\":{\"card_name\":\"Treasury Masters\",\"col\":4}}]",
+ "creation": "2026-09-29 18:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "accounting",
+ "idx": 0,
+ "indicator_color": "",
+ "is_hidden": 0,
+ "label": "Treasury",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cheques",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PDC Cheque",
+   "link_count": 0,
+   "link_to": "PDC Cheque",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PDC Bank Clearing",
+   "link_count": 0,
+   "link_to": "PDC Bank Clearing",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PDC Reports",
+   "link_count": 6,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "PDC Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bank Position Forecast",
+   "link_count": 0,
+   "link_to": "Bank Position Forecast",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "PDC Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projected Party Statement",
+   "link_count": 0,
+   "link_to": "Projected Party Statement",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "PDC Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PDC Register",
+   "link_count": 0,
+   "link_to": "PDC Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "PDC Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PDC Maturity",
+   "link_count": 0,
+   "link_to": "PDC Maturity",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "PDC Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bounced and Postponed Cheques",
+   "link_count": 0,
+   "link_to": "Bounced and Postponed Cheques",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Cheque Book",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cheque Book Usage",
+   "link_count": 0,
+   "link_to": "Cheque Book Usage",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Treasury Masters",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cheque Book",
+   "link_count": 0,
+   "link_to": "Cheque Book",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Treasury Company Settings",
+   "link_count": 0,
+   "link_to": "Treasury Company Settings",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Treasury Settings",
+   "link_count": 0,
+   "link_to": "Treasury Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-29 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Treasury",
+ "number_cards": [
+  {
+   "label": "Outgoing Cheques Due Today",
+   "number_card_name": "Outgoing Cheques Due Today"
+  },
+  {
+   "label": "Incoming Cheques Due Today",
+   "number_card_name": "Incoming Cheques Due Today"
+  },
+  {
+   "label": "Overdue Outgoing Cheques",
+   "number_card_name": "Overdue Outgoing Cheques"
+  },
+  {
+   "label": "Overdue Incoming Cheques",
+   "number_card_name": "Overdue Incoming Cheques"
+  },
+  {
+   "label": "Outgoing Cheques Due in 7 Days",
+   "number_card_name": "Outgoing Cheques Due in 7 Days"
+  },
+  {
+   "label": "Incoming Cheques Due in 7 Days",
+   "number_card_name": "Incoming Cheques Due in 7 Days"
+  },
+  {
+   "label": "Outstanding PDC Payable",
+   "number_card_name": "Outstanding PDC Payable"
+  },
+  {
+   "label": "Outstanding PDC Receivable",
+   "number_card_name": "Outstanding PDC Receivable"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 30.0,
+ "shortcuts": [
+  {
+   "color": "Red",
+   "label": "New Outgoing Cheque",
+   "type": "URL",
+   "url": "/app/pdc-cheque/new?direction=Outgoing"
+  },
+  {
+   "color": "Green",
+   "label": "New Incoming Cheque",
+   "type": "URL",
+   "url": "/app/pdc-cheque/new?direction=Incoming"
+  },
+  {
+   "color": "Blue",
+   "label": "PDC Bank Clearing",
+   "link_to": "PDC Bank Clearing",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "label": "Treasury Company Settings",
+   "link_to": "Treasury Company Settings",
+   "type": "DocType"
+  }
+ ],
+ "title": "Treasury",
+ "type": "Workspace"
+}

@@ -73,7 +73,7 @@ frappe.query_reports["PDC Register"] = {
 		},
 		{
 			fieldname: "party",
-			label: __("Party"),
+			label: __("Party", null, "Treasury Report"),
 			fieldtype: "Dynamic Link",
 			get_options: function () {
 				const party_type = frappe.query_report.get_filter_value("party_type");
@@ -112,17 +112,17 @@ frappe.query_reports["PDC Register"] = {
 		},
 		{
 			fieldname: "from_date",
-			label: __("From Date"),
+			label: __("From Date", null, "Treasury Report"),
 			fieldtype: "Date",
 		},
 		{
 			fieldname: "to_date",
-			label: __("To Date"),
+			label: __("To Date", null, "Treasury Report"),
 			fieldtype: "Date",
 		},
 		{
 			fieldname: "group_by",
-			label: __("Group By"),
+			label: __("Group By", null, "Treasury Report"),
 			fieldtype: "Select",
 			options: [
 				{ value: "", label: "" },

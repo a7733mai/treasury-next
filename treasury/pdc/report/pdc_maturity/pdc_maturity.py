@@ -14,6 +14,7 @@ from frappe.utils import date_diff, flt, getdate
 
 from treasury.pdc.report_utils import (
 	BANK_POSTED,
+	CTX,
 	OPEN_STATUSES,
 	OUTGOING,
 	AmountConverter,
@@ -89,7 +90,7 @@ def new_row(key: str, label: str, currency: str) -> frappe._dict:
 
 
 def total_row(rows: list[frappe._dict], currency: str) -> frappe._dict:
-	row = new_row("", _("Total"), currency)
+	row = new_row("", _("Total", context=CTX), currency)
 	row.is_total = 1
 	for fieldname in [b[0] for b in BUCKETS] + ["total", "cheque_count"]:
 		row[fieldname] = sum(r[fieldname] for r in rows)
@@ -127,7 +128,13 @@ def get_columns(group_by: str) -> list[dict]:
 			{"fieldname": fieldname, "label": label, "fieldtype": "Currency", "options": "currency", "width": 120}
 		)
 	columns += [
-		{"fieldname": "total", "label": _("Total"), "fieldtype": "Currency", "options": "currency", "width": 130},
+		{
+			"fieldname": "total",
+			"label": _("Total", context=CTX),
+			"fieldtype": "Currency",
+			"options": "currency",
+			"width": 130,
+		},
 		{"fieldname": "cheque_count", "label": _("Cheques"), "fieldtype": "Int", "width": 80},
 		{"fieldname": "currency", "label": _("Currency"), "fieldtype": "Link", "options": "Currency", "hidden": 1},
 	]
