@@ -15,6 +15,7 @@ class TreasurySettings(Document):
 
 		allow_future_clearance_date: DF.Check
 		default_alert_days: DF.Int
+		security_alert_days: DF.Int
 	# end: auto-generated types
 
 	pass

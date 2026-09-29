@@ -6,6 +6,7 @@
  "field_order": [
   "alerts_section",
   "default_alert_days",
+  "security_alert_days",
   "column_break_alerts",
   "allow_future_clearance_date"
  ],
@@ -24,6 +25,14 @@
    "non_negative": 1
   },
   {
+   "default": "15",
+   "description": "Number of days before the expiry date to send security cheque alerts (expired cheques not returned are always included).",
+   "fieldname": "security_alert_days",
+   "fieldtype": "Int",
+   "label": "Security Cheque Alert Days",
+   "non_negative": 1
+  },
+  {
    "fieldname": "column_break_alerts",
    "fieldtype": "Column Break"
   },
@@ -36,7 +45,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-09-28 12:00:00.000000",
+ "modified": "2026-10-06 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Settings",

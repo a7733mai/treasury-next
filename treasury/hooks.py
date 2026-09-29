@@ -169,6 +169,9 @@ doc_events = {
 
 # `daily_long`: the posting job may submit many Payment Entries (catch-up after days without a run).
 scheduler_events = {
+	"daily": [
+		"treasury.security_cheques.scheduler.send_security_expiry_alerts",
+	],
 	"daily_long": [
 		"treasury.pdc.scheduler.post_due_party_postings",
 		"treasury.pdc.scheduler.send_due_alerts",

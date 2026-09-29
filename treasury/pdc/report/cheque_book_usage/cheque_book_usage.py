@@ -5,7 +5,8 @@
 
 A leaf is used when an outgoing PDC Cheque of the book's bank account carries its number (the same rule the
 cheque book applies when it allocates numbers) and that cheque is not cancelled; a cancelled cheque's leaf
-is recorded in the book's cancelled leaves. A leaf is counted once: cancelled wins over used.
+is recorded in the book's cancelled leaves. An outgoing Security Cheque uses its leaf whatever its status
+(cancelling or returning it frees nothing). A leaf is counted once: cancelled wins over used.
 """
 
 import frappe
@@ -46,7 +47,8 @@ def execute(filters=None):
 
 
 def get_used_leaves(bank_account: str) -> set[int]:
-	"""Leaf numbers written on non-cancelled outgoing cheques of the bank account."""
+	"""Leaf numbers written on non-cancelled outgoing PDC cheques or any outgoing security cheque of the bank
+	account."""
 	numbers = frappe.get_all(
 		"PDC Cheque",
 		filters={
@@ -54,6 +56,11 @@ def get_used_leaves(bank_account: str) -> set[int]:
 			"direction": OUTGOING,
 			"operational_status": ["!=", "Cancelled"],
 		},
+		pluck="cheque_no",
+	)
+	numbers += frappe.get_all(
+		"Security Cheque",
+		filters={"bank_account": bank_account, "direction": OUTGOING},
 		pluck="cheque_no",
 	)
 	return {int(n) for n in numbers if str(n or "").strip().isdigit()}

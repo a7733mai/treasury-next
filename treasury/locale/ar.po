@@ -691,8 +691,8 @@ msgstr "يجب إدخال سبب لإلغاء الورقة."
 msgid "Cheque No {0} is already cancelled."
 msgstr "رقم الشيك {0} ملغي بالفعل."
 
-msgid "Cheque No {0} is used by a PDC Cheque. Cancel that cheque instead."
-msgstr "رقم الشيك {0} مستخدم في شيك آجل. قم بإلغاء ذلك الشيك بدلاً من ذلك."
+msgid "Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead."
+msgstr "رقم الشيك {0} مستخدم في شيك آجل أو شيك ضمان. قم بإلغاء ذلك الشيك بدلاً من ذلك."
 
 # PDC Cheque messages
 msgid "Cheque {0} has accounting entries and cannot be deleted. Cancel it instead."
@@ -1957,3 +1957,491 @@ msgstr "المستحق غير المغطى"
 
 msgid "One invoice per cheque: part of a cheque stays an advance while invoices are still open. Allocate those rows by hand, or reconcile the advance later."
 msgstr "فاتورة واحدة لكل شيك: يبقى جزء من الشيك دفعة مقدمة رغم وجود فواتير مستحقة. خصص هذه السطور يدوياً، أو قم بتسوية الدفعة المقدمة لاحقاً."
+
+# Phase 4 — Security Cheques: DocTypes, reports, number cards, print format, workspace
+msgid "Security Cheque"
+msgstr "شيك ضمان"
+
+msgid "Custody Location"
+msgstr "مكان الحفظ"
+
+msgid "Security Cheque Custody Log"
+msgstr "سجل حفظ شيك الضمان"
+
+msgid "Security Cheque Status Log"
+msgstr "سجل حالات شيك الضمان"
+
+msgid "Security Cheque Receipt"
+msgstr "إيصال استلام شيك ضمان"
+
+msgid "Security Cheque Handover Acknowledgment"
+msgstr "إقرار تسليم شيك ضمان"
+
+msgid "Security Cheque Register"
+msgstr "سجل شيكات الضمان"
+
+msgid "Security Exposure"
+msgstr "مركز الضمانات"
+
+msgid "Security Cheques by Custody"
+msgstr "شيكات الضمان حسب مكان الحفظ"
+
+msgid "Expired Security Cheques Not Returned"
+msgstr "شيكات ضمان منتهية لم تُرد"
+
+msgid "Security Held"
+msgstr "ضمانات لدينا"
+
+msgid "Security Given"
+msgstr "ضمانات علينا"
+
+msgid "Security Cheques Expiring in 30 Days"
+msgstr "شيكات ضمان تنتهي خلال 30 يوماً"
+
+msgid "New Security Cheque"
+msgstr "شيك ضمان جديد"
+
+# Phase 4 — Custody Location fields
+msgid "Where security cheques are kept (a safe, a file, a branch ...)."
+msgstr "مكان حفظ شيكات الضمان (خزنة، ملف، فرع ...)."
+
+msgid "Location Name"
+msgstr "اسم الموقع"
+
+msgid "Is Active"
+msgstr "نشط"
+
+msgctxt "Custody Location"
+msgid "Description"
+msgstr "الوصف"
+
+# Phase 4 — Security Cheque fields
+msgid "A guarantee cheque held from a party (incoming) or given to a party (outgoing). It never creates accounting entries; only its encashment, through a PDC Cheque, does."
+msgstr "شيك ضمان محفوظ لدينا من طرف (وارد) أو مسلَّم منا لطرف (صادر). لا ينشئ أي قيود محاسبية أبداً؛ فقط تسييله من خلال شيك آجل هو الذي ينشئها."
+
+msgid "Incoming: a guarantee we hold from the party. Outgoing: a guarantee we gave to the party."
+msgstr "وارد: ضمان محفوظ لدينا من الطرف. صادر: ضمان سلمناه للطرف."
+
+msgctxt "Security Cheque"
+msgid "Party"
+msgstr "الطرف"
+
+msgid "Party Name (Other)"
+msgstr "اسم الطرف (أخرى)"
+
+msgctxt "Security Cheque"
+msgid "Employee"
+msgstr "موظف"
+
+msgctxt "Security Cheque"
+msgid "Other"
+msgstr "أخرى"
+
+msgctxt "Security Cheque"
+msgid "Purpose"
+msgstr "الغرض"
+
+msgctxt "Security Cheque"
+msgid "Tender"
+msgstr "مناقصة"
+
+msgctxt "Security Cheque"
+msgid "Contract Performance"
+msgstr "حسن تنفيذ عقد"
+
+msgctxt "Security Cheque"
+msgid "Advance Payment"
+msgstr "دفعة مقدمة"
+
+msgctxt "Security Cheque"
+msgid "Rent"
+msgstr "إيجار"
+
+msgctxt "Security Cheque"
+msgid "Employee Custody"
+msgstr "عهدة موظف"
+
+msgctxt "Security Cheque"
+msgid "Facility Collateral"
+msgstr "ضمان تسهيل بنكي"
+
+msgctxt "Security Cheque"
+msgid "Cheque"
+msgstr "الشيك"
+
+msgctxt "Security Cheque"
+msgid "Fixed"
+msgstr "محدد"
+
+msgctxt "Security Cheque"
+msgid "Open / Blank"
+msgstr "مفتوح / على بياض"
+
+msgctxt "Security Cheque"
+msgid "Reference Document"
+msgstr "المستند المرتبط"
+
+msgctxt "Security Cheque"
+msgid "Issue"
+msgstr "تسليم للطرف"
+
+msgid "Expired"
+msgstr "منتهي"
+
+msgid "The expiry date has passed and the cheque is still held / given."
+msgstr "انتهى تاريخ الضمان والشيك ما زال محفوظاً لدينا / لدى الطرف."
+
+msgid "Amount Type"
+msgstr "نوع المبلغ"
+
+msgid "An Open / Blank cheque carries no amount; creating, receiving or issuing one requires the Treasury Manager role."
+msgstr "الشيك المفتوح / على بياض ليس له مبلغ؛ وإنشاؤه أو استلامه أو تسليمه يتطلب دور مدير الخزينة."
+
+msgid "Outgoing: the currency of the bank account. Incoming: the company currency unless changed before the first action."
+msgstr "صادر: عملة الحساب البنكي. وارد: عملة الشركة ما لم تُغيَّر قبل أول إجراء."
+
+msgid "Required Amount"
+msgstr "المبلغ المطلوب"
+
+msgid "The guarantee the contract / tender requires (compared with the cheques held in Security Exposure)."
+msgstr "الضمان الذي يتطلبه العقد / المناقصة (تتم مقارنته بالشيكات المحفوظة في تقرير مركز الضمانات)."
+
+msgid "Cheque Date"
+msgstr "تاريخ الشيك"
+
+msgid "The date written on the cheque, if any (a security cheque may be undated)."
+msgstr "التاريخ المكتوب على الشيك إن وجد (قد يكون شيك الضمان بدون تاريخ)."
+
+msgid "Expiry Date"
+msgstr "تاريخ الانتهاء"
+
+msgid "End of the guarantee: the cheque is due back after it."
+msgstr "نهاية الضمان: يجب رد الشيك بعده."
+
+msgid "Lost Date"
+msgstr "تاريخ الفقد"
+
+msgid "Encashment Date"
+msgstr "تاريخ التسييل"
+
+msgid "Custody"
+msgstr "الحفظ"
+
+msgid "Custodian"
+msgstr "المسؤول عن الحفظ"
+
+msgid "Returned To / Received By"
+msgstr "رُدَّ إلى / استلمه"
+
+msgid "Encashment"
+msgstr "التسييل"
+
+msgid "Converted PDC Cheque"
+msgstr "الشيك الآجل الناتج عن التسييل"
+
+msgid "Encashed Amount"
+msgstr "المبلغ المسيَّل"
+
+msgid "Custody Log"
+msgstr "سجل الحفظ"
+
+# Phase 4 — Security Cheque statuses and log events
+msgctxt "Security Cheque"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Security Cheque"
+msgid "Received"
+msgstr "تم الاستلام"
+
+msgctxt "Security Cheque"
+msgid "In Custody"
+msgstr "في الحفظ"
+
+msgctxt "Security Cheque"
+msgid "Issued"
+msgstr "مسلَّم للطرف"
+
+msgctxt "Security Cheque"
+msgid "Returned"
+msgstr "مردود"
+
+msgctxt "Security Cheque"
+msgid "Encashed"
+msgstr "مسيَّل"
+
+msgctxt "Security Cheque"
+msgid "Lost"
+msgstr "مفقود"
+
+msgctxt "Security Cheque"
+msgid "Cancelled"
+msgstr "ملغي"
+
+msgid "In Custody"
+msgstr "في الحفظ"
+
+msgid "Encashed"
+msgstr "مسيَّل"
+
+msgid "Stored"
+msgstr "تم الحفظ"
+
+msgid "Custody Transferred"
+msgstr "تم نقل الحفظ"
+
+msgctxt "Security Cheque Status Log"
+msgid "Issued"
+msgstr "تم التسليم للطرف"
+
+msgctxt "Security Cheque Status Log"
+msgid "Lost"
+msgstr "تم الفقد"
+
+# Phase 4 — log child tables
+msgid "From Location"
+msgstr "من مكان"
+
+msgid "To Location"
+msgstr "إلى مكان"
+
+msgid "From Custodian"
+msgstr "من المسؤول"
+
+msgid "To Custodian"
+msgstr "إلى المسؤول"
+
+msgid "From Status"
+msgstr "من الحالة"
+
+msgid "To Status"
+msgstr "إلى الحالة"
+
+msgid "The date of the event as entered by the user (e.g. the receipt date). Empty for events without a date of their own."
+msgstr "تاريخ الحدث كما أدخله المستخدم (مثل تاريخ الاستلام). يترك فارغاً للأحداث التي ليس لها تاريخ خاص."
+
+# Phase 4 — PDC Cheque back-link, Treasury Settings
+msgid "The security cheque whose encashment created this cheque."
+msgstr "شيك الضمان الذي نتج هذا الشيك عن تسييله."
+
+msgid "Security Cheque Alert Days"
+msgstr "أيام التنبيه لشيكات الضمان"
+
+msgid "Number of days before the expiry date to send security cheque alerts (expired cheques not returned are always included)."
+msgstr "عدد الأيام قبل تاريخ الانتهاء لإرسال تنبيهات شيكات الضمان (الشيكات المنتهية التي لم تُرد تُضمَّن دائماً)."
+
+# Phase 4 — Security Cheque messages (security_cheque.py, treasury.security_cheques.lifecycle)
+msgid "Security cheque {0} cannot be deleted once acted on or when it uses a cheque book leaf. Cancel it instead."
+msgstr "لا يمكن حذف شيك الضمان {0} بعد تنفيذ أي إجراء عليه أو إذا كان يستخدم ورقة من دفتر شيكات. قم بإلغائه بدلاً من ذلك."
+
+msgid "{0} can only be changed by the security cheque actions."
+msgstr "لا يمكن تغيير {0} إلا من خلال إجراءات شيك الضمان."
+
+msgid "Enter the name of the party."
+msgstr "أدخل اسم الطرف."
+
+msgid "Bank Account and Cheque Book apply to outgoing security cheques only. Enter the Drawer Bank instead."
+msgstr "الحساب البنكي ودفتر الشيكات يخصان شيكات الضمان الصادرة فقط. أدخل بنك الساحب بدلاً منهما."
+
+msgid "An Open / Blank security cheque carries no amount: leave the Amount empty."
+msgstr "شيك الضمان المفتوح / على بياض ليس له مبلغ: اترك المبلغ فارغاً."
+
+msgid "Amount Type must be one of: {0}."
+msgstr "يجب أن يكون نوع المبلغ أحد: {0}."
+
+msgid "Required Amount cannot be negative."
+msgstr "لا يمكن أن يكون المبلغ المطلوب سالباً."
+
+msgid "The Expiry Date cannot be before the Issue Date."
+msgstr "لا يمكن أن يكون تاريخ الانتهاء قبل تاريخ التحرير."
+
+msgid "Select the Reference Type of {0}."
+msgstr "اختر نوع المستند المرتبط {0}."
+
+msgid "Reference Type must be one of: {0}."
+msgstr "يجب أن يكون نوع المرجع أحد: {0}."
+
+msgid "Reference Name is required."
+msgstr "اسم المرجع مطلوب."
+
+msgid "{0} cannot be changed after the security cheque is received or issued."
+msgstr "لا يمكن تغيير {0} بعد استلام شيك الضمان أو تسليمه."
+
+msgid "Select the Custody Location too."
+msgstr "اختر مكان الحفظ أيضاً."
+
+msgid "The cheque is already at this location with this custodian."
+msgstr "الشيك موجود بالفعل في هذا المكان مع نفس المسؤول."
+
+msgid "Only a security cheque of a Customer or Supplier can be encashed through a PDC Cheque; this one is of {0}."
+msgstr "لا يمكن تسييل شيك الضمان من خلال شيك آجل إلا إذا كان لعميل أو مورد؛ وهذا الشيك من نوع {0}."
+
+msgid "Enter the amount to encash: security cheque {0} is Open / Blank."
+msgstr "أدخل المبلغ المراد تسييله: شيك الضمان {0} مفتوح / على بياض."
+
+msgid "Security cheque {0} has the fixed amount {1}; it cannot be encashed for {2}."
+msgstr "شيك الضمان {0} مبلغه محدد {1}؛ ولا يمكن تسييله بمبلغ {2}."
+
+msgid "Select the Bank Account the cheque is deposited to."
+msgstr "اختر الحساب البنكي الذي سيتم إيداع الشيك فيه."
+
+msgid "An outgoing security cheque is paid from its own Bank Account {0}."
+msgstr "شيك الضمان الصادر يُصرف من حسابه البنكي {0}."
+
+msgid "Encashment of security cheque {0}"
+msgstr "تسييل شيك الضمان {0}"
+
+msgid "Security cheque {0} is in {1}, but Bank Account {2} is in {3}."
+msgstr "شيك الضمان {0} بعملة {1}، بينما الحساب البنكي {2} بعملة {3}."
+
+msgid "References must be a list."
+msgstr "يجب أن تكون المراجع قائمة."
+
+msgid "Custody Location is required."
+msgstr "مكان الحفظ مطلوب."
+
+msgid "Custody Location {0} does not exist or is not active."
+msgstr "مكان الحفظ {0} غير موجود أو غير نشط."
+
+msgid "Custodian {0} is not an enabled user."
+msgstr "المسؤول عن الحفظ {0} ليس مستخدماً مفعّلاً."
+
+msgid "An Open / Blank security cheque can only be created, received or issued by a {0}."
+msgstr "لا يمكن إنشاء شيك ضمان مفتوح / على بياض أو استلامه أو تسليمه إلا بواسطة {0}."
+
+msgid "This action is only available for {0} security cheques."
+msgstr "هذا الإجراء متاح فقط لشيكات الضمان من نوع {0}."
+
+msgid "Security cheque {0} is already {1}."
+msgstr "شيك الضمان {0} حالته بالفعل {1}."
+
+msgid "This action is not allowed while security cheque {0} is {1}."
+msgstr "هذا الإجراء غير مسموح بينما حالة شيك الضمان {0} هي {1}."
+
+# Phase 4 — expiry alerts (treasury.security_cheques.scheduler)
+msgid "Expired, Not Returned"
+msgstr "منتهية ولم تُرد"
+
+msgid "Expiring Soon"
+msgstr "تنتهي قريباً"
+
+msgid "Held from party"
+msgstr "محفوظ لدينا من الطرف"
+
+msgid "Given to party"
+msgstr "مسلَّم للطرف"
+
+msgid "Security cheques expiring for {0} as of {1}"
+msgstr "شيكات الضمان المنتهية لشركة {0} حتى {1}"
+
+msgid "Security cheque expiry alert email could not be sent"
+msgstr "تعذر إرسال بريد تنبيه انتهاء شيكات الضمان"
+
+msgid "Security cheques of {0} expiring up to the alert date, as of {1}:"
+msgstr "شيكات ضمان {0} التي تنتهي حتى تاريخ التنبيه، في {1}:"
+
+# Phase 4 — Security Cheque reports and number cards
+msgid "Days to Expiry"
+msgstr "أيام حتى الانتهاء"
+
+msgid "Days Since Expiry"
+msgstr "أيام منذ الانتهاء"
+
+msgid "Expiry From"
+msgstr "الانتهاء من"
+
+msgid "Expiry To"
+msgstr "الانتهاء إلى"
+
+msgid "Please select the Reference Type first"
+msgstr "من فضلك اختر نوع المرجع أولاً"
+
+msgid "Group By must be one of: {0}."
+msgstr "التجميع يجب أن يكون أحد: {0}."
+
+msgctxt "Treasury Report"
+msgid "Reference Document"
+msgstr "المستند المرتبط"
+
+msgid "Exposure"
+msgstr "نوع الضمان"
+
+msgid "Held from Others"
+msgstr "ضمانات لدينا من الغير"
+
+msgid "Given to Others"
+msgstr "ضمانات منا للغير"
+
+msgid "Open / Blank Held"
+msgstr "شيكات على بياض لدينا"
+
+msgid "Open / Blank Given"
+msgstr "شيكات على بياض منا"
+
+msgid "Total Shortfall"
+msgstr "إجمالي العجز"
+
+msgid "Fixed Cheques"
+msgstr "شيكات بمبلغ محدد"
+
+msgid "Open / Blank Cheques"
+msgstr "شيكات على بياض"
+
+msgid "Shortfall"
+msgstr "العجز"
+
+msgid "No Custody Location"
+msgstr "بدون مكان حفظ"
+
+msgid "Custody Location / Custodian"
+msgstr "مكان الحفظ / المسؤول"
+
+# Phase 4 — Security Cheque print format
+msgid "Open-ended"
+msgstr "مفتوح المدة"
+
+msgid "This cheque is held as a guarantee only. It is not a payment and creates no accounting entry."
+msgstr "هذا الشيك محفوظ كضمان فقط. ليس سداداً ولا ينشئ أي قيد محاسبي."
+
+msgid "This cheque is given as a guarantee only. It is not a payment and creates no accounting entry."
+msgstr "هذا الشيك مسلَّم كضمان فقط. ليس سداداً ولا ينشئ أي قيد محاسبي."
+
+# Phase 4 — Security Cheque form (security_cheque.js, security_cheque_list.js)
+msgid "Put in Custody"
+msgstr "إيداع في الحفظ"
+
+msgid "Transfer Custody"
+msgstr "نقل الحفظ"
+
+msgid "Return Cheque"
+msgstr "رد الشيك"
+
+msgid "Returned To"
+msgstr "رُدَّ إلى"
+
+msgid "Received By"
+msgstr "استلمه"
+
+msgid "Mark as Lost"
+msgstr "تسجيل كمفقود"
+
+msgid "Encash"
+msgstr "تسييل"
+
+msgid "A PDC Cheque is created for the encashment and posted per Treasury Company Settings. The security cheque itself never posts."
+msgstr "يتم إنشاء شيك آجل للتسييل ويُرحَّل حسب إعدادات الخزينة للشركة. شيك الضمان نفسه لا يُرحَّل أبداً."
+
+msgid "Deposit to Bank Account"
+msgstr "الإيداع في الحساب البنكي"
+
+msgid "Settle Invoice Type"
+msgstr "نوع الفاتورة المراد سدادها"
+
+msgid "Settle Invoice"
+msgstr "الفاتورة المراد سدادها"
+
+msgid "Optional. Without an invoice the amount is posted as an advance of the party."
+msgstr "اختياري. بدون فاتورة يُرحَّل المبلغ كدفعة مقدمة على الطرف."
+
+msgid "Encash this security cheque? This cannot be undone."
+msgstr "تسييل شيك الضمان هذا؟ لا يمكن التراجع عن ذلك."

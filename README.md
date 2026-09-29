@@ -107,6 +107,79 @@ bench install-app treasury
   One reference per row. FIFO needs the party account in the cheque currency. The batch's `cheque_batch` /
   `cheque_batch_row` link on a cheque is set only by the batch and cannot be changed.
 
+### Security Cheques
+
+- **What it is.** A guarantee cheque (شيك ضمان) held from a party (*Incoming*: tender, contract performance,
+  advance payment, rent, employee custody ...) or given to a party (*Outgoing*), numbered SEC-IN- / SEC-OUT-.
+  The party is a Customer, Supplier, Employee or *Other* (a free-text name). A cheque may reference the
+  document it guarantees (Project, Contract, Sales / Purchase Order, Quotation, Supplier Quotation,
+  Employee — and Bank Facility once that DocType exists), carries the *Required Amount* of that document,
+  an optional cheque date (a security cheque may be undated) and an expiry date (end of the guarantee).
+- **No accounting, ever.** A security cheque never creates a GL entry, Payment Ledger entry, Payment Entry
+  or Journal Entry, whatever happens to it (receive, custody, return, lost, cancel). The tests check the
+  company's ledgers after every action. The only way to accounting is *Encash*, through a PDC Cheque.
+- **Lifecycle** (actions on the form; status, custody, dates, the PDC link and both logs change only
+  through them — any other save touching them is rejected, and they are reset on insert):
+  - Incoming: Created → *Receive* (straight into custody when a location is given) → Received → *Put in
+    Custody* → In Custody → *Transfer Custody* (location and / or custodian) → *Return Cheque* / *Encash* /
+    *Mark as Lost*.
+  - Outgoing: Created → *Issue* → Issued → *Return Cheque* (the party gave it back) / *Encash* (the holder
+    presented it) / *Mark as Lost*.
+  - *Cancel Cheque* only while Created. Every action records its own date (receipt / handover, return,
+    lost, encashment are separate fields) in the status log's Event Date; an action cannot be dated before
+    the cheque's issue date or its latest event. Repeating an action raises an "already ..." error.
+  - The custody log (from / to location and custodian, date, user, remarks) is append-only; returning,
+    encashing or losing a cheque closes it with a final row.
+  - Once received / issued, the cheque itself (party, cheque no, bank, amount, amount type, currency, issue
+    and cheque dates) is locked; remarks, purpose, reference, required amount and expiry date (the
+    guarantee may be extended) stay editable.
+  - *Expired* (list / form indicator, virtual `is_expired` field): expiry date passed and still held /
+    given. It is not a status.
+- **Open / Blank cheques** carry no amount (the Amount must stay empty). Creating one (or turning a cheque
+  into one), receiving or issuing it needs the **Treasury Manager** role.
+- **Roles.** Treasury Users create and handle security cheques (receive, issue, custody, return, cancel);
+  *Mark as Lost* and *Encash* need Treasury Manager.
+- **Cheque book (outgoing).** An outgoing security cheque may take the next leaf of a Cheque Book of its
+  bank account (Cheque No left empty). The leaf is consumed for good: cancelling, returning or losing the
+  security cheque frees nothing, it is never allocated again, cannot be cancelled as an unused leaf, and
+  counts as *Used* in Cheque Book Usage. Our outgoing cheque numbers are unique per bank account across
+  security and PDC cheques. A security cheque that took a leaf, or on which any action happened, cannot be
+  deleted (cancel it instead).
+- **Encash → PDC Cheque** (Treasury Manager): allowed for a Customer / Supplier party only (Employee and
+  Other are refused for now). The user gives the encashment date, the amount (required for Open / Blank; a
+  Fixed cheque is encashed for its own amount), the due date (default: the encashment date) and, for an
+  incoming cheque, the bank account it is deposited to (in the cheque currency).
+  - Incoming: a PDC Cheque (Incoming, same party, cheque no and drawer bank) is created and **received**
+    on the encashment date, so it is posted per Treasury Company Settings like any cheque (e.g. `On
+    Receipt`: Payment Entry at once; `On Cheque Date`: by the daily job). Invoice / order references may
+    be passed to settle them; without references the amount is an advance of the party.
+  - Outgoing: a PDC Cheque (Outgoing, same bank account and cheque no, no cheque book) is created and
+    **delivered** on the encashment date; clear it through the PDC flow when the bank pays it.
+  - The PDC Cheque's issue date is the encashment date (an `On Creation` posting is never back-dated). It
+    links back through its read-only *Security Cheque* field (set only by the encashment), the security
+    cheque becomes Encashed with *Converted PDC Cheque* set. All or nothing: if the PDC Cheque cannot be
+    created or received / delivered, nothing is kept.
+- **Alerts.** A daily job (`treasury.security_cheques.scheduler.send_security_expiry_alerts`) sends each
+  Treasury Manager / User one digest per company and day of the cheques still held / given that expired
+  (not returned) or expire within *Security Cheque Alert Days* (Treasury Settings, default 15) — only the
+  cheques they may read, in their language, as a notification and, if outgoing email is set up, by email.
+- **Reports and cards** (Security Cheques section of the Treasury workspace): *Security Cheque Register*,
+  *Security Exposure* (held from others vs given to others, by party or by reference document with Required
+  / Actual / Shortfall — the requirement of a document is the highest Required Amount on its cheques, not
+  their sum; a cheque without a reference is its own row; Open / Blank cheques are counted, never summed),
+  *Security Cheques by Custody*, *Expired Security Cheques Not Returned*; number cards *Security Held*
+  (incoming Received + In Custody), *Security Given* (outgoing Issued), *Security Cheques Expiring in 30
+  Days* (today to today + 30) and *Expired Security Cheques Not Returned*. Amounts are in the company
+  currency; reports and cards read with the user's permissions and User Permissions.
+- **Print.** *Security Cheque Receipt*: receipt (incoming) / handover acknowledgment (outgoing) with the
+  print date (today), party, cheque, amount or "Open / Blank", purpose, reference, expiry, custody location
+  and signatures; right-to-left in Arabic.
+- **Scope limits / follow-ups.** Encashing against a claim or penalty income account by Journal Entry
+  (PLAN.md §7: "a penalties / income account") is not implemented: an encashment settles the party's
+  invoices or stays an advance of the party, to be reconciled or adjusted later. Encashment for Employee /
+  Other parties, alerts before the end of the linked contract, approval workflow for open / blank cheques
+  and memo (off-balance-sheet) accounts are follow-ups.
+
 ### Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:

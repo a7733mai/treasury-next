@@ -1,0 +1,23 @@
+{
+ "color": "#ECAD4B",
+ "creation": "2026-10-06 09:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Security Cheque",
+ "dynamic_filters_json": "{\"company\":\"frappe.defaults.get_user_default(\\\"Company\\\")\"}",
+ "filters_json": "{\"scope\":\"expiring\"}",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Security Cheques Expiring in 30 Days",
+ "method": "treasury.security_cheques.dashboard.get_security_card",
+ "modified": "2026-10-06 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Cheques",
+ "name": "Security Cheques Expiring in 30 Days",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Custom"
+}

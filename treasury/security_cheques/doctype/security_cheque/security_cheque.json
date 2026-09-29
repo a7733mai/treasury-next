@@ -1,0 +1,479 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-06 09:00:00.000000",
+ "description": "A guarantee cheque held from a party (incoming) or given to a party (outgoing). It never creates accounting entries; only its encashment, through a PDC Cheque, does.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "direction",
+  "company",
+  "party_type",
+  "party",
+  "party_name_other",
+  "party_name",
+  "column_break_main",
+  "purpose",
+  "reference_doctype",
+  "reference_name",
+  "status",
+  "is_expired",
+  "cheque_section",
+  "cheque_no",
+  "drawer_bank",
+  "bank_account",
+  "cheque_book",
+  "column_break_cheque",
+  "amount_type",
+  "amount",
+  "currency",
+  "required_amount",
+  "dates_section",
+  "issue_date",
+  "cheque_date",
+  "expiry_date",
+  "column_break_dates",
+  "handover_date",
+  "return_date",
+  "lost_date",
+  "encashment_date",
+  "custody_section",
+  "custody_location",
+  "custodian",
+  "column_break_custody",
+  "return_person",
+  "encashment_section",
+  "converted_pdc_cheque",
+  "column_break_encashment",
+  "encashed_amount",
+  "custody_log_section",
+  "custody_log",
+  "status_log_section",
+  "status_log",
+  "more_info_section",
+  "remarks",
+  "column_break_more",
+  "cheque_image"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "no_copy": 1,
+   "options": "SEC-IN-.YYYY.-.#####\nSEC-OUT-.YYYY.-.#####",
+   "print_hide": 1
+  },
+  {
+   "description": "Incoming: a guarantee we hold from the party. Outgoing: a guarantee we gave to the party.",
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Direction",
+   "options": "Incoming\nOutgoing",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Customer",
+   "fieldname": "party_type",
+   "fieldtype": "Select",
+   "label": "Party Type",
+   "options": "Customer\nSupplier\nEmployee\nOther",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.party_type!='Other'",
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "in_standard_filter": 1,
+   "label": "Party",
+   "mandatory_depends_on": "eval:doc.party_type!='Other'",
+   "options": "party_type"
+  },
+  {
+   "depends_on": "eval:doc.party_type=='Other'",
+   "fieldname": "party_name_other",
+   "fieldtype": "Data",
+   "label": "Party Name (Other)",
+   "mandatory_depends_on": "eval:doc.party_type=='Other'"
+  },
+  {
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "label": "Party Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purpose",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Purpose",
+   "options": "Tender\nContract Performance\nAdvance Payment\nRent\nEmployee Custody\nFacility Collateral\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Type",
+   "options": "DocType"
+  },
+  {
+   "depends_on": "eval:doc.reference_doctype",
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype",
+   "search_index": 1
+  },
+  {
+   "default": "Created",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Created\nReceived\nIn Custody\nIssued\nReturned\nEncashed\nLost\nCancelled",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "The expiry date has passed and the cheque is still held / given.",
+   "fieldname": "is_expired",
+   "fieldtype": "Check",
+   "is_virtual": 1,
+   "label": "Expired",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cheque_section",
+   "fieldtype": "Section Break",
+   "label": "Cheque"
+  },
+  {
+   "bold": 1,
+   "description": "Leave empty on an outgoing cheque to take the next leaf of the cheque book.",
+   "fieldname": "cheque_no",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "label": "Cheque No",
+   "no_copy": 1
+  },
+  {
+   "depends_on": "eval:doc.direction=='Incoming'",
+   "fieldname": "drawer_bank",
+   "fieldtype": "Data",
+   "label": "Drawer Bank"
+  },
+  {
+   "depends_on": "eval:doc.direction=='Outgoing'",
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "mandatory_depends_on": "eval:doc.direction=='Outgoing'",
+   "options": "Bank Account"
+  },
+  {
+   "depends_on": "eval:doc.direction=='Outgoing'",
+   "fieldname": "cheque_book",
+   "fieldtype": "Link",
+   "label": "Cheque Book",
+   "no_copy": 1,
+   "options": "Cheque Book"
+  },
+  {
+   "fieldname": "column_break_cheque",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Fixed",
+   "description": "An Open / Blank cheque carries no amount; creating, receiving or issuing one requires the Treasury Manager role.",
+   "fieldname": "amount_type",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Amount Type",
+   "options": "Fixed\nOpen / Blank",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.amount_type=='Fixed'",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "mandatory_depends_on": "eval:doc.amount_type=='Fixed'",
+   "options": "currency"
+  },
+  {
+   "description": "Outgoing: the currency of the bank account. Incoming: the company currency unless changed before the first action.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "description": "The guarantee the contract / tender requires (compared with the cheques held in Security Exposure).",
+   "fieldname": "required_amount",
+   "fieldtype": "Currency",
+   "label": "Required Amount",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "dates_section",
+   "fieldtype": "Section Break",
+   "label": "Dates"
+  },
+  {
+   "default": "Today",
+   "fieldname": "issue_date",
+   "fieldtype": "Date",
+   "label": "Issue Date",
+   "reqd": 1
+  },
+  {
+   "description": "The date written on the cheque, if any (a security cheque may be undated).",
+   "fieldname": "cheque_date",
+   "fieldtype": "Date",
+   "label": "Cheque Date"
+  },
+  {
+   "description": "End of the guarantee: the cheque is due back after it.",
+   "fieldname": "expiry_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Expiry Date",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "handover_date",
+   "fieldtype": "Date",
+   "label": "Handover / Receipt Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "return_date",
+   "fieldtype": "Date",
+   "label": "Return Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "lost_date",
+   "fieldtype": "Date",
+   "label": "Lost Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "encashment_date",
+   "fieldtype": "Date",
+   "label": "Encashment Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.direction=='Incoming'",
+   "fieldname": "custody_section",
+   "fieldtype": "Section Break",
+   "label": "Custody"
+  },
+  {
+   "fieldname": "custody_location",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Custody Location",
+   "no_copy": 1,
+   "options": "Custody Location",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custodian",
+   "fieldtype": "Link",
+   "label": "Custodian",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_custody",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "return_person",
+   "fieldtype": "Data",
+   "label": "Returned To / Received By",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.converted_pdc_cheque",
+   "fieldname": "encashment_section",
+   "fieldtype": "Section Break",
+   "label": "Encashment"
+  },
+  {
+   "fieldname": "converted_pdc_cheque",
+   "fieldtype": "Link",
+   "label": "Converted PDC Cheque",
+   "no_copy": 1,
+   "options": "PDC Cheque",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_encashment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "encashed_amount",
+   "fieldtype": "Currency",
+   "label": "Encashed Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.direction=='Incoming'",
+   "fieldname": "custody_log_section",
+   "fieldtype": "Section Break",
+   "label": "Custody Log"
+  },
+  {
+   "fieldname": "custody_log",
+   "fieldtype": "Table",
+   "label": "Custody Log",
+   "no_copy": 1,
+   "options": "Security Cheque Custody Log",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "status_log_section",
+   "fieldtype": "Section Break",
+   "label": "Status Log"
+  },
+  {
+   "fieldname": "status_log",
+   "fieldtype": "Table",
+   "label": "Status Log",
+   "no_copy": 1,
+   "options": "Security Cheque Status Log",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Information"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "column_break_more",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cheque_image",
+   "fieldtype": "Attach Image",
+   "label": "Cheque Image",
+   "no_copy": 1
+  }
+ ],
+ "image_field": "cheque_image",
+ "links": [],
+ "modified": "2026-10-06 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Cheques",
+ "name": "Security Cheque",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "party_name,cheque_no,purpose",
+ "show_title_field_in_link": 0,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "party_name",
+ "track_changes": 1
+}

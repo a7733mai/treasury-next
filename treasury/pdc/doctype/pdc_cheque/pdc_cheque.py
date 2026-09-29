@@ -29,6 +29,9 @@ LOCKED_DATE_FIELDS = ("issue_date", "original_due_date")
 # Link to the Cheque Batch that created the cheque: set only on insert by treasury.pdc.batch (flag
 # `treasury_cheque_batch`) or carried to a replacement by the lifecycle, never changed afterwards.
 BATCH_FIELDS = ("cheque_batch", "cheque_batch_row")
+# Back-link to the Security Cheque whose encashment created the cheque: set only on insert by
+# treasury.security_cheques.lifecycle (flag `treasury_security_cheque`), never changed afterwards.
+SECURITY_FIELDS = ("security_cheque",)
 # What a submitted Cheque Batch voucher states about each of its cheques: frozen outside the cheque actions
 # while the batch is submitted (replace or cancel the cheque instead), together with the references.
 BATCH_LOCKED_FIELDS = (*LOCKED_FIELDS, "cheque_book", "drawer_bank")
@@ -58,6 +61,7 @@ PROTECTED_FIELDS = (
 	"replaced_by",
 	"replaces",
 	*BATCH_FIELDS,
+	*SECURITY_FIELDS,
 )
 # Append-only history tables, appended to only by the lifecycle.
 PROTECTED_TABLES = ("status_log", "postponements")
@@ -134,6 +138,7 @@ class PDCCheque(Document):
 		replaced_by: DF.Link | None
 		replaces: DF.Link | None
 		reversal_journal: DF.Link | None
+		security_cheque: DF.Link | None
 		status_log: DF.Table[PDCStatusLog]
 		under_collection_journal: DF.Link | None
 		vouchers_html: DF.HTML | None
@@ -212,8 +217,11 @@ class PDCCheque(Document):
 	def reset_protected_fields(self):
 		"""A new cheque starts clean, whatever the client sent (lifecycle.log_creation sets the statuses).
 
-		Only a cheque inserted by a Cheque Batch keeps its batch link (a flag, which a client cannot send)."""
+		Only a cheque inserted by a Cheque Batch keeps its batch link, and only one inserted by a security
+		cheque encashment its security cheque link (flags, which a client cannot send)."""
 		keep = BATCH_FIELDS if self.flags.treasury_cheque_batch else ()
+		if self.flags.treasury_security_cheque:
+			keep += SECURITY_FIELDS
 		for fieldname in PROTECTED_FIELDS:
 			if fieldname not in keep:
 				self.set(fieldname, None)
@@ -388,6 +396,25 @@ class PDCCheque(Document):
 				"operational_status": ["not in", RELEASED_STATUSES],
 			},
 		)
+		if not duplicate:
+			# an outgoing security cheque holds its leaf whatever its status; only the PDC Cheque of its own
+			# encashment carries the same number
+			duplicate = next(
+				(
+					name
+					for name in frappe.get_all(
+						"Security Cheque",
+						filters={
+							"direction": "Outgoing",
+							"bank_account": self.bank_account,
+							"cheque_no": self.cheque_no,
+						},
+						pluck="name",
+					)
+					if name != self.security_cheque
+				),
+				None,
+			)
 		if duplicate:
 			frappe.throw(
 				_("Cheque No {0} is already used on Bank Account {1} by {2}.").format(

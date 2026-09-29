@@ -472,6 +472,85 @@ def add_user_permission(user: str, allow: str, for_value: str, applicable_for: s
 
 
 # ---------------------------------------------------------------------------
+# Security cheque helpers
+# ---------------------------------------------------------------------------
+
+EMPLOYEE_FIRST_NAME = "_Test Treasury Employee"
+GENDER = "_Test Treasury Gender"
+
+
+def ensure_custody_location(name: str = "_Test Treasury Safe", is_active: int = 1) -> str:
+	return _ensure("Custody Location", name, {"location_name": name, "is_active": is_active})
+
+
+def ensure_employee() -> str:
+	"""An Employee of the test company (named by ERPNext's series), e.g. for an employee custody cheque."""
+	existing = frappe.db.get_value("Employee", {"first_name": EMPLOYEE_FIRST_NAME, "company": COMPANY})
+	if existing:
+		return existing
+	_ensure("Gender", GENDER, {"gender": GENDER})
+	return (
+		frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"first_name": EMPLOYEE_FIRST_NAME,
+				"company": COMPANY,
+				"gender": GENDER,
+				"date_of_birth": "1990-01-01",
+				"date_of_joining": "2020-01-01",
+				"status": "Active",
+			}
+		)
+		.insert(ignore_permissions=True)
+		.name
+	)
+
+
+def make_security_cheque(
+	direction: str = "Incoming",
+	amount: float = 5000,
+	amount_type: str = "Fixed",
+	party_type: str | None = None,
+	party: str | None = None,
+	issue_date=None,
+	expiry_date=None,
+	cheque_no: str | None = None,
+	cheque_book: str | None = None,
+	currency: str = "EGP",
+	**values,
+):
+	"""Insert a Security Cheque (status Created). Outgoing ones are drawn on the EGP (or `currency`) bank."""
+	outgoing = direction == "Outgoing"
+	issue_date = getdate(issue_date or day(-60))
+	party_type = party_type or ("Supplier" if outgoing else "Customer")
+	if party is None and party_type in ("Customer", "Supplier"):
+		party = SUPPLIER if party_type == "Supplier" else CUSTOMER
+	if cheque_no is None and not cheque_book:
+		cheque_no = unique_cheque_no()
+	doc = frappe.get_doc(
+		{
+			"doctype": "Security Cheque",
+			"direction": direction,
+			"company": COMPANY,
+			"party_type": party_type,
+			"party": party,
+			"purpose": values.pop("purpose", "Contract Performance"),
+			"cheque_no": cheque_no,
+			"bank_account": bank_account_name(currency) if outgoing else None,
+			"cheque_book": cheque_book,
+			"drawer_bank": None if outgoing else "Drawer Bank Y",
+			"amount_type": amount_type,
+			"amount": amount if amount_type == "Fixed" else 0,
+			"issue_date": issue_date,
+			"expiry_date": getdate(expiry_date) if expiry_date else add_days(issue_date, 365),
+			**values,
+		}
+	)
+	doc.insert()
+	return doc
+
+
+# ---------------------------------------------------------------------------
 # Invoice factories
 # ---------------------------------------------------------------------------
 

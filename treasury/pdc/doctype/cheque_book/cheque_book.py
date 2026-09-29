@@ -127,7 +127,9 @@ class ChequeBook(Document):
 		return {cint(row.cheque_no) for row in self.cancelled_leaves}
 
 	def used_numbers(self, numbers: list[int], exclude_cancelled_cheques: bool = False) -> set[int]:
-		"""Leaves among `numbers` already written on an outgoing PDC Cheque of this bank account."""
+		"""Leaves among `numbers` already written on an outgoing PDC Cheque or Security Cheque of this bank
+		account. A security cheque keeps its leaf whatever its status (cancelling or returning it frees
+		nothing), so `exclude_cancelled_cheques` applies to PDC Cheques only."""
 		if not numbers:
 			return set()
 		candidates = {str(n) for n in numbers} | {self.format_leaf(n) for n in numbers}
@@ -136,13 +138,17 @@ class ChequeBook(Document):
 			"direction": "Outgoing",
 			"cheque_no": ["in", list(candidates)],
 		}
+		used = frappe.get_all("Security Cheque", filters=filters, pluck="cheque_no")
 		if exclude_cancelled_cheques:
 			filters["operational_status"] = ["!=", "Cancelled"]
-		used = frappe.get_all("PDC Cheque", filters=filters, pluck="cheque_no")
+		used += frappe.get_all("PDC Cheque", filters=filters, pluck="cheque_no")
 		return {cint(n) for n in used if str(n).strip().isdigit()}
 
 	def has_used_leaves(self) -> bool:
-		return bool(frappe.db.exists("PDC Cheque", {"cheque_book": self.name}))
+		return bool(
+			frappe.db.exists("PDC Cheque", {"cheque_book": self.name})
+			or frappe.db.exists("Security Cheque", {"cheque_book": self.name})
+		)
 
 	def find_available_leaf(self, start_from: int) -> int | None:
 		"""First leaf from `start_from` on that is neither cancelled nor already used."""
@@ -227,7 +233,7 @@ def cancel_leaf(cheque_book: str, cheque_no: str, reason: str | None = None):
 		frappe.throw(_("Cheque No {0} is already cancelled.").format(frappe.bold(cheque_no)))
 	if book.used_numbers([number], exclude_cancelled_cheques=True):
 		frappe.throw(
-			_("Cheque No {0} is used by a PDC Cheque. Cancel that cheque instead.").format(
+			_("Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead.").format(
 				frappe.bold(cheque_no)
 			)
 		)

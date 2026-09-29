@@ -19,6 +19,7 @@
   "drawer_bank",
   "cheque_batch",
   "cheque_batch_row",
+  "security_cheque",
   "amount_section",
   "amount",
   "currency",
@@ -171,6 +172,17 @@
    "label": "Cheque Batch Row",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.security_cheque",
+   "description": "The security cheque whose encashment created this cheque.",
+   "fieldname": "security_cheque",
+   "fieldtype": "Link",
+   "label": "Security Cheque",
+   "no_copy": 1,
+   "options": "Security Cheque",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "amount_section",
@@ -495,7 +507,7 @@
  ],
  "image_field": "cheque_image",
  "links": [],
- "modified": "2026-10-01 09:00:00.000000",
+ "modified": "2026-10-06 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "PDC Cheque",
