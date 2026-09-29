@@ -466,6 +466,10 @@ set up, by email, listing only the documents each recipient may read.
 - **Translations**: Arabic only. Generic words already translated by Frappe / ERPNext are left to the core
   translation or given a context (`msgctxt`); a few PDC status words (Received, Delivered, Returned ...)
   keep a plain entry with a compatible wording.
+- **Uninstall**: `bench uninstall-app treasury` removes the app's DocTypes, reports, workspace and its
+  custom fields on Payment Entry / Journal Entry, and leaves the Treasury roles. As usual in Frappe, the
+  database columns of deleted custom fields (`treasury_*` on `tabPayment Entry` / `tabJournal Entry`) are
+  kept (empty) to protect data; they are reused if the app is installed again.
 
 ### Testing
 
