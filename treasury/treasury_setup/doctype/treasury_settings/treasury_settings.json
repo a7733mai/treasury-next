@@ -9,7 +9,9 @@
   "security_alert_days",
   "facility_alert_days",
   "column_break_alerts",
-  "allow_future_clearance_date"
+  "allow_future_clearance_date",
+  "payees_section",
+  "payee_supplier_group"
  ],
  "fields": [
   {
@@ -50,6 +52,20 @@
    "fieldname": "allow_future_clearance_date",
    "fieldtype": "Check",
    "label": "Allow Future Clearance Date"
+  },
+  {
+   "fieldname": "payees_section",
+   "fieldtype": "Section Break",
+   "label": "Payees"
+  },
+  {
+   "default": "Treasury Payees",
+   "description": "Supplier Group of the suppliers created with New Payee.",
+   "fieldname": "payee_supplier_group",
+   "fieldtype": "Link",
+   "label": "Payee Supplier Group",
+   "options": "Supplier Group",
+   "reqd": 1
   }
  ],
  "issingle": 1,

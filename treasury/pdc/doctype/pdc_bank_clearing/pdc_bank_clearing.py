@@ -322,16 +322,21 @@ class PDCBankClearing(Document):
 			lifecycle.post_bank(row.cheque, posting_date=date, bank_transaction_date=date)
 
 	def reconcile(self, row):
-		"""Reconcile the Bank Transaction against the bank Journal Entry of the cheque (ERPNext's
-		BankTransaction methods, in the order `bank_reconciliation_tool.reconcile_vouchers` calls them)."""
-		journal = frappe.db.get_value(CHEQUE, row.cheque, "bank_journal")
-		if not journal:
-			frappe.throw(_("Cheque {0} has no bank Journal Entry to reconcile.").format(row.cheque))
+		"""Reconcile the Bank Transaction against the bank voucher of the cheque — its bank Payment Entry, or
+		its bank Journal Entry (Journal Entry mode / version 1.0) — with ERPNext's BankTransaction methods, in
+		the order `bank_reconciliation_tool.reconcile_vouchers` calls them."""
+		vouchers = frappe.db.get_value(CHEQUE, row.cheque, ["bank_payment_entry", "bank_journal"], as_dict=True)
+		if vouchers and vouchers.bank_payment_entry:
+			voucher = {"payment_doctype": "Payment Entry", "payment_name": vouchers.bank_payment_entry}
+		elif vouchers and vouchers.bank_journal:
+			voucher = {"payment_doctype": "Journal Entry", "payment_name": vouchers.bank_journal}
+		else:
+			frappe.throw(_("Cheque {0} has no bank voucher to reconcile.").format(row.cheque))
 		# the user's right to clear the cheque was checked by the lifecycle just before; Treasury users need
 		# not hold Bank Transaction / voucher permissions (like the vouchers of treasury.accounting.posting)
 		with elevated():
 			transaction = frappe.get_doc(BANK_TRANSACTION, row.bank_transaction)
-			transaction.add_payment_entries([{"payment_doctype": "Journal Entry", "payment_name": journal}])
+			transaction.add_payment_entries([voucher])
 			transaction.validate_duplicate_references()
 			transaction.allocate_payment_entries()
 			transaction.update_allocated_amount()

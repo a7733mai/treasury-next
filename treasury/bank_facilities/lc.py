@@ -29,11 +29,12 @@ Utilisation (hook `treasury_facility_utilisation_sources`): the open amount of t
 Documents Received / Accepted credits (on a past date: from the status log).
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, formatdate, getdate
 
-from treasury.accounting import posting
+from treasury.accounting import payment_modes, posting
 from treasury.bank_facilities import accounting, instruments
 
 DOCTYPE = "Letter of Credit"
@@ -318,6 +319,11 @@ def settle(
 		references=references,
 		remarks=_("Settlement of {0} {1}").format(_(DOCTYPE), doc.name),
 		clearance_date=date,
+		details={
+			**payment_modes.resolve(doc.company, doc.bank_account, "Bank Transfer"),
+			"bank_account": doc.bank_account,
+			"cost_center": erpnext.get_default_cost_center(doc.company),
+		},
 	)
 	# the credit closes with the settlement: what was not drawn is no longer committed by the bank
 	unused = max(flt(flt(doc.current_amount) - amount, precision), 0)

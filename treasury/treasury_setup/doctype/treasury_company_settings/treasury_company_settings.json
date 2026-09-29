@@ -19,8 +19,15 @@
   "on_bounce",
   "column_break_bounce",
   "bounce_charges_account",
+  "vouchers_section",
+  "bank_settlement_voucher",
+  "column_break_vouchers_settings",
+  "vouchers_help",
   "accounts_section",
   "pdc_accounts",
+  "payment_modes_section",
+  "mode_name_template",
+  "payment_modes",
   "facilities_section",
   "accrue_facility_interest"
  ],
@@ -100,6 +107,7 @@
   },
   {
    "default": "Reverse by Journal Entry",
+   "description": "Reverse: bank-side Payment Entries are reversed by a reverse Payment Entry, party postings by a Journal Entry.",
    "fieldname": "on_bounce",
    "fieldtype": "Select",
    "label": "On Bounce",
@@ -117,6 +125,28 @@
    "options": "Account"
   },
   {
+   "fieldname": "vouchers_section",
+   "fieldtype": "Section Break",
+   "label": "Vouchers"
+  },
+  {
+   "default": "Payment Entry",
+   "description": "Voucher for the under-collection stage and the bank settlement of cheques. Payment Entry: Internal Transfer with the bank charges in the same entry. Journal Entry: behaviour of version 1.0.",
+   "fieldname": "bank_settlement_voucher",
+   "fieldtype": "Select",
+   "label": "Bank Settlement Voucher",
+   "options": "Payment Entry\nJournal Entry",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_vouchers_settings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vouchers_help",
+   "fieldtype": "HTML"
+  },
+  {
    "fieldname": "accounts_section",
    "fieldtype": "Section Break",
    "label": "Accounts"
@@ -126,6 +156,26 @@
    "fieldtype": "Table",
    "label": "PDC Accounts",
    "options": "PDC Account Mapping"
+  },
+  {
+   "collapsible": 0,
+   "fieldname": "payment_modes_section",
+   "fieldtype": "Section Break",
+   "label": "Modes of Payment"
+  },
+  {
+   "default": "{method} - {bank}",
+   "description": "Name given to generated Modes of Payment. Placeholders: {method} (e.g. Cheque Out), {bank} (bank name, e.g. Al Rayan), {account} (bank account name). {method} is required.",
+   "fieldname": "mode_name_template",
+   "fieldtype": "Data",
+   "label": "Mode Name Template",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_modes",
+   "fieldtype": "Table",
+   "label": "Modes of Payment",
+   "options": "Treasury Payment Mode Map"
   },
   {
    "fieldname": "facilities_section",

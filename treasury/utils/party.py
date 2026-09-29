@@ -1,0 +1,95 @@
+"""Open party: a cheque may be drawn to / from any ERPNext Party Type (Customer, Supplier, Employee,
+Shareholder ...), and a payee without a Supplier record yet is created from its name alone (`create_payee`).
+
+The party account of a Payment Entry comes from ERPNext's own resolution (`get_party_account`: the party's
+account row, its group for a Customer / Supplier, else the company default for the Party Type's account type).
+"""
+
+import frappe
+from frappe import _, scrub
+from frappe.utils.nestedset import get_root_of
+
+from treasury.utils.context import elevated
+
+DEFAULT_PAYEE_GROUP = "Treasury Payees"
+PAYEE_ROLES = ("Treasury Manager", "Treasury User", "System Manager")
+PAYEE_NAME_LENGTH = 140
+
+
+def validate_party_type(party_type: str | None):
+	if not party_type or not frappe.db.exists("Party Type", party_type):
+		frappe.throw(_("{0} is not a Party Type.").format(frappe.bold(party_type or "-")))
+
+
+def get_party_name(party_type: str, party: str) -> str:
+	"""The display name of a party, the way Payment Entry sets its `party_name`: `title` for a Shareholder,
+	`<party type>_name` when the doctype has it (customer_name, supplier_name, employee_name ...), else the
+	record name."""
+	fieldname = "title" if party_type == "Shareholder" else f"{scrub(party_type)}_name"
+	name = None
+	if frappe.db.has_column(party_type, fieldname):
+		name = frappe.db.get_value(party_type, party, fieldname)
+	return name or party
+
+
+@frappe.whitelist(methods=["POST"])
+def create_payee(supplier_name: str) -> dict:
+	"""A Supplier named `supplier_name` in the Payee Supplier Group of Treasury Settings, or the existing
+	(enabled) Supplier of that name. Returns {"party_type", "party", "party_name", "created"}."""
+	if not (
+		frappe.has_permission("PDC Cheque", "create") or frappe.has_permission("Cheque Batch", "create")
+	) or not set(PAYEE_ROLES) & set(frappe.get_roles()):
+		frappe.throw(
+			_("You need permission to create PDC Cheques or Cheque Batches to add a payee."),
+			frappe.PermissionError,
+			title=_("Not Permitted"),
+		)
+	name = " ".join((supplier_name or "").split())
+	if not name:
+		frappe.throw(_("A payee name is required."))
+	if len(name) > PAYEE_NAME_LENGTH:
+		frappe.throw(_("The payee name is too long."))
+
+	# the default collation compares case-insensitively: "ali rent" finds "Ali Rent"
+	existing = frappe.get_all(
+		"Supplier", filters={"supplier_name": name}, fields=["name", "supplier_name", "disabled"], limit=1
+	)
+	if existing:
+		supplier = existing[0]
+		if supplier.disabled:
+			frappe.throw(_("Supplier {0} is disabled.").format(frappe.bold(supplier.supplier_name)))
+		return _payee(supplier.name, supplier.supplier_name, created=False)
+
+	group = frappe.db.get_single_value("Treasury Settings", "payee_supplier_group")
+	if not group or frappe.db.get_value("Supplier Group", group, "is_group") in (None, 1):
+		frappe.throw(_("Set a valid Payee Supplier Group in Treasury Settings."), title=_("Missing Settings"))
+
+	# the user's create permission on the cheque doctypes and role were checked above; Treasury users need
+	# not hold the Supplier create permission
+	with elevated() as user:
+		supplier = frappe.get_doc({"doctype": "Supplier", "supplier_name": name, "supplier_group": group})
+		supplier.insert(ignore_permissions=True)
+		frappe.db.set_value("Supplier", supplier.name, {"owner": user, "modified_by": user}, update_modified=False)
+	return _payee(supplier.name, supplier.supplier_name, created=True)
+
+
+def _payee(name: str, supplier_name: str, created: bool) -> dict:
+	return {"party_type": "Supplier", "party": name, "party_name": supplier_name, "created": created}
+
+
+def ensure_payee_supplier_group() -> str | None:
+	"""The default Payee Supplier Group (a leaf under the root Supplier Group); None on a site without one."""
+	if frappe.db.exists("Supplier Group", DEFAULT_PAYEE_GROUP):
+		return DEFAULT_PAYEE_GROUP
+	root = get_root_of("Supplier Group")
+	if not root:
+		return None
+	frappe.get_doc(
+		{
+			"doctype": "Supplier Group",
+			"supplier_group_name": DEFAULT_PAYEE_GROUP,
+			"parent_supplier_group": root,
+			"is_group": 0,
+		}
+	).insert(ignore_permissions=True)
+	return DEFAULT_PAYEE_GROUP

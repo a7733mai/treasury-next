@@ -1,8 +1,11 @@
 import frappe
+from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.permissions import reset_perms
 from frappe.utils import cint
 
+from treasury.accounting import dimensions, payment_modes
+from treasury.utils.party import ensure_payee_supplier_group
 from treasury.utils.settings import set_missing_single_defaults
 
 TREASURY_ROLES = ("Treasury Manager", "Treasury User", "Cheque Approver")
@@ -79,9 +82,14 @@ def after_migrate():
 def before_uninstall():
 	"""Remove what the app added to core doctypes. The Treasury roles (and their assignment to users) are
 	kept on purpose: they hold no permission outside the app's own doctypes once it is uninstalled, and a
-	reinstall finds the users' assignments intact. An administrator can delete them in Role."""
+	reinstall finds the users' assignments intact. An administrator can delete them in Role.
+
+	Kept on purpose too, as user data: the Payment Entry series added from Treasury Company Settings (their
+	Property Setters), the Modes of Payment and the "Treasury Payees" Supplier Group (and its suppliers)."""
 	delete_custom_fields()
+	delete_dimension_fields()
 	remove_legacy_permissions()  # a site never migrated since the legacy grants
+	report_kept_series()
 
 
 def setup():
@@ -89,7 +97,9 @@ def setup():
 	create_roles()
 	create_custom_fields(get_custom_fields(), update=True)
 	remove_legacy_permissions()
+	ensure_payee_supplier_group()  # before the defaults: Payee Supplier Group links to it
 	set_default_settings()
+	dimensions.create_dimension_fields()
 
 
 def set_default_settings() -> list[str]:
@@ -226,3 +236,25 @@ def delete_custom_fields():
 			frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
 	for doctype in VOUCHER_INSERT_AFTER:
 		frappe.clear_cache(doctype=doctype)
+
+
+def delete_dimension_fields():
+	"""The Accounting Dimension fields ERPNext added to the app's own doctypes (dropped with them anyway; the
+	Custom Field records would otherwise stay behind)."""
+	for doctype, fieldname in dimensions.dimension_custom_fields():
+		name = frappe.db.get_value("Custom Field", {"dt": doctype, "fieldname": fieldname})
+		if name:
+			frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
+
+
+def report_kept_series() -> list[str]:
+	"""Tell the administrator which Payment Entry series the app added and left in place on uninstall."""
+	series = payment_modes.get_added_series()
+	if series:
+		message = _(
+			"The Payment Entry naming series {0} were added by Treasury and are kept on purpose (existing Payment Entries use them). Remove them in Document Naming Settings if they are not needed."
+		).format(", ".join(series))
+		print(message)
+		if getattr(frappe.local, "request", None):
+			frappe.msgprint(message)
+	return series

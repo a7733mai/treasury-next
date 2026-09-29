@@ -690,17 +690,12 @@ class TestSecurityChequeEncashment(SecurityChequeTestCase):
 		security.encash(encashment_date=day(-5), amount=2000, bank_account=bank_account_name("EGP"))
 		self.assertEqual(frappe.db.get_value(DOCTYPE, security.name, "status"), "Encashed")
 
-	def test_encash_needs_a_customer_or_supplier(self):
-		employee = ensure_employee()
-		custody = self.received(3000, party_type="Employee", party=employee, purpose="Employee Custody")
+	def test_encash_needs_a_party(self):
+		# Phase 7a: any Party Type may be encashed (an Employee's: tests/test_open_party.py); "Other" may not
 		other = self.received(3000, party_type="Other", party=None, party_name_other="Tender Board")
-		for security in (custody, other):
-			with self.subTest(party_type=security.party_type):
-				self.assertRaises(
-					frappe.ValidationError, security.encash, day(-5), None, None, bank_account_name("EGP")
-				)
-				self.assertEqual(frappe.db.get_value(DOCTYPE, security.name, "status"), "In Custody")
-				self.assertFalse(frappe.db.exists("PDC Cheque", {"security_cheque": security.name}))
+		self.assertRaises(frappe.ValidationError, other.encash, day(-5), None, None, bank_account_name("EGP"))
+		self.assertEqual(frappe.db.get_value(DOCTYPE, other.name, "status"), "In Custody")
+		self.assertFalse(frappe.db.exists("PDC Cheque", {"security_cheque": other.name}))
 
 	def test_encash_needs_a_deposit_bank_in_the_cheque_currency(self):
 		security = self.received(1000)

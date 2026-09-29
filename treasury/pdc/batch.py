@@ -37,7 +37,7 @@ from frappe import _
 from frappe.query_builder.functions import IfNull, Sum
 from frappe.utils import add_days, cint, flt, getdate
 
-from treasury.accounting import posting
+from treasury.accounting import dimensions, posting
 from treasury.pdc import lifecycle
 from treasury.pdc.batch_status import (
 	RELEASED_STATUSES,
@@ -46,6 +46,7 @@ from treasury.pdc.batch_status import (
 	update_batch_status,
 )
 from treasury.pdc.doctype.cheque_book.cheque_book import SCAN_CHUNK
+from treasury.pdc.doctype.pdc_cheque.pdc_cheque import STALE_CHECK_FIELDS
 from treasury.utils.dates import monthly_dates
 
 CHEQUE = "PDC Cheque"
@@ -75,8 +76,16 @@ FIFO_INVOICES = {
 }
 # Not posted cheques in these statuses still intend to settle their references (reserved allocations).
 OPEN_STATUSES = ("Created", "Delivered", "Received", "Deposited")
-# Header fields copied to every cheque of the batch.
-HEADER_FIELDS = ("direction", "company", "party_type", "party", "bank_account", "issue_date")
+# Header fields copied to every cheque of the batch (with the accounting dimension fields).
+HEADER_FIELDS = (
+	"direction",
+	"company",
+	"party_type",
+	"party",
+	"bank_account",
+	"issue_date",
+	*lifecycle.ACCOUNTING_FIELDS,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +225,7 @@ def transient_cheque(batch, row=None):
 	cheque.flags.treasury_batch_validation = True
 	for fieldname in HEADER_FIELDS:
 		cheque.set(fieldname, batch.get(fieldname))
+	dimensions.copy_dimensions(batch, cheque)
 	cheque.cheque_book = batch.cheque_book if batch.direction == lifecycle.OUTGOING else None
 	cheque.currency = batch.currency
 	if row:
@@ -234,6 +244,15 @@ def validate_batch(batch):
 	header.validate_party()
 	batch.party_name = header.party_name
 	header.validate_bank_account()
+	# the defaults every cheque of the batch will get, shown on the batch (the ones that came with a previous
+	# bank / party of the draft are dropped first)
+	before = None
+	if not batch.is_new():
+		before = frappe.db.get_value(BATCH, batch.name, list(STALE_CHECK_FIELDS), as_dict=True)
+	header.validate_accounting_details(before or {})
+	for fieldname in lifecycle.ACCOUNTING_FIELDS:
+		batch.set(fieldname, header.get(fieldname))
+	dimensions.copy_dimensions(header, batch)
 	header.set_currency_and_rate()
 	batch.currency = header.currency
 	if batch.direction != lifecycle.OUTGOING:
@@ -582,6 +601,7 @@ def _insert_cheque(batch, row):
 	cheque = frappe.new_doc(CHEQUE)
 	for fieldname in HEADER_FIELDS:
 		cheque.set(fieldname, batch.get(fieldname))
+	dimensions.copy_dimensions(batch, cheque)
 	if batch.direction == lifecycle.OUTGOING:
 		cheque.cheque_book = batch.cheque_book
 	else:
@@ -754,6 +774,7 @@ def get_receipt_cheques(batch) -> dict:
 				amount=c.amount,
 				bank=c.drawer_bank if incoming else c.bank_account,
 				pdc_cheque=c.name,
+				payment_entry=c.party_payment_entry or "",
 			)
 			for c in sorted(
 				frappe.get_all(
@@ -767,6 +788,7 @@ def get_receipt_cheques(batch) -> dict:
 						"drawer_bank",
 						"bank_account",
 						"cheque_batch_row",
+						"party_payment_entry",
 					],
 					order_by="creation asc, name asc",
 				),
@@ -782,6 +804,7 @@ def get_receipt_cheques(batch) -> dict:
 				amount=row.amount,
 				bank=row.drawer_bank if incoming else batch.bank_account,
 				pdc_cheque=row.pdc_cheque,
+				payment_entry="",
 			)
 			for row in batch.cheques
 		]
@@ -802,6 +825,8 @@ def get_dashboard(batch) -> list:
 			"operational_status",
 			"accounting_status",
 			"party_payment_entry",
+			"under_collection_payment_entry",
+			"bank_payment_entry",
 			"cheque_batch_row",
 		],
 		as_user=True,

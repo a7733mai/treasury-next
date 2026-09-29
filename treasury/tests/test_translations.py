@@ -483,6 +483,14 @@ class TestTranslations(IntegrationTestCase):
 		# Frappe looks up "msgid:context" first, then the entry without context
 		return None in contexts or (context is not None and context in contexts)
 
+	def test_payment_mode_methods_are_translated(self):
+		"""The methods of the Modes of Payment map (grid Select options, generated mode names and messages
+		translate them with the child DocType as context)."""
+		from treasury.accounting.payment_modes import MAP_DOCTYPE, METHODS
+
+		missing = [m for m in METHODS if MAP_DOCTYPE not in self.contexts_by_msgid.get(m, ())]
+		self.assertEqual(missing, [])
+
 	def test_extraction_helpers(self):
 		"""The static extraction understands the call styles used in the app."""
 		py = APP_DIR / "utils" / "amount_in_words.py"

@@ -23,6 +23,7 @@ from functools import wraps
 import erpnext
 import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
+from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_accounting_dimensions
 from erpnext.accounts.party import get_party_account as erpnext_get_party_account
 from erpnext.setup.utils import get_exchange_rate
 from frappe import _
@@ -33,6 +34,7 @@ from frappe.utils import cint, flt, getdate
 from treasury.utils.context import elevated, real_user
 
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
+INTERNAL_TRANSFER = "Internal Transfer"
 INVOICE_DOCTYPES = ("Sales Invoice", "Purchase Invoice")
 ORDER_DOCTYPES = ("Sales Order", "Purchase Order")
 REFERENCE_DOCTYPES = (*INVOICE_DOCTYPES, *ORDER_DOCTYPES, "Journal Entry")
@@ -116,10 +118,13 @@ def get_linked_vouchers(source_doctype: str, source_name: str) -> list[dict]:
 	"""All vouchers (any docstatus) created for a Treasury source, oldest first."""
 	vouchers = []
 	for doctype in VOUCHER_DOCTYPES:
+		fields = ["name", "docstatus", "posting_date", "treasury_event", "treasury_cycle", "creation"]
+		if doctype == "Payment Entry":
+			fields.append("payment_type")
 		rows = frappe.get_all(
 			doctype,
 			filters={"treasury_source_doctype": source_doctype, "treasury_source_name": source_name},
-			fields=["name", "docstatus", "posting_date", "treasury_event", "treasury_cycle", "creation"],
+			fields=fields,
 			order_by="creation asc",
 		)
 		for row in rows:
@@ -127,6 +132,41 @@ def get_linked_vouchers(source_doctype: str, source_name: str) -> list[dict]:
 			vouchers.append(row)
 	vouchers.sort(key=lambda d: d["creation"])
 	return vouchers
+
+
+def get_voucher_rows(source_doctype: str, source_names: list[str]) -> list[dict]:
+	"""All vouchers (any docstatus) of several sources of one doctype, oldest first, with the details a
+	voucher summary shows; `amount` is the paid amount of a Payment Entry, the total debit of a Journal Entry."""
+	if not source_names:
+		return []
+	common = [
+		"name",
+		"docstatus",
+		"posting_date",
+		"treasury_event",
+		"treasury_cycle",
+		"treasury_source_name",
+		"clearance_date",
+		"creation",
+	]
+	specific = {
+		"Payment Entry": ["reference_no", "payment_type", "mode_of_payment", "paid_amount as amount"],
+		"Journal Entry": ["cheque_no as reference_no", "total_debit as amount"],
+	}
+	rows = []
+	for doctype in VOUCHER_DOCTYPES:
+		for row in frappe.get_all(
+			doctype,
+			filters={"treasury_source_doctype": source_doctype, "treasury_source_name": ["in", source_names]},
+			fields=common + specific[doctype],
+			order_by="creation asc",
+		):
+			row.doctype = doctype
+			row.setdefault("payment_type", None)
+			row.setdefault("mode_of_payment", None)
+			rows.append(row)
+	rows.sort(key=lambda d: d.creation)
+	return rows
 
 
 def find_voucher(
@@ -204,12 +244,13 @@ def create_payment_entry(
 	cycle: int = 1,
 	submit: bool = True,
 	clearance_date=None,
+	details: dict | None = None,
 ) -> str:
 	"""Create (or return the existing) Payment Entry whose bank side is `bank_account_head`.
 
 	`amount` is expressed in the currency of `bank_account_head` (the cheque currency) and
 	`exchange_rate` converts that currency to the company currency. `clearance_date` (the bank already
-	moved the money) requires `submit=True`.
+	moved the money) requires `submit=True`. `details`: see `_apply_details`.
 	"""
 	if clearance_date and not submit:
 		frappe.throw(_("Clearance Date can only be set on a submitted Payment Entry."))
@@ -281,6 +322,7 @@ def create_payment_entry(
 		pe.custom_remarks = 1
 		pe.remarks = remarks
 
+	_apply_details(pe, details)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
 	pe.flags.ignore_permissions = True  # see module docstring
 	pe.insert()
@@ -290,6 +332,192 @@ def create_payment_entry(
 			_set_clearance_date(pe.name, clearance_date, "Payment Entry")
 	_stamp_user("Payment Entry", pe.name, owner=True)
 	return pe.name
+
+
+def _apply_details(pe: Document, details: dict | None):
+	"""Accounting details of a Payment Entry, from its Treasury source.
+
+	Keys: `naming_series` (must already be a Payment Entry series), `mode_of_payment` (ignored when missing or
+	disabled: the settings validate it), `cost_center`, `project`, `bank_account` (the company Bank Account),
+	`dimensions` ({fieldname: value}), and for Pay / Receive only `party_bank_account` and `contact_person`.
+	"""
+	if not details:
+		return
+	details = frappe._dict(details)
+	series = (details.naming_series or "").strip()
+	if series:
+		if series not in frappe.get_meta("Payment Entry").get_naming_series_options():
+			frappe.throw(
+				_(
+					"Series {0} is not a Payment Entry series. A System Manager must add it in Treasury Company Settings (Add Series to Payment Entry)."
+				).format(frappe.bold(series)),
+				title=_("Missing Settings"),
+			)
+		pe.naming_series = series
+	if details.mode_of_payment and frappe.db.get_value("Mode of Payment", details.mode_of_payment, "enabled"):
+		pe.mode_of_payment = details.mode_of_payment
+	for fieldname in ("cost_center", "project", "bank_account"):
+		if details.get(fieldname):
+			pe.set(fieldname, details[fieldname])
+	for fieldname, value in _dimension_values(pe.meta, details.dimensions).items():
+		pe.set(fieldname, value)
+	if pe.payment_type != INTERNAL_TRANSFER:
+		for fieldname in ("party_bank_account", "contact_person"):
+			if details.get(fieldname):
+				pe.set(fieldname, details[fieldname])
+
+
+def _dimension_values(meta, dimensions: dict | None) -> dict:
+	"""The set values of `dimensions` whose fieldname is an enabled Accounting Dimension field of `meta`."""
+	if not dimensions:
+		return {}
+	enabled = set(get_accounting_dimensions())
+	return {f: v for f, v in dimensions.items() if v and f in enabled and meta.has_field(f)}
+
+
+@_system_context
+def create_internal_transfer(
+	*,
+	source_doctype: str,
+	source_name: str,
+	event: str,
+	company: str,
+	posting_date,
+	paid_from: str,
+	paid_to: str,
+	paid_amount: float,
+	reference_no: str,
+	reference_date,
+	received_amount: float | None = None,
+	exchange_rate: float | None = None,
+	deduction_account: str | None = None,
+	remarks: str | None = None,
+	details: dict | None = None,
+	cycle: int = 1,
+	submit: bool = True,
+	clearance_date=None,
+) -> str:
+	"""Create (or return the existing) Internal Transfer Payment Entry `paid_from` → `paid_to`.
+
+	Both accounts are in one currency; `paid_amount` / `received_amount` are in that currency and
+	`exchange_rate` converts it to the company currency (one rate for both sides: ERPNext forces the target
+	rate to the source rate when the currencies are equal). A `received_amount` below `paid_amount` books the
+	difference (e.g. bank charges) on `deduction_account`. `clearance_date` requires `submit=True`.
+	"""
+	if clearance_date and not submit:
+		frappe.throw(_("Clearance Date can only be set on a submitted Payment Entry."))
+
+	cycle = _validate_cycle(cycle)
+	_lock_source(source_doctype, source_name)
+	if existing := find_voucher("Payment Entry", source_doctype, source_name, event, cycle):
+		_return_existing("Payment Entry", existing, submit)
+		if clearance_date and not frappe.db.get_value("Payment Entry", existing, "clearance_date"):
+			_set_clearance_date(existing, clearance_date, "Payment Entry")
+		return existing
+
+	if paid_from == paid_to:
+		frappe.throw(_("Paid From and Paid To accounts must be different for an Internal Transfer."))
+	source, target = _transfer_account(paid_from, company), _transfer_account(paid_to, company)
+	if source.account_currency != target.account_currency:
+		frappe.throw(_("Internal Transfer between accounts in different currencies is not supported."))
+
+	precision = frappe.get_precision("Payment Entry", "paid_amount")
+	paid = flt(paid_amount, precision)
+	received = flt(paid if received_amount is None else received_amount, precision)
+	if paid <= 0 or received <= 0:
+		frappe.throw(_("Amount must be greater than zero."))
+	if received > paid:
+		frappe.throw(_("Received Amount cannot be greater than Paid Amount"))
+
+	company_currency = erpnext.get_company_currency(company)
+	if source.account_currency == company_currency:
+		rate = 1.0
+	else:
+		rate = flt(exchange_rate) or flt(
+			get_exchange_rate(source.account_currency, company_currency, getdate(posting_date))
+		)
+	if rate <= 0:
+		frappe.throw(
+			_("Exchange rate from {0} to {1} is required.").format(source.account_currency, company_currency)
+		)
+
+	details = frappe._dict(details or {})
+	pe = frappe.new_doc("Payment Entry")
+	pe.payment_type = INTERNAL_TRANSFER
+	pe.company = company
+	pe.posting_date = getdate(posting_date)
+	pe.paid_from = paid_from
+	pe.paid_from_account_currency = source.account_currency
+	pe.paid_from_account_type = source.account_type
+	pe.paid_to = paid_to
+	pe.paid_to_account_currency = target.account_currency
+	pe.paid_to_account_type = target.account_type
+	pe.paid_amount = paid
+	pe.received_amount = received
+	pe.source_exchange_rate = rate
+	pe.target_exchange_rate = rate
+	pe.reference_no = reference_no
+	pe.reference_date = getdate(reference_date)
+	if remarks:
+		pe.custom_remarks = 1
+		pe.remarks = remarks
+
+	if received < paid:
+		_append_difference_row(pe, company, deduction_account, flt((paid - received) * rate), details)
+
+	_apply_details(pe, details)
+	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
+	pe.flags.ignore_permissions = True  # see module docstring
+	pe.insert()
+	if flt(pe.difference_amount):
+		frappe.throw(
+			_("The Internal Transfer {0} is not balanced (difference {1}).").format(pe.name, pe.difference_amount)
+		)
+	if submit:
+		pe.submit()
+		if clearance_date:
+			_set_clearance_date(pe.name, clearance_date, "Payment Entry")
+	_stamp_user("Payment Entry", pe.name, owner=True)
+	return pe.name
+
+
+def _transfer_account(account: str, company: str) -> frappe._dict:
+	details = frappe.db.get_value(
+		"Account", account, ["company", "is_group", "account_currency", "account_type"], as_dict=True
+	)
+	if not details or details.company != company:
+		frappe.throw(_("Account {0} does not belong to company {1}.").format(frappe.bold(account), company))
+	if details.is_group:
+		frappe.throw(_("Account {0} is a group account.").format(frappe.bold(account)))
+	return details
+
+
+def _append_difference_row(pe: Document, company: str, account: str | None, amount: float, details):
+	"""The deduction row of an Internal Transfer whose received amount is below the paid amount.
+
+	ERPNext 16 (PaymentEntry.set_exchange_gain_loss, run on every validate for every payment type) keeps
+	exactly one row flagged `is_exchange_gain_loss` and sets its amount to base_paid - base_received, then
+	subtracts *all* deductions in set_difference_amount: an unflagged charges row would be counted twice and
+	the entry could not be submitted ("Difference Amount must be zero"). The difference is therefore put on the
+	flagged row itself, with its account changed to `account`; ERPNext keeps the account of that first
+	flagged row and only rewrites its amount (spec 7a F1, guarded by the PE settlement tests).
+	"""
+	if not account:
+		frappe.throw(_("An account for the difference between the paid and the received amount is required."))
+	company_currency = erpnext.get_company_currency(company)
+	account_details = _transfer_account(account, company)
+	if account_details.account_currency != company_currency:
+		frappe.throw(
+			_("Account {0} must be in the company currency {1}.").format(frappe.bold(account), company_currency)
+		)
+	row = {
+		"account": account,
+		"cost_center": details.get("cost_center") or erpnext.get_default_cost_center(company),
+		"amount": flt(amount, frappe.get_precision("Payment Entry Deduction", "amount")),
+		"is_exchange_gain_loss": 1,
+	}
+	row.update(_dimension_values(frappe.get_meta("Payment Entry Deduction"), details.get("dimensions")))
+	pe.append("deductions", row)
 
 
 def _get_payment_amounts(
@@ -671,8 +899,95 @@ def reverse_journal_entry(
 	return make_reversal("Journal Entry", name, posting_date, event, remarks, cycle)
 
 
+def can_reverse_by_payment_entry(pe: Document) -> bool:
+	"""A submitted Treasury Internal Transfer without deductions: its mirror is an Internal Transfer too.
+
+	A party Payment Entry cannot be reversed by a Payment Entry (ERPNext rejects a reference to another
+	Payment Entry, and a Payment Entry cannot re-open an invoice), and a negative exchange gain / loss row is
+	not supported: those are reversed by a Journal Entry.
+	"""
+	return bool(
+		pe.docstatus == 1
+		and pe.get("treasury_source_name")
+		and pe.payment_type == INTERNAL_TRANSFER
+		and not pe.get("deductions")
+	)
+
+
+@_system_context
+def make_reverse_payment_entry(
+	name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
+) -> str:
+	"""Create the Internal Transfer that mirrors the Internal Transfer `name` (same source, accounts swapped,
+	same rate, series, mode and accounting details). No clearance date."""
+	original = frappe.get_doc("Payment Entry", name)
+	if not can_reverse_by_payment_entry(original):
+		frappe.throw(_("Payment Entry {0} cannot be reversed by a Payment Entry.").format(frappe.bold(name)))
+
+	source_doctype, source_name = original.treasury_source_doctype, original.treasury_source_name
+	cycle = _validate_cycle(cycle)
+	_lock_source(source_doctype, source_name)
+	if existing := find_voucher("Payment Entry", source_doctype, source_name, event, cycle):
+		return _return_existing("Payment Entry", existing, True)
+
+	series = original.naming_series
+	details = {
+		# a series removed from Payment Entry since then must not block the reversal
+		"naming_series": series
+		if series in frappe.get_meta("Payment Entry").get_naming_series_options()
+		else None,
+		"mode_of_payment": original.mode_of_payment,
+		"cost_center": original.cost_center,
+		"project": original.project,
+		"bank_account": original.bank_account,
+		"dimensions": {
+			f: original.get(f) for f in get_accounting_dimensions() if original.meta.has_field(f)
+		},
+	}
+	return create_internal_transfer(
+		source_doctype=source_doctype,
+		source_name=source_name,
+		event=event,
+		company=original.company,
+		posting_date=posting_date,
+		paid_from=original.paid_to,
+		paid_to=original.paid_from,
+		paid_amount=original.received_amount,
+		exchange_rate=original.source_exchange_rate,
+		reference_no=original.reference_no,
+		reference_date=original.reference_date,
+		remarks=remarks or _("Reversal of Payment Entry {0}").format(name),
+		details=details,
+		cycle=cycle,
+	)
+
+
+@_system_context
+def reverse_voucher(
+	doctype: str, name: str, posting_date, event: str, remarks: str | None = None, cycle: int = 1
+) -> tuple[str, str]:
+	"""Reverse a Treasury voucher with the fitting voucher: an Internal Transfer without deductions by a
+	reverse Payment Entry, anything else by a Journal Entry. Returns (doctype, name) of the reversal; the one
+	already created for (source, event, cycle), of either doctype, is returned as it is."""
+	if doctype not in VOUCHER_DOCTYPES:
+		frappe.throw(_("Only Payment Entries and Journal Entries can be reversed here."))
+	source = frappe.db.get_value(doctype, name, ["treasury_source_doctype", "treasury_source_name"], as_dict=True)
+	if source and source.treasury_source_name:
+		for voucher_doctype in VOUCHER_DOCTYPES:
+			existing = find_voucher(
+				voucher_doctype, source.treasury_source_doctype, source.treasury_source_name, event, cycle
+			)
+			if existing:
+				return voucher_doctype, _return_existing(voucher_doctype, existing, True)
+
+	if doctype == "Payment Entry" and can_reverse_by_payment_entry(frappe.get_doc(doctype, name)):
+		return "Payment Entry", make_reverse_payment_entry(name, posting_date, event, remarks, cycle)
+	return "Journal Entry", make_reversal(doctype, name, posting_date, event, remarks, cycle)
+
+
 def _reverse_journal_rows(je: Document) -> list[dict]:
 	rows = []
+	dimensions = _row_dimension_fields("Journal Entry Account")
 	for d in je.accounts:
 		row = {
 			"account": d.account,
@@ -682,6 +997,7 @@ def _reverse_journal_rows(je: Document) -> list[dict]:
 			"exchange_rate": d.exchange_rate,
 			"debit_in_account_currency": d.credit_in_account_currency,
 			"credit_in_account_currency": d.debit_in_account_currency,
+			**{f: d.get(f) for f in dimensions if d.get(f)},
 		}
 		if d.reference_type in INVOICE_DOCTYPES:
 			row.update(reference_type=d.reference_type, reference_name=d.reference_name)
@@ -692,6 +1008,10 @@ def _reverse_journal_rows(je: Document) -> list[dict]:
 def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 	"""Build reversal rows from the GL Entries of a voucher (used for Payment Entries)."""
 	gl = frappe.qb.DocType("GL Entry")
+	# accounting dimensions that both GL Entry and Journal Entry Account carry are kept on the reversal
+	dimensions = [
+		f for f in _row_dimension_fields("Journal Entry Account") if frappe.get_meta("GL Entry").has_field(f)
+	]
 	entries = (
 		frappe.qb.from_(gl)
 		.select(
@@ -705,6 +1025,7 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			gl.credit,
 			gl.debit_in_account_currency,
 			gl.credit_in_account_currency,
+			*(getattr(gl, f) for f in dimensions),
 		)
 		.where((gl.voucher_type == voucher_type) & (gl.voucher_no == voucher_no) & (gl.is_cancelled == 0))
 		.orderby(gl.creation)
@@ -732,6 +1053,7 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			"exchange_rate": (amount / amount_in_account_currency) if amount_in_account_currency else 1,
 			"debit_in_account_currency": flt(e.credit_in_account_currency),
 			"credit_in_account_currency": flt(e.debit_in_account_currency),
+			**{f: e.get(f) for f in dimensions if e.get(f)},
 		}
 		if e.against_voucher_type in INVOICE_DOCTYPES and e.against_voucher:
 			row.update(reference_type=e.against_voucher_type, reference_name=e.against_voucher)
@@ -747,6 +1069,12 @@ def _reverse_gl_rows(voucher_type: str, voucher_no: str) -> list[dict]:
 			continue
 		rows.append(row)
 	return rows
+
+
+def _row_dimension_fields(doctype: str) -> list[str]:
+	"""Enabled Accounting Dimension fieldnames present on `doctype`."""
+	meta = frappe.get_meta(doctype)
+	return [f for f in get_accounting_dimensions() if meta.has_field(f)]
 
 
 def _get_order_advances(voucher_type: str, voucher_no: str) -> list[dict]:

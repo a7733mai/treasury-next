@@ -69,6 +69,9 @@ def ensure_base_masters():
 	"""Minimal setup-wizard records, in case the test site never ran the wizard."""
 	_ensure("Party Type", "Customer", {"party_type": "Customer", "account_type": "Receivable"})
 	_ensure("Party Type", "Supplier", {"party_type": "Supplier", "account_type": "Payable"})
+	# open party (Phase 7a): the other Party Types of ERPNext's setup wizard
+	_ensure("Party Type", "Employee", {"party_type": "Employee", "account_type": "Payable"})
+	_ensure("Party Type", "Shareholder", {"party_type": "Shareholder", "account_type": "Payable"})
 	_ensure("Warehouse Type", "Transit", {"name": "Transit"})
 	_ensure("UOM", UOM, {"uom_name": UOM, "must_be_whole_number": 1})
 	_ensure_tree_leaf("Item Group", "item_group_name", "parent_item_group", "All Item Groups", ITEM_GROUP)
@@ -371,7 +374,10 @@ class TreasuryTestMixin:
 # ---------------------------------------------------------------------------
 
 
-# The shipped defaults of Treasury Company Settings; PDC test classes start every test from them.
+# The shipped defaults of Treasury Company Settings; PDC test classes start every test from them. The 1.0 test
+# classes keep asserting the Journal Entry settlement (under_collection_journal, bank_journal ...): they pin the
+# `Journal Entry` Bank Settlement Voucher and are the coverage of that mode; the Payment Entry mode (the shipped
+# default since Phase 7a) has its own test classes, which start from PE_SETTINGS.
 DEFAULT_PDC_SETTINGS = {
 	"outgoing_party_posting": "On Handover",
 	"outgoing_bank_posting": "On Actual Clearance",
@@ -380,7 +386,9 @@ DEFAULT_PDC_SETTINGS = {
 	"incoming_bank_posting": "On Actual Clearance",
 	"on_bounce": "Reverse by Journal Entry",
 	"bounce_charges_account": None,
+	"bank_settlement_voucher": "Journal Entry",
 }
+PE_SETTINGS = {**DEFAULT_PDC_SETTINGS, "bank_settlement_voucher": "Payment Entry"}
 
 
 def day(offset: int):
@@ -924,6 +932,115 @@ def ensure_second_egp_bank() -> frappe._dict:
 		settings.append("pdc_accounts", mapping_row(bank))
 		settings.save(ignore_permissions=True)
 	return bank
+
+
+# ---------------------------------------------------------------------------
+# Phase 7a: modes of payment, open party, accounting dimensions
+# ---------------------------------------------------------------------------
+
+MAP_DOCTYPE = "Treasury Payment Mode Map"
+SHAREHOLDER_TITLE = "_Test Treasury Shareholder"
+BRANCH = "_Test Treasury Branch"
+
+
+def ensure_mode(name: str, company: str = COMPANY, account: str | None = None, enabled: int = 1) -> str:
+	"""A Mode of Payment (type Bank) with `account` as the default account of `company` (no row without one)."""
+	if not frappe.db.exists("Mode of Payment", name):
+		frappe.get_doc(
+			{
+				"doctype": "Mode of Payment",
+				"mode_of_payment": name,
+				"type": "Bank",
+				"enabled": enabled,
+				"accounts": [{"company": company, "default_account": account}] if account else [],
+			}
+		).insert(ignore_permissions=True)
+	return name
+
+
+def _map_rows() -> list[dict]:
+	return frappe.get_all(
+		MAP_DOCTYPE,
+		filters={"parenttype": "Treasury Company Settings", "parent": COMPANY},
+		fields=["bank_account", "method", "mode_of_payment", "pe_naming_series"],
+		order_by="idx asc",
+	)
+
+
+def _write_map_rows(rows: list[dict]):
+	frappe.db.delete(MAP_DOCTYPE, {"parenttype": "Treasury Company Settings", "parent": COMPANY})
+	for idx, row in enumerate(rows, 1):
+		frappe.get_doc(
+			{
+				"doctype": MAP_DOCTYPE,
+				"name": frappe.generate_hash(length=10),
+				"parenttype": "Treasury Company Settings",
+				"parentfield": "payment_modes",
+				"parent": COMPANY,
+				"idx": idx,
+				**row,
+			}
+		).db_insert()
+
+
+def set_mode_map(testcase, rows: list[dict]):
+	"""Replace the Modes of Payment map of the test company for the current test (restored by a cleanup).
+
+	Written straight to the table (no settings validation): the validation has tests of its own."""
+	previous = [dict(row) for row in _map_rows()]
+	_write_map_rows(rows)
+	testcase.addCleanup(_write_map_rows, previous)
+
+
+def ensure_shareholder() -> str:
+	"""A Shareholder of the test company (named by ERPNext's series)."""
+	existing = frappe.db.get_value("Shareholder", {"title": SHAREHOLDER_TITLE, "company": COMPANY})
+	if existing:
+		return existing
+	return (
+		frappe.get_doc({"doctype": "Shareholder", "title": SHAREHOLDER_TITLE, "company": COMPANY})
+		.insert(ignore_permissions=True)
+		.name
+	)
+
+
+def ensure_branch_dimension() -> str:
+	"""The persistent Accounting Dimension on Branch of the test site; returns its fieldname.
+
+	Creating an Accounting Dimension adds custom fields (DDL, which commits implicitly) to every doctype of the
+	`accounting_dimension_doctypes` hook, so it is created once and never deleted, like the roles and custom
+	fields of the app. Call it before any test data exists (first in `setUpClass`); the commit below only
+	closes the DDL's own transaction. Branch values are created inside the tests (`ensure_branch`).
+	"""
+	name = frappe.db.get_value("Accounting Dimension", {"document_type": "Branch"}, "name")
+	if not name:
+		name = frappe.get_doc({"doctype": "Accounting Dimension", "document_type": "Branch"}).insert(
+			ignore_permissions=True
+		).name
+		frappe.db.commit()  # nosemgrep: persistent fixture (see docstring)
+	fieldname = frappe.db.get_value("Accounting Dimension", name, "fieldname")
+	if not frappe.get_meta("PDC Cheque").has_field(fieldname):
+		# a dimension created before the app's hook was loaded
+		from treasury.accounting.dimensions import create_dimension_fields
+
+		create_dimension_fields()
+		frappe.db.commit()  # nosemgrep: persistent fixture (see docstring)
+	return fieldname
+
+
+def ensure_branch(name: str = BRANCH) -> str:
+	return _ensure("Branch", name, {"branch": name})
+
+
+def get_pe(name: str):
+	return frappe.get_doc("Payment Entry", name)
+
+
+def assert_deductions(testcase, pe, expected: list[tuple]):
+	"""Deduction rows of a Payment Entry, as (account, amount, is_exchange_gain_loss), order-independent."""
+	actual = sorted((d.account, flt(d.amount, 2), int(d.is_exchange_gain_loss)) for d in pe.deductions)
+	wanted = sorted((account, flt(amount, 2), int(flag)) for account, amount, flag in expected)
+	testcase.assertEqual(wanted, actual, f"deductions of {pe.name}")
 
 
 # ---------------------------------------------------------------------------

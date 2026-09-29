@@ -36,8 +36,6 @@ MANAGER = "Treasury Manager"
 OTHER = "Other"
 FIXED = "Fixed"
 OPEN = "Open / Blank"
-# Parties an encashment can be converted for: a PDC Cheque needs a Customer or Supplier.
-PDC_PARTY_TYPES = ("Customer", "Supplier")
 
 CREATED = "Created"
 RECEIVED = "Received"
@@ -236,10 +234,10 @@ def encash(
 	"""
 	doc = _begin(name, roles=(MANAGER,))
 	_require_status(doc, LIVE_BY_DIRECTION[doc.direction], already=(ENCASHED,), label=ENCASHED)
-	if doc.party_type not in PDC_PARTY_TYPES:
+	if not doc.party_type or doc.party_type == OTHER or not frappe.db.exists("Party Type", doc.party_type):
 		frappe.throw(
 			_(
-				"Only a security cheque of a Customer or Supplier can be encashed through a PDC Cheque; this one is of {0}."
+				"Only a security cheque of a party (Customer, Supplier, Employee …) can be encashed through a PDC Cheque; this one is of {0}."
 			).format(_(doc.party_type, context=DOCTYPE)),
 			title=_("Not Allowed"),
 		)

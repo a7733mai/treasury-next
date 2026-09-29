@@ -4,22 +4,39 @@
 import erpnext
 import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
+from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_account
 from frappe import _
+from frappe.contacts.doctype.contact.contact import get_default_contact
 from frappe.model.document import Document
 from frappe.utils import flt, getdate, money_in_words
 
-from treasury.accounting import posting
+from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
+from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils.protected_fields import changed_fields, changed_tables
 
-PARTY_TYPES = ("Customer", "Supplier")
 NAMING_SERIES = {"Outgoing": "PDC-OUT-.YYYY.-.#####", "Incoming": "PDC-IN-.YYYY.-.#####"}
-# Reference types allowed per direction, and the field holding their party.
-REFERENCE_PARTY_FIELD = {
-	"Outgoing": {"Purchase Invoice": "supplier", "Purchase Order": "supplier", "Journal Entry": None},
-	"Incoming": {"Sales Invoice": "customer", "Sales Order": "customer", "Journal Entry": None},
-}
+# Accounting details copied to every voucher of the cheque (with the accounting dimension fields); defaulted
+# while the cheque is not posted, locked once it is.
+ACCOUNTING_FIELDS = lifecycle.ACCOUNTING_FIELDS
+# Party details defaulted from the party: dropped when the party changes (unless chosen for the new one).
+PARTY_DETAIL_FIELDS = ("party_bank_account", "contact_person")
+# Saved values the defaults are compared with to find the stale ones (see `_drop_stale_defaults`).
+STALE_CHECK_FIELDS = ("bank_account", "party_type", "party", "mode_of_payment", *PARTY_DETAIL_FIELDS)
+
+
+def reference_rules(direction: str | None, party_type: str | None) -> dict:
+	"""Reference types a cheque may allocate, and the field holding their party (None: no party check).
+
+	Invoices and orders only for an outgoing cheque to a Supplier / incoming cheque from a Customer; any
+	cheque may settle a Journal Entry of its party (checked in the Payment Ledger when it is posted).
+	"""
+	if (direction, party_type) == ("Outgoing", "Supplier"):
+		return {"Purchase Invoice": "supplier", "Purchase Order": "supplier", "Journal Entry": None}
+	if (direction, party_type) == ("Incoming", "Customer"):
+		return {"Sales Invoice": "customer", "Sales Order": "customer", "Journal Entry": None}
+	return {"Journal Entry": None}
 # Fields that cannot change once the cheque left the Created status (except by lifecycle actions) or is
 # posted to accounts (the vouchers were built from them).
 LOCKED_FIELDS = ("direction", "company", "party_type", "party", "bank_account", "currency", "cheque_no")
@@ -56,6 +73,9 @@ PROTECTED_FIELDS = (
 	"bank_charges",
 	"cheque_discounting",
 	"party_payment_entry",
+	"under_collection_payment_entry",
+	"bank_payment_entry",
+	"reversal_payment_entry",
 	"under_collection_journal",
 	"bank_journal",
 	"bank_charges_journal",
@@ -95,6 +115,7 @@ class PDCCheque(Document):
 		bank_charges: DF.Currency
 		bank_charges_journal: DF.Link | None
 		bank_journal: DF.Link | None
+		bank_payment_entry: DF.Link | None
 		bank_posting_date: DF.Date | None
 		bank_transaction_date: DF.Date | None
 		bounce_charges_journal: DF.Link | None
@@ -105,6 +126,8 @@ class PDCCheque(Document):
 		cheque_image: DF.AttachImage | None
 		cheque_no: DF.Data | None
 		company: DF.Link
+		contact_person: DF.Link | None
+		cost_center: DF.Link | None
 		currency: DF.Link | None
 		cycle: DF.Int
 		deposit_date: DF.Date | None
@@ -116,6 +139,7 @@ class PDCCheque(Document):
 		handover_date: DF.Date | None
 		is_postponed: DF.Check
 		issue_date: DF.Date
+		mode_of_payment: DF.Link | None
 		naming_series: DF.Literal["PDC-OUT-.YYYY.-.#####", "PDC-IN-.YYYY.-.#####"]
 		operational_status: DF.Literal[
 			"Created",
@@ -132,20 +156,24 @@ class PDCCheque(Document):
 		]
 		original_due_date: DF.Date
 		party: DF.DynamicLink
+		party_bank_account: DF.Link | None
 		party_name: DF.Data | None
 		party_payment_entry: DF.Link | None
 		party_posting_date: DF.Date | None
 		party_type: DF.Link
 		postponement_count: DF.Int
 		postponements: DF.Table[PDCPostponement]
+		project: DF.Link | None
 		references: DF.Table[PDCChequeReference]
 		remarks: DF.SmallText | None
 		replaced_by: DF.Link | None
 		replaces: DF.Link | None
 		reversal_journal: DF.Link | None
+		reversal_payment_entry: DF.Link | None
 		security_cheque: DF.Link | None
 		status_log: DF.Table[PDCStatusLog]
 		under_collection_journal: DF.Link | None
+		under_collection_payment_entry: DF.Link | None
 		vouchers_html: DF.HTML | None
 	# end: auto-generated types
 
@@ -198,6 +226,7 @@ class PDCCheque(Document):
 		self.validate_protected_fields()
 		self.validate_party()
 		self.validate_bank_account()
+		self.validate_accounting_details()
 		self.set_currency_and_rate()
 		self.validate_amount()
 		self.validate_cheque_book()
@@ -258,15 +287,13 @@ class PDCCheque(Document):
 			)
 
 	def validate_party(self):
-		if self.party_type not in PARTY_TYPES:
-			frappe.throw(_("Party Type must be one of: {0}.").format(", ".join(_(d) for d in PARTY_TYPES)))
+		"""Any ERPNext Party Type (Customer, Supplier, Employee, Shareholder ...)."""
+		validate_party_type(self.party_type)
 		if not self.party:
 			frappe.throw(_("Party is required."))
-		name_field = "customer_name" if self.party_type == "Customer" else "supplier_name"
-		party_name = frappe.db.get_value(self.party_type, self.party, name_field)
-		if party_name is None and not frappe.db.exists(self.party_type, self.party):
+		if not frappe.db.exists(self.party_type, self.party):
 			frappe.throw(_("{0} {1} does not exist").format(_(self.party_type), self.party))
-		self.party_name = party_name or self.party
+		self.party_name = get_party_name(self.party_type, self.party)
 
 	def validate_bank_account(self):
 		if not self.bank_account:
@@ -286,6 +313,121 @@ class PDCCheque(Document):
 			frappe.throw(_("Bank Account {0} has no GL account.").format(frappe.bold(self.bank_account)))
 		# throws when the bank account has no PDC Account Mapping row
 		posting.get_account_mapping(self.company, self.bank_account)
+
+	def validate_accounting_details(self, before: dict | None = None):
+		"""Default the accounting details of a cheque not posted yet, then check the ones set or changed.
+
+		`before`: the saved values (STALE_CHECK_FIELDS) the defaults may be stale against; read from the
+		cheque's own row when not given (a Cheque Batch passes the values of the batch)."""
+		self.set_accounting_defaults(before)
+
+		def changed(*fieldnames) -> bool:
+			return self.is_new() or any(self.has_value_changed(f) for f in fieldnames)
+
+		if self.cost_center and changed("cost_center", "company"):
+			cost_center = frappe.db.get_value(
+				"Cost Center", self.cost_center, ["company", "is_group"], as_dict=True
+			)
+			if not cost_center or cost_center.company != self.company:
+				frappe.throw(
+					_("Cost Center {0} does not belong to company {1}.").format(
+						frappe.bold(self.cost_center), frappe.bold(self.company)
+					)
+				)
+			if cost_center.is_group:
+				frappe.throw(_("Cost Center {0} is a group.").format(frappe.bold(self.cost_center)))
+		if self.project and changed("project", "company"):
+			project_company = frappe.db.get_value("Project", self.project, "company")
+			if project_company and project_company != self.company:
+				frappe.throw(
+					_("Project {0} does not belong to company {1}.").format(
+						frappe.bold(self.project), frappe.bold(self.company)
+					)
+				)
+		if self.mode_of_payment and changed("mode_of_payment"):
+			if not frappe.db.get_value("Mode of Payment", self.mode_of_payment, "enabled"):
+				frappe.throw(_("Mode of Payment {0} is disabled.").format(frappe.bold(self.mode_of_payment)))
+		if self.party_bank_account and changed("party_bank_account", "party_type", "party"):
+			account = frappe.db.get_value(
+				"Bank Account",
+				self.party_bank_account,
+				["party_type", "party", "is_company_account"],
+				as_dict=True,
+			)
+			if (
+				not account
+				or account.is_company_account
+				or (account.party_type, account.party) != (self.party_type, self.party)
+			):
+				frappe.throw(
+					_("Bank Account {0} does not belong to {1} {2}.").format(
+						frappe.bold(self.party_bank_account), _(self.party_type), frappe.bold(self.party)
+					)
+				)
+		if self.contact_person and changed("contact_person", "party_type", "party"):
+			linked = frappe.db.exists(
+				"Dynamic Link",
+				{
+					"parenttype": "Contact",
+					"parent": self.contact_person,
+					"link_doctype": self.party_type,
+					"link_name": self.party,
+				},
+			)
+			if not linked:
+				frappe.throw(
+					_("Contact {0} is not linked to {1} {2}.").format(
+						frappe.bold(self.contact_person), _(self.party_type), frappe.bold(self.party)
+					)
+				)
+
+	def set_accounting_defaults(self, before: dict | None = None):
+		"""Fill the empty accounting details while the cheque is not posted: the company's default cost center
+		and dimension defaults, the Mode of Payment mapped to the bank (Treasury Company Settings), the party's
+		default bank account and contact. Also called by the lifecycle right before the party posting."""
+		if (self.accounting_status or lifecycle.NOT_POSTED) != lifecycle.NOT_POSTED:
+			return
+		self._drop_stale_defaults(before)
+		if not self.cost_center and self.company:
+			self.cost_center = erpnext.get_default_cost_center(self.company)
+		for fieldname, value in dimensions.default_dimensions(self.company).items():
+			if value and self.meta.has_field(fieldname) and not self.get(fieldname):
+				self.set(fieldname, value)
+		if not self.mode_of_payment:
+			self.mode_of_payment = self._mapped_mode(self.bank_account)
+		if self.party_type and self.party:
+			if not self.party_bank_account:
+				self.party_bank_account = get_party_bank_account(self.party_type, self.party)
+			if not self.contact_person and self.party_type != "Employee":
+				self.contact_person = get_default_contact(self.party_type, self.party)
+
+	def _drop_stale_defaults(self, before: dict | None = None):
+		"""A bank or party change drops the Mode of Payment / party details that came with the old ones (a
+		value the user chose for the new bank / party is kept)."""
+		if before is None:
+			if self.is_new():
+				return
+			before = frappe.db.get_value(self.doctype, self.name, list(STALE_CHECK_FIELDS), as_dict=True)
+		if not before:
+			return
+		before = frappe._dict(before)
+		if (
+			before.bank_account != self.bank_account
+			and self.mode_of_payment
+			and self.mode_of_payment == before.mode_of_payment
+			and self.mode_of_payment == self._mapped_mode(before.bank_account)
+		):
+			self.mode_of_payment = None
+		if (before.party_type, before.party) != (self.party_type, self.party):
+			for fieldname in PARTY_DETAIL_FIELDS:
+				if self.get(fieldname) and self.get(fieldname) == before.get(fieldname):
+					self.set(fieldname, None)
+
+	def _mapped_mode(self, bank_account: str | None) -> str | None:
+		method = payment_modes.CHEQUE_METHOD.get(self.direction)
+		if not bank_account or not method:
+			return None
+		return payment_modes.resolve(self.company, bank_account, method).mode_of_payment
 
 	def set_currency_and_rate(self):
 		"""The cheque currency is the currency of the bank GL account (company currency until a bank is set).
@@ -402,7 +544,7 @@ class PDCCheque(Document):
 			self.effective_due_date = self.original_due_date
 
 	def validate_references(self):
-		allowed = REFERENCE_PARTY_FIELD.get(self.direction, {})
+		allowed = reference_rules(self.direction, self.party_type)
 		precision = self._allocation_precision()
 		total = 0
 		for row in self.references:
@@ -477,6 +619,13 @@ class PDCCheque(Document):
 		changed += [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
 		if self._references_key(before) != self._references_key(self):
 			changed.append("references")
+		if not self.flags.treasury_lifecycle:
+			# the vouchers carry them; the lifecycle only fills details a cheque of version 1.0 lacks
+			changed += [
+				f
+				for f in (*ACCOUNTING_FIELDS, *self._dimension_fields())
+				if (before.get(f) or None) != (self.get(f) or None)
+			]
 		if changed:
 			frappe.throw(
 				_("{0} cannot be changed after the cheque is posted to accounts.").format(
@@ -510,6 +659,9 @@ class PDCCheque(Document):
 				),
 				title=_("Not Allowed"),
 			)
+
+	def _dimension_fields(self) -> list[str]:
+		return [f for f in dimensions.get_dimension_fieldnames() if self.meta.has_field(f)]
 
 	def _changed_identity_fields(self, before) -> list[str]:
 		changed = [f for f in LOCKED_FIELDS if (before.get(f) or None) != (self.get(f) or None)]

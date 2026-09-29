@@ -228,6 +228,41 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assert_reconciled(bt, cheque.bank_journal)
 
+	def test_clear_selected_reconciles_the_bank_payment_entry(self):
+		"""Payment Entry mode (Phase 7a): the Bank Transaction is reconciled against the bank Payment Entry."""
+		self.use_company_settings(bank_settlement_voucher="Payment Entry")
+		egp = self.data.egp
+		cheque = self.delivered(1414.5)
+		bt = make_bank_transaction(
+			egp.bank_account, day(-28), withdrawal=1414.5, reference_number=cheque.cheque_no
+		)
+
+		tool = self.tool()
+		tool.get_suggestions()
+		self.select_only(tool, cheque)
+		result = tool.clear_selected()
+
+		self.assertEqual(result["cleared"], [cheque.name])
+		cheque.reload()
+		self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Cleared", "Bank Posted"))
+		self.assertFalse(cheque.bank_journal)
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			cheque.bank_payment_entry,
+			[(egp.pdc_payable, 1414.5, 0, None, day(-28)), (egp.bank_gl, 0, 1414.5, None, day(-28))],
+		)
+		bt.reload()
+		self.assertEqual(bt.status, "Reconciled")
+		self.assertEqual(flt(bt.unallocated_amount), 0)
+		self.assertEqual(
+			[(p.payment_document, p.payment_entry) for p in bt.payment_entries],
+			[("Payment Entry", cheque.bank_payment_entry)],
+		)
+		self.assertEqual(
+			getdate(frappe.db.get_value("Payment Entry", cheque.bank_payment_entry, "clearance_date")), day(-28)
+		)
+
 	def test_cleared_in_manual_mode_is_posted_and_reconciled(self):
 		self.use_company_settings(outgoing_bank_posting="Manual")
 		egp = self.data.egp

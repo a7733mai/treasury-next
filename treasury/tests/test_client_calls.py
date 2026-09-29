@@ -72,3 +72,32 @@ class TestClientCalls(UnitTestCase):
 					missing.append(f"{controller.__name__}.{name}")
 		self.assertEqual(missing, [])
 		self.assertGreater(checked, 20)  # the scan really sees the action buttons
+
+	def test_state_changing_methods_reject_get(self):
+		"""The Phase 7a actions change data: POST only (Frappe checks the CSRF token only on POST)."""
+		from types import SimpleNamespace
+
+		from frappe.handler import is_valid_http_method
+
+		from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
+			TreasuryCompanySettings,
+		)
+		from treasury.utils.party import create_payee
+
+		methods = (
+			TreasuryCompanySettings.generate_modes_of_payment,
+			TreasuryCompanySettings.add_series_to_payment_entry,
+			create_payee,
+		)
+		previous = getattr(frappe.local, "request", None)
+		try:
+			for method in methods:
+				with self.subTest(method=method.__qualname__):
+					self.assertIn(method, frappe.whitelisted)
+					self.assertEqual(frappe.allowed_http_methods_for_whitelisted_func[method], ["POST"])
+					frappe.local.request = SimpleNamespace(method="GET")
+					self.assertRaises(frappe.PermissionError, is_valid_http_method, method)
+					frappe.local.request = SimpleNamespace(method="POST")
+					is_valid_http_method(method)
+		finally:
+			frappe.local.request = previous

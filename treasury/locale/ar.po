@@ -6518,3 +6518,324 @@ msgstr "تاريخ الإقفال"
 msgctxt "Cheque Discounting Item"
 msgid "Closing Journal Entry"
 msgstr "قيد الإقفال"
+
+# ---------------------------------------------------------------------------
+# Phase 7a — Payment Entry settlement, Modes of Payment, accounting details, open party
+# ---------------------------------------------------------------------------
+
+# DocType
+msgid "Treasury Payment Mode Map"
+msgstr "ربط طرق الدفع بالبنوك"
+
+# Treasury Payment Mode Map (labels and the method options)
+msgctxt "Treasury Payment Mode Map"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Method"
+msgstr "الطريقة"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Mode of Payment"
+msgstr "طريقة الدفع"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "PE Naming Series"
+msgstr "سلسلة ترقيم سند الدفع"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Cheque Out"
+msgstr "شيك صادر"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Cheque In"
+msgstr "شيك وارد"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Bank Transfer"
+msgstr "تحويل بنكي"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Fawran"
+msgstr "فوران"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "SWIFT"
+msgstr "سويفت"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Internal Transfer"
+msgstr "تحويل داخلي"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Auto Debit"
+msgstr "خصم تلقائي"
+
+msgctxt "Treasury Payment Mode Map"
+msgid "Bank Charge"
+msgstr "مصروف بنكي"
+
+msgid "Optional Payment Entry series, e.g. PE-RYN-CHQ-.YYYY.-. Must be added to Payment Entry with 'Add Series to Payment Entry'."
+msgstr "سلسلة ترقيم اختيارية لسند الدفع، مثل PE-RYN-CHQ-.YYYY.-. يجب إضافتها إلى سند الدفع بزر \"إضافة السلاسل إلى سند الدفع\"."
+
+# Treasury Company Settings
+msgctxt "Treasury Company Settings"
+msgid "Vouchers"
+msgstr "السندات"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Settlement Voucher"
+msgstr "سند التسوية البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "Payment Entry"
+msgstr "سند الدفع"
+
+msgctxt "Treasury Company Settings"
+msgid "Journal Entry"
+msgstr "قيد يومية"
+
+msgctxt "Treasury Company Settings"
+msgid "Modes of Payment"
+msgstr "طرق الدفع"
+
+msgctxt "Treasury Company Settings"
+msgid "Mode Name Template"
+msgstr "نموذج اسم طريقة الدفع"
+
+msgid "Voucher for the under-collection stage and the bank settlement of cheques. Payment Entry: Internal Transfer with the bank charges in the same entry. Journal Entry: behaviour of version 1.0."
+msgstr "السند المستخدم لمرحلة التحصيل وللتسوية البنكية للشيكات. سند دفع: تحويل داخلي تُدرج فيه المصاريف البنكية في نفس السند. قيد يومية: سلوك الإصدار 1.0."
+
+msgid "Reverse: bank-side Payment Entries are reversed by a reverse Payment Entry, party postings by a Journal Entry."
+msgstr "العكس: تُعكس سندات الدفع البنكية بسند دفع عكسي، وتُعكس ترحيلات الطرف بقيد يومية."
+
+msgid "Name given to generated Modes of Payment. Placeholders: {method} (e.g. Cheque Out), {bank} (bank name, e.g. Al Rayan), {account} (bank account name). {method} is required."
+msgstr "الاسم الذي يُعطى لطرق الدفع المُنشأة. المتغيرات: {method} (مثل شيك صادر)، {bank} (اسم البنك مثل الريان)، {account} (اسم الحساب البنكي). المتغير {method} إلزامي."
+
+# Treasury Settings
+msgctxt "Treasury Settings"
+msgid "Payees"
+msgstr "المستفيدون"
+
+msgctxt "Treasury Settings"
+msgid "Payee Supplier Group"
+msgstr "مجموعة موردي المستفيدين"
+
+msgid "Supplier Group of the suppliers created with New Payee."
+msgstr "مجموعة الموردين للموردين المُنشأين من \"مستفيد جديد\"."
+
+msgid "Treasury Payees"
+msgstr "مستفيدو الخزينة"
+
+# PDC Cheque
+msgctxt "PDC Cheque"
+msgid "Accounting Details"
+msgstr "البيانات المحاسبية"
+
+msgctxt "PDC Cheque"
+msgid "Cost Center"
+msgstr "مركز التكلفة"
+
+msgctxt "PDC Cheque"
+msgid "Project"
+msgstr "المشروع"
+
+msgctxt "PDC Cheque"
+msgid "Mode of Payment"
+msgstr "طريقة الدفع"
+
+msgctxt "PDC Cheque"
+msgid "Party Bank Account"
+msgstr "الحساب البنكي للطرف"
+
+msgctxt "PDC Cheque"
+msgid "Contact Person"
+msgstr "جهة الاتصال"
+
+msgctxt "PDC Cheque"
+msgid "Accounting Dimensions"
+msgstr "الأبعاد المحاسبية"
+
+msgctxt "PDC Cheque"
+msgid "Payment Entries and Vouchers"
+msgstr "سندات الدفع والقيود"
+
+msgctxt "PDC Cheque"
+msgid "Under Collection Payment Entry"
+msgstr "سند دفع التحصيل"
+
+msgctxt "PDC Cheque"
+msgid "Bank Payment Entry"
+msgstr "سند دفع التسوية البنكية"
+
+msgctxt "PDC Cheque"
+msgid "Reversal Payment Entry"
+msgstr "سند دفع العكس"
+
+msgid "Empty: taken from Treasury Company Settings (Modes of Payment)."
+msgstr "فارغ: تؤخذ من إعدادات الخزينة للشركة (طرق الدفع)."
+
+# Cheque Batch
+msgctxt "Cheque Batch"
+msgid "Accounting Details"
+msgstr "البيانات المحاسبية"
+
+msgctxt "Cheque Batch"
+msgid "Cost Center"
+msgstr "مركز التكلفة"
+
+msgctxt "Cheque Batch"
+msgid "Project"
+msgstr "المشروع"
+
+msgctxt "Cheque Batch"
+msgid "Mode of Payment"
+msgstr "طريقة الدفع"
+
+msgctxt "Cheque Batch"
+msgid "Party Bank Account"
+msgstr "الحساب البنكي للطرف"
+
+msgctxt "Cheque Batch"
+msgid "Contact Person"
+msgstr "جهة الاتصال"
+
+msgctxt "Cheque Batch"
+msgid "Accounting Dimensions"
+msgstr "الأبعاد المحاسبية"
+
+msgctxt "Cheque Batch"
+msgid "Payment Entries"
+msgstr "سندات الدفع"
+
+msgid "Copied to every cheque of the batch."
+msgstr "تُنسخ إلى كل شيكات الدفعة."
+
+# Messages (posting service)
+msgid "Series {0} is not a Payment Entry series. A System Manager must add it in Treasury Company Settings (Add Series to Payment Entry)."
+msgstr "السلسلة {0} ليست من سلاسل سند الدفع. يجب على مدير النظام إضافتها من إعدادات الخزينة للشركة (إضافة السلاسل إلى سند الدفع)."
+
+msgid "Paid From and Paid To accounts must be different for an Internal Transfer."
+msgstr "يجب أن يختلف الحساب المدفوع منه عن الحساب المدفوع إليه في التحويل الداخلي."
+
+msgid "Internal Transfer between accounts in different currencies is not supported."
+msgstr "التحويل الداخلي بين حسابات بعملات مختلفة غير مدعوم."
+
+msgid "Received Amount cannot be greater than Paid Amount"
+msgstr "لا يمكن أن يكون المبلغ المستلم أكبر من المبلغ المدفوع"
+
+msgid "The Internal Transfer {0} is not balanced (difference {1})."
+msgstr "التحويل الداخلي {0} غير متوازن (الفرق {1})."
+
+msgid "Account {0} does not belong to company {1}."
+msgstr "الحساب {0} لا يتبع الشركة {1}."
+
+msgid "Account {0} is a group account."
+msgstr "الحساب {0} حساب مجموعة."
+
+msgid "An account for the difference between the paid and the received amount is required."
+msgstr "يلزم تحديد حساب للفرق بين المبلغ المدفوع والمبلغ المستلم."
+
+msgid "Account {0} must be in the company currency {1}."
+msgstr "يجب أن يكون الحساب {0} بعملة الشركة {1}."
+
+msgid "Payment Entry {0} cannot be reversed by a Payment Entry."
+msgstr "لا يمكن عكس سند الدفع {0} بسند دفع."
+
+msgid "Reversal of Payment Entry {0}"
+msgstr "عكس سند الدفع {0}"
+
+msgid "Only Payment Entries and Journal Entries can be reversed here."
+msgstr "يمكن هنا عكس سندات الدفع وقيود اليومية فقط."
+
+# Messages (Modes of Payment, series)
+msgid "The Mode Name Template must contain {method}."
+msgstr "يجب أن يحتوي نموذج اسم طريقة الدفع على {method}."
+
+msgid "Invalid Template"
+msgstr "نموذج غير صالح"
+
+msgid "Unknown method {0}."
+msgstr "طريقة غير معروفة {0}."
+
+msgid "No free Mode of Payment name found for {0}."
+msgstr "لم يتم العثور على اسم متاح لطريقة الدفع {0}."
+
+msgid "Mode of Payment {0} is disabled."
+msgstr "طريقة الدفع {0} معطلة."
+
+msgid "uses account {0}"
+msgstr "يستخدم الحساب {0}"
+
+msgid "Row #{0}: Bank Account {1} already has a row for {2}."
+msgstr "الصف #{0}: الحساب البنكي {1} له صف بالفعل للطريقة {2}."
+
+msgid "Row #{0}: Mode of Payment {1} is disabled."
+msgstr "الصف #{0}: طريقة الدفع {1} معطلة."
+
+msgid "Row #{0}: Mode of Payment {1} uses account {2} in company {3}, not the account {4} of Bank Account {5}."
+msgstr "الصف #{0}: طريقة الدفع {1} تستخدم الحساب {2} في الشركة {3}، وليس الحساب {4} الخاص بالحساب البنكي {5}."
+
+msgid "Series {0} is not a Payment Entry series yet. A System Manager must click \"Add Series to Payment Entry\"."
+msgstr "السلسلة {0} ليست من سلاسل سند الدفع بعد. يجب على مدير النظام الضغط على \"إضافة السلاسل إلى سند الدفع\"."
+
+msgid "Confirm to add the series to Payment Entry."
+msgstr "أكّد إضافة السلاسل إلى سند الدفع."
+
+msgid "All series are already Payment Entry series."
+msgstr "جميع السلاسل مسجلة بالفعل في سند الدفع."
+
+msgid "A list is expected."
+msgstr "يجب إدخال قائمة."
+
+msgid "The Payment Entry naming series {0} were added by Treasury and are kept on purpose (existing Payment Entries use them). Remove them in Document Naming Settings if they are not needed."
+msgstr "سلاسل ترقيم سند الدفع {0} أضافها تطبيق الخزينة وتم الإبقاء عليها عمداً (تستخدمها سندات دفع قائمة). احذفها من إعدادات تسمية المستندات إذا لم تكن مطلوبة."
+
+# Messages (open party, New Payee)
+msgid "{0} is not a Party Type."
+msgstr "{0} ليس نوع طرف."
+
+msgid "You need permission to create PDC Cheques or Cheque Batches to add a payee."
+msgstr "تحتاج إلى صلاحية إنشاء الشيكات الآجلة أو دفعات الشيكات لإضافة مستفيد."
+
+msgid "A payee name is required."
+msgstr "اسم المستفيد مطلوب."
+
+msgid "The payee name is too long."
+msgstr "اسم المستفيد طويل جداً."
+
+msgid "Supplier {0} is disabled."
+msgstr "المورد {0} معطل."
+
+msgid "Set a valid Payee Supplier Group in Treasury Settings."
+msgstr "حدد مجموعة موردي مستفيدين صحيحة في إعدادات الخزينة."
+
+msgid "Only a security cheque of a party (Customer, Supplier, Employee …) can be encashed through a PDC Cheque; this one is of {0}."
+msgstr "لا يمكن صرف شيك الضمان عبر شيك آجل إلا إذا كان لطرف (عميل، مورد، موظف …)؛ وهذا الشيك يخص {0}."
+
+# Messages (accounting details)
+msgid "Cost Center {0} does not belong to company {1}."
+msgstr "مركز التكلفة {0} لا يتبع الشركة {1}."
+
+msgid "Cost Center {0} is a group."
+msgstr "مركز التكلفة {0} مجموعة."
+
+msgid "Project {0} does not belong to company {1}."
+msgstr "المشروع {0} لا يتبع الشركة {1}."
+
+msgid "Bank Account {0} does not belong to {1} {2}."
+msgstr "الحساب البنكي {0} لا يخص {1} {2}."
+
+msgid "Contact {0} is not linked to {1} {2}."
+msgstr "جهة الاتصال {0} غير مرتبطة بـ {1} {2}."
+
+# Messages (PDC settlement)
+msgid "Bank charges must be less than the cheque amount."
+msgstr "يجب أن تكون المصاريف البنكية أقل من مبلغ الشيك."
+
+msgid "In Payment Entry mode the cheque is settled at its carrying rate {0}; the exchange difference is booked by Exchange Rate Revaluation."
+msgstr "في وضع سند الدفع تتم تسوية الشيك بسعره الدفتري {0}، ويُسجَّل فرق العملة من خلال إعادة تقييم سعر الصرف."
+
+msgid "Cheque {0} has no bank voucher to reconcile."
+msgstr "الشيك {0} ليس له سند بنكي لتسويته."

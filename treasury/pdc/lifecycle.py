@@ -28,7 +28,7 @@ from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 
-from treasury.accounting import posting
+from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
@@ -59,12 +59,23 @@ UNDER_COLLECTION_POSTED = "Under Collection Posted"
 BANK_POSTED = "Bank Posted"
 REVERSED = "Reversed"
 
+# Treasury Company Settings `bank_settlement_voucher`: the voucher of the under-collection stage and of the
+# bank settlement (the party posting is always a Payment Entry).
+PAYMENT_ENTRY_MODE = "Payment Entry"
+JOURNAL_ENTRY_MODE = "Journal Entry"
+
+# Accounting details of a cheque (PDC Cheque ACCOUNTING_FIELDS), carried to its replacement.
+ACCOUNTING_FIELDS = ("cost_center", "project", "mode_of_payment", "party_bank_account", "contact_person")
+
 # Statuses after which the due date no longer matters.
 FINAL_STATUSES = ("Cleared", "Bounced", "Returned", "Endorsed", "Discounted", "Replaced", "Cancelled")
 
 # Per-presentation fields, reset when a bounced cheque is re-presented (history stays in the status log).
 CYCLE_FIELDS = (
 	"party_payment_entry",
+	"under_collection_payment_entry",
+	"bank_payment_entry",
+	"reversal_payment_entry",
 	"under_collection_journal",
 	"bank_journal",
 	"bank_charges_journal",
@@ -258,6 +269,7 @@ def clear(
 		_not_before(doc, transaction_date, "bank_transaction_date", latest)
 	if flt(bank_charges) < 0:
 		frappe.throw(_("Bank charges cannot be negative."))
+	_validate_settlement_charges(doc, bank_charges)
 
 	doc.actual_clearance_date = date
 	doc.bank_transaction_date = transaction_date
@@ -292,6 +304,7 @@ def post_bank(
 		if flt(bank_charges) < 0:
 			frappe.throw(_("Bank charges cannot be negative."))
 		doc.bank_charges = flt(bank_charges, doc.precision("bank_charges"))
+	_validate_settlement_charges(doc, doc.bank_charges)
 
 	_ensure_party_posted(doc, date)
 	_post_bank(doc, date, exchange_rate)
@@ -567,6 +580,8 @@ def _post_party(doc, posting_date):
 	outgoing = doc.direction == OUTGOING
 	if not flt(doc.exchange_rate):
 		doc.exchange_rate = posting.get_cheque_exchange_rate(doc.currency, doc.company, posting_date)
+	# e.g. the bank chosen at the deposit: its mode of payment, not the one of the bank the cheque had
+	doc.set_accounting_defaults()
 
 	payment_entry = posting.create_payment_entry(
 		source_doctype=DOCTYPE,
@@ -593,6 +608,7 @@ def _post_party(doc, posting_date):
 		],
 		remarks=_voucher_remarks(doc),
 		cycle=_cycle(doc),
+		details=_details(doc),
 	)
 	doc.party_payment_entry = payment_entry
 	doc.party_posting_date = getdate(posting_date)
@@ -622,7 +638,8 @@ def _ensure_party_posted(doc, event_date):
 
 
 def _post_under_collection(doc, posting_date):
-	"""Incoming deposit: Dr Under Collection / Cr PDC Receivable."""
+	"""Incoming deposit: Dr Under Collection / Cr PDC Receivable (an Internal Transfer Payment Entry, or a
+	Journal Entry per the settings' Bank Settlement Voucher)."""
 	if doc.accounting_status != PARTY_POSTED:
 		return
 	mapping = posting.get_account_mapping(doc.company, doc.bank_account)
@@ -634,6 +651,33 @@ def _post_under_collection(doc, posting_date):
 			title=_("Missing Settings"),
 		)
 	rate = _carrying_rate(doc)
+	if _settlement_voucher(doc) == PAYMENT_ENTRY_MODE:
+		payment_entry = posting.create_internal_transfer(
+			source_doctype=DOCTYPE,
+			source_name=doc.name,
+			event=EVENT_UNDER_COLLECTION,
+			company=doc.company,
+			posting_date=posting_date,
+			paid_from=mapping.pdc_receivable_account,
+			paid_to=mapping.under_collection_account,
+			paid_amount=doc.amount,
+			exchange_rate=rate,
+			reference_no=doc.cheque_no,
+			reference_date=doc.effective_due_date,
+			remarks=_voucher_remarks(doc),
+			details=_details(doc),
+			cycle=_cycle(doc),
+		)
+		doc.under_collection_payment_entry = payment_entry
+		_log(
+			doc,
+			"Under Collection Posted",
+			accounting=UNDER_COLLECTION_POSTED,
+			voucher=("Payment Entry", payment_entry),
+			event_date=posting_date,
+		)
+		return
+
 	journal = posting.create_journal_entry(
 		source_doctype=DOCTYPE,
 		source_name=doc.name,
@@ -672,6 +716,9 @@ def _post_bank(doc, posting_date, exchange_rate=None):
 		return
 	mapping = posting.get_account_mapping(doc.company, doc.bank_account)
 	bank_gl = frappe.db.get_value("Bank Account", doc.bank_account, "account")
+	if _settlement_voucher(doc) == PAYMENT_ENTRY_MODE:
+		_post_bank_payment_entry(doc, mapping, bank_gl, posting_date, exchange_rate)
+		return
 	carrying_rate = _carrying_rate(doc)
 	bank_rate = _bank_rate(doc, posting_date, exchange_rate)
 
@@ -720,15 +767,101 @@ def _post_bank(doc, posting_date, exchange_rate=None):
 		_post_bank_charges(doc, mapping, bank_gl, posting_date, bank_rate, clearance_date)
 
 
+def _post_bank_payment_entry(doc, mapping, bank_gl: str, posting_date, exchange_rate=None):
+	"""Bank settlement as one Internal Transfer Payment Entry, the bank charges inside it (on the deduction
+	row): outgoing Bank → PDC Payable (paid amount + charges, received amount), incoming Under Collection /
+	PDC Receivable → Bank (paid amount, received amount − charges). Both sides are at the carrying rate (one
+	currency, one rate: ERPNext forces it); the exchange difference of a foreign cheque is left to Exchange
+	Rate Revaluation. Clearance date as for the Journal Entry (see `_post_bank`)."""
+	charges = flt(doc.bank_charges)
+	if charges and not mapping.bank_charges_account:
+		_missing_bank_charges_account(doc)
+	carrying_rate = _carrying_rate(doc)
+	_warn_carrying_rate(doc, exchange_rate, carrying_rate)
+	amount = flt(doc.amount)
+	if doc.direction == OUTGOING:
+		accounts = {
+			"paid_from": bank_gl,
+			"paid_to": mapping.pdc_payable_account,
+			"paid_amount": amount + charges,
+			"received_amount": amount,
+		}
+	else:
+		if doc.accounting_status == UNDER_COLLECTION_POSTED:
+			contra = mapping.under_collection_account
+		else:
+			contra = mapping.pdc_receivable_account
+		accounts = {
+			"paid_from": contra,
+			"paid_to": bank_gl,
+			"paid_amount": amount,
+			"received_amount": amount - charges,
+		}
+
+	clearance_date = doc.bank_transaction_date or doc.actual_clearance_date or posting_date
+	payment_entry = posting.create_internal_transfer(
+		source_doctype=DOCTYPE,
+		source_name=doc.name,
+		event=EVENT_BANK,
+		company=doc.company,
+		posting_date=posting_date,
+		**accounts,
+		exchange_rate=carrying_rate,
+		deduction_account=mapping.bank_charges_account,
+		reference_no=doc.cheque_no,
+		reference_date=doc.effective_due_date,
+		remarks=_voucher_remarks(doc),
+		details=_details(doc),
+		cycle=_cycle(doc),
+		clearance_date=clearance_date,
+	)
+	doc.bank_payment_entry = payment_entry
+	doc.bank_posting_date = getdate(posting_date)
+	voucher = ("Payment Entry", payment_entry)
+	_log(doc, "Bank Posted", accounting=BANK_POSTED, voucher=voucher, event_date=posting_date)
+	if charges > 0:
+		_log(doc, "Bank Charges Posted", voucher=voucher, event_date=posting_date)
+
+
+def _validate_settlement_charges(doc, charges):
+	"""Payment Entry mode: an incoming cheque's charges are taken from its amount on the same entry."""
+	if (
+		_settlement_voucher(doc) == PAYMENT_ENTRY_MODE
+		and doc.direction == INCOMING
+		and flt(charges)
+		and flt(charges) >= flt(doc.amount)
+	):
+		frappe.throw(_("Bank charges must be less than the cheque amount."))
+
+
+def _warn_carrying_rate(doc, exchange_rate, carrying_rate: float):
+	if (
+		flt(exchange_rate)
+		and doc.currency != erpnext.get_company_currency(doc.company)
+		and flt(exchange_rate, 9) != flt(carrying_rate, 9)
+	):
+		frappe.msgprint(
+			_(
+				"In Payment Entry mode the cheque is settled at its carrying rate {0}; the exchange difference is booked by Exchange Rate Revaluation."
+			).format(carrying_rate),
+			title=_("Warning"),
+			indicator="orange",
+		)
+
+
+def _missing_bank_charges_account(doc):
+	frappe.throw(
+		_("Set the Bank Charges Account of Bank Account {0} in Treasury Company Settings.").format(
+			frappe.bold(doc.bank_account)
+		),
+		title=_("Missing Settings"),
+	)
+
+
 def _post_bank_charges(doc, mapping, bank_gl: str, posting_date, bank_rate: float, clearance_date):
 	"""Dr Bank Charges / Cr Bank. `bank_charges` is in the cheque (bank) currency."""
 	if not mapping.bank_charges_account:
-		frappe.throw(
-			_("Set the Bank Charges Account of Bank Account {0} in Treasury Company Settings.").format(
-				frappe.bold(doc.bank_account)
-			),
-			title=_("Missing Settings"),
-		)
+		_missing_bank_charges_account(doc)
 	charges = flt(doc.bank_charges)
 	precision = frappe.get_precision("Journal Entry Account", "debit_in_account_currency")
 	journal = posting.create_journal_entry(
@@ -805,8 +938,10 @@ def _post_bounce_charges(doc, posting_date, charges):
 
 
 def _undo_postings(doc, posting_date, remarks: str | None = None):
-	"""Undo the current cycle's postings, newest first, as `on_bounce` says: cancel them or reverse them by
-	Journal Entries dated `posting_date`. Nothing to do if nothing was posted (edge rule)."""
+	"""Undo the current cycle's postings, newest first, as `on_bounce` says: cancel them, or reverse them
+	dated `posting_date` — an Internal Transfer Payment Entry (no deductions) by a reverse Payment Entry, the
+	party Payment Entry and any Journal Entry by a Journal Entry (`posting.reverse_voucher`: the kind follows
+	each voucher, not the current settings). Nothing to do if nothing was posted (edge rule)."""
 	if doc.accounting_status in (NOT_POSTED, REVERSED):
 		return
 	cancel = _settings(doc).on_bounce == "Cancel Payment Entry"
@@ -826,7 +961,7 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 				event_date=posting_date,
 			)
 			continue
-		reversal = posting.make_reversal(
+		reversal_doctype, reversal = posting.reverse_voucher(
 			voucher.doctype,
 			voucher.name,
 			posting_date,
@@ -835,11 +970,13 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 			cycle=_cycle(doc),
 		)
 		if voucher.treasury_event == EVENT_PARTY:
-			doc.reversal_journal = reversal
+			doc.reversal_journal = reversal  # always a Journal Entry (see posting.can_reverse_by_payment_entry)
+		elif reversal_doctype == "Payment Entry":
+			doc.reversal_payment_entry = reversal
 		_log(
 			doc,
 			"Voucher Reversed",
-			voucher=("Journal Entry", reversal),
+			voucher=(reversal_doctype, reversal),
 			remarks=remarks,
 			event_date=posting_date,
 		)
@@ -909,6 +1046,27 @@ def _settings(doc):
 	return posting.get_company_settings(doc.company)
 
 
+def _settlement_voucher(doc) -> str:
+	"""Voucher of the under-collection stage and the bank settlement (`bank_settlement_voucher`)."""
+	return _settings(doc).bank_settlement_voucher or PAYMENT_ENTRY_MODE
+
+
+def _details(doc) -> dict:
+	"""Accounting details of the cheque's Payment Entries (posting._apply_details): the cheque's own values,
+	else the Mode of Payment / series mapped to its bank and direction, else the company's cost center."""
+	mode = payment_modes.resolve(doc.company, doc.bank_account, payment_modes.CHEQUE_METHOD[doc.direction])
+	return {
+		"mode_of_payment": doc.get("mode_of_payment") or mode.mode_of_payment,
+		"naming_series": mode.naming_series,
+		"cost_center": doc.get("cost_center") or erpnext.get_default_cost_center(doc.company),
+		"project": doc.get("project"),
+		"bank_account": doc.bank_account,
+		"party_bank_account": doc.get("party_bank_account"),
+		"contact_person": doc.get("contact_person"),
+		"dimensions": dimensions.get_dimension_values(doc),
+	}
+
+
 def _party_mode(doc) -> str:
 	settings = _settings(doc)
 	return settings.outgoing_party_posting if doc.direction == OUTGOING else settings.incoming_party_posting
@@ -960,7 +1118,10 @@ def _row(doc, account: str, rate: float, debit=0, credit=0) -> dict:
 
 
 def _voucher_remarks(doc) -> str:
-	return _("Cheque {0} ({1})").format(doc.cheque_no, doc.name)
+	remarks = _("Cheque {0} ({1})").format(doc.cheque_no, doc.name)
+	if doc.get("remarks"):
+		remarks += "\n" + doc.remarks
+	return remarks
 
 
 def _log(doc, event: str, operational=None, accounting=None, voucher=None, remarks=None, event_date=None):
@@ -1034,8 +1195,10 @@ def _make_replacement(doc, values: frappe._dict, date):
 		"cheque_batch",
 		"cheque_batch_row",
 		"security_cheque",
+		*ACCOUNTING_FIELDS,
 	):
 		new.set(fieldname, doc.get(fieldname))
+	dimensions.copy_dimensions(doc, new)
 	new.cheque_no = values.cheque_no
 	if values.cheque_book:
 		new.cheque_book = values.cheque_book

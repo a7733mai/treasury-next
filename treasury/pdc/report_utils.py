@@ -17,6 +17,7 @@ from frappe.query_builder.functions import Sum
 from frappe.utils import flt, getdate, today
 
 from treasury.accounting import posting
+from treasury.utils.party import validate_party_type
 
 DOCTYPE = "PDC Cheque"
 # Translation context of generic words in the reports (e.g. "Party", "Total"), so their Arabic entries in
@@ -87,6 +88,9 @@ CHEQUE_FIELDS = [
 # Voucher links of the current cycle on a cheque.
 VOUCHER_FIELDS = [
 	"party_payment_entry",
+	"under_collection_payment_entry",
+	"bank_payment_entry",
+	"reversal_payment_entry",
 	"under_collection_journal",
 	"bank_journal",
 	"bank_charges_journal",
@@ -170,8 +174,7 @@ def validate_company(company: str | None, doctype: str = DOCTYPE) -> str:
 
 
 def validate_party(party_type: str | None, party: str | None):
-	if party_type not in ("Customer", "Supplier"):
-		frappe.throw(_("Party Type must be one of: {0}.").format(", ".join((_("Customer"), _("Supplier")))))
+	validate_party_type(party_type)  # any Party Type: a cheque may be of an Employee, a Shareholder ...
 	if not party:
 		frappe.throw(_("Party is required."))
 	if not frappe.db.exists(party_type, party):

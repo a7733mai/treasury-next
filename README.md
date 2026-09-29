@@ -102,10 +102,10 @@ linked back through the read-only `treasury_source_doctype` / `treasury_source_n
 |---|---|---|
 | Outgoing party posting (handover date / due date by the daily job / issue date / *Post to Party Now*) | Payment Entry (Pay) | Dr Supplier (or Customer) / Cr PDC Payable, allocated to the cheque's invoices / orders |
 | Incoming party posting (receipt date / due date by the daily job / *Post to Party Now*) | Payment Entry (Receive) | Dr PDC Receivable / Cr Customer (or Supplier), allocated |
-| Incoming deposit (Under Collection *On Deposit*) | Journal Entry | Dr Under Collection / Cr PDC Receivable |
-| Bank posting (clearance date / bank transaction date via *PDC Bank Clearing* / *Post to Bank*) | Journal Entry (clearance date set) | outgoing: Dr PDC Payable / Cr Bank; incoming: Dr Bank / Cr Under Collection (or PDC Receivable) — plus exchange gain / loss for foreign currency |
-| Bank charges at clearance | Journal Entry | Dr Bank Charges / Cr Bank |
-| Bounce after the party posting | Cancel of the Payment Entry, or reversal Journal Entry (per *On Bounce*) | the party owes / is owed again; later postings (under collection) are reversed too |
+| Incoming deposit (Under Collection *On Deposit*) | Payment Entry (Internal Transfer); Journal Entry in *Journal Entry* mode | Dr Under Collection / Cr PDC Receivable |
+| Bank posting (clearance date / bank transaction date via *PDC Bank Clearing* / *Post to Bank*) | Payment Entry (Internal Transfer, clearance date set, bank charges inside it); Journal Entry in *Journal Entry* mode | outgoing: Dr PDC Payable / Cr Bank; incoming: Dr Bank / Cr Under Collection (or PDC Receivable) — in *Journal Entry* mode plus exchange gain / loss for foreign currency |
+| Bank charges at clearance | inside the bank Payment Entry; a separate Journal Entry in *Journal Entry* mode | Dr Bank Charges / Cr Bank |
+| Bounce after the party posting | Cancel of the vouchers, or reversal (per *On Bounce*): an Internal Transfer Payment Entry by a reverse Payment Entry, the party Payment Entry and Journal Entries by a Journal Entry | the party owes / is owed again; later postings (under collection) are reversed too |
 | Bounce charges (incoming) | Journal Entry | Dr Customer / Cr Bounce Charges Account |
 | Clearing before the party posting | party posting first, then the bank posting | |
 | Security cheque (any action) | **none** | only an encashment creates a PDC Cheque, which posts as above |
@@ -113,11 +113,78 @@ linked back through the read-only `treasury_source_doctype` / `treasury_source_n
 A Payment Entry or Journal Entry managed by Treasury cannot be cancelled or deleted from its own form (the
 form links to the cheque / facility document, which undoes it).
 
+#### Payment Entry settlement
+
+*Bank Settlement Voucher* (Treasury Company Settings, section *Vouchers*) chooses the voucher of the
+under-collection stage and of the bank settlement of cheques:
+
+- **Payment Entry** (default): an Internal Transfer Payment Entry per bank event — PDC Receivable → Under
+  Collection at the deposit, Under Collection (or PDC Receivable) → Bank / Bank → PDC Payable at the
+  clearance — so every cheque event has a Payment Entry number to file the paper under. The bank charges
+  are inside the same entry: outgoing, the bank pays amount + charges and PDC Payable receives the amount;
+  incoming, the bank receives the amount − charges (the charges must be less than the cheque amount). They
+  are booked on the deduction row ERPNext keeps for the exchange difference of an Internal Transfer, with
+  its account changed to the Bank Charges Account: ERPNext 16 rejects any other deduction row on an
+  Internal Transfer. A reverse Payment Entry undoes an Internal Transfer on bounce / return / replace; the
+  party Payment Entry is still reversed by a Journal Entry (ERPNext cannot reverse an invoice-allocated
+  Payment Entry by a Payment Entry).
+- **Journal Entry**: the behaviour of version 1.0 (Bank Entry Journal Entries, the charges in a separate
+  Journal Entry).
+
+Switching is safe at any time: vouchers already posted stay as they are, a voucher is always reversed by the
+kind that fits it (a Journal Entry of version 1.0 by a Journal Entry), and the bank Payment Entry takes the
+cheque from whichever account the earlier voucher left it in.
+
+*Foreign currency in Payment Entry mode.* PDC, Under Collection and Bank accounts share the bank's currency,
+and ERPNext books an Internal Transfer between two accounts of one currency at one rate. The settlement is
+therefore at the cheque's carrying rate (its party posting rate); a clearance rate entered on *Clear* is
+ignored with a message, and the realised exchange difference is left to ERPNext's *Exchange Rate
+Revaluation*. Companies that want the difference booked at the clearance keep *Journal Entry* mode.
+
+*Bank reconciliation of outgoing cheques with charges.* The bank Payment Entry credits the bank with the
+amount plus the charges in one line, while a bank statement usually shows the cheque and the charges as two
+lines, so ERPNext's Bank Reconciliation Tool will not match it exactly (match it manually against both
+lines). The *PDC Bank Clearing* tool reconciles the Bank Transaction against the bank Payment Entry (or the
+bank Journal Entry of a Journal Entry mode / 1.0 cheque).
+
+#### Modes of Payment
+
+Treasury Company Settings, section *Modes of Payment*: one row per (company bank account, method — Cheque Out,
+Cheque In, Bank Transfer, Fawran, SWIFT, Internal Transfer, Auto Debit, Bank Charge) with a Mode of Payment
+and an optional Payment Entry naming series (e.g. `PE-RYN-CHQ-.YYYY.-`). Every Payment Entry of a cheque gets
+the mode and series of its bank and direction (a cheque may override the mode); the LC settlement gets the
+*Bank Transfer* row.
+
+- *Generate Modes of Payment* (Treasury Manager / System Manager) creates the missing modes (type *Bank*,
+  the bank's GL account as the company's default account) named by the *Mode Name Template* (`{method}`,
+  `{bank}`, `{account}`; two accounts at the same bank get the account name appended) and fills the
+  missing rows. Existing modes and rows are never changed; a mode that already uses another account for the
+  company is skipped with the reason.
+- A series must be registered on Payment Entry before it is used: *Add Series to Payment Entry* (System
+  Manager, with confirmation) adds the map's series through Document Naming Settings, keeping the current
+  default series first. Posting on a bank whose series is not registered fails with a clear message.
+
+**Accounting details.** PDC Cheque and Cheque Batch have *Accounting Details* (cost center, project, mode of
+payment, party bank account, contact person) and the company's *Accounting Dimensions*; they are defaulted
+on save (company cost center and dimension defaults, the mapped mode, the party's default bank account and
+contact), copied from a batch to its cheques and to a replacement cheque, carried to every voucher and
+locked once the cheque is posted.
+
+#### Open party / New Payee
+
+A PDC Cheque or Cheque Batch may be of any ERPNext *Party Type* — Customer, Supplier, Employee, Shareholder
+... The party account comes from ERPNext (the party's account, else the company default for the Party
+Type's account type). Invoices and orders can be allocated only by an outgoing cheque to a Supplier / an
+incoming cheque from a Customer; any cheque may settle a Journal Entry. *New Payee* creates a Supplier from a
+name alone in the *Payee Supplier Group* of Treasury Settings (default *Treasury Payees*, created on
+install), or selects the existing enabled Supplier of that name. A security cheque of any party can be
+encashed (not one of an *Other* party).
+
 ### Modules
 
 #### PDC Cheques
 
-- **PDC Cheque** (PDC-OUT- / PDC-IN-): direction, party (Customer / Supplier), bank account, cheque book
+- **PDC Cheque** (PDC-OUT- / PDC-IN-): direction, party (any Party Type), bank account, cheque book
   (outgoing: the next free leaf is allocated when the Cheque No is left empty), cheque no, drawer bank,
   amount, currency (always the bank account's; company currency while an incoming cheque has no bank),
   exchange rate, references to invoices / orders (the allocation becomes final at the party posting; what
@@ -446,16 +513,15 @@ set up, by email, listing only the documents each recipient may read.
 ### Known limitations and follow-ups
 
 - **PDC**: *Endorsed* is a status the reports understand, but there is no endorsement action yet
-  (endorsing a received cheque to a supplier). A payee without a party (e.g. rent booked straight to an
-  expense account) is not supported: a PDC Cheque requires a Customer / Supplier. No list-view bulk
+  (endorsing a received cheque to a supplier). No list-view bulk
   actions (bulk deposit / clear): use *PDC Bank Clearing* or the Cheque Batch actions. No approval workflow
   for postponement / cancellation beyond the role checks. No warning when an outgoing cheque would make the
   projected balance negative. No customer / supplier portal.
 - **Cheque Batch**: party cheques only; one reference per row; FIFO needs the party account in the cheque
   currency; at most 120 cheques per batch; the batch link on a cheque is set only by the batch.
 - **Security Cheques**: encashing against a claim or penalty income account by Journal Entry is not
-  implemented (an encashment settles the party's invoices or stays an advance); encashment for Employee /
-  Other parties, alerts before the end of the linked contract, an approval workflow for Open / Blank
+  implemented (an encashment settles the party's invoices or stays an advance); encashment for Other
+  parties, alerts before the end of the linked contract, an approval workflow for Open / Blank
   cheques and memo (off-balance-sheet) accounts are follow-ups.
 - **Bank Facilities**: a variable rate is informational only (nothing is repriced when the reference rate
   moves); a prepayment reduces the installment, never the tenor, and a Murabaha profit is not recomputed;
@@ -478,6 +544,14 @@ set up, by email, listing only the documents each recipient may read.
   custom fields on Payment Entry / Journal Entry, and leaves the Treasury roles. As usual in Frappe, the
   database columns of deleted custom fields (`treasury_*` on `tabPayment Entry` / `tabJournal Entry`) are
   kept (empty) to protect data; they are reused if the app is installed again.
+
+#### Uninstall: what is kept
+
+Besides the roles, uninstalling keeps on purpose what has become the company's own data: the Modes of
+Payment created by *Generate Modes of Payment*, the Payment Entry naming series added by *Add Series to
+Payment Entry* (Property Setters of Payment Entry; the uninstall prints the list, remove them in Document
+Naming Settings if not needed) and the *Treasury Payees* Supplier Group with its suppliers. The accounting
+dimension fields ERPNext added to PDC Cheque / Cheque Batch are removed with those doctypes.
 
 ### Testing
 

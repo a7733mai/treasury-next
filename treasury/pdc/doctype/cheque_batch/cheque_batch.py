@@ -32,6 +32,8 @@ class ChequeBatch(Document):
 		cheques: DF.Table[ChequeBatchItem]
 		cheques_html: DF.HTML | None
 		company: DF.Link
+		contact_person: DF.Link | None
+		cost_center: DF.Link | None
 		currency: DF.Link | None
 		direction: DF.Literal["Outgoing", "Incoming"]
 		gen_amount: DF.Currency
@@ -48,11 +50,15 @@ class ChequeBatch(Document):
 		gen_total: DF.Currency
 		handover_date: DF.Date | None
 		issue_date: DF.Date
+		mode_of_payment: DF.Link | None
 		naming_series: DF.Literal["CHQB-OUT-.YYYY.-.####", "CHQB-IN-.YYYY.-.####"]
 		party: DF.DynamicLink
+		party_bank_account: DF.Link | None
 		party_name: DF.Data | None
 		party_type: DF.Link
+		payment_entries_html: DF.HTML | None
 		posting_mode: DF.Literal["", "On Handover", "On Receipt", "On Cheque Date", "On Creation", "Manual"]
+		project: DF.Link | None
 		purpose: DF.Literal["", "Rent", "Installments", "Supplier Settlement", "Customer Settlement", "Other"]
 		remarks: DF.SmallText | None
 		status: DF.Literal[
