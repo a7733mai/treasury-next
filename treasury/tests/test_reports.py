@@ -48,6 +48,7 @@ from treasury.tests.utils import (
 	make_cheque_book,
 	make_pdc_cheque,
 	make_purchase_invoice,
+	make_sales_invoice,
 	mapping_row,
 )
 
@@ -204,7 +205,7 @@ class ReportTestCase(TreasuryTestMixin, IntegrationTestCase):
 
 class TestBankPositionForecast(ReportTestCase):
 	def make_scenario(self) -> frappe._dict:
-		"""Opening 100,000; outgoing / incoming cheques at several due dates (see the expected rows below)."""
+		"""Opening 100,000; outgoing / incoming cheques at several due dates (expected rows below)."""
 		bank = make_bank()
 		fund_bank(bank, 100000, day(-30))
 		cheques = frappe._dict(
@@ -287,9 +288,8 @@ class TestBankPositionForecast(ReportTestCase):
 		# the postponed cheque appears only on its new date
 		postponed = [r for r in details if r.reference_name == bank.cheques.o2.name]
 		self.assertEqual([(r.parent_row_id, r.due_date) for r in postponed], [("p2", day(17))])
-		self.assertEqual(
-			[r.reference_name for r in details if r.parent_row_id == "overdue"], [bank.cheques.i2_overdue.name]
-		)
+		overdue = [r.reference_name for r in details if r.parent_row_id == "overdue"]
+		self.assertEqual(overdue, [bank.cheques.i2_overdue.name])
 
 	def test_include_created_and_overdue_toggles(self):
 		bank = self.make_scenario()
@@ -338,7 +338,11 @@ class TestBankPositionForecast(ReportTestCase):
 
 		# bank currency view: one currency only
 		self.assertRaises(
-			frappe.ValidationError, self.run_report, banks, to_date=add_days(T, 6), currency_view="Bank Currency"
+			frappe.ValidationError,
+			self.run_report,
+			banks,
+			to_date=add_days(T, 6),
+			currency_view="Bank Currency",
 		)
 		report, _c, data, _ch, _s = self.run_report(
 			usd, to_date=add_days(T, 6), currency_view="Bank Currency"
@@ -348,20 +352,125 @@ class TestBankPositionForecast(ReportTestCase):
 
 	def test_forecast_source_hook(self):
 		bank = self.make_scenario()
-		with self.patch_hooks({"treasury_forecast_sources": ["treasury.tests.test_reports.fake_forecast_source"]}):
+		hooks = {"treasury_forecast_sources": ["treasury.tests.test_reports.fake_forecast_source"]}
+		with self.patch_hooks(hooks):
 			_r, _c, data, _ch, _s = self.run_report(bank, show_details=1)
 		rows = period_rows(data)
 		self.assertEqual(rows[1].expected_out, 10000 + 1234)
 		self.assertIn("FACILITY-1", {r.reference_name for r in data if r.get("indent")})
 
+	def test_manual_bank_posting_cleared_not_posted(self):
+		"""Cleared but not bank posted (Manual): expected on the bank's date (early clearance -> Overdue row),
+		never on the due date; once bank posted it is only in the actual GL, never in both."""
+		self.use_company_settings(outgoing_bank_posting="Manual", incoming_bank_posting="Manual")
+		bank = make_bank()
+		fund_bank(bank, 100000, day(-30))
+		out1 = outgoing(bank, 10000, 20)
+		out1.clear(clearance_date=day(-3))  # cleared 23 days before its due date
+		inc1 = incoming(bank, 5000, 10)
+		inc1.deposit(deposit_date=day(-5))
+		inc1.clear(clearance_date=day(-3), bank_transaction_date=day(-2))
+		for cheque in (out1, inc1):
+			statuses = frappe.db.get_value(
+				"PDC Cheque", cheque.name, ["operational_status", "accounting_status"], as_dict=True
+			)
+			self.assertEqual(statuses.operational_status, "Cleared")
+			self.assertNotEqual(statuses.accounting_status, "Bank Posted")
+
+		report, _c, data, _ch, _s = self.run_report(bank, show_details=1)
+		rows = period_rows(data)
+		self.assertEqual([r.row_id for r in rows], ["overdue", "p0", "p1", "p2", "p3"])
+		self.assertEqual(
+			self.figures(rows),
+			[
+				(100000, 0, 0, 5000, 10000, -5000, 95000),
+				(95000, 0, 0, 0, 0, 0, 95000),
+				(95000, 0, 0, 0, 0, 0, 95000),
+				(95000, 0, 0, 0, 0, 0, 95000),  # out1's due date (day 20): nothing
+				(95000, 0, 0, 0, 0, 0, 95000),
+			],
+		)
+		details = {(r.reference_name, r.due_date) for r in data if r.get("indent")}
+		self.assertEqual(details, {(out1.name, day(-3)), (inc1.name, day(-2))})
+		self.assertEqual(report.summary_values.current_balance, 100000)
+
+		# the PDC Register drill-down dates them the same way
+		register = {"company": COMPANY, "bank_account": bank.bank_account, "expected_only": 1}
+		window = {"from_date": day(-7), "to_date": day(-1)}
+		_columns, data = pdc_register({**register, "date_based_on": "Forecast Date", **window})
+		self.assertEqual({r.cheque for r in data if r.get("cheque")}, {out1.name, inc1.name})
+		_columns, data = pdc_register({**register, "date_based_on": "Effective Due Date", **window})
+		self.assertFalse([r for r in data if r.get("cheque")])
+
+		out1.post_bank()
+		inc1.post_bank()
+		_r, _c, data, _ch, _s = self.run_report(bank, show_details=1)
+		rows = period_rows(data)
+		self.assertEqual([r.row_id for r in rows], ["p0", "p1", "p2", "p3"])
+		self.assertEqual(self.figures(rows)[0], (95000, 0, 0, 0, 0, 0, 95000))  # opening from GL only
+		self.assertFalse([r for r in data if r.get("indent")])
+
+	def test_under_collection_stays_expected(self):
+		"""On Deposit: the Under Collection JE does not touch the bank GL; the cheque stays expected."""
+		bank = make_bank()
+		fund_bank(bank, 30000, day(-30))
+		cheque = incoming(bank, 6000, 4)
+		cheque.deposit(deposit_date=day(-2))
+		self.assertEqual(
+			frappe.db.get_value("PDC Cheque", cheque.name, "accounting_status"), "Under Collection Posted"
+		)
+
+		report, _c, data, _ch, _s = self.run_report(bank, to_date=add_days(T, 6))
+		self.assertEqual(self.figures(period_rows(data)), [(30000, 0, 0, 6000, 0, 6000, 36000)])
+		self.assertEqual(report.summary_values.current_balance, 30000)
+
+	def test_future_from_date_brought_forward(self):
+		"""From Date after today: flows from today to the day before From Date are brought forward."""
+		bank = make_bank()
+		fund_bank(bank, 50000, day(-30))
+		outgoing(bank, 2000, -2)  # overdue
+		brought_forward = outgoing(bank, 10000, 3)  # between today and From Date
+		incoming(bank, 4000, 9)  # in the first period
+
+		filters = {"from_date": add_days(T, 7), "to_date": add_days(T, 20), "show_details": 1}
+		report, _c, data, _ch, _s = self.run_report(bank, **filters)
+		rows = period_rows(data)
+		self.assertEqual([r.row_id for r in rows], ["overdue", "brought_forward", "p0", "p1"])
+		self.assertEqual(
+			self.figures(rows),
+			[
+				(50000, 0, 0, 0, 2000, -2000, 48000),
+				(48000, 0, 0, 0, 10000, -10000, 38000),
+				(38000, 0, 0, 4000, 0, 4000, 42000),
+				(42000, 0, 0, 0, 0, 0, 42000),
+			],
+		)
+		self.assertEqual((rows[1].period_start, rows[1].period_end), (T, getdate(add_days(T, 6))))
+		self.assertEqual(
+			[r.reference_name for r in data if r.get("parent_row_id") == "brought_forward"],
+			[brought_forward.name],
+		)
+		values = report.summary_values
+		self.assertEqual((values.lowest_balance, values.lowest_date), (38000, getdate(add_days(T, 6))))
+		self.assertEqual(values.closing, 42000)
+
+		_r, _c, data, _ch, _s = self.run_report(bank, **filters, include_overdue=0)
+		rows = period_rows(data)
+		self.assertEqual([r.row_id for r in rows], ["brought_forward", "p0", "p1"])
+		self.assertEqual([r.closing for r in rows], [40000, 44000, 44000])
+
 	def test_horizon_weeks_and_default_filters(self):
 		bank = make_bank()
-		report = BankPositionForecast({"company": COMPANY, "bank_account": [bank.bank_account], "horizon_weeks": 12})
+		report = BankPositionForecast(
+			{"company": COMPANY, "bank_account": [bank.bank_account], "horizon_weeks": 12}
+		)
 		self.assertEqual(report.to_date, getdate(add_days(T, 83)))
 		# defaults: today .. today + 90, weekly, company currency, every bank
 		columns, data, _m, chart, summary = bank_position({"company": COMPANY})
 		self.assertTrue(columns and data and chart and summary)
-		self.assertRaises(frappe.ValidationError, bank_position, {"company": COMPANY, "periodicity": "Hourly"})
+		self.assertRaises(
+			frappe.ValidationError, bank_position, {"company": COMPANY, "periodicity": "Hourly"}
+		)
 
 
 # ---------------------------------------------------------------------------
@@ -408,8 +517,9 @@ class TestProjectedPartyStatement(ReportTestCase):
 			[(pi.name, 0, 10000, -10000)],
 		)
 		self.assertEqual(self.rows(data, "actual_closing")[0].balance, -10000)
+		projected = self.rows(data, "projected")
 		self.assertEqual(
-			[(r.voucher_no, r.posting_date, r.debit, r.projected_balance) for r in self.rows(data, "projected")],
+			[(r.voucher_no, r.posting_date, r.debit, r.projected_balance) for r in projected],
 			[(overdue.name, day(-2), 3000, -7000), (later.name, day(20), 4000, -3000)],
 		)
 		self.assertEqual(self.rows(data, "projected_closing")[0].projected_balance, -3000)
@@ -439,8 +549,9 @@ class TestProjectedPartyStatement(ReportTestCase):
 		report, data, _summary = self.run_report(supplier)
 		cleared_pe = frappe.db.get_value("PDC Cheque", cleared.name, "party_payment_entry")
 		posted_pe = frappe.db.get_value("PDC Cheque", posted.name, "party_payment_entry")
+		actual = self.rows(data, "actual")
 		self.assertEqual(
-			[(r.posting_date, r.voucher_no, r.debit, r.credit, r.balance) for r in self.rows(data, "actual")],
+			[(r.posting_date, r.voucher_no, r.debit, r.credit, r.balance) for r in actual],
 			[
 				(day(-60), pi.name, 0, 10000, -10000),
 				(day(-40), cleared_pe, 2500, 0, -7500),
@@ -457,6 +568,51 @@ class TestProjectedPartyStatement(ReportTestCase):
 		self.assertEqual(values.balance_before_uncleared, -7500)
 		self.assertEqual(values.net_after_cheques, -3500)
 
+	def test_customer_incoming_cheques(self):
+		"""Customer side: incoming cheques credit the balance. One Deposited (Under Collection Posted: in the
+		actual balance, posted not cleared), two Received in On Cheque Date mode (not posted), one of them due
+		after To Date: left out of the projected rows but counted in the exposure summary."""
+		customer = make_customer()
+		invoice = make_sales_invoice(20000, posting_date=day(-60), customer=customer)
+		deposited = make_pdc_cheque(
+			"Incoming", amount=5000, party=customer, issue_date=day(-30), due_date=day(10)
+		)
+		deposited.receive(receipt_date=day(-10))  # On Receipt: party posted
+		deposited.deposit(deposit_date=day(-5))  # On Deposit: under collection posted
+		self.assertEqual(
+			frappe.db.get_value("PDC Cheque", deposited.name, "accounting_status"), "Under Collection Posted"
+		)
+		self.use_company_settings(incoming_party_posting="On Cheque Date")
+		due_in_range = make_pdc_cheque(
+			"Incoming", amount=3000, party=customer, issue_date=day(-30), due_date=day(20)
+		)
+		due_later = make_pdc_cheque(
+			"Incoming", amount=1000, party=customer, issue_date=day(-30), due_date=day(90)
+		)
+		for cheque in (due_in_range, due_later):
+			cheque.receive(receipt_date=day(-8))
+
+		report, data, _summary = self.run_report(customer, party_type="Customer")
+		payment_entry = frappe.db.get_value("PDC Cheque", deposited.name, "party_payment_entry")
+		actual = self.rows(data, "actual")
+		self.assertEqual(
+			[(r.posting_date, r.voucher_no, r.debit, r.credit, r.balance) for r in actual],
+			[(day(-60), invoice.name, 20000, 0, 20000), (day(-10), payment_entry, 0, 5000, 15000)],
+		)
+		projected = self.rows(data, "projected")
+		self.assertEqual(
+			[(r.voucher_no, r.posting_date, r.debit, r.credit, r.projected_balance) for r in projected],
+			[(due_in_range.name, day(20), 0, 3000, 12000)],
+		)
+		self.assertEqual(self.rows(data, "projected_closing")[0].projected_balance, 12000)
+
+		values = report.summary_values
+		self.assertEqual(values.actual_balance, 15000)
+		self.assertEqual(values.unposted_cheques, -4000)  # both received cheques, whatever their due date
+		self.assertEqual(values.posted_not_cleared, -5000)  # the deposited cheque
+		self.assertEqual(values.balance_before_uncleared, 20000)
+		self.assertEqual(values.net_after_cheques, 11000)
+
 	def test_opening_balance_and_validation(self):
 		supplier = make_supplier()
 		make_purchase_invoice(600, posting_date=day(-120), supplier=supplier)
@@ -469,7 +625,9 @@ class TestProjectedPartyStatement(ReportTestCase):
 		)
 		self.assertTrue(columns and data)
 		self.assertRaises(
-			frappe.ValidationError, projected_party_statement, {"company": COMPANY, "party_type": "Supplier"}
+			frappe.ValidationError,
+			projected_party_statement,
+			{"company": COMPANY, "party_type": "Supplier"},
 		)
 		self.assertRaises(
 			frappe.ValidationError,
@@ -503,7 +661,9 @@ class TestPDCRegister(ReportTestCase):
 	def test_filters(self):
 		bank = self.make_cheques()
 		_columns, data, cheques = self.run_report(bank)
-		self.assertEqual({r.cheque for r in cheques}, {bank.r1.name, bank.r2.name, bank.r3.name, bank.r4.name})
+		self.assertEqual(
+			{r.cheque for r in cheques}, {bank.r1.name, bank.r2.name, bank.r3.name, bank.r4.name}
+		)
 		total = data[-1]
 		self.assertEqual((total.is_total, total.cheque_count, total.base_amount), (1, 4, 10000))
 
@@ -522,7 +682,9 @@ class TestPDCRegister(ReportTestCase):
 		window = {"from_date": day(10), "to_date": day(20)}
 		self.assertEqual(names(date_based_on="Original Due Date", **window), [bank.r2.name])
 		self.assertEqual(names(date_based_on="Effective Due Date", **window), [])
-		self.assertEqual(names(date_based_on="Issue Date", from_date=day(-10), to_date=day(-10)), [bank.r3.name])
+		self.assertEqual(
+			names(date_based_on="Issue Date", from_date=day(-10), to_date=day(-10)), [bank.r3.name]
+		)
 		# the Bank Position Forecast drill-down
 		self.assertEqual(set(names(direction="Outgoing", expected_only=1)), {bank.r1.name, bank.r2.name})
 		self.assertEqual(
@@ -538,7 +700,8 @@ class TestPDCRegister(ReportTestCase):
 		self.assertEqual((r2.original_due_date, r2.effective_due_date), (day(15), day(25)))
 		self.assertEqual((r2.days_to_due, r2.postponement_count), (25, 1))
 		self.assertEqual(rows[bank.r3.name].days_to_due, -3)  # overdue
-		self.assertIn(frappe.db.get_value("PDC Cheque", bank.r1.name, "party_payment_entry"), rows[bank.r1.name].vouchers)
+		r1_payment = frappe.db.get_value("PDC Cheque", bank.r1.name, "party_payment_entry")
+		self.assertIn(r1_payment, rows[bank.r1.name].vouchers)
 		self.assertEqual(rows[bank.r4.name].base_amount, 4000)
 
 	def test_group_by(self):
@@ -571,8 +734,11 @@ class TestPDCMaturity(ReportTestCase):
 	def test_bucket_boundaries(self):
 		bank = make_bank()
 		# (days from As On to the effective due date, amount)
-		for offset, amount in ((-1, 100), (0, 200), (7, 400), (8, 800), (30, 1600), (31, 3200), (61, 6400), (91, 12800)):
-			make_pdc_cheque(amount=amount, bank_account=bank.bank_account, issue_date=day(-10), due_date=day(offset))
+		offsets = ((-1, 100), (0, 200), (7, 400), (8, 800), (30, 1600), (31, 3200), (61, 6400), (91, 12800))
+		for offset, amount in offsets:
+			make_pdc_cheque(
+				amount=amount, bank_account=bank.bank_account, issue_date=day(-10), due_date=day(offset)
+			)
 		# not open: bank posted
 		outgoing(bank, 99999, -5).clear(clearance_date=day(-5))
 
@@ -593,7 +759,12 @@ class TestPDCMaturity(ReportTestCase):
 
 		# one day later: 0 days -> overdue, 8 -> 7 (0-7), 31 -> 30 (8-30), 61 -> 60, 91 -> 90
 		_c, data, _m, _ch = pdc_maturity(
-			{"company": COMPANY, "direction": "Outgoing", "bank_account": bank.bank_account, "as_on": day(1)}
+			{
+				"company": COMPANY,
+				"direction": "Outgoing",
+				"bank_account": bank.bank_account,
+				"as_on": day(1),
+			}
 		)
 		row = data[0]
 		self.assertEqual(
@@ -627,11 +798,15 @@ class TestBouncedAndPostponed(ReportTestCase):
 	def test_bounced_view(self):
 		self.use_company_settings(bounce_charges_account=self.data.egp.bank_charges)
 		customer = make_customer()
-		first = make_pdc_cheque("Incoming", amount=5000, party=customer, issue_date=day(-50), due_date=day(-20))
+		first = make_pdc_cheque(
+			"Incoming", amount=5000, party=customer, issue_date=day(-50), due_date=day(-20)
+		)
 		first.receive(receipt_date=day(-40))
 		first.bounce(bounce_date=day(-15), reason="Insufficient funds", charges=50)
 		first.represent(represent_date=day(-12))
-		second = make_pdc_cheque("Incoming", amount=2000, party=customer, issue_date=day(-50), due_date=day(-6))
+		second = make_pdc_cheque(
+			"Incoming", amount=2000, party=customer, issue_date=day(-50), due_date=day(-6)
+		)
 		second.receive(receipt_date=day(-40))
 		second.bounce(bounce_date=day(-5), reason="Signature mismatch")
 
@@ -647,13 +822,49 @@ class TestBouncedAndPostponed(ReportTestCase):
 		_columns, rows = bounced_and_postponed({**filters, "from_date": day(-10), "to_date": T})
 		self.assertEqual([r.cheque for r in rows], [second.name])
 
+	def test_bounce_without_dated_voucher(self):
+		"""A cheque bounced while Not Posted has no voucher: the report uses the bounce date the user entered
+		(status log `event_date`), not the moment the bounce was recorded."""
+		self.use_company_settings(outgoing_party_posting="On Cheque Date")
+		supplier = make_supplier()
+		cheque = make_pdc_cheque(amount=1500, party=supplier, issue_date=day(-40), due_date=day(-5))
+		cheque.deliver(handover_date=day(-30))
+		self.assertEqual(frappe.db.get_value("PDC Cheque", cheque.name, "accounting_status"), "Not Posted")
+		cheque.bounce(bounce_date=day(-15), reason="Stopped by drawer")
+		self.assertEqual(
+			frappe.get_all(
+				"PDC Status Log",
+				filters={"parent": cheque.name, "event": "Bounced"},
+				pluck="event_date",
+			),
+			[day(-15)],
+		)
+
+		filters = {"company": COMPANY, "view": "Bounced", "party_type": "Supplier", "party": supplier}
+		_columns, rows = bounced_and_postponed({**filters, "from_date": day(-20), "to_date": day(-10)})
+		self.assertEqual(
+			[(r.cheque, r.bounce_date, r.reason, r.charges, r.represented) for r in rows],
+			[(cheque.name, day(-15), "Stopped by drawer", 0, 0)],
+		)
+		_columns, rows = bounced_and_postponed({**filters, "from_date": day(-9), "to_date": T})
+		self.assertEqual(rows, [])
+		# the direction filter applies to the bounced cheques
+		_columns, rows = bounced_and_postponed(
+			{**filters, "direction": "Incoming", "from_date": day(-20), "to_date": day(-10)}
+		)
+		self.assertEqual(rows, [])
+
 	def test_postponed_view(self):
 		customer = make_customer()
-		first = make_pdc_cheque("Incoming", amount=1000, party=customer, issue_date=day(-20), due_date=day(10))
+		first = make_pdc_cheque(
+			"Incoming", amount=1000, party=customer, issue_date=day(-20), due_date=day(10)
+		)
 		first.receive(receipt_date=day(-19))
 		first.postpone(new_due_date=day(20), reason="Customer request", contact_person="Mr X")
 		first.postpone(new_due_date=day(30), reason="Customer request again")
-		second = make_pdc_cheque("Incoming", amount=2000, party=customer, issue_date=day(-20), due_date=day(12))
+		second = make_pdc_cheque(
+			"Incoming", amount=2000, party=customer, issue_date=day(-20), due_date=day(12)
+		)
 		second.receive(receipt_date=day(-19))
 		second.postpone(new_due_date=day(15), reason="Holiday")
 
@@ -684,7 +895,9 @@ class TestBouncedAndPostponed(ReportTestCase):
 		for view in ("Bounced", "Postponed"):
 			columns, _rows = bounced_and_postponed({"company": COMPANY, "view": view})
 			self.assertTrue(columns)
-		self.assertRaises(frappe.ValidationError, bounced_and_postponed, {"company": COMPANY, "view": "Lost"})
+		self.assertRaises(
+			frappe.ValidationError, bounced_and_postponed, {"company": COMPANY, "view": "Lost"}
+		)
 
 
 # ---------------------------------------------------------------------------
@@ -722,7 +935,9 @@ class TestChequeBookUsage(ReportTestCase):
 			{"company": COMPANY, "bank_account": bank.bank_account, "status": "Closed"}
 		)
 		self.assertEqual(data, [])
-		self.assertRaises(frappe.ValidationError, cheque_book_usage, {"company": COMPANY, "status": "Lost"})
+		self.assertRaises(
+			frappe.ValidationError, cheque_book_usage, {"company": COMPANY, "status": "Lost"}
+		)
 
 	def test_default_filters(self):
 		columns, _data = cheque_book_usage({"company": COMPANY})
@@ -758,6 +973,18 @@ class TestDashboardCards(ReportTestCase):
 
 		self.assertRaises(frappe.ValidationError, total, "Sideways", "outstanding")
 		self.assertRaises(frappe.ValidationError, total, "Outgoing", "forever")
+
+	def test_cheque_total_without_default_company(self):
+		"""No Company filter and no default company: the sum cards show 0 instead of failing."""
+		filters = {"direction": "Outgoing", "scope": "outstanding"}
+		user = ensure_user("treasury-rpt-no-default@example.com", ["Treasury User"])
+		with patch("erpnext.get_default_company", return_value=None):
+			self.assertEqual(dashboard.get_cheque_total(filters)["value"], 0)
+			with self.set_user(user):
+				self.assertEqual(dashboard.get_cheque_total(filters)["value"], 0)
+			self.assertRaises(
+				frappe.ValidationError, dashboard.get_cheque_total, {**filters, "scope": "forever"}
+			)
 
 	def test_standard_records_exist(self):
 		for doctype, names in (
@@ -809,6 +1036,7 @@ class TestReportPermissions(ReportTestCase):
 
 	def reports(self, supplier):
 		company = {"company": COMPANY}
+		card_filters = {**company, "direction": "Outgoing", "scope": "outstanding"}
 		return (
 			(bank_position, company),
 			(pdc_register, company),
@@ -816,7 +1044,7 @@ class TestReportPermissions(ReportTestCase):
 			(bounced_and_postponed, company),
 			(cheque_book_usage, company),
 			(projected_party_statement, {**company, "party_type": "Supplier", "party": supplier}),
-			(dashboard.get_cheque_total, {"filters": {**company, "direction": "Outgoing", "scope": "outstanding"}}),
+			(dashboard.get_cheque_total, {"filters": card_filters}),
 		)
 
 	def test_forbidden_company(self):
@@ -835,6 +1063,22 @@ class TestReportPermissions(ReportTestCase):
 		with self.set_user(ALLOWED_USER):
 			_columns, data = pdc_register({"company": COMPANY, "bank_account": bank.bank_account})
 			self.assertEqual([r.cheque for r in data if r.get("cheque")], [cheque.name])
+
+	def test_bank_account_user_permission(self):
+		"""A user restricted to one Bank Account (for PDC Cheque) sees only its GL position."""
+		allowed, other = make_bank(), make_bank()
+		user = ensure_user("treasury-rpt-one-bank@example.com", ["Treasury User"])
+		add_user_permission(user, "Bank Account", allowed.bank_account, applicable_for="PDC Cheque")
+		with self.set_user(user):
+			report = BankPositionForecast({"company": COMPANY})
+			banks = [b.name for b in report.banks]
+			self.assertIn(allowed.bank_account, banks)
+			self.assertNotIn(other.bank_account, banks)
+			self.assertRaises(
+				frappe.PermissionError,
+				BankPositionForecast,
+				{"company": COMPANY, "bank_account": [other.bank_account]},
+			)
 
 	def test_user_without_access(self):
 		user = ensure_user("treasury-rpt-noperm@example.com", [])

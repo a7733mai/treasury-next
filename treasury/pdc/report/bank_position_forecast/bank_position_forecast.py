@@ -5,18 +5,25 @@
 
 Opening = the actual GL balance of the selected banks' GL accounts on the day before From Date. The bank GL
 moves only on the bank posting of a cheque, so the GL is the actual position and every cheque whose bank
-posting is still to come is an expected flow on its effective (possibly postponed) due date:
+posting is still to come is an expected flow (see `report_utils.forecast_date` for its date):
 
-- incoming: Received / Deposited, and Cleared but not bank posted yet (bank posting mode Manual);
-- outgoing: Delivered (plus Created with "Include Created"), and Cleared but not bank posted yet.
+- incoming: Received / Deposited on the effective (possibly postponed) due date;
+- outgoing: Delivered (plus Created with "Include Created") on the effective due date;
+- both: Cleared but not bank posted yet (bank posting mode Manual) on the date the bank moved the money
+  (bank transaction date, else actual clearance date), which may be well before the due date.
 
 Actual movements are the GL movements of the bank accounts within the range, so past periods are exact and
 a bank posting dated in the future (future clearance dates allowed) is shown where it is booked.
 
 Expected flows dated before today are overdue: with "Include Overdue" they are shown in an "Overdue" row
 counted as expected today (placed just before the period containing today, i.e. first when From Date is
-today); otherwise they are left out. Other modules add flows through `treasury_forecast_sources`
+today or later); otherwise they are left out. When From Date is after today, the flows expected from today
+to the day before From Date are not in the (GL) opening either: they are shown in a "Brought Forward" row
+before the first period. Other modules add flows through `treasury_forecast_sources`
 (treasury.pdc.forecast_sources).
+
+With no Bank Account selected, every cheque of the company is counted (cheques without a bank account under
+"Unassigned Bank"), while the opening / actual columns cover the company bank accounts with a GL account.
 
 `horizon_weeks` (not shown in the filter bar) replaces To Date by From Date + that many weeks; the
 "Expected Cash Flow" dashboard chart uses it for its 12-week horizon.
@@ -38,6 +45,7 @@ from treasury.pdc.report_utils import (
 	AmountConverter,
 	as_list,
 	expected_statuses,
+	forecast_date,
 	get_bank_accounts,
 	get_cheques,
 	get_gl_balance,
@@ -107,7 +115,7 @@ class BankPositionForecast:
 	def get_view_currency(self) -> str:
 		if not self.bank_view:
 			return self.converter.company_currency
-		currencies = sorted({b.currency for b in self.banks})
+		currencies = sorted({b.currency for b in self.banks if b.currency})
 		if len(currencies) > 1:
 			frappe.throw(
 				_(
@@ -121,9 +129,10 @@ class BankPositionForecast:
 	def run(self):
 		self.periods = build_periods(self.from_date, self.to_date, self.periodicity)
 		self.overdue_index = self.get_overdue_index()
-		overdue, by_period = self.assign_flows(self.get_cheque_flows() + self.get_hook_flows())
+		flows = self.get_cheque_flows() + self.get_hook_flows()
+		overdue, brought_forward, by_period = self.assign_flows(flows)
 		actual = self.get_actual_by_period()
-		summary_rows, data = self.build_rows(overdue, by_period, actual)
+		summary_rows, data = self.build_rows(overdue, brought_forward, by_period, actual)
 		return self.get_columns(), data, None, self.get_chart(summary_rows), self.get_summary(summary_rows)
 
 	def get_overdue_index(self) -> int | None:
@@ -140,31 +149,48 @@ class BankPositionForecast:
 	# ------------------------------------------------------------------ flows
 
 	def accepts_bank(self, bank_account: str | None) -> bool:
-		"""Flows of the selected banks; flows without a bank only when no bank is selected."""
-		if bank_account:
+		"""Flows of the selected banks; every flow (with or without a bank) when no bank is selected."""
+		if self.selected_banks:
 			return bank_account in self.bank_names
-		return not self.selected_banks
+		return True
+
+	def get_expected_cheques(self, direction: str) -> list[frappe._dict]:
+		"""Cheques of `direction` whose bank posting is still to come and may fall in the report.
+
+		Not cleared ones are bounded by their effective due date (no lower bound when overdue ones count;
+		else from today, which also covers the Brought Forward flows). Cleared-not-bank-posted ones (Manual
+		mode, a short list) are dated by the bank's date, so they are filtered by `forecast_date` later."""
+		base = {
+			"company": self.company,
+			"direction": direction,
+			"accounting_status": ["!=", BANK_POSTED],
+		}
+		if self.selected_banks:
+			base["bank_account"] = ["in", sorted(self.bank_names)]
+		open_statuses = [s for s in expected_statuses(direction, self.include_created) if s != "Cleared"]
+		if self.include_overdue:
+			due_filter = ["<=", self.to_date]
+		else:
+			due_filter = ["between", [self.today, self.to_date]]
+		return get_cheques(
+			{**base, "operational_status": ["in", open_statuses], "effective_due_date": due_filter}
+		) + get_cheques({**base, "operational_status": "Cleared"})
 
 	def get_cheque_flows(self) -> list[frappe._dict]:
 		flows = []
 		for direction in (OUTGOING, INCOMING):
-			for row in get_cheques(
-				{
-					"company": self.company,
-					"direction": direction,
-					"operational_status": ["in", expected_statuses(direction, self.include_created)],
-					"accounting_status": ["!=", BANK_POSTED],
-					"effective_due_date": ["<=", self.to_date],
-				}
-			):
+			for row in self.get_expected_cheques(direction):
 				if not self.accepts_bank(row.bank_account):
 					continue
 				if self.bank_view and row.currency != self.currency:
 					continue
-				amount = flt(row.amount, self.precision) if self.bank_view else self.converter.company_amount(row)
+				if self.bank_view:
+					amount = flt(row.amount, self.precision)
+				else:
+					amount = self.converter.company_amount(row)
 				flows.append(
 					frappe._dict(
-						date=getdate(row.effective_due_date),
+						date=forecast_date(row),
 						direction=IN if direction == INCOMING else OUT,
 						amount=amount,
 						bank_account=row.bank_account,
@@ -195,24 +221,25 @@ class BankPositionForecast:
 			flows.append(flow)
 		return flows
 
-	def assign_flows(self, flows: list[frappe._dict]) -> tuple[list, list[list]]:
-		"""Split flows into the overdue ones and one list per period (flows outside the range are dropped)."""
+	def assign_flows(self, flows: list[frappe._dict]) -> tuple[list, list, list[list]]:
+		"""Split flows into the overdue ones, the brought forward ones (from today to the day before a future
+		From Date) and one list per period; flows after To Date are dropped."""
 		starts = [p.start for p in self.periods]
-		overdue, by_period = [], [[] for _p in self.periods]
+		overdue, brought_forward, by_period = [], [], [[] for _p in self.periods]
 		for flow in flows:
 			if flow.date < self.today:
 				if self.overdue_index is not None:
 					overdue.append(flow)
-				continue
-			if flow.date < self.from_date or flow.date > self.to_date:
-				continue
-			by_period[bisect_right(starts, flow.date) - 1].append(flow)
-		return overdue, by_period
+			elif flow.date < self.from_date:
+				brought_forward.append(flow)
+			elif flow.date <= self.to_date:
+				by_period[bisect_right(starts, flow.date) - 1].append(flow)
+		return overdue, brought_forward, by_period
 
 	# ------------------------------------------------------------------ actual (GL)
 
 	def get_gl_accounts(self) -> list[str]:
-		return sorted({b.account for b in self.banks})
+		return sorted({b.account for b in self.banks if b.account})
 
 	def get_actual_by_period(self) -> list[frappe._dict]:
 		starts = [p.start for p in self.periods]
@@ -233,7 +260,7 @@ class BankPositionForecast:
 
 	# ------------------------------------------------------------------ rows
 
-	def build_rows(self, overdue, by_period, actual) -> tuple[list, list]:
+	def build_rows(self, overdue, brought_forward, by_period, actual) -> tuple[list, list]:
 		summary_rows, data = [], []
 		balance = self.get_opening()
 		for index, period in enumerate(self.periods):
@@ -244,6 +271,21 @@ class BankPositionForecast:
 				balance = row.closing
 				summary_rows.append(row)
 				data += [row, *self.detail_rows(row, overdue)]
+			if index == 0 and brought_forward:
+				# only when From Date is after today: the Overdue row (if any) is then before this one
+				row = self.make_row(
+					"brought_forward",
+					_("Brought Forward", context=CTX),
+					self.today,
+					add_days(self.from_date, -1),
+					balance,
+					0,
+					0,
+					brought_forward,
+				)
+				balance = row.closing
+				summary_rows.append(row)
+				data += [row, *self.detail_rows(row, brought_forward)]
 			flows = by_period[index]
 			row = self.make_row(
 				f"p{index}",

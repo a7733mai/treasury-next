@@ -1328,6 +1328,26 @@ msgstr "عرض الشيكات"
 msgid "Open in PDC Register"
 msgstr "فتح في سجل الشيكات الآجلة"
 
+# Phase 2 fix round
+msgid "Open in PDC Register (all bank accounts: approximate)"
+msgstr "فتح في سجل الشيكات الآجلة (كل الحسابات البنكية: تقريبي)"
+
+msgid "You are not permitted to view Bank Account {0}."
+msgstr "غير مسموح لك بعرض الحساب البنكي {0}."
+
+msgid "Forecast Date"
+msgstr "تاريخ التوقع"
+
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgid "The date of the event as entered by the user (e.g. the bounce date), or the posting date of the voucher. Empty for events without a date of their own."
+msgstr "تاريخ الحدث كما أدخله المستخدم (مثل تاريخ الارتداد)، أو تاريخ ترحيل القيد. يترك فارغًا للأحداث التي ليس لها تاريخ خاص."
+
+msgctxt "Treasury Report"
+msgid "Brought Forward"
+msgstr "المرحّل من قبل تاريخ البداية"
+
 # Phase 2 — PDC Register
 msgid "Invalid Operational Status: {0}"
 msgstr "حالة تشغيلية غير صحيحة: {0}"

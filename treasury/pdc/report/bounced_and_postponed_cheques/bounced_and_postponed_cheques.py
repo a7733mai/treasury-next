@@ -3,10 +3,9 @@
 
 """Bounced and Postponed Cheques (PLAN.md §5.5), one view at a time.
 
-Bounced: one row per bounce (a re-presented cheque may bounce again), from the status log. The bounce date
-is the posting date of the reversal (or bounce charges) Journal Entry of that bounce — the date the user
-gave — and the date the bounce was recorded when no dated voucher exists (a cheque bounced before posting,
-or On Bounce = Cancel Payment Entry without bounce charges).
+Bounced: one row per bounce (a re-presented cheque may bounce again), from the "Bounced" status log rows
+whose `event_date` (the bounce date the user entered) is in the range. Bounce charges come from the
+"Bounce Charges Posted" row that follows the bounce.
 
 Postponed: one row per postponement (PDC Postponement), dated when it was recorded, with the number of
 postponements of the same party in the result as a frequency indicator.
@@ -32,9 +31,7 @@ from treasury.pdc.report_utils import (
 )
 
 BOUNCED, POSTPONED = "Bounced", "Postponed"
-# status log events written by the same bounce action, right after its "Bounced" row
-BOUNCE_FOLLOW_UP_EVENTS = ("Voucher Reversed", "Voucher Cancelled", "Reversed", "Bounce Charges Posted")
-DATED_BOUNCE_VOUCHER_EVENTS = ("Voucher Reversed", "Bounce Charges Posted")
+BOUNCE_CHARGES_POSTED, REPRESENTED = "Bounce Charges Posted", "Re-presented"
 
 
 def execute(filters=None):
@@ -55,16 +52,16 @@ def execute(filters=None):
 		conditions["party_type"] = filters.party_type
 	if filters.party:
 		conditions["party"] = filters.party
-	if view == POSTPONED:
-		conditions["postponement_count"] = [">", 0]
 
-	cheques = {c.name: c for c in get_cheques(conditions)}
 	if view == BOUNCED:
-		rows = get_bounced_rows(cheques, from_date, to_date)
+		rows = get_bounced_rows(conditions, from_date, to_date)
 		company_currency = erpnext.get_company_currency(company)
 		for row in rows:
 			row.company_currency = company_currency
 		return get_bounced_columns(), rows
+
+	conditions["postponement_count"] = [">", 0]
+	cheques = {c.name: c for c in get_cheques(conditions)}
 	return get_postponed_columns(), get_postponed_rows(cheques, from_date, to_date)
 
 
@@ -85,70 +82,104 @@ def get_child_rows(doctype: str, parentfield: str, cheque_names: list[str], fiel
 # ---------------------------------------------------------------------------
 
 
-def get_bounced_rows(cheques: dict, from_date, to_date) -> list[frappe._dict]:
-	bounced = {
-		log.parent
-		for log in get_child_rows("PDC Status Log", "status_log", list(cheques), [], event="Bounced")
-	}
-	logs: dict[str, list] = {}
-	for log in get_child_rows(
+def get_bounced_rows(conditions: dict, from_date, to_date) -> list[frappe._dict]:
+	"""Bounces dated in [from_date, to_date] of the cheques matching `conditions` that the user may read.
+
+	The status log is queried first (indexed on `event` / `event_date`), so only the bounced cheques are
+	loaded; their parents then go through `frappe.get_list` (permissions and User Permissions apply)."""
+	bounces = frappe.get_all(
 		"PDC Status Log",
-		"status_log",
-		sorted(bounced),
-		["event", "datetime", "remarks", "voucher_type", "voucher_no"],
-	):
-		logs.setdefault(log.parent, []).append(log)
+		filters={
+			"parenttype": DOCTYPE,
+			"parentfield": "status_log",
+			"event": BOUNCED,
+			"event_date": ["between", [from_date, to_date]],
+		},
+		fields=["parent", "idx", "event_date", "remarks"],
+		order_by="parent asc, idx asc",
+	)
+	if not bounces:
+		return []
+	cheques = {
+		c.name: c for c in get_cheques({**conditions, "name": ["in", sorted({b.parent for b in bounces})]})
+	}
+	history = get_bounce_history(sorted(cheques))
 
 	precision = get_precision()
 	rows = []
-	for name, history in logs.items():
-		cheque = cheques[name]
-		for index, log in enumerate(history):
-			if log.event != "Bounced":
-				continue
-			bounce_date, charges = bounce_details(log, history[index + 1 :])
-			if not from_date <= bounce_date <= to_date:
-				continue
-			rows.append(
-				frappe._dict(
-					cheque=name,
-					direction=cheque.direction,
-					party_type=cheque.party_type,
-					party=cheque.party,
-					party_name=cheque.party_name,
-					bank_account=cheque.bank_account,
-					cheque_no=cheque.cheque_no,
-					amount=flt(cheque.amount, precision),
-					currency=cheque.currency,
-					effective_due_date=cheque.effective_due_date,
-					bounce_date=bounce_date,
-					reason=log.remarks,
-					charges=flt(charges, precision),
-					represented=1 if any(r.event == "Re-presented" for r in history[index + 1 :]) else 0,
-					operational_status=cheque.operational_status,
-				)
+	for bounce in bounces:
+		cheque = cheques.get(bounce.parent)
+		if not cheque:
+			continue
+		charges, represented = bounce_follow_up(bounce, history.get(bounce.parent, []))
+		rows.append(
+			frappe._dict(
+				cheque=cheque.name,
+				direction=cheque.direction,
+				party_type=cheque.party_type,
+				party=cheque.party,
+				party_name=cheque.party_name,
+				bank_account=cheque.bank_account,
+				cheque_no=cheque.cheque_no,
+				amount=flt(cheque.amount, precision),
+				currency=cheque.currency,
+				effective_due_date=cheque.effective_due_date,
+				bounce_date=getdate(bounce.event_date),
+				reason=bounce.remarks,
+				charges=flt(charges, precision),
+				represented=represented,
+				operational_status=cheque.operational_status,
 			)
+		)
 	rows.sort(key=lambda r: (r.bounce_date, r.cheque))
 	return rows
 
 
-def bounce_details(log, following: list) -> tuple:
-	"""(bounce date, bounce charges in the company currency) of the bounce logged in `log`."""
-	bounce_date, charges = None, 0.0
-	for row in following:
-		if row.event not in BOUNCE_FOLLOW_UP_EVENTS:
-			break
-		if row.voucher_type != "Journal Entry" or row.event not in DATED_BOUNCE_VOUCHER_EVENTS:
-			continue
-		journal = frappe.db.get_value(
-			"Journal Entry", row.voucher_no, ["posting_date", "total_debit"], as_dict=True
+def get_bounce_history(cheque_names: list[str]) -> dict[str, list]:
+	"""Per cheque, its Bounced / Bounce Charges Posted / Re-presented log rows in order; bounce charges rows
+	carry the charged amount (`charges`, company currency) of their Journal Entry."""
+	history: dict[str, list] = {}
+	for log in get_child_rows(
+		"PDC Status Log",
+		"status_log",
+		cheque_names,
+		["event", "voucher_no"],
+		event=["in", [BOUNCED, BOUNCE_CHARGES_POSTED, REPRESENTED]],
+	):
+		history.setdefault(log.parent, []).append(log)
+
+	journals = [
+		log.voucher_no for logs in history.values() for log in logs if log.event == BOUNCE_CHARGES_POSTED
+	]
+	totals = {}
+	if journals:
+		totals = dict(
+			frappe.get_all(
+				"Journal Entry",
+				filters={"name": ["in", journals], "docstatus": 1},
+				fields=["name", "total_debit"],
+				as_list=True,
+			)
 		)
-		if not journal:
+	for logs in history.values():
+		for log in logs:
+			log.charges = flt(totals.get(log.voucher_no)) if log.event == BOUNCE_CHARGES_POSTED else 0.0
+	return history
+
+
+def bounce_follow_up(bounce, history: list) -> tuple[float, int]:
+	"""(bounce charges, re-presented?) of `bounce`: the rows after it, up to the next bounce."""
+	charges, represented = 0.0, 0
+	for log in history:
+		if log.idx <= bounce.idx:
 			continue
-		bounce_date = bounce_date or getdate(journal.posting_date)
-		if row.event == "Bounce Charges Posted":
-			charges += flt(journal.total_debit)
-	return bounce_date or getdate(log.datetime), charges
+		if log.event == BOUNCED:
+			break
+		if log.event == BOUNCE_CHARGES_POSTED:
+			charges += log.charges
+		elif log.event == REPRESENTED:
+			represented = 1
+	return charges, represented
 
 
 def get_bounced_columns() -> list[dict]:

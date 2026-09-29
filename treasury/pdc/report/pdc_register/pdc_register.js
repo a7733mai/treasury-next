@@ -107,8 +107,18 @@ frappe.query_reports["PDC Register"] = {
 				{ value: "Original Due Date", label: __("Original Due Date") },
 				{ value: "Effective Due Date", label: __("Effective Due Date") },
 				{ value: "Clearance Date", label: __("Actual Clearance Date") },
+				// the Bank Position Forecast's dating (cleared cheques not bank posted: the bank's date)
+				{ value: "Forecast Date", label: __("Forecast Date") },
 			],
 			default: "Effective Due Date",
+		},
+		{
+			// set by the Bank Position Forecast drill-down in its Bank Currency view
+			fieldname: "currency",
+			label: __("Currency"),
+			fieldtype: "Link",
+			options: "Currency",
+			hidden: 1,
 		},
 		{
 			fieldname: "from_date",

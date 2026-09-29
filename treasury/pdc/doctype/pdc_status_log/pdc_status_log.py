@@ -36,6 +36,7 @@ class PDCStatusLog(Document):
 			"Cancelled",
 			"Returned",
 		]
+		event_date: DF.Date | None
 		from_accounting: DF.Data | None
 		from_operational: DF.Data | None
 		parent: DF.Data

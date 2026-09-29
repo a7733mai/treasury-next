@@ -228,7 +228,8 @@
    "in_standard_filter": 1,
    "label": "Effective Due Date",
    "no_copy": 1,
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_dates",
@@ -473,7 +474,7 @@
  ],
  "image_field": "cheque_image",
  "links": [],
- "modified": "2026-09-29 18:00:00.000000",
+ "modified": "2026-09-30 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "PDC Cheque",

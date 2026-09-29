@@ -127,7 +127,7 @@ def deliver(name: str, handover_date=None, remarks: str | None = None) -> dict:
 	_not_before(doc, date, "handover_date", _latest_date(doc))
 
 	doc.handover_date = date
-	_log(doc, "Delivered", operational="Delivered", remarks=remarks)
+	_log(doc, "Delivered", operational="Delivered", remarks=remarks, event_date=date)
 	if _party_mode(doc) == "On Handover":
 		_post_party(doc, date)
 	return _save(doc)
@@ -141,7 +141,7 @@ def receive(name: str, receipt_date=None, remarks: str | None = None) -> dict:
 	_not_before(doc, date, "handover_date", _latest_date(doc))
 
 	doc.handover_date = date
-	_log(doc, "Received", operational="Received", remarks=remarks)
+	_log(doc, "Received", operational="Received", remarks=remarks, event_date=date)
 	if _party_mode(doc) == "On Receipt":
 		_post_party(doc, date)
 	return _save(doc)
@@ -194,7 +194,7 @@ def deposit(name: str, deposit_date=None, bank_account: str | None = None, remar
 	_require_bank_account(doc)
 
 	doc.deposit_date = date
-	_log(doc, "Deposited", operational="Deposited", remarks=remarks)
+	_log(doc, "Deposited", operational="Deposited", remarks=remarks, event_date=date)
 	if _settings(doc).incoming_under_collection == "On Deposit":
 		_ensure_party_posted(doc, date)
 		_post_under_collection(doc, date)
@@ -251,7 +251,7 @@ def clear(
 	doc.actual_clearance_date = date
 	doc.bank_transaction_date = transaction_date
 	doc.bank_charges = flt(bank_charges, doc.precision("bank_charges"))
-	_log(doc, "Cleared", operational="Cleared", remarks=remarks)
+	_log(doc, "Cleared", operational="Cleared", remarks=remarks, event_date=date)
 	# the party posting may not come after the bank posting (e.g. a bank transaction before the due date)
 	bank_date = transaction_date if mode == "On Bank Transaction Date" else date
 	_ensure_party_posted(doc, bank_date)
@@ -315,7 +315,7 @@ def bounce(name: str, bounce_date=None, reason: str | None = None, charges=0) ->
 	date = _date(bounce_date)
 	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
 
-	_log(doc, "Bounced", operational="Bounced", remarks=reason)
+	_log(doc, "Bounced", operational="Bounced", remarks=reason, event_date=date)
 	_undo_postings(doc, date, reason)
 	if flt(charges) > 0:
 		_post_bounce_charges(doc, date, charges)
@@ -334,7 +334,9 @@ def represent(name: str, represent_date=None, new_due_date=None, remarks: str | 
 		doc.set(fieldname, None)
 	doc.bank_charges = 0
 	target = "Delivered" if doc.direction == OUTGOING else "Received"
-	_log(doc, "Re-presented", operational=target, accounting=NOT_POSTED, remarks=remarks)
+	_log(
+		doc, "Re-presented", operational=target, accounting=NOT_POSTED, remarks=remarks, event_date=date
+	)
 	if new_due_date and getdate(new_due_date) != getdate(doc.effective_due_date):
 		_apply_postponement(doc, new_due_date, remarks or _("Re-presented after bounce"))
 
@@ -359,13 +361,13 @@ def replace(name: str, new_cheque_values: dict | str | None = None) -> dict:
 	was_handed_over = doc.operational_status != "Created"
 
 	_undo_postings(doc, date, values.reason)
-	_log(doc, "Replaced", operational="Replaced", remarks=values.reason)
+	_log(doc, "Replaced", operational="Replaced", remarks=values.reason, event_date=date)
 	_save(doc)
 
 	new = _make_replacement(doc, values, date)
 	doc.replaced_by = new.name
 	# saved log rows are immutable (validate_protected_fields), so the new cheque gets its own row
-	_log(doc, "Replacement Created", voucher=(DOCTYPE, new.name), remarks=values.reason)
+	_log(doc, "Replacement Created", voucher=(DOCTYPE, new.name), remarks=values.reason, event_date=date)
 	result = _save(doc)
 
 	if was_handed_over:
@@ -404,7 +406,7 @@ def return_to_party(name: str, return_date=None, reason: str | None = None) -> d
 	date = _date(return_date)
 	_not_before(doc, date, None, _latest_date(doc, "handover_date"))
 
-	_log(doc, "Returned", operational="Returned", remarks=reason)
+	_log(doc, "Returned", operational="Returned", remarks=reason, event_date=date)
 	_undo_postings(doc, date, reason)
 	return _save(doc)
 
@@ -452,7 +454,13 @@ def _post_party(doc, posting_date):
 	)
 	doc.party_payment_entry = payment_entry
 	doc.party_posting_date = getdate(posting_date)
-	_log(doc, "Party Posted", accounting=PARTY_POSTED, voucher=("Payment Entry", payment_entry))
+	_log(
+		doc,
+		"Party Posted",
+		accounting=PARTY_POSTED,
+		voucher=("Payment Entry", payment_entry),
+		event_date=posting_date,
+	)
 
 
 def _ensure_party_posted(doc, event_date):
@@ -500,7 +508,13 @@ def _post_under_collection(doc, posting_date):
 		cycle=_cycle(doc),
 	)
 	doc.under_collection_journal = journal
-	_log(doc, "Under Collection Posted", accounting=UNDER_COLLECTION_POSTED, voucher=("Journal Entry", journal))
+	_log(
+		doc,
+		"Under Collection Posted",
+		accounting=UNDER_COLLECTION_POSTED,
+		voucher=("Journal Entry", journal),
+		event_date=posting_date,
+	)
 
 
 def _post_bank(doc, posting_date, exchange_rate=None):
@@ -552,7 +566,9 @@ def _post_bank(doc, posting_date, exchange_rate=None):
 	)
 	doc.bank_journal = journal
 	doc.bank_posting_date = getdate(posting_date)
-	_log(doc, "Bank Posted", accounting=BANK_POSTED, voucher=("Journal Entry", journal))
+	_log(
+		doc, "Bank Posted", accounting=BANK_POSTED, voucher=("Journal Entry", journal), event_date=posting_date
+	)
 
 	if flt(doc.bank_charges) > 0:
 		_post_bank_charges(doc, mapping, bank_gl, posting_date, bank_rate, clearance_date)
@@ -592,7 +608,7 @@ def _post_bank_charges(doc, mapping, bank_gl: str, posting_date, bank_rate: floa
 		balance_exchange_difference=True,
 	)
 	doc.bank_charges_journal = journal
-	_log(doc, "Bank Charges Posted", voucher=("Journal Entry", journal))
+	_log(doc, "Bank Charges Posted", voucher=("Journal Entry", journal), event_date=posting_date)
 
 
 def _post_bounce_charges(doc, posting_date, charges):
@@ -639,7 +655,7 @@ def _post_bounce_charges(doc, posting_date, charges):
 		cycle=_cycle(doc),
 	)
 	doc.bounce_charges_journal = journal
-	_log(doc, "Bounce Charges Posted", voucher=("Journal Entry", journal))
+	_log(doc, "Bounce Charges Posted", voucher=("Journal Entry", journal), event_date=posting_date)
 
 
 def _undo_postings(doc, posting_date, remarks: str | None = None):
@@ -656,7 +672,13 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 	for voucher in reversed(vouchers):
 		if cancel:
 			_cancel_voucher(voucher.doctype, voucher.name)
-			_log(doc, "Voucher Cancelled", voucher=(voucher.doctype, voucher.name), remarks=remarks)
+			_log(
+				doc,
+				"Voucher Cancelled",
+				voucher=(voucher.doctype, voucher.name),
+				remarks=remarks,
+				event_date=posting_date,
+			)
 			continue
 		reversal = posting.make_reversal(
 			voucher.doctype,
@@ -668,8 +690,10 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 		)
 		if voucher.treasury_event == EVENT_PARTY:
 			doc.reversal_journal = reversal
-		_log(doc, "Voucher Reversed", voucher=("Journal Entry", reversal), remarks=remarks)
-	_log(doc, "Reversed", accounting=REVERSED, remarks=remarks)
+		_log(
+			doc, "Voucher Reversed", voucher=("Journal Entry", reversal), remarks=remarks, event_date=posting_date
+		)
+	_log(doc, "Reversed", accounting=REVERSED, remarks=remarks, event_date=posting_date)
 
 
 def _cancel_voucher(doctype: str, name: str):
@@ -780,12 +804,17 @@ def _voucher_remarks(doc) -> str:
 	return _("Cheque {0} ({1})").format(doc.cheque_no, doc.name)
 
 
-def _log(doc, event: str, operational=None, accounting=None, voucher=None, remarks=None):
-	"""Append a status log row and apply the new statuses."""
+def _log(doc, event: str, operational=None, accounting=None, voucher=None, remarks=None, event_date=None):
+	"""Append a status log row and apply the new statuses.
+
+	`event_date`: the date of the event itself (the date the user entered, or the voucher posting date),
+	distinct from `datetime`, the moment the row was recorded. Reports filter on it (e.g. bounce dates).
+	"""
 	doc.append(
 		"status_log",
 		{
 			"datetime": now_datetime(),
+			"event_date": getdate(event_date) if event_date else None,
 			"user": real_user(),
 			"event": event,
 			"from_operational": doc.operational_status,

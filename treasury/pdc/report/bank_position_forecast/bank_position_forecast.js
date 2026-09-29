@@ -97,24 +97,34 @@ frappe.query_reports["Bank Position Forecast"] = {
 		if (column.fieldname === "closing" && flt(value) < 0) {
 			formatted = `<span style="color: var(--red-600)">${formatted}</span>`;
 		}
-		// drill-down: the cheques of a period in the PDC Register
+		// drill-down: the cheques of a period in the PDC Register, dated like the forecast dates them
 		if (!data.indent && ["expected_in", "expected_out"].includes(column.fieldname) && flt(value)) {
 			const filters = frappe.query_report.get_filter_values();
 			const banks = filters.bank_account || [];
+			const today = frappe.datetime.get_today();
 			const params = {
 				company: filters.company,
 				direction: column.fieldname === "expected_in" ? "Incoming" : "Outgoing",
-				date_based_on: "Effective Due Date",
+				date_based_on: "Forecast Date",
 				expected_only: 1,
 				include_created: filters.include_created ? 1 : 0,
 				to_date: data.period_end,
 			};
-			if (data.period_start) params.from_date = data.period_start;
+			// cheques dated before today are in the Overdue row (or left out), never in a period
+			if (data.period_start) {
+				params.from_date = data.period_start > today ? data.period_start : today;
+			}
 			if (banks.length === 1) params.bank_account = banks[0];
+			if (filters.currency_view === "Bank Currency" && data.currency) params.currency = data.currency;
 			const url = `/app/query-report/${encodeURIComponent("PDC Register")}?${new URLSearchParams(
 				params
 			).toString()}`;
-			formatted = `<a href="${url}" title="${__("Open in PDC Register")}">${formatted}</a>`;
+			// the register filters one bank account only: with several selected it lists every bank
+			const title =
+				banks.length > 1
+					? __("Open in PDC Register (all bank accounts: approximate)")
+					: __("Open in PDC Register");
+			formatted = `<a href="${url}" title="${frappe.utils.escape_html(title)}">${formatted}</a>`;
 		}
 		return formatted;
 	},

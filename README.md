@@ -43,10 +43,25 @@ bench install-app treasury
   Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage.
 - Reports only read data. Cheques are read with the user's permissions and User Permissions; a user
   restricted to other companies gets a permission error for a forbidden Company filter.
+  The workspace and its desktop icon are shown to Treasury Manager / User, Accounts Manager / User and
+  System Manager. Bank accounts excluded by a User Permission (Bank Account, for PDC Cheque) are left out
+  of the forecast's GL balances.
 - **Bank Position Forecast**: opening and actual movements come from the bank GL only (it moves on the
   bank posting of a cheque); every cheque whose bank posting is still to come is an expected flow on its
-  effective (possibly postponed) due date. Other modules add flows through the `treasury_forecast_sources`
-  hook (see `treasury/pdc/forecast_sources.py`).
+  effective (possibly postponed) due date — or, for a cheque cleared but not bank posted yet (Manual
+  mode), on the bank transaction / clearance date. Past-dated flows form the *Overdue* row (counted as
+  today); with a From Date after today, the flows from today up to it form a *Brought Forward* row. Other
+  modules add flows through the `treasury_forecast_sources` hook (see `treasury/pdc/forecast_sources.py`).
+- **Projected Party Statement**: the projected rows stop at To Date; the exposure summary counts every
+  unposted cheque of the party, whatever its due date.
+- **Bounced and Postponed Cheques**: a bounce is dated by the bounce date the user entered, stored in the
+  status log's `Event Date` (every dated lifecycle action and voucher records its date there).
+- **Number cards vs. the forecast** (deliberate): the cards count cheques still in circulation — outgoing
+  Created + Delivered, incoming Received + Deposited — so a written but not handed over outgoing cheque is
+  outstanding, and a cheque already cleared by the bank (Manual bank posting pending) is not, although the
+  forecast still expects its bank posting. "Due in 7 Days" means due today or in the next 7 days (0 to 7
+  days, both included), the same convention as the *0-7 Days* bucket of PDC Maturity. Without a company
+  and a default company, the sum cards show 0.
 - Generic words of the reports are translated with the context `Treasury Report` (see `locale/ar.po`),
   so the app never changes ERPNext's own translation of the same words.
 

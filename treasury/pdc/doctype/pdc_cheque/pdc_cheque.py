@@ -555,3 +555,8 @@ class PDCCheque(Document):
 	@frappe.whitelist(methods=["POST"])
 	def return_to_party(self, return_date=None, reason=None):
 		return lifecycle.return_to_party(self.name, return_date, reason)
+
+
+def on_doctype_update():
+	"""Indexes for the PDC reports, number cards and schedulers, which all filter on these columns."""
+	frappe.db.add_index("PDC Cheque", ["company", "direction", "operational_status", "effective_due_date"])

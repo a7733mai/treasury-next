@@ -73,9 +73,21 @@ CHEQUE_FIELDS = [
 	"original_due_date",
 	"effective_due_date",
 	"actual_clearance_date",
+	"bank_transaction_date",
 	"operational_status",
 	"accounting_status",
 	"postponement_count",
+]
+
+
+# Voucher links of the current cycle on a cheque.
+VOUCHER_FIELDS = [
+	"party_payment_entry",
+	"under_collection_journal",
+	"bank_journal",
+	"bank_charges_journal",
+	"reversal_journal",
+	"bounce_charges_journal",
 ]
 
 
@@ -179,8 +191,12 @@ def validate_date_range(from_date, to_date):
 
 
 def get_bank_accounts(company: str, names: list[str] | None = None) -> list[frappe._dict]:
-	"""Company bank accounts (all, or `names`) with their GL account and its currency."""
-	filters = {"company": company, "is_company_account": 1, "account": ["is", "set"]}
+	"""Company bank accounts (all, or `names`) the user may see, with their GL account and its currency.
+
+	User Permissions on Bank Account (applicable to PDC Cheque) apply: the others are left out, and naming
+	one of them in `names` raises a PermissionError. A bank account without a GL account has `account` and
+	`currency` None (it has no GL balance)."""
+	filters = {"company": company, "is_company_account": 1}
 	if names:
 		filters["name"] = ["in", names]
 	rows = frappe.get_all("Bank Account", filters=filters, fields=["name", "account"], order_by="name asc")
@@ -192,9 +208,31 @@ def get_bank_accounts(company: str, names: list[str] | None = None) -> list[frap
 					", ".join(frappe.bold(m) for m in sorted(missing)), frappe.bold(company)
 				)
 			)
+		forbidden = [r.name for r in rows if not is_permitted_value("Bank Account", r.name)]
+		if forbidden:
+			frappe.throw(
+				_("You are not permitted to view Bank Account {0}.").format(
+					", ".join(frappe.bold(f) for f in forbidden)
+				),
+				frappe.PermissionError,
+				title=_("Not Permitted"),
+			)
+	rows = [r for r in rows if is_permitted_value("Bank Account", r.name)]
 	for row in rows:
-		row.currency = get_account_currency(row.account)
+		row.currency = get_account_currency(row.account) if row.account else None
 	return rows
+
+
+def forecast_date(cheque):
+	"""The date a cheque's bank posting is expected on (Bank Position Forecast, its PDC Register drill-down).
+
+	Cleared but not bank posted yet (Manual mode): the bank already moved the money on the bank transaction
+	date (else the actual clearance date), whatever the due date. Otherwise the effective due date."""
+	if cheque.operational_status == "Cleared":
+		cleared_on = cheque.bank_transaction_date or cheque.actual_clearance_date
+		if cleared_on:
+			return getdate(cleared_on)
+	return getdate(cheque.effective_due_date)
 
 
 class AmountConverter:
@@ -229,7 +267,9 @@ class AmountConverter:
 # ---------------------------------------------------------------------------
 
 
-def get_cheques(filters: dict, fields: list[str] | None = None, order_by: str = "effective_due_date asc, name asc"):
+def get_cheques(
+	filters: dict, fields: list[str] | None = None, order_by: str = "effective_due_date asc, name asc"
+):
 	"""PDC Cheques the user may read (`frappe.get_list`: permissions and User Permissions apply)."""
 	return frappe.get_list(DOCTYPE, filters=filters, fields=fields or CHEQUE_FIELDS, order_by=order_by)
 
@@ -290,13 +330,5 @@ def _gl_amount_fields(gle, in_account_currency: bool):
 
 
 def get_linked_vouchers(row) -> str:
-	"""Comma separated vouchers linked on a cheque row (the current cycle)."""
-	fields = (
-		"party_payment_entry",
-		"under_collection_journal",
-		"bank_journal",
-		"bank_charges_journal",
-		"reversal_journal",
-		"bounce_charges_journal",
-	)
-	return ", ".join(row.get(f) for f in fields if row.get(f))
+	"""Comma separated vouchers linked on a cheque row (the current cycle; fields VOUCHER_FIELDS)."""
+	return ", ".join(row.get(f) for f in VOUCHER_FIELDS if row.get(f))

@@ -20,8 +20,8 @@
 
 <div class="pps-meta">
 	<div>
-		<div><strong>{%= __(filters.party_type) %}:</strong> {%= filters.party %}</div>
-		<div><strong>{%= __("Company") %}:</strong> {%= filters.company %}</div>
+		<div><strong>{%= __(filters.party_type) %}:</strong> {%= frappe.utils.escape_html(filters.party || "") %}</div>
+		<div><strong>{%= __("Company") %}:</strong> {%= frappe.utils.escape_html(filters.company || "") %}</div>
 	</div>
 	<div class="pps-right">
 		<div>
@@ -49,8 +49,8 @@
 			{% var row = data[i]; %}
 			<tr class="{% if (row.bold) { %}pps-bold{% } %} {% if (row.row_type === 'projected') { %}pps-projected{% } %}">
 				<td>{%= row.posting_date ? frappe.datetime.str_to_user(row.posting_date) : "" %}</td>
-				<td>{%= row.voucher_type ? __(row.voucher_type) + " " + (row.voucher_no || "") : "" %}</td>
-				<td>{%= row.description || "" %}</td>
+				<td>{%= row.voucher_type ? __(row.voucher_type) + " " + frappe.utils.escape_html(row.voucher_no || "") : "" %}</td>
+				<td>{%= frappe.utils.escape_html(row.description || "") %}</td>
 				<td class="pps-right">{%= row.debit ? format_currency(row.debit, currency) : "" %}</td>
 				<td class="pps-right">{%= row.credit ? format_currency(row.credit, currency) : "" %}</td>
 				<td class="pps-right">{%= (row.balance !== null && row.balance !== undefined) ? format_currency(row.balance, currency) : "" %}</td>

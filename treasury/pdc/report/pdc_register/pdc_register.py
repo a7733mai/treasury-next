@@ -4,13 +4,17 @@
 """PDC Register (PLAN.md §5.3): incoming and outgoing cheques with every filter and status.
 
 `expected_only` restricts the register to the cheques the Bank Position Forecast counts as expected
-(bank posting still to come), so its figures drill down here.
+(bank posting still to come), so its figures drill down here. The drill-down dates the cheques like the
+forecast does: `date_based_on` = "Forecast Date" (report_utils.forecast_date), filtered in Python since it
+is the effective due date or, for cleared cheques not bank posted yet, the bank's date. `currency`
+(hidden) keeps the cheques of one currency (the forecast's Bank Currency view).
 """
 
 import frappe
 from frappe import _
 from frappe.utils import cint, date_diff, flt, getdate
 
+from treasury.pdc.lifecycle import FINAL_STATUSES
 from treasury.pdc.report_utils import (
 	ALL_OPERATIONAL_STATUSES,
 	BANK_POSTED,
@@ -18,11 +22,13 @@ from treasury.pdc.report_utils import (
 	CTX,
 	INCOMING,
 	OUTGOING,
+	VOUCHER_FIELDS,
 	AmountConverter,
 	as_list,
 	cheque_columns,
 	column,
 	expected_statuses,
+	forecast_date,
 	get_cheques,
 	get_linked_vouchers,
 	get_precision,
@@ -31,27 +37,21 @@ from treasury.pdc.report_utils import (
 	validate_date_range,
 )
 
-FINAL_STATUSES = ("Cleared", "Bounced", "Returned", "Endorsed", "Discounted", "Replaced", "Cancelled")
+FORECAST_DATE = "Forecast Date"
 DATE_FIELDS = {
 	"Issue Date": "issue_date",
 	"Handover / Receipt Date": "handover_date",
 	"Original Due Date": "original_due_date",
 	"Effective Due Date": "effective_due_date",
 	"Clearance Date": "actual_clearance_date",
+	# not a column: see the module docstring
+	FORECAST_DATE: "effective_due_date",
 }
 GROUP_FIELDS = {
 	"Party": "party",
 	"Bank Account": "bank_account",
 	"Operational Status": "operational_status",
 }
-VOUCHER_FIELDS = [
-	"party_payment_entry",
-	"under_collection_journal",
-	"bank_journal",
-	"bank_charges_journal",
-	"reversal_journal",
-	"bounce_charges_journal",
-]
 
 
 def execute(filters=None):
@@ -83,16 +83,19 @@ def get_filters(filters: frappe._dict, company: str) -> list:
 		conditions.append(["party", "=", filters.party])
 	if filters.bank_account:
 		conditions.append(["bank_account", "=", filters.bank_account])
+	if filters.currency:
+		conditions.append(["currency", "=", filters.currency])
 	if cint(filters.postponed_only):
 		conditions.append(["is_postponed", "=", 1])
 
 	date_field = DATE_FIELDS.get(filters.date_based_on or "Effective Due Date")
 	if not date_field:
 		frappe.throw(_("Invalid Date Based On: {0}").format(filters.date_based_on))
-	if filters.from_date:
-		conditions.append([date_field, ">=", getdate(filters.from_date)])
-	if filters.to_date:
-		conditions.append([date_field, "<=", getdate(filters.to_date)])
+	if filters.date_based_on != FORECAST_DATE:
+		if filters.from_date:
+			conditions.append([date_field, ">=", getdate(filters.from_date)])
+		if filters.to_date:
+			conditions.append([date_field, "<=", getdate(filters.to_date)])
 
 	if cint(filters.expected_only):
 		conditions.append(["accounting_status", "!=", BANK_POSTED])
@@ -115,6 +118,9 @@ def get_rows(filters: frappe._dict, company: str) -> list[frappe._dict]:
 	# `expected_only` with "Include Created": Created cheques are outgoing only
 	if cint(filters.expected_only) and not filters.direction:
 		cheques = [c for c in cheques if not (c.direction == INCOMING and c.operational_status == "Created")]
+	if filters.date_based_on == FORECAST_DATE:
+		cheques = [c for c in cheques if in_range(forecast_date(c), filters.from_date, filters.to_date)]
+		cheques.sort(key=lambda c: (forecast_date(c), c.name))
 
 	converter = AmountConverter(company)
 	today = report_today()
@@ -149,6 +155,10 @@ def get_rows(filters: frappe._dict, company: str) -> list[frappe._dict]:
 			)
 		)
 	return rows
+
+
+def in_range(date, from_date, to_date) -> bool:
+	return (not from_date or date >= getdate(from_date)) and (not to_date or date <= getdate(to_date))
 
 
 def group_rows(rows: list[frappe._dict], group_field: str) -> list[frappe._dict]:

@@ -21,11 +21,16 @@ from treasury.pdc.report_utils import (
 )
 
 # Cheques still to be paid / collected, as the number cards count them (also in the card JSON filters).
+# Deliberately not the Bank Position Forecast's set: a card shows the cheques still in circulation, so an
+# outgoing cheque written but not handed over yet (Created) is outstanding, and a cheque the bank already
+# cleared (Manual bank posting pending) is not, although the forecast still expects its bank posting.
 CARD_STATUSES = {
 	OUTGOING: ("Created", "Delivered"),
 	INCOMING: ("Received", "Deposited"),
 }
 DUE_7_DAYS, OUTSTANDING = "due_7_days", "outstanding"
+# "Due in 7 days" = due today or within the next 7 days (0 to 7 days from today, both included): the same
+# convention as the "0-7 Days" bucket of PDC Maturity.
 DUE_WINDOW_DAYS = 7
 
 
@@ -35,13 +40,17 @@ def get_cheque_total(filters: str | dict | None = None) -> dict:
 
 	filters: company (default: the user's default company), direction (Outgoing / Incoming) and scope:
 	`due_7_days` (effective due date from today to today + 7) or `outstanding` (all open cheques).
+	Without a company and without a default company, the total is 0 (nothing to show, not an error).
 	"""
 	filters = frappe._dict(frappe.parse_json(filters) or {})
-	company = validate_company(filters.company or erpnext.get_default_company())
 	if filters.direction not in CARD_STATUSES:
 		frappe.throw(_("Direction must be one of: {0}.").format(", ".join((_(OUTGOING), _(INCOMING)))))
 	if filters.scope not in (DUE_7_DAYS, OUTSTANDING):
 		frappe.throw(_("Invalid scope: {0}").format(filters.scope))
+	company = filters.company or erpnext.get_default_company()
+	if not company:
+		return {"value": 0, "fieldtype": "Currency"}
+	company = validate_company(company)
 
 	statuses = list(CARD_STATUSES[filters.direction])
 	conditions = {

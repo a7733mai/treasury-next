@@ -12,7 +12,8 @@ the party (Cr). An outgoing cheque settles as a debit of the party, an incoming 
 
 Summary (exposure): actual balance; cheques handed over / received but not posted yet; cheques posted to
 the PDC accounts but not cleared by the bank yet (already in the actual balance, but usually not yet in the
-party's own books); the net balance after all cheques.
+party's own books); the net balance after all cheques. The summary is a snapshot of all such cheques,
+whatever their due date; the projected rows stop at To Date.
 """
 
 import frappe
@@ -91,12 +92,13 @@ class ProjectedPartyStatement:
 		)
 
 		projected = balance
-		unposted_effect = 0.0
-		for cheque in self.get_unposted_cheques():
+		unposted = self.get_unposted_cheques()
+		for cheque in unposted:
+			if getdate(cheque.effective_due_date) > self.to_date:
+				continue  # in the exposure summary only
 			amount = self.converter.company_amount(cheque)
 			debit, credit = (amount, 0.0) if cheque.direction == OUTGOING else (0.0, amount)
 			projected = flt(projected + debit - credit, self.precision)
-			unposted_effect += debit - credit
 			description = _("{0} cheque {1} ({2})").format(
 				_(cheque.direction), cheque.cheque_no, _(cheque.operational_status)
 			)
@@ -116,7 +118,7 @@ class ProjectedPartyStatement:
 			self.make_row(PROJECTED_CLOSING, _("Projected Closing Balance"), projected=projected)
 		)
 
-		summary = self.get_summary(balance, unposted_effect)
+		summary = self.get_summary(balance, sum(self.signed_amount(c) for c in unposted))
 		return self.get_columns(), data, None, None, summary
 
 	# ------------------------------------------------------------------ queries
@@ -165,7 +167,8 @@ class ProjectedPartyStatement:
 		return {"company": self.company, "party_type": self.party_type, "party": self.party}
 
 	def get_unposted_cheques(self) -> list[frappe._dict]:
-		"""Cheques of the party not posted to it yet, due up to To Date (overdue ones included)."""
+		"""All cheques of the party not posted to it yet, whatever their due date: the exposure summary is a
+		snapshot; only the projected rows stop at To Date."""
 		statuses = list(UNPOSTED_STATUSES)
 		if self.include_created:
 			statuses.append("Created")
@@ -174,7 +177,6 @@ class ProjectedPartyStatement:
 				**self.party_filters(),
 				"accounting_status": NOT_POSTED,
 				"operational_status": ["in", statuses],
-				"effective_due_date": ["<=", self.to_date],
 			}
 		)
 		# "Created" is only meaningful for outgoing cheques (an incoming one is not received yet)
