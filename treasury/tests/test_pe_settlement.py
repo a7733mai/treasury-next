@@ -179,6 +179,7 @@ class TestPESettlement(PESettlementTestCase):
 		cheque.deposit(deposit_date=day(-20))
 		self.assert_status(cheque, "Deposited", "Party Posted")
 		cheque.clear(clearance_date=day(-18))
+		self.assert_status(cheque, "Cleared", "Bank Posted")
 
 		pe = get_pe(cheque.bank_payment_entry)
 		self.assertEqual((pe.paid_from, pe.paid_to), (egp.pdc_receivable, egp.bank_gl))
@@ -321,7 +322,9 @@ class TestPESettlement(PESettlementTestCase):
 		self.use_company_settings(on_bounce="Cancel Payment Entry")
 		cheque, si = self.received_incoming()
 		cheque.deposit(deposit_date=day(-20))
+		cheque.reload()
 		party_pe, uc_pe = cheque.party_payment_entry, cheque.under_collection_payment_entry
+		self.assertTrue(party_pe and uc_pe)
 
 		cheque.bounce(bounce_date=day(-15), reason="Insufficient funds")
 		self.assert_status(cheque, "Bounced", "Reversed")
@@ -334,7 +337,9 @@ class TestPESettlement(PESettlementTestCase):
 	def test_represent_after_bounce_pe(self):
 		cheque, _si = self.received_incoming()
 		cheque.deposit(deposit_date=day(-20))
+		cheque.reload()
 		first = (cheque.party_payment_entry, cheque.under_collection_payment_entry)
+		self.assertTrue(all(first))
 		cheque.bounce(bounce_date=day(-15), reason="Insufficient funds")
 		cheque.reload()
 		reverse = cheque.reversal_payment_entry
@@ -482,6 +487,7 @@ class TestPESettlement(PESettlementTestCase):
 	def test_voucher_guard_it_pe(self):
 		cheque, _si = self.received_incoming()
 		cheque.deposit(deposit_date=day(-20))
+		cheque.reload()
 		pe = get_pe(cheque.under_collection_payment_entry)
 		with self.assertRaisesRegex(frappe.ValidationError, "managed by"):
 			pe.cancel()

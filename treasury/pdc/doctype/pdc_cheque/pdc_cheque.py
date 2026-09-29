@@ -37,6 +37,8 @@ def reference_rules(direction: str | None, party_type: str | None) -> dict:
 	if (direction, party_type) == ("Incoming", "Customer"):
 		return {"Sales Invoice": "customer", "Sales Order": "customer", "Journal Entry": None}
 	return {"Journal Entry": None}
+
+
 # Fields that cannot change once the cheque left the Created status (except by lifecycle actions) or is
 # posted to accounts (the vouchers were built from them).
 LOCKED_FIELDS = ("direction", "company", "party_type", "party", "bank_account", "currency", "cheque_no")

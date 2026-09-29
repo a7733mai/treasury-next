@@ -39,6 +39,14 @@ BANK_SETUP = {
 }
 
 
+# Link targets added by Phase 7a (open party, Accounting Details, Modes of Payment, the `Branch` test
+# dimension). Frappe walks test-record dependencies recursively and applies a test module's
+# IGNORE_TEST_RECORD_DEPENDENCIES only to that module's own doctype: a link not ignored there is walked
+# with ERPNext's test modules (Cost Center -> Company -> ... -> Payment Gateway, a doctype of the payments
+# app, which is not installed). The doctype test modules add these to their list.
+PHASE_7A_TEST_RECORD_IGNORES = ["Party Type", "Cost Center", "Project", "Mode of Payment", "Contact", "Branch"]
+
+
 def acc(name: str, abbr: str = ABBR) -> str:
 	return f"{name} - {abbr}"
 

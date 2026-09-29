@@ -10,6 +10,7 @@ from treasury.tests.utils import (
 	COMPANY,
 	OTHER_ABBR,
 	OTHER_COMPANY,
+	PHASE_7A_TEST_RECORD_IGNORES,
 	TreasuryTestMixin,
 	acc,
 	ensure_account,
@@ -19,7 +20,13 @@ from treasury.tests.utils import (
 )
 
 # Fixtures are built by treasury.tests.utils; don't let Frappe pull ERPNext's global test records.
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Account", "Bank Account", "Print Format"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Account",
+	"Bank Account",
+	"Print Format",
+	*PHASE_7A_TEST_RECORD_IGNORES,
+]
 
 
 class TestTreasuryCompanySettings(TreasuryTestMixin, IntegrationTestCase):

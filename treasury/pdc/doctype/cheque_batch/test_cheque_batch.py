@@ -20,6 +20,7 @@ from treasury.tests.utils import (
 	COMPANY,
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
+	PHASE_7A_TEST_RECORD_IGNORES,
 	SUPPLIER,
 	TreasuryTestMixin,
 	assert_gl_entries,
@@ -54,6 +55,7 @@ IGNORE_TEST_RECORD_DEPENDENCIES = [
 	"PDC Cheque",
 	"User",
 	"Print Format",
+	*PHASE_7A_TEST_RECORD_IGNORES,
 ]
 
 DOCTYPE = "Cheque Batch"
@@ -547,6 +549,11 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertRaises(
 			frappe.ValidationError, self.make_batch(rows=self.numbered_rows(1), bank_account=None).insert
+		)
+		# any Party Type is allowed (Phase 7a), but it must be one and the party must exist in it
+		self.assertRaises(
+			frappe.ValidationError,
+			self.make_batch(rows=self.numbered_rows(1), party_type="Bank Account").insert,
 		)
 		self.assertRaises(
 			frappe.ValidationError,

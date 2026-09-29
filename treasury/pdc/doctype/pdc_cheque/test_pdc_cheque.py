@@ -8,6 +8,7 @@ from frappe.utils import flt, getdate
 from treasury.tests.utils import (
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
+	PHASE_7A_TEST_RECORD_IGNORES,
 	SUPPLIER,
 	TreasuryTestMixin,
 	bank_account_name,
@@ -38,6 +39,7 @@ IGNORE_TEST_RECORD_DEPENDENCIES = [
 	"PDC Cheque",
 	"User",
 	"Print Format",
+	*PHASE_7A_TEST_RECORD_IGNORES,
 ]
 
 
@@ -71,7 +73,9 @@ class TestPDCCheque(TreasuryTestMixin, IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, make_pdc_cheque, amount=-5)
 
 	def test_party_type_is_restricted(self):
-		self.assertRaises(frappe.ValidationError, make_pdc_cheque, party_type="Employee")
+		# Phase 7a: any Party Type is allowed (test_open_party); the party must exist in that Party Type
+		self.assertRaises(frappe.ValidationError, make_pdc_cheque, party_type="Bank Account")
+		self.assertRaises(frappe.ValidationError, make_pdc_cheque, party_type="Employee", party=SUPPLIER)
 
 	def test_due_date_not_before_issue_date(self):
 		self.assertRaises(frappe.ValidationError, make_pdc_cheque, issue_date=day(0), due_date=day(-1))

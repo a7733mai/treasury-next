@@ -12,6 +12,7 @@ from frappe.utils.nestedset import get_root_of
 from treasury.utils.context import elevated
 
 DEFAULT_PAYEE_GROUP = "Treasury Payees"
+ROOT_SUPPLIER_GROUP = "All Supplier Groups"
 PAYEE_ROLES = ("Treasury Manager", "Treasury User", "System Manager")
 PAYEE_NAME_LENGTH = 140
 
@@ -78,11 +79,15 @@ def _payee(name: str, supplier_name: str, created: bool) -> dict:
 
 
 def ensure_payee_supplier_group() -> str | None:
-	"""The default Payee Supplier Group (a leaf under the root Supplier Group); None on a site without one."""
+	"""The default Payee Supplier Group, a leaf under the root Supplier Group.
+
+	A site that never ran the setup wizard has no Supplier Group at all; a leaf cannot be a tree root (every
+	leaf needs a group parent), so the root is created first, the way ERPNext's install fixtures do. Returns
+	None (and leaves the tree alone) when the existing root is not a group."""
 	if frappe.db.exists("Supplier Group", DEFAULT_PAYEE_GROUP):
 		return DEFAULT_PAYEE_GROUP
-	root = get_root_of("Supplier Group")
-	if not root:
+	root = get_root_of("Supplier Group") or _ensure_root_supplier_group()
+	if not frappe.db.get_value("Supplier Group", root, "is_group"):
 		return None
 	frappe.get_doc(
 		{
@@ -93,3 +98,17 @@ def ensure_payee_supplier_group() -> str | None:
 		}
 	).insert(ignore_permissions=True)
 	return DEFAULT_PAYEE_GROUP
+
+
+def _ensure_root_supplier_group() -> str:
+	"""ERPNext's root Supplier Group (`install_fixtures`: a group without a parent)."""
+	if not frappe.db.exists("Supplier Group", ROOT_SUPPLIER_GROUP):
+		frappe.get_doc(
+			{
+				"doctype": "Supplier Group",
+				"supplier_group_name": ROOT_SUPPLIER_GROUP,
+				"parent_supplier_group": "",
+				"is_group": 1,
+			}
+		).insert(ignore_permissions=True)
+	return ROOT_SUPPLIER_GROUP
