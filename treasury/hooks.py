@@ -91,6 +91,7 @@ jinja = {
 		"treasury.utils.print_helpers.treasury_print_date",
 		"treasury.utils.print_helpers.treasury_batch_receipt",
 		"treasury.utils.print_helpers.treasury_payment_entries",
+		"treasury.utils.print_helpers.treasury_party_account_no",
 	],
 }
 

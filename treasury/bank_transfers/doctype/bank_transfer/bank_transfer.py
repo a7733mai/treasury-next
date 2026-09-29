@@ -257,7 +257,8 @@ class BankTransfer(Document):
 		self.party_name = get_party_name(self.party_type, self.party)
 		# before the fee: the beneficiary's bank decides the scope
 		self._drop_stale_party_details()
-		# the party's bank details are copied only for a user who may read the party
+		# the party's bank details are copied only for a user who may read the party (the beneficiary fields
+		# have no `fetch_from` on the bank account: Frappe's link validation would copy them for anyone)
 		readable = can_read_party(self.party_type, self.party)
 		if not self.party_bank_account and readable:
 			self.party_bank_account = get_party_bank_account(self.party_type, self.party)

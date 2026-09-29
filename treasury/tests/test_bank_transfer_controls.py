@@ -24,6 +24,7 @@ from treasury.bank_transfers.api import make_bank_transfer as build_transfer
 from treasury.bank_transfers.scheduler import post_scheduled_transfers
 from treasury.tests.utils import (
 	COMPANY,
+	CUSTOMER,
 	OTHER_ABBR,
 	OTHER_COMPANY,
 	SUPPLIER,
@@ -314,10 +315,37 @@ class TestHelperPermissions(ControlsTestCase):
 				submit=False, beneficiary_iban=None, party_bank_account=self.party_account
 			)
 			self.assertEqual(chosen.party_bank_account, self.party_account)  # still checked against the party
-			self.assertFalse(chosen.beneficiary_iban)  # but its IBAN is not copied
+			# but its IBAN and bank are not copied (not even by Frappe's `fetch_from` of the link)
+			self.assertFalse(chosen.beneficiary_iban)
+			self.assertFalse(chosen.beneficiary_bank)
+			# nor on submit (another save)
+			chosen.submit()
+			chosen.reload()
+			self.assertEqual((chosen.docstatus, chosen.beneficiary_iban, chosen.beneficiary_bank), (1, None, None))
 		with self.set_user(READER):
 			doc = make_bank_transfer(submit=False, beneficiary_iban=None)
 		self.assertEqual((doc.party_bank_account, doc.beneficiary_iban), (self.party_account, self.iban))
+
+	def test_beneficiary_fields_not_fetched_from_the_party_account(self):
+		"""The root cause of the leak above: a `fetch_from` on the party's bank account is applied by Frappe's
+		link validation before `validate`, for any user."""
+		meta = frappe.get_meta(DOCTYPE)
+		for fieldname in ("beneficiary_iban", "beneficiary_bank"):
+			self.assertFalse(meta.get_field(fieldname).fetch_from, fieldname)
+		self.assertFalse(meta.get_fields_to_fetch("party_bank_account"))
+
+	def test_print_account_no_needs_party_read(self):
+		from treasury.utils.print_helpers import treasury_party_account_no
+
+		frappe.db.set_value("Bank Account", self.party_account, "bank_account_no", "ACC-778899")
+		doc = make_bank_transfer(submit=False, beneficiary_iban=None, party_bank_account=self.party_account)
+		with self.set_user(USER):
+			self.assertIsNone(treasury_party_account_no(doc))
+		with self.set_user(READER):
+			self.assertEqual(treasury_party_account_no(doc), "ACC-778899")
+		# not for another party's account
+		doc.party_bank_account = ensure_party_bank_account("Customer", CUSTOMER, is_default=0)
+		self.assertIsNone(treasury_party_account_no(doc))
 
 	def test_make_bank_transfer_party_details_need_party_read(self):
 		with self.set_user(READER):

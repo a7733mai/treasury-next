@@ -10,7 +10,8 @@
 {%- set bank_fields = ["account_name", "bank_account_no", "iban", "branch_code"] -%}
 {%- set ours = (frappe.db.get_value("Bank Account", doc.bank_account, bank_fields, as_dict=1) if doc.bank_account else None) or {} -%}
 {%- set target = (frappe.db.get_value("Bank Account", doc.to_bank_account, bank_fields, as_dict=1) if internal and doc.to_bank_account else None) or {} -%}
-{%- set party_account_no = frappe.db.get_value("Bank Account", doc.party_bank_account, "bank_account_no") if doc.party_bank_account and not internal else None -%}
+{#- the party's account number only for a user who may read the party (the IBAN printed is the transfer's own) -#}
+{%- set party_account_no = treasury_party_account_no(doc) if not internal else None -%}
 {%- set company_currency = frappe.db.get_value("Company", doc.company, "default_currency") -%}
 {%- set pes = treasury_payment_entries(doc) -%}
 {%- set fee = doc.fee_amount or 0 -%}

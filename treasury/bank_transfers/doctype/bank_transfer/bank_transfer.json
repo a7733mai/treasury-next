@@ -224,15 +224,11 @@
    "options": "Bank Account"
   },
   {
-   "fetch_from": "party_bank_account.iban",
-   "fetch_if_empty": 1,
    "fieldname": "beneficiary_iban",
    "fieldtype": "Data",
    "label": "IBAN"
   },
   {
-   "fetch_from": "party_bank_account.bank",
-   "fetch_if_empty": 1,
    "fieldname": "beneficiary_bank",
    "fieldtype": "Link",
    "label": "Beneficiary Bank",
@@ -647,7 +643,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-30 18:00:00.000000",
+ "modified": "2026-09-30 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Transfers",
  "name": "Bank Transfer",

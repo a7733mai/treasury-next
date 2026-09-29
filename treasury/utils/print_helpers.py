@@ -27,6 +27,26 @@ def treasury_batch_receipt(doc) -> dict:
 	return get_receipt_cheques(doc)
 
 
+def treasury_party_account_no(doc) -> str | None:
+	"""The account number of a Bank Transfer's beneficiary / payer bank account, for its print: only for a user
+	who may read the transfer and the party (the number is not stored on the transfer; any Jinja template may
+	call this helper)."""
+	from treasury.utils.party import can_read_party
+
+	if getattr(doc, "doctype", None) != "Bank Transfer" or not doc.get("party_bank_account"):
+		return None
+	if not (doc.get("name") and frappe.has_permission("Bank Transfer", "read", doc=doc.name)):
+		return None
+	if not can_read_party(doc.get("party_type"), doc.get("party")):
+		return None
+	account = frappe.db.get_value(
+		"Bank Account", doc.party_bank_account, ["party_type", "party", "bank_account_no"], as_dict=True
+	)
+	if not account or (account.party_type, account.party) != (doc.party_type, doc.party):
+		return None
+	return account.bank_account_no
+
+
 def treasury_payment_entries(doc) -> list[dict]:
 	"""The submitted Payment Entries of a PDC Cheque (its current cycle) or a Bank Transfer, for its print: the
 	numbers the paper is filed under. [{name, posting_date, event_label}]; [] for any other document, and for
