@@ -59,7 +59,10 @@ def execute(filters=None):
 	submitted = set(
 		frappe.get_all(
 			"Payment Entry",
-			filters={"name": ["in", [r.payment_entry for r in rows if r.payment_entry] or [""]], "docstatus": 1},
+			filters={
+				"name": ["in", [r.payment_entry for r in rows if r.payment_entry] or [""]],
+				"docstatus": 1,
+			},
 			pluck="name",
 		)
 	)

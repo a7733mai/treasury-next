@@ -770,7 +770,7 @@ def _post_bank(doc, posting_date, exchange_rate=None):
 def _post_bank_payment_entry(doc, mapping, bank_gl: str, posting_date, exchange_rate=None):
 	"""Bank settlement as one Internal Transfer Payment Entry, the bank charges inside it (on the deduction
 	row): outgoing Bank → PDC Payable (paid amount + charges, received amount), incoming Under Collection /
-	PDC Receivable → Bank (paid amount, received amount − charges). Both sides are at the carrying rate (one
+	PDC Receivable → Bank (paid amount, received amount - charges). Both sides are at the carrying rate (one
 	currency, one rate: ERPNext forces it); the exchange difference of a foreign cheque is left to Exchange
 	Rate Revaluation. Clearance date as for the Journal Entry (see `_post_bank`)."""
 	charges = flt(doc.bank_charges)
@@ -970,7 +970,9 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 			cycle=_cycle(doc),
 		)
 		if voucher.treasury_event == EVENT_PARTY:
-			doc.reversal_journal = reversal  # always a Journal Entry (see posting.can_reverse_by_payment_entry)
+			doc.reversal_journal = (
+				reversal  # always a Journal Entry (see posting.can_reverse_by_payment_entry)
+			)
 		elif reversal_doctype == "Payment Entry":
 			doc.reversal_payment_entry = reversal
 		_log(

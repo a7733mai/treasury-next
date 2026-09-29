@@ -184,7 +184,11 @@ class TestPaymentModes(TreasuryTestMixin, IntegrationTestCase):
 		cheque.deposit(deposit_date=day(-20))
 		cheque.clear(clearance_date=day(-18))
 		cheque.reload()
-		vouchers = (cheque.party_payment_entry, cheque.under_collection_payment_entry, cheque.bank_payment_entry)
+		vouchers = (
+			cheque.party_payment_entry,
+			cheque.under_collection_payment_entry,
+			cheque.bank_payment_entry,
+		)
 		for name in vouchers:
 			pe = get_pe(name)
 			self.assertEqual((pe.mode_of_payment, pe.bank_account), (mode, egp.bank_account), pe.payment_type)

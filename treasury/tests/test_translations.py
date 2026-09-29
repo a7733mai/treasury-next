@@ -417,7 +417,9 @@ class TestTranslations(IntegrationTestCase):
 		self.assertEqual(plain, [])
 
 	def test_treasury_terms_have_a_treasury_entry(self):
-		missing = sorted(t for t in TREASURY_TERMS if TREASURY_CONTEXT not in self.contexts_by_msgid.get(t, ()))
+		missing = sorted(
+			t for t in TREASURY_TERMS if TREASURY_CONTEXT not in self.contexts_by_msgid.get(t, ())
+		)
 		self.assertEqual(missing, [])
 
 	def test_treasury_terms_are_never_translated_without_context(self):

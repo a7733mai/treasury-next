@@ -180,9 +180,7 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(
 			voucher_summary.event_label("pdc_under_collection_reversal"), "Reversal of Under Collection"
 		)
-		self.assertEqual(
-			voucher_summary.event_label("interest_accrual:2025-01"), "Interest Accrual 2025-01"
-		)
+		self.assertEqual(voucher_summary.event_label("interest_accrual:2025-01"), "Interest Accrual 2025-01")
 		self.assertEqual(voucher_summary.event_label("lc_settlement"), "Settlement")
 		self.assertEqual(voucher_summary.event_label("something_else"), "something_else")
 

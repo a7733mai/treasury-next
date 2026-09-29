@@ -177,7 +177,11 @@ class TestAccountingDetails(TreasuryTestMixin, IntegrationTestCase):
 		cheque.clear(clearance_date=day(-18), bank_charges=10)
 		cheque.reload()
 
-		vouchers = (cheque.party_payment_entry, cheque.under_collection_payment_entry, cheque.bank_payment_entry)
+		vouchers = (
+			cheque.party_payment_entry,
+			cheque.under_collection_payment_entry,
+			cheque.bank_payment_entry,
+		)
 		for name in vouchers:
 			pe = get_pe(name)
 			self.assertEqual(pe.get(self.branch_field), branch, pe.payment_type)

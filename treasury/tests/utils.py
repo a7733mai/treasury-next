@@ -1031,9 +1031,11 @@ def ensure_branch_dimension() -> str:
 	"""
 	name = frappe.db.get_value("Accounting Dimension", {"document_type": "Branch"}, "name")
 	if not name:
-		name = frappe.get_doc({"doctype": "Accounting Dimension", "document_type": "Branch"}).insert(
-			ignore_permissions=True
-		).name
+		name = (
+			frappe.get_doc({"doctype": "Accounting Dimension", "document_type": "Branch"})
+			.insert(ignore_permissions=True)
+			.name
+		)
 		frappe.db.commit()  # nosemgrep: persistent fixture (see docstring)
 	fieldname = frappe.db.get_value("Accounting Dimension", name, "fieldname")
 	if not frappe.get_meta("PDC Cheque").has_field(fieldname):

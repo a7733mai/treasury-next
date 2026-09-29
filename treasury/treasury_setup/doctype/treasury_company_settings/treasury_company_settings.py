@@ -80,7 +80,9 @@ class TreasuryCompanySettings(Document):
 			label = _(self.meta.get_label("bounce_charges_account"))
 			self.validate_expense_account(self.bounce_charges_account, label)
 		self.validate_pdc_accounts()
-		self.mode_name_template = (self.mode_name_template or "").strip() or payment_modes.DEFAULT_NAME_TEMPLATE
+		self.mode_name_template = (
+			self.mode_name_template or ""
+		).strip() or payment_modes.DEFAULT_NAME_TEMPLATE
 		payment_modes.validate_name_template(self.mode_name_template)
 		self.validate_payment_modes()
 
@@ -116,7 +118,9 @@ class TreasuryCompanySettings(Document):
 	def validate_mode_of_payment(self, row, bank_gl_account: str):
 		if not frappe.db.get_value("Mode of Payment", row.mode_of_payment, "enabled"):
 			frappe.throw(
-				_("Row #{0}: Mode of Payment {1} is disabled.").format(row.idx, frappe.bold(row.mode_of_payment))
+				_("Row #{0}: Mode of Payment {1} is disabled.").format(
+					row.idx, frappe.bold(row.mode_of_payment)
+				)
 			)
 		default_account = frappe.db.get_value(
 			"Mode of Payment Account",
@@ -149,7 +153,9 @@ class TreasuryCompanySettings(Document):
 		doc = self.saved_for_write()
 		if not set(GENERATE_ROLES) & set(frappe.get_roles()):
 			frappe.throw(
-				_("This action requires one of the roles: {0}.").format(", ".join(_(r) for r in GENERATE_ROLES)),
+				_("This action requires one of the roles: {0}.").format(
+					", ".join(_(r) for r in GENERATE_ROLES)
+				),
 				frappe.PermissionError,
 				title=_("Not Permitted"),
 			)

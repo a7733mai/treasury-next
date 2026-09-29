@@ -765,7 +765,7 @@ def get_receipt_cheques(batch) -> dict:
 	number, amount and due date), Cancelled / Replaced cheques left out, in batch row order. So the voucher
 	the party signs lists exactly the cheques that exist. A draft or cancelled batch prints its rows.
 	"""
-	incoming =batch.direction == lifecycle.INCOMING
+	incoming = batch.direction == lifecycle.INCOMING
 	if batch.docstatus == 1:
 		row_idx = {row.name: row.idx for row in batch.cheques}
 		live = sorted(

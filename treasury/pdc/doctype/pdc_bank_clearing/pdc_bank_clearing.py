@@ -325,7 +325,9 @@ class PDCBankClearing(Document):
 		"""Reconcile the Bank Transaction against the bank voucher of the cheque — its bank Payment Entry, or
 		its bank Journal Entry (Journal Entry mode / version 1.0) — with ERPNext's BankTransaction methods, in
 		the order `bank_reconciliation_tool.reconcile_vouchers` calls them."""
-		vouchers = frappe.db.get_value(CHEQUE, row.cheque, ["bank_payment_entry", "bank_journal"], as_dict=True)
+		vouchers = frappe.db.get_value(
+			CHEQUE, row.cheque, ["bank_payment_entry", "bank_journal"], as_dict=True
+		)
 		if vouchers and vouchers.bank_payment_entry:
 			voucher = {"payment_doctype": "Payment Entry", "payment_name": vouchers.bank_payment_entry}
 		elif vouchers and vouchers.bank_journal:

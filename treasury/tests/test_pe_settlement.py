@@ -1,6 +1,6 @@
 """Phase 7a: under collection and bank settlement as Internal Transfer Payment Entries (Bank Settlement
 Voucher = Payment Entry), the bank charges inside the bank Payment Entry, reversal by reverse Payment Entries,
-and the mixed history of cheques posted in Journal Entry mode (spec 7a §4 E2–E6, §7 A)."""
+and the mixed history of cheques posted in Journal Entry mode (spec 7a §4 E2-E6, §7 A)."""
 
 import frappe
 from frappe import _
@@ -137,12 +137,16 @@ class TestPESettlement(PESettlementTestCase):
 			self,
 			"Payment Entry",
 			pe.name,
-			[(egp.under_collection, 20000, 0, None, day(-20)), (egp.pdc_receivable, 0, 20000, None, day(-20))],
+			[
+				(egp.under_collection, 20000, 0, None, day(-20)),
+				(egp.pdc_receivable, 0, 20000, None, day(-20)),
+			],
 		)
 		self.assertIsNone(self.clearance_date(pe.name))
 		log = cheque.status_log[-1]
 		self.assertEqual(
-			(log.event, log.voucher_type, log.voucher_no), ("Under Collection Posted", "Payment Entry", pe.name)
+			(log.event, log.voucher_type, log.voucher_no),
+			("Under Collection Posted", "Payment Entry", pe.name),
 		)
 
 	def test_incoming_clear_after_uc_with_charges(self):
@@ -191,7 +195,7 @@ class TestPESettlement(PESettlementTestCase):
 		)
 		self.assertEqual(get_voucher_count(DOCTYPE, cheque.name), 2)
 
-	# ------------------------------------------------------------------ bank posting modes × charges
+	# ------------------------------------------------------------------ bank posting modes x charges
 
 	def test_bank_posting_modes_and_charges(self):
 		egp = self.data.egp
@@ -208,7 +212,9 @@ class TestPESettlement(PESettlementTestCase):
 							cheque, _si = self.received_incoming(amount=1000, invoice=False)
 						transaction_date = day(-8) if mode == "On Bank Transaction Date" else None
 						cheque.clear(
-							clearance_date=day(-10), bank_transaction_date=transaction_date, bank_charges=charges
+							clearance_date=day(-10),
+							bank_transaction_date=transaction_date,
+							bank_charges=charges,
 						)
 						if mode == "Manual":
 							self.assert_status(cheque, "Cleared", "Party Posted")
@@ -299,7 +305,10 @@ class TestPESettlement(PESettlementTestCase):
 			self,
 			"Payment Entry",
 			reverse.name,
-			[(egp.pdc_receivable, 20000, 0, None, day(-15)), (egp.under_collection, 0, 20000, None, day(-15))],
+			[
+				(egp.pdc_receivable, 20000, 0, None, day(-15)),
+				(egp.under_collection, 0, 20000, None, day(-15)),
+			],
 		)
 		assert_gl_entries(
 			self,
@@ -313,7 +322,9 @@ class TestPESettlement(PESettlementTestCase):
 		self.assertEqual(get_party_outstanding("Sales Invoice", si.name), 20000)
 		for account, balance in before.items():
 			self.assertEqual(get_account_balance(account), balance, account)
-		reversed_ = [(r.voucher_type, r.voucher_no) for r in cheque.status_log if r.event == "Voucher Reversed"]
+		reversed_ = [
+			(r.voucher_type, r.voucher_no) for r in cheque.status_log if r.event == "Voucher Reversed"
+		]
 		self.assertEqual(
 			reversed_, [("Payment Entry", reverse.name), ("Journal Entry", cheque.reversal_journal)]
 		)
@@ -402,7 +413,10 @@ class TestPESettlement(PESettlementTestCase):
 			self,
 			"Journal Entry",
 			reversal[0],
-			[(egp.pdc_receivable, 20000, 0, None, day(-15)), (egp.under_collection, 0, 20000, None, day(-15))],
+			[
+				(egp.pdc_receivable, 20000, 0, None, day(-15)),
+				(egp.under_collection, 0, 20000, None, day(-15)),
+			],
 		)
 		self.assertEqual(frappe.db.count("Payment Entry", {"treasury_source_name": bounced.name}), 1)
 
@@ -521,7 +535,9 @@ class TestPESettlement(PESettlementTestCase):
 				self.assertRaises(
 					frappe.ValidationError, posting.create_internal_transfer, **{**values, **changes}
 				)
-		self.assertFalse(frappe.db.exists("Payment Entry", {"treasury_event": "test_internal_transfer_checks"}))
+		self.assertFalse(
+			frappe.db.exists("Payment Entry", {"treasury_event": "test_internal_transfer_checks"})
+		)
 
 	# ------------------------------------------------------------------ Journal Entry mode
 
@@ -545,6 +561,8 @@ class TestPESettlement(PESettlementTestCase):
 			cheque.bank_charges_journal,
 			[(egp.bank_charges, 15, 0, None, day(-10)), (egp.bank_gl, 0, 15, None, day(-10))],
 		)
-		self.assertEqual(frappe.db.get_value("Journal Entry", cheque.bank_journal, "voucher_type"), "Bank Entry")
+		self.assertEqual(
+			frappe.db.get_value("Journal Entry", cheque.bank_journal, "voucher_type"), "Bank Entry"
+		)
 		self.assertEqual(get_voucher_count(DOCTYPE, cheque.name), 3)
 		self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "party"), SUPPLIER)

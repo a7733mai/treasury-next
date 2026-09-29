@@ -480,7 +480,9 @@ def create_internal_transfer(
 	pe.insert()
 	if flt(pe.difference_amount):
 		frappe.throw(
-			_("The Internal Transfer {0} is not balanced (difference {1}).").format(pe.name, pe.difference_amount)
+			_("The Internal Transfer {0} is not balanced (difference {1}).").format(
+				pe.name, pe.difference_amount
+			)
 		)
 	if submit:
 		pe.submit()
@@ -517,7 +519,9 @@ def _append_difference_row(pe: Document, company: str, account: str | None, amou
 	account_details = _transfer_account(account, company)
 	if account_details.account_currency != company_currency:
 		frappe.throw(
-			_("Account {0} must be in the company currency {1}.").format(frappe.bold(account), company_currency)
+			_("Account {0} must be in the company currency {1}.").format(
+				frappe.bold(account), company_currency
+			)
 		)
 	row = {
 		"account": account,
@@ -949,9 +953,7 @@ def make_reverse_payment_entry(
 		"cost_center": original.cost_center,
 		"project": original.project,
 		"bank_account": original.bank_account,
-		"dimensions": {
-			f: original.get(f) for f in get_accounting_dimensions() if original.meta.has_field(f)
-		},
+		"dimensions": {f: original.get(f) for f in get_accounting_dimensions() if original.meta.has_field(f)},
 	}
 	return create_internal_transfer(
 		source_doctype=source_doctype,

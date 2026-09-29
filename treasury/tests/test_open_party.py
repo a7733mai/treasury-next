@@ -158,7 +158,11 @@ class TestOpenParty(TreasuryTestMixin, IntegrationTestCase):
 			party_type="Employee",
 			party=self.employee,
 			references=[
-				{"reference_doctype": "Journal Entry", "reference_name": journal.name, "allocated_amount": 1000}
+				{
+					"reference_doctype": "Journal Entry",
+					"reference_name": journal.name,
+					"allocated_amount": 1000,
+				}
 			],
 		)
 		self.assertEqual([r.reference_name for r in cheque.references], [journal.name])
@@ -271,9 +275,7 @@ class TestOpenParty(TreasuryTestMixin, IntegrationTestCase):
 
 		other = make_security_cheque(party_type="Other", party=None, party_name_other=f"Board {self.tag}")
 		other.receive(receipt_date=day(-50), custody_location=ensure_custody_location())
-		self.assertRaises(
-			frappe.ValidationError, other.encash, day(-5), None, None, bank_account_name("EGP")
-		)
+		self.assertRaises(frappe.ValidationError, other.encash, day(-5), None, None, bank_account_name("EGP"))
 
 	def test_projected_party_statement_of_employee(self):
 		cheque = make_pdc_cheque(

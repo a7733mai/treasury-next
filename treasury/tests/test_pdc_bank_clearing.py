@@ -260,7 +260,8 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 			[("Payment Entry", cheque.bank_payment_entry)],
 		)
 		self.assertEqual(
-			getdate(frappe.db.get_value("Payment Entry", cheque.bank_payment_entry, "clearance_date")), day(-28)
+			getdate(frappe.db.get_value("Payment Entry", cheque.bank_payment_entry, "clearance_date")),
+			day(-28),
 		)
 
 	def test_cleared_in_manual_mode_is_posted_and_reconciled(self):

@@ -265,7 +265,12 @@ class ProjectedPartyStatement:
 			}
 
 		return [
-			{"fieldname": "posting_date", "label": _("Date", context="Treasury"), "fieldtype": "Date", "width": 100},
+			{
+				"fieldname": "posting_date",
+				"label": _("Date", context="Treasury"),
+				"fieldtype": "Date",
+				"width": 100,
+			},
 			{"fieldname": "voucher_type", "label": _("Voucher Type"), "fieldtype": "Data", "width": 120},
 			{
 				"fieldname": "voucher_no",

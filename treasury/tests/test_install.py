@@ -75,7 +75,8 @@ class TestInstall(IntegrationTestCase):
 		frappe.db.set_value("Treasury Company Settings", COMPANY, "bank_settlement_voucher", "Journal Entry")
 		set_bank_settlement_voucher.execute()
 		self.assertEqual(
-			frappe.db.get_value("Treasury Company Settings", COMPANY, "bank_settlement_voucher"), "Journal Entry"
+			frappe.db.get_value("Treasury Company Settings", COMPANY, "bank_settlement_voucher"),
+			"Journal Entry",
 		)
 
 	def test_dimension_fields_are_created_and_listed_for_uninstall(self):
