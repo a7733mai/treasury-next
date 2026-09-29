@@ -7,6 +7,9 @@
   method limit and whether the transfer needs a Treasury Manager's approval (Treasury roles cannot read
   Bank Account, so the form cannot look these up itself).
 - `get_transfer_settings`: the company's Bank Transfer settings a new transfer form needs (defaults).
+
+All three answer only for a company the user may prepare Bank Transfers of (`check_company_permission`), and
+return a party's bank details (default bank account, IBAN) only when the user may read the party.
 """
 
 import erpnext
@@ -23,7 +26,7 @@ from treasury.bank_transfers.doctype.bank_transfer.bank_transfer import transfer
 from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
 	TRANSFER_DEFAULT_BANK_FIELDS,
 )
-from treasury.utils.party import get_party_name
+from treasury.utils.party import can_read_party, get_party_name
 
 DOCTYPE = "Bank Transfer"
 METHODS = ("Normal", "Fawran", "SWIFT")
@@ -56,6 +59,7 @@ def make_bank_transfer(
 	source.check_permission("read")
 	transfer_type, party_type, party_field = SOURCES[source_doctype]
 	company = source.get("company") or company or frappe.defaults.get_user_default("Company")
+	check_company_permission(company)
 	settings = posting.get_company_settings(company)
 
 	doc = frappe.new_doc(DOCTYPE)
@@ -73,7 +77,8 @@ def make_bank_transfer(
 	doc.party_type = party_type
 	doc.party = source.get(party_field) if party_field else source.name
 	doc.party_name = get_party_name(party_type, doc.party)
-	doc.party_bank_account = get_party_bank_account(party_type, doc.party)
+	if can_read_party(party_type, doc.party):
+		doc.party_bank_account = get_party_bank_account(party_type, doc.party)
 	doc.contact_person = source.get("contact_person") or (
 		get_default_contact(party_type, doc.party) if party_type != "Employee" else None
 	)
@@ -104,24 +109,54 @@ def _set_amount(doc, source):
 		doc.amount = outstanding
 	elif party_currency == erpnext.get_company_currency(doc.company) and flt(doc.exchange_rate):
 		doc.amount = flt(outstanding / flt(doc.exchange_rate), precision)
+	else:
+		# e.g. a USD supplier and an EGP bank: the transfer amount cannot be derived from the outstanding
+		frappe.throw(
+			_(
+				"Bank Account {0} is in {1} and cannot settle the {2} outstanding of {3} {4}. Choose a Bank Account in {2}."
+			).format(
+				frappe.bold(doc.bank_account),
+				doc.currency,
+				party_currency,
+				_(source.doctype),
+				frappe.bold(source.name),
+			)
+		)
 	doc.append(
 		"references",
 		{"reference_doctype": source.doctype, "reference_name": source.name, "allocated_amount": outstanding},
 	)
 
 
-def _check_prepare_permission():
+def _check_prepare_permission(company: str | None):
 	if not (frappe.has_permission(DOCTYPE, "create") or frappe.has_permission(DOCTYPE, "write")):
 		frappe.throw(_("You are not permitted to prepare Bank Transfers."), frappe.PermissionError)
+	check_company_permission(company)
+
+
+def check_company_permission(company: str | None):
+	"""The user may prepare Bank Transfers of `company`: create / write permission on a Bank Transfer of that
+	company, which applies the user's User Permissions on Company (a user restricted to company A gets nothing
+	of company B). Read permission on Company itself is not used: the Treasury roles hold none on core
+	doctypes, and it would not say whether the user may transfer for the company."""
+	if not company or not frappe.db.exists("Company", company):
+		frappe.throw(_("Company {0} does not exist.").format(frappe.bold(company or "-")))
+	probe = frappe.new_doc(DOCTYPE)
+	probe.company = company
+	if any(frappe.has_permission(DOCTYPE, ptype, doc=probe) for ptype in ("create", "write")):
+		return
+	frappe.throw(
+		_("You are not permitted to prepare Bank Transfers of company {0}.").format(frappe.bold(company)),
+		frappe.PermissionError,
+		title=_("Not Permitted"),
+	)
 
 
 @frappe.whitelist()
 def get_transfer_settings(company: str) -> dict:
 	"""The Bank Transfer values of the company's Treasury Company Settings a new transfer form needs (default
 	method, banks and charge bearer, completion, limit action, approval threshold); {} without settings."""
-	_check_prepare_permission()
-	if not company or not frappe.db.exists("Company", company):
-		frappe.throw(_("Company {0} does not exist.").format(frappe.bold(company or "-")))
+	_check_prepare_permission(company)
 	return transfer_settings(company)
 
 
@@ -143,14 +178,18 @@ def get_fee_preview(
 	party: str | None = None,
 	name: str | None = None,
 	exchange_rate=None,
+	fee_amount=None,
+	received_amount=None,
 ) -> dict:
 	"""What the transfer being entered will do, as the server will compute it on save (read only):
 	{scope, computed_fee, correspondent_fee, fee_account, fee_rule, fee_basis, limit_messages, currency,
-	to_currency, bank, to_bank, company_currency, exchange_rate, base_amount, limit, limit_action,
-	approval_threshold, above_threshold, approval_required, is_manager}, plus the party's default
-	`party_bank_account` / `beneficiary_iban` / `beneficiary_bank` / `beneficiary_swift` for those sent empty.
-	`name`: the saved transfer itself, left out of its daily limit."""
-	_check_prepare_permission()
+	to_currency, bank, to_bank, company_currency, exchange_rate, base_amount, approval_amount, limit,
+	limit_action, approval_threshold, above_threshold, approval_required, is_manager}, plus the party's default
+	`party_bank_account` / `beneficiary_iban` / `beneficiary_bank` / `beneficiary_swift` for those sent empty
+	(only for a party the user may read). `name`: the saved transfer itself, left out of its daily limit.
+	`fee_amount`: an overridden fee (else the rule fee); `received_amount`: of an Internal Transfer between
+	two currencies — both count for the approval rule (`lifecycle.approval_amount`)."""
+	_check_prepare_permission(company)
 	if transfer_type not in fees.DIRECTION:
 		frappe.throw(_("Unknown transfer type {0}.").format(frappe.bold(transfer_type)))
 	if method not in METHODS:
@@ -203,10 +242,16 @@ def get_fee_preview(
 	company_currency = erpnext.get_company_currency(company)
 	rate = _exchange_rate(source.currency, company, company_currency, exchange_rate, date)
 	base_amount = flt(transfer.amount * rate, frappe.get_precision(DOCTYPE, "base_amount") or 2)
+	transfer.update(
+		exchange_rate=rate,
+		fee_amount=result.fee if fee_amount is None or fee_amount == "" else flt(fee_amount),
+		to_currency=target.currency,
+		received_amount=transfer.amount if target.currency == source.currency else flt(received_amount),
+	)
 	settings = transfer_settings(company)
 	threshold = flt(settings.get("transfer_approval_threshold"))
-	is_manager = bool(set(lifecycle.MANAGER_ROLES) & set(frappe.get_roles()))
-	above_threshold = threshold > 0 and base_amount > threshold
+	is_manager = lifecycle.is_manager()
+	above_threshold = lifecycle.approval_required(transfer, threshold)
 	return {
 		"scope": scope,
 		"computed_fee": result.fee,
@@ -222,6 +267,7 @@ def get_fee_preview(
 		"company_currency": company_currency,
 		"exchange_rate": rate,
 		"base_amount": base_amount,
+		"approval_amount": lifecycle.approval_amount(transfer),
 		"limit": _limit(transfer, date),
 		"limit_action": settings.get("transfer_limit_action") or "Warn",
 		"approval_threshold": threshold,
@@ -260,11 +306,15 @@ def _party_defaults(
 	swift: str | None,
 ) -> dict:
 	"""The beneficiary details the server fills on save, for the fields sent empty: the party's default bank
-	account, its IBAN and bank, and the SWIFT code of the bank. Only a bank account of the party itself."""
+	account, its IBAN and bank, and the SWIFT code of the bank. Only a bank account of the party itself, and
+	only for a party the user may read (else just the SWIFT code of the bank the user chose)."""
 	if not (party_type and party) or not frappe.db.exists("Party Type", party_type):
 		return {}
 	if not frappe.db.exists(party_type, party):
 		return {}
+	if not can_read_party(party_type, party):
+		swift_number = None if swift or not bank else frappe.db.get_value("Bank", bank, "swift_number")
+		return {"beneficiary_swift": swift_number} if swift_number else {}
 	defaults = {}
 	account_name = party_bank_account
 	if not account_name:

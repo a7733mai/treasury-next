@@ -8043,6 +8043,18 @@ msgstr "لا يوجد مبلغ مستحق على {0} {1}."
 msgid "You are not permitted to prepare Bank Transfers."
 msgstr "ليس لديك صلاحية إعداد التحويلات البنكية."
 
+msgid "You are not permitted to prepare Bank Transfers of company {0}."
+msgstr "ليس لديك صلاحية إعداد التحويلات البنكية للشركة {0}."
+
+msgid "Bank Account {0} is in {1} and cannot settle the {2} outstanding of {3} {4}. Choose a Bank Account in {2}."
+msgstr "الحساب البنكي {0} بعملة {1} ولا يمكنه سداد المبلغ المستحق بعملة {2} على {3} {4}. اختر حساباً بنكياً بعملة {2}."
+
+msgid "There is no exchange rate from {0} to {1} on {2}: the transfer can only be submitted by a Treasury Manager."
+msgstr "لا يوجد سعر صرف من {0} إلى {1} بتاريخ {2}: لا يعتمد هذا التحويل إلا مدير الخزينة."
+
+msgid "{0} ({1}) cannot be in the future."
+msgstr "لا يمكن أن يكون {0} ({1}) في المستقبل."
+
 msgid "Unknown transfer type {0}."
 msgstr "نوع تحويل غير معروف {0}."
 

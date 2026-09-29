@@ -62,6 +62,8 @@ class TestBankTransferScheduler(TreasuryTestMixin, IntegrationTestCase):
 		def errors():
 			return frappe.db.count("Error Log", {"reference_doctype": DOCTYPE, "reference_name": failing.name})
 
+		# Error Logs survive the test rollback and transfer names repeat between runs: start from none
+		frappe.db.delete("Error Log", {"reference_doctype": DOCTYPE, "reference_name": failing.name})
 		before = errors()
 		result = post_scheduled_transfers(as_of=execution)
 		self.assertIn(failing.name, result["failed"])

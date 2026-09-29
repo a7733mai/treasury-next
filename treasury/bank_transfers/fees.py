@@ -228,9 +228,17 @@ def get_limit(company: str, bank_account: str, method: str) -> frappe._dict | No
 	return rows[0] if rows else None
 
 
-def check_limits(doc, execution_date=None) -> list[str]:
+def lock_bank_account(bank_account: str):
+	"""Row lock on the Bank Account: every path that posts or moves a transfer (submit, Send Now, Reschedule,
+	the daily job) takes it before counting the day's transfers, so two of them cannot both pass a limit."""
+	frappe.db.get_value("Bank Account", bank_account, "name", for_update=True)
+
+
+def check_limits(doc, execution_date=None, lock: bool = False) -> list[str]:
 	"""Messages for the per-transaction and daily limits of (bank account, method) the transfer exceeds on
-	its execution date (or `execution_date`, e.g. a reschedule); empty when it is within its limits."""
+	its execution date (or `execution_date`, e.g. a reschedule); empty when it is within its limits.
+	`lock`: count with a locking read (after `lock_bank_account`), which sees the latest committed transfers
+	instead of the transaction's snapshot."""
 	limit = get_limit(doc.company, doc.bank_account, doc.method)
 	if not limit:
 		return []
@@ -251,7 +259,7 @@ def check_limits(doc, execution_date=None) -> list[str]:
 	daily = flt(limit.daily_limit)
 	if daily > 0:
 		date = getdate(execution_date or doc.execution_date)
-		used = used_on(doc, date)
+		used = used_on(doc, date, lock=lock)
 		if used + amount > daily:
 			messages.append(
 				_("Transfers of {0} on {1} would reach {2}, above the daily {3} limit {4} of Bank Account {5}.").format(
@@ -266,10 +274,16 @@ def check_limits(doc, execution_date=None) -> list[str]:
 	return messages
 
 
-def used_on(doc, date) -> float:
-	"""Amount of the other submitted, not cancelled transfers of the bank account and method on `date`."""
+def used_on(doc, date, lock: bool = False) -> float:
+	"""Amount of the other submitted, not cancelled transfers of the bank account and method on `date`
+	(`lock`: a locking read, see `check_limits`)."""
+	result = used_query(doc, date, lock).run()
+	return flt(result[0][0]) if result else 0.0
+
+
+def used_query(doc, date, lock: bool = False):
 	transfer = frappe.qb.DocType(DOCTYPE)
-	result = (
+	query = (
 		frappe.qb.from_(transfer)
 		.select(Sum(transfer.amount))
 		.where(
@@ -280,5 +294,5 @@ def used_on(doc, date) -> float:
 			& (transfer.status != CANCELLED)
 			& (transfer.name != (doc.get("name") or ""))
 		)
-	).run()
-	return flt(result[0][0]) if result else 0.0
+	)
+	return query.for_update() if lock else query

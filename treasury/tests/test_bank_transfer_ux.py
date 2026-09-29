@@ -151,11 +151,20 @@ class TestFeePreview(BankTransferUXTestCase):
 			self.assertTrue(above["above_threshold"])
 			self.assertTrue(above["approval_required"])
 			self.assertFalse(above["is_manager"])
-			at = self.preview(amount=100000)
+			# the fee counts: 99,950 + 50 (R3, capped) = 100,000 is not above; 100,000 + 50 is
+			at = self.preview(amount=99950)
+			self.assertEqual(at["approval_amount"], 100000)
 			self.assertFalse(at["above_threshold"])
 			self.assertFalse(at["approval_required"])
+			self.assertTrue(self.preview(amount=100000)["approval_required"])
+			# an overridden fee counts as entered
+			self.assertTrue(self.preview(amount=99950, fee_amount=51)["approval_required"])
 			# in the company currency: 2,500 USD at 50 = 125,000
 			self.assertTrue(self.preview(bank_account=self.bu, amount=2500)["approval_required"])
+			# a low rate typed on the transfer does not lower it: the system rate (50) is used
+			low = self.preview(bank_account=self.bu, amount=2500, exchange_rate=0.5)
+			self.assertEqual(low["base_amount"], 1250)
+			self.assertTrue(low["approval_required"])
 		with self.set_user(TREASURY_MANAGER):
 			manager = self.preview(amount=150000)
 			self.assertTrue(manager["above_threshold"])

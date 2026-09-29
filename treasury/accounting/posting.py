@@ -355,7 +355,7 @@ def create_payment_entry(
 	pe.flags.ignore_permissions = True  # see module docstring
 	pe.insert()
 	if charges:
-		_absorb_rounding(pe, charges_account)
+		_absorb_rounding(pe, charges_account, party_cap, amounts.precision)
 	if submit:
 		pe.submit()
 		if clearance_date:
@@ -399,14 +399,30 @@ def _charges_row(company: str, account: str, amount: float, details: dict | None
 	return row
 
 
-def _absorb_rounding(pe: Document, charges_account: str):
+def _absorb_rounding(pe: Document, charges_account: str, party_cap: float, party_precision: int):
 	"""A company-currency rounding gap of a foreign-currency entry (the party side, the bank side and the
-	charges are rounded separately) goes into the charges row, up to ROUNDING_TOLERANCE."""
+	charges are rounded separately) goes into the charges row, up to ROUNDING_TOLERANCE.
+
+	Two forms of the gap (payment_entry.py set_unallocated_amount / set_difference_amount):
+	- the party side is short (allocated + unallocated < bank side - charges): a difference amount;
+	- the party side is over: the unflagged charges row feeds `set_unallocated_amount`, and the gap would stay
+	  as a tiny unallocated advance. It is rounding only when the principal (`party_cap`) is fully allocated;
+	  Pay: unallocated = base received - charges - allocated (the row grows by it); Receive: unallocated =
+	  base paid + charges - allocated (the row shrinks by it)."""
 	precision = frappe.get_precision("Payment Entry Deduction", "amount")
-	difference = flt(pe.difference_amount, precision)
 	row = next(
 		(d for d in pe.deductions if d.account == charges_account and not d.is_exchange_gain_loss), None
 	)
+	allocated = flt(sum(flt(r.allocated_amount) for r in pe.references), party_precision)
+	if row and pe.references and allocated == flt(party_cap, party_precision):
+		rate = pe.source_exchange_rate if pe.payment_type == "Receive" else pe.target_exchange_rate
+		unallocated = flt(flt(pe.unallocated_amount) * flt(rate), precision)
+		sign = -1 if pe.payment_type == "Receive" else 1
+		new_amount = flt(flt(row.amount) + sign * unallocated, precision)
+		if unallocated and abs(unallocated) <= ROUNDING_TOLERANCE and new_amount > 0:
+			row.amount = new_amount
+			pe.save()
+	difference = flt(pe.difference_amount, precision)
 	if difference and row and abs(difference) <= ROUNDING_TOLERANCE:
 		row.amount = flt(flt(row.amount) + difference, precision)
 		pe.save()

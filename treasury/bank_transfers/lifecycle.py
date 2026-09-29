@@ -22,6 +22,7 @@ Status log events are stored in English and translated when displayed.
 
 import erpnext
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.utils import flt, fmt_money, formatdate, getdate, now_datetime, today
 
@@ -192,24 +193,75 @@ def _label(doc, fieldname: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def is_manager() -> bool:
+	return bool(set(MANAGER_ROLES) & set(frappe.get_roles()))
+
+
+def approval_amount(doc) -> float | None:
+	"""The company-currency value the approval threshold is compared with (`doc`: a transfer, or a
+	`frappe._dict` with its fields):
+	- the money that leaves the bank account, fee included (an overridden fee as entered): amount + fee for a
+	  Party Payment / Internal Transfer; the amount the party pays for a Party Receipt;
+	- converted at the higher of the transfer's exchange rate and the system rate of the execution date, so a
+	  rate entered on the transfer can never lower it;
+	- for an Internal Transfer into a company-currency account, at least the received amount.
+	None when the bank currency has no system rate on that date: the value cannot be verified."""
+	company_currency = erpnext.get_company_currency(doc.company)
+	fee = 0 if doc.get("transfer_type") == PARTY_RECEIPT else flt(doc.get("fee_amount"))
+	amount = flt(doc.get("amount")) + fee
+	if doc.get("currency") and doc.currency != company_currency:
+		date = getdate(doc.get("execution_date"))
+		system_rate = flt(get_exchange_rate(doc.currency, company_currency, date))
+		if system_rate <= 0:
+			return None
+		amount *= max(flt(doc.get("exchange_rate")), system_rate)
+	if doc.get("transfer_type") == INTERNAL and doc.get("to_currency") == company_currency:
+		amount = max(amount, flt(doc.get("received_amount")))
+	return flt(amount, frappe.get_precision(DOCTYPE, "base_amount") or 2)
+
+
+def approval_required(doc, threshold: float | None = None) -> bool:
+	"""Whether the transfer is above the company's approval threshold (0 = no rule), or cannot be valued."""
+	if threshold is None:
+		threshold = flt(_settings(doc).transfer_approval_threshold)
+	if threshold <= 0:
+		return False
+	value = approval_amount(doc)
+	return value is None or value > threshold
+
+
 def check_approval(doc):
-	"""Above the company's approval threshold (company currency) only a Treasury Manager may submit."""
+	"""Above the company's approval threshold (company currency, see `approval_amount`) only a Treasury
+	Manager may submit."""
 	threshold = flt(_settings(doc).transfer_approval_threshold)
-	if threshold > 0 and flt(doc.base_amount) > threshold and not set(MANAGER_ROLES) & set(frappe.get_roles()):
-		frappe.throw(
-			_("Transfers above {0} must be submitted by a Treasury Manager.").format(
-				fmt_money(threshold, currency=erpnext.get_company_currency(doc.company))
-			),
-			frappe.PermissionError,
-			title=_("Not Permitted"),
+	if is_manager() or not approval_required(doc, threshold):
+		return
+	company_currency = erpnext.get_company_currency(doc.company)
+	if approval_amount(doc) is None:
+		message = _(
+			"There is no exchange rate from {0} to {1} on {2}: the transfer can only be submitted by a Treasury Manager."
+		).format(doc.currency, company_currency, formatdate(doc.execution_date))
+	else:
+		message = _("Transfers above {0} must be submitted by a Treasury Manager.").format(
+			fmt_money(threshold, currency=company_currency)
 		)
+	frappe.throw(message, frappe.PermissionError, title=_("Not Permitted"))
 
 
-def check_limits_on_submit(doc):
-	"""The limits again at submit: Block (Treasury Company Settings) rejects the transfer."""
-	messages = fees.check_limits(doc)
-	if messages and _settings(doc).transfer_limit_action == BLOCK:
+def enforce_limits(doc, execution_date=None, warn: bool = True):
+	"""The per-transaction and daily limits of the transfer on its execution date (or `execution_date`),
+	race-safe: the Bank Account row is locked first, then the day's transfers are counted with a locking read.
+	Block (Treasury Company Settings) rejects the transfer; Warn shows the messages (`warn`)."""
+	if not fees.get_limit(doc.company, doc.bank_account, doc.method):
+		return
+	fees.lock_bank_account(doc.bank_account)
+	messages = fees.check_limits(doc, execution_date, lock=True)
+	if not messages:
+		return
+	if _settings(doc).transfer_limit_action == BLOCK:
 		frappe.throw("<br>".join(messages), title=_("Transfer Limit Exceeded"))
+	if warn:
+		frappe.msgprint("<br>".join(messages), title=_("Transfer Limit Exceeded"), indicator="orange")
 
 
 def on_submit(doc):
@@ -278,17 +330,21 @@ def send(name: str, system: bool = False) -> dict:
 def _send_scheduled(name: str, system: bool = False) -> dict:
 	doc = _begin(name, None if system else USER_ROLES, system=system)
 	instruments.require_status(doc, (SCHEDULED,))
+	# the limits of the day again (e.g. lowered since the submit): Block leaves the transfer Scheduled
+	enforce_limits(doc, warn=False)
 	_send(doc, doc.execution_date)
 	return _save(doc)
 
 
 def send_now(name: str, execution_date=None, remarks=None) -> dict:
-	"""Send a Scheduled transfer today (or on a past `execution_date`), which becomes its execution date."""
+	"""Send a Scheduled transfer today (or on a past `execution_date`), which becomes its execution date; the
+	limits of that day apply as on submit."""
 	doc = _begin(name, USER_ROLES)
 	instruments.require_status(doc, (SCHEDULED,))
 	date = _date(execution_date)
 	if date > getdate(today()):
 		frappe.throw(_("Use Reschedule for a future date."))
+	enforce_limits(doc, date)
 	doc.execution_date = date
 	_send(doc, date, remarks)
 	return _save(doc)
@@ -300,11 +356,7 @@ def reschedule(name: str, execution_date, remarks=None) -> dict:
 	if not execution_date or getdate(execution_date) <= getdate(today()):
 		frappe.throw(_("The new execution date must be in the future; use Send Now to send it today."))
 	new_date = getdate(execution_date)
-	messages = fees.check_limits(doc, new_date)
-	if messages:
-		if _settings(doc).transfer_limit_action == BLOCK:
-			frappe.throw("<br>".join(messages), title=_("Transfer Limit Exceeded"))
-		frappe.msgprint("<br>".join(messages), title=_("Transfer Limit Exceeded"), indicator="orange")
+	enforce_limits(doc, new_date)
 	note = f"{formatdate(doc.execution_date)} → {formatdate(new_date)}"
 	if remarks:
 		note += f": {remarks}"
@@ -389,12 +441,9 @@ def _booked_fee(payment_entry: str, fee_account: str | None) -> float:
 # ---------------------------------------------------------------------------
 
 
-def complete(
-	name: str, completion_date=None, bank_transaction_date=None, remarks=None, system: bool = False
-) -> dict:
+def complete(name: str, completion_date=None, bank_transaction_date=None, remarks=None) -> dict:
 	"""The bank confirmed the transfer: Completed, its Payment Entry cleared on the bank transaction date
-	(else the completion date). `system` is accepted for symmetry and ignored: the PDC Bank Clearing tool
-	calls this with the user's own permission."""
+	(else the completion date). The PDC Bank Clearing tool calls this with the user's own permission."""
 	doc = _begin(name, USER_ROLES)
 	instruments.require_status(doc, (SENT,), COMPLETED)
 	date = _date(completion_date)
@@ -436,6 +485,9 @@ def return_transfer(name: str, return_date=None, reason=None) -> dict:
 		frappe.throw(_("A reason is required."))
 	date = _date(return_date)
 	_not_before(date, doc.completion_date or doc.execution_date, _label(doc, "return_date"))
+	if date > getdate(today()):
+		# the reversal is posted on the return date: the money has not come back yet
+		frappe.throw(_("{0} ({1}) cannot be in the future.").format(_label(doc, "return_date"), formatdate(date)))
 
 	fee = flt(doc.fee_amount)
 	refund = bool(_settings(doc).refund_fees_on_return)

@@ -468,7 +468,9 @@ posted as **one Payment Entry** on its **execution date** (the value date), with
 | Internal Transfer | Internal Transfer | Cr amount + fee | Dr amount (or the received amount) on the target bank |
 
 The fee is a deduction row on its expense account (company currency; a foreign-currency fee is converted at
-the transfer's rate, a rounding gap of up to 0.05 is absorbed by the fee row).
+the transfer's rate). A rounding gap of up to 0.05 (company currency) between the separately rounded bank,
+party and fee amounts is absorbed by the fee row — both a difference amount and, when the principal is fully
+allocated to the references, a tiny unallocated amount (which would otherwise stay as a 0.01 advance).
 
 **Fee rules** (Treasury Company Settings, *Transfer Fees*): per bank account, method, direction (Outgoing /
 Incoming: the fee our bank takes from a received transfer), scope and amount range (bank account currency;
@@ -485,8 +487,26 @@ letters.
 
 **Limits** (*Transfer Limits*): per-transaction and daily limits of a bank account and method (the daily
 limit counts the submitted, not cancelled transfers of the same execution date). *Transfer Limit Action*
-Warn shows a message; Block rejects the submit (and a Reschedule onto a full day). **Approval**: above the
-*Transfer Approval Threshold* (company currency) only a Treasury Manager may submit.
+Warn shows a message; Block rejects the transfer. The limits are enforced on the server in **every** path
+that posts or moves a transfer: submit, **Send Now** (on the send date), **Reschedule** (on the new date) and
+the daily job (a blocked transfer stays Scheduled and is logged). Each of them first locks the Bank Account
+row and then counts the day's transfers with a locking read, so two concurrent submits cannot both pass a
+daily limit (the second waits for the first and sees it).
+
+**Approval**: above the *Transfer Approval Threshold* (company currency) only a Treasury Manager may submit.
+The value compared is what leaves the bank account — amount **plus fee** (an overridden fee as entered) for a
+payment or internal transfer, the amount for a receipt — converted at the **higher** of the transfer's
+exchange rate and the system exchange rate (Currency Exchange) of the execution date: a low rate typed on the
+transfer can never bring it under the threshold (for an internal transfer into a company-currency account
+the received amount counts too). Without a system rate for that date the value cannot be verified and only a
+Treasury Manager may submit. The rate typed on the transfer is still the one the Payment Entry is posted at.
+
+**Permissions of the form helpers**: the fee preview, the transfer settings and *make_bank_transfer* answer
+only for a company the user may prepare Bank Transfers of (their User Permissions on Company apply). A
+party's bank details (its default bank account, IBAN, bank) are returned by the preview, pre-filled by
+*make_bank_transfer* and copied on save only when the user may read that party; otherwise the user enters the
+beneficiary IBAN / bank account. *make_bank_transfer* rejects an invoice whose party currency is neither the
+bank account currency nor the company currency (e.g. a USD supplier paid from an EGP bank).
 
 **Statuses**: Draft → *Scheduled* (future execution date; the daily job sends it on its date, catching up
 missed days; **Send Now** / **Reschedule**) → *Sent* (Payment Entry posted) → *Completed* (the bank
@@ -494,7 +514,7 @@ confirmed it: **Mark Completed** or the PDC Bank Clearing tool; the Payment Entr
 *Transfer Completion* can complete on send (all, or Fawran only). **Mark Returned** (Treasury Manager; not
 for a receipt — refund it with a new Party Payment) reverses the Payment Entry on the return date: an
 Internal Transfer without fee by a reverse Payment Entry, anything else by a Journal Entry; the fee stays
-booked unless *Refund Fees on Return* is set. **Cancel** a Scheduled or Sent transfer (its Payment Entry is
+booked unless *Refund Fees on Return* is set. The return date cannot be in the future. **Cancel** a Scheduled or Sent transfer (its Payment Entry is
 cancelled); a Completed or Returned one is returned instead. Every change is in the status log.
 
 **Internal Transfer between two currencies**: the rates are derived from the bank's own conversion (amount →

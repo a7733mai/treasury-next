@@ -14,6 +14,10 @@
 - PDC Bank Clearing matches statement lines with Sent transfers too.
 - Reports: Bank Transfer Register, Transfer Fees Analysis; Bank Position Forecast flows and summary card.
 - Bank Transfer is an accounting dimension doctype.
+- Controls: the approval threshold compares amount + fee at the higher of the transfer's and the system
+  exchange rate; the transfer limits are enforced under a Bank Account row lock with a locking count on
+  submit, Send Now, Reschedule and the daily job; the form helpers check the company and return a party's
+  bank details only to users who may read the party; return dates cannot be in the future.
 
 ## 1.0.1 — 2026-09-29
 

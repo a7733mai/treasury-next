@@ -367,6 +367,70 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 		assert_deductions(self, pe, [(self.charges, 5000.01, 0)])
 		self.assertEqual(get_party_outstanding("Sales Invoice", si.name), 9999.99)
 
+	def test_rounding_unallocated_absorbed(self):
+		"""The other form of the gap, at 50.00006: the principal 200 USD is 10,000.01 EGP (fully allocated), the
+		net 100 USD and the fee 100 USD are 5,000.01 each — the party side is over by 0.01, which ERPNext
+		would leave as an unallocated advance of 0.01. It goes into the charges row (5,000.00) instead."""
+		usd = self.data.usd
+		si = make_sales_invoice(20000)
+		name = posting.create_payment_entry(
+			source_doctype="Sales Invoice",
+			source_name=si.name,
+			event="test_bt_rounding_unallocated",
+			payment_type="Receive",
+			company=COMPANY,
+			posting_date=today(),
+			party_type="Customer",
+			party=CUSTOMER,
+			amount=200,
+			bank_account_head=usd.bank_gl,
+			reference_no="RNDU",
+			reference_date=today(),
+			currency="USD",
+			exchange_rate=50.00006,
+			references=pi_reference(si, 10000.01),
+			charges=100,
+			charges_account=self.charges,
+		)
+		pe = get_pe(name)
+		self.assertEqual(pe.docstatus, 1)
+		self.assertEqual((flt(pe.unallocated_amount), flt(pe.difference_amount)), (0, 0))
+		assert_deductions(self, pe, [(self.charges, 5000.00, 0)])
+		self.assertEqual(get_party_outstanding("Sales Invoice", si.name), 9999.99)
+		self.assertFalse(
+			frappe.get_all(
+				"Payment Ledger Entry",
+				filters={"voucher_no": name, "against_voucher_no": name, "delinked": 0},
+				pluck="name",
+			),
+			"no unallocated advance on the Payment Entry",
+		)
+
+	def test_real_advance_is_not_absorbed(self):
+		"""A principal larger than the invoice outstanding leaves a real advance, even a small one."""
+		egp = self.data.egp
+		pi = make_purchase_invoice(1000)
+		name = posting.create_payment_entry(
+			source_doctype="Purchase Invoice",
+			source_name=pi.name,
+			event="test_bt_real_advance",
+			payment_type="Pay",
+			company=COMPANY,
+			posting_date=today(),
+			party_type="Supplier",
+			party=SUPPLIER,
+			amount=1000.03,
+			bank_account_head=egp.bank_gl,
+			reference_no="ADV",
+			reference_date=today(),
+			references=pi_reference(pi, 1000),
+			charges=7,
+			charges_account=self.charges,
+		)
+		pe = get_pe(name)
+		self.assertEqual(flt(pe.unallocated_amount), 0.03)
+		assert_deductions(self, pe, [(self.charges, 7, 0)])
+
 	# ------------------------------------------------------------------ posting service
 
 	def test_posting_service_charges(self):

@@ -18,7 +18,7 @@ from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_
 	validate_expense_account,
 )
 from treasury.utils import references, voucher_summary
-from treasury.utils.party import get_party_name, validate_party_type
+from treasury.utils.party import can_read_party, get_party_name, validate_party_type
 
 # Written only by treasury.bank_transfers.lifecycle (on submit, or by the actions with `treasury_lifecycle`).
 LIFECYCLE_FIELDS = (
@@ -125,7 +125,7 @@ class BankTransfer(Document):
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 			self.set_onload("payment_entries", voucher_summary.payment_entries(self.doctype, [self.name]))
 		self.set_onload("transfer_settings", transfer_settings(self.company))
-		self.set_onload("is_manager", bool(set(lifecycle.MANAGER_ROLES) & set(frappe.get_roles())))
+		self.set_onload("is_manager", lifecycle.is_manager())
 
 	def insert(self, *args, **kwargs):
 		# a new transfer starts with an empty log, whatever the client sent (before_insert writes the first row)
@@ -142,7 +142,6 @@ class BankTransfer(Document):
 		self.status = lifecycle.DRAFT
 		self.accounting_status = lifecycle.NOT_POSTED
 		instruments.reset_draft_fields(self, DRAFT_RESET_FIELDS)
-		self.fees_refunded = 0
 		self.set_defaults()
 		self.validate_bank_accounts()
 		self.validate_party()
@@ -158,10 +157,8 @@ class BankTransfer(Document):
 
 	def before_submit(self):
 		lifecycle.check_approval(self)
-		if fees.get_limit(self.company, self.bank_account, self.method):
-			# serialise the submits on one bank account: the daily limit sees every earlier transfer
-			frappe.db.get_value("Bank Account", self.bank_account, "name", for_update=True)
-		lifecycle.check_limits_on_submit(self)
+		# Block rejects the transfer (validate already showed the Warn messages)
+		lifecycle.enforce_limits(self, warn=False)
 		if self.transfer_type == lifecycle.PARTY_PAYMENT:
 			if self.method == fees.SWIFT:
 				if not self.beneficiary_swift:
@@ -260,11 +257,13 @@ class BankTransfer(Document):
 		self.party_name = get_party_name(self.party_type, self.party)
 		# before the fee: the beneficiary's bank decides the scope
 		self._drop_stale_party_details()
-		if not self.party_bank_account:
+		# the party's bank details are copied only for a user who may read the party
+		readable = can_read_party(self.party_type, self.party)
+		if not self.party_bank_account and readable:
 			self.party_bank_account = get_party_bank_account(self.party_type, self.party)
 		if not self.contact_person and self.party_type != "Employee":
 			self.contact_person = get_default_contact(self.party_type, self.party)
-		self._validate_party_bank_account()
+		self._validate_party_bank_account(copy_details=readable)
 
 	def validate_amounts(self):
 		self.amount = flt(self.amount, self.precision("amount"))
@@ -431,8 +430,9 @@ class BankTransfer(Document):
 					)
 				)
 
-	def _validate_party_bank_account(self):
-		"""The beneficiary's bank account belongs to the party; its IBAN / bank / SWIFT fill the empty ones."""
+	def _validate_party_bank_account(self, copy_details: bool = True):
+		"""The beneficiary's bank account belongs to the party; its IBAN / bank / SWIFT fill the empty ones
+		(`copy_details`: the user may read the party)."""
 		if not self.party_bank_account:
 			return
 		account = frappe.db.get_value(
@@ -451,6 +451,8 @@ class BankTransfer(Document):
 					frappe.bold(self.party_bank_account), _(self.party_type), frappe.bold(self.party)
 				)
 			)
+		if not copy_details:
+			return
 		self.beneficiary_iban = self.beneficiary_iban or account.iban
 		self.beneficiary_bank = self.beneficiary_bank or account.bank
 		if not self.beneficiary_swift and self.beneficiary_bank:

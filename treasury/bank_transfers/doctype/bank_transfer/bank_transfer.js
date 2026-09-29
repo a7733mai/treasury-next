@@ -447,8 +447,13 @@ function bt_preview(frm, apply = true) {
 		name: frm.is_new() ? null : doc.name,
 		exchange_rate: flt(doc.exchange_rate),
 	};
+	if (doc.override_fee) {
+		// the approval rule counts the fee the user entered
+		args.fee_amount = flt(doc.fee_amount);
+	}
 	if (internal) {
 		args.to_bank_account = doc.to_bank_account;
+		args.received_amount = flt(doc.received_amount);
 	} else {
 		args.party_type = doc.party_type;
 		args.party = doc.party;

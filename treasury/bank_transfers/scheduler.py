@@ -3,7 +3,8 @@ has come.
 
 Each transfer is sent through `treasury.bank_transfers.lifecycle.send(system=True)` — the rules of "Send Now",
 without the user permission check (a scheduler job has no acting user; the approval was checked when the
-transfer was submitted) — in its own savepoint: a failing transfer is rolled back, stays Scheduled and is
+transfer was submitted), the transfer limits of the day enforced under the Bank Account lock — in its own
+savepoint: a failing transfer is rolled back, stays Scheduled and is
 logged (once per transfer and day), the others go on; each is committed on its own. Days on which the job did
 not run are caught up: every transfer due up to `as_of` is posted on its own execution date.
 """

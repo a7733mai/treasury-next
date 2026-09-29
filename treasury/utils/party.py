@@ -22,6 +22,14 @@ def validate_party_type(party_type: str | None):
 		frappe.throw(_("{0} is not a Party Type.").format(frappe.bold(party_type or "-")))
 
 
+def can_read_party(party_type: str | None, party: str | None) -> bool:
+	"""Whether the user may read the (existing) party record — role permission and User Permissions. A
+	party's bank details (default bank account, IBAN) are shown or copied only then."""
+	if not (party_type and party):
+		return False
+	return frappe.has_permission(party_type, "read", doc=party)
+
+
 def get_party_name(party_type: str, party: str) -> str:
 	"""The display name of a party, the way Payment Entry sets its `party_name`: `title` for a Shareholder,
 	`<party type>_name` when the doctype has it (customer_name, supplier_name, employee_name ...), else the
