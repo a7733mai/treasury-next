@@ -214,6 +214,8 @@ class TestPDCScheduledPosting(TreasuryTestMixin, IntegrationTestCase):
 
 	def test_a_failing_cheque_is_logged_once_a_day(self):
 		bad = self.delivered(due=-2)
+		# Error Logs survive the test rollback and cheque names repeat between runs: start from none
+		frappe.db.delete("Error Log", {"reference_doctype": DOCTYPE, "reference_name": bad.name})
 
 		def fail(doc, posting_date):
 			frappe.throw("Simulated posting failure")
