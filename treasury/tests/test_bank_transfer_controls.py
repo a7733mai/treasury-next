@@ -321,7 +321,9 @@ class TestHelperPermissions(ControlsTestCase):
 			# nor on submit (another save)
 			chosen.submit()
 			chosen.reload()
-			self.assertEqual((chosen.docstatus, chosen.beneficiary_iban, chosen.beneficiary_bank), (1, None, None))
+			self.assertEqual(
+				(chosen.docstatus, chosen.beneficiary_iban, chosen.beneficiary_bank), (1, None, None)
+			)
 		with self.set_user(READER):
 			doc = make_bank_transfer(submit=False, beneficiary_iban=None)
 		self.assertEqual((doc.party_bank_account, doc.beneficiary_iban), (self.party_account, self.iban))
