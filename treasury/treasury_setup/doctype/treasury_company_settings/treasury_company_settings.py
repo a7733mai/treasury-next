@@ -60,7 +60,9 @@ class TreasuryCompanySettings(Document):
 		self.set_onload("pe_default_series", series[0] if series else None)
 		banks = [row.bank_account for row in self.get("pdc_accounts") if row.bank_account]
 		accounts = (
-			frappe.get_all("Bank Account", filters={"name": ["in", banks]}, fields=["name", "bank", "account_name"])
+			frappe.get_all(
+				"Bank Account", filters={"name": ["in", banks]}, fields=["name", "bank", "account_name"]
+			)
 			if banks
 			else []
 		)
@@ -136,13 +138,15 @@ class TreasuryCompanySettings(Document):
 			)
 
 	# ------------------------------------------------------------------ actions
-	# POST only: they change data, and Frappe checks the CSRF token only on POST requests.
+	# POST only: they change data, and Frappe checks the CSRF token only on POST requests. They work on the
+	# saved settings, never on the (possibly edited, unvalidated) document the client sent.
 
 	@frappe.whitelist(methods=["POST"])
 	def generate_modes_of_payment(self, methods=None, bank_accounts=None):
 		"""Create the missing Modes of Payment of the banks and fill the missing map rows (see
-		treasury.accounting.payment_modes.generate); existing modes and map rows are never changed."""
-		self.check_permission("write")
+		treasury.accounting.payment_modes.generate); existing map rows are never changed, an existing mode of
+		the same name without an account for the company is given one (see README)."""
+		doc = self.saved_for_write()
 		if not set(GENERATE_ROLES) & set(frappe.get_roles()):
 			frappe.throw(
 				_("This action requires one of the roles: {0}.").format(", ".join(_(r) for r in GENERATE_ROLES)),
@@ -151,27 +155,36 @@ class TreasuryCompanySettings(Document):
 			)
 		methods = _parse_list(methods)
 		bank_accounts = _parse_list(bank_accounts)
+		# not given: the defaults; given but empty: an error (never silently the defaults)
+		if methods == [] or bank_accounts == []:
+			frappe.throw(_("Select at least one method and one bank account."))
 		for method in methods or ():
 			if method not in payment_modes.METHODS:
 				frappe.throw(_("Unknown method {0}.").format(frappe.bold(method)))
 		with elevated():
-			result = payment_modes.generate(self, methods, bank_accounts)
+			result = payment_modes.generate(doc, methods, bank_accounts)
 		# the user's write permission and role were checked above
-		self.flags.ignore_permissions = True
-		self.save()
+		doc.flags.ignore_permissions = True
+		doc.save()
 		return result
 
 	@frappe.whitelist(methods=["POST"])
 	def add_series_to_payment_entry(self, confirm=0):
 		"""Register the map's series as Payment Entry series (Document Naming Settings), after confirmation."""
 		frappe.only_for("System Manager")
-		self.check_permission("write")
+		doc = self.saved_for_write()
 		if not cint(confirm):
 			frappe.throw(_("Confirm to add the series to Payment Entry."))
-		added = payment_modes.add_series_to_payment_entry(self)
+		added = payment_modes.add_series_to_payment_entry(doc)
 		if not added:
 			frappe.msgprint(_("All series are already Payment Entry series."))
 		return added
+
+	def saved_for_write(self) -> "TreasuryCompanySettings":
+		"""The saved settings of this company, after checking the user's write permission on them."""
+		doc = frappe.get_doc(self.doctype, self.name)
+		doc.check_permission("write")
+		return doc
 
 	def warn_outgoing_on_creation(self):
 		if self.outgoing_party_posting == "On Creation":

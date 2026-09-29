@@ -248,7 +248,7 @@ class TestPESettlement(PESettlementTestCase):
 		cheque.clear(clearance_date=day(-18), bank_charges=5, exchange_rate=52)
 		warning = _(
 			"In Payment Entry mode the cheque is settled at its carrying rate {0}; the exchange difference is booked by Exchange Rate Revaluation."
-		).format(flt(50))
+		).format("50")  # formatted: "50", not the raw float "50.0"
 		self.assertIn(warning, self.messages())
 		self.assert_status(cheque, "Cleared", "Bank Posted")
 

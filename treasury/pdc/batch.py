@@ -47,6 +47,7 @@ from treasury.pdc.batch_status import (
 )
 from treasury.pdc.doctype.cheque_book.cheque_book import SCAN_CHUNK
 from treasury.pdc.doctype.pdc_cheque.pdc_cheque import STALE_CHECK_FIELDS
+from treasury.pdc.report_utils import payment_entries_by_cheque
 from treasury.utils.dates import monthly_dates
 
 CHEQUE = "PDC Cheque"
@@ -764,9 +765,30 @@ def get_receipt_cheques(batch) -> dict:
 	number, amount and due date), Cancelled / Replaced cheques left out, in batch row order. So the voucher
 	the party signs lists exactly the cheques that exist. A draft or cancelled batch prints its rows.
 	"""
-	incoming = batch.direction == lifecycle.INCOMING
+	incoming =batch.direction == lifecycle.INCOMING
 	if batch.docstatus == 1:
 		row_idx = {row.name: row.idx for row in batch.cheques}
+		live = sorted(
+			frappe.get_all(
+				CHEQUE,
+				filters={"cheque_batch": batch.name, "operational_status": ["not in", RELEASED_STATUSES]},
+				fields=[
+					"name",
+					"cheque_no",
+					"effective_due_date",
+					"amount",
+					"drawer_bank",
+					"bank_account",
+					"cheque_batch_row",
+				],
+				order_by="creation asc, name asc",
+			),
+			# stable: a replacement follows the cheques of earlier rows, in creation order
+			key=lambda c: row_idx.get(c.cheque_batch_row, len(row_idx) + 1),
+		)
+		# the submitted Payment Entries of the current cycle, like every other view (never a cancelled one,
+		# e.g. of a cheque bounced in "Cancel Payment Entry" mode)
+		payment_entries = payment_entries_by_cheque([c.name for c in live])
 		cheques = [
 			frappe._dict(
 				cheque_no=c.cheque_no,
@@ -774,27 +796,9 @@ def get_receipt_cheques(batch) -> dict:
 				amount=c.amount,
 				bank=c.drawer_bank if incoming else c.bank_account,
 				pdc_cheque=c.name,
-				payment_entry=c.party_payment_entry or "",
+				payment_entry=payment_entries.get(c.name, ""),
 			)
-			for c in sorted(
-				frappe.get_all(
-					CHEQUE,
-					filters={"cheque_batch": batch.name, "operational_status": ["not in", RELEASED_STATUSES]},
-					fields=[
-						"name",
-						"cheque_no",
-						"effective_due_date",
-						"amount",
-						"drawer_bank",
-						"bank_account",
-						"cheque_batch_row",
-						"party_payment_entry",
-					],
-					order_by="creation asc, name asc",
-				),
-				# stable: a replacement follows the cheques of earlier rows, in creation order
-				key=lambda c: row_idx.get(c.cheque_batch_row, len(row_idx) + 1),
-			)
+			for c in live
 		]
 	else:
 		cheques = [

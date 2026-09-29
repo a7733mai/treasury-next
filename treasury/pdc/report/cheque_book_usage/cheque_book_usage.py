@@ -57,10 +57,11 @@ def execute(filters=None):
 
 
 def get_book_payment_entries(books: list[str]) -> dict[str, str]:
-	"""{book: comma separated submitted Payment Entries (current cycle) of its cheques, in leaf order}."""
-	if not books:
+	"""{book: comma separated submitted Payment Entries (current cycle) of its cheques, in leaf order}; only the
+	cheques the user can read (User Permissions apply)."""
+	if not books or not frappe.has_permission("PDC Cheque", "read"):
 		return {}
-	cheques = frappe.get_all(
+	cheques = frappe.get_list(
 		"PDC Cheque",
 		filters={"cheque_book": ["in", books]},
 		fields=["name", "cheque_book"],

@@ -843,7 +843,7 @@ def _warn_carrying_rate(doc, exchange_rate, carrying_rate: float):
 		frappe.msgprint(
 			_(
 				"In Payment Entry mode the cheque is settled at its carrying rate {0}; the exchange difference is booked by Exchange Rate Revaluation."
-			).format(carrying_rate),
+			).format(frappe.format(carrying_rate, {"fieldtype": "Float", "precision": 9})),
 			title=_("Warning"),
 			indicator="orange",
 		)

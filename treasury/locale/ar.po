@@ -6808,6 +6808,9 @@ msgstr "اسم المستفيد طويل جداً."
 msgid "Supplier {0} is disabled."
 msgstr "المورد {0} معطل."
 
+msgid "A Supplier named {0} already exists but you cannot access it. Ask a user with access to Suppliers to select it."
+msgstr "يوجد مورد باسم {0} بالفعل لكن لا تملك صلاحية الوصول إليه. اطلب من مستخدم لديه صلاحية على الموردين اختياره."
+
 msgid "Set a valid Payee Supplier Group in Treasury Settings."
 msgstr "حدد مجموعة موردي مستفيدين صحيحة في إعدادات الخزينة."
 

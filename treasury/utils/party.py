@@ -51,27 +51,53 @@ def create_payee(supplier_name: str) -> dict:
 	if len(name) > PAYEE_NAME_LENGTH:
 		frappe.throw(_("The payee name is too long."))
 
-	# the default collation compares case-insensitively: "ali rent" finds "Ali Rent"
-	existing = frappe.get_all(
-		"Supplier", filters={"supplier_name": name}, fields=["name", "supplier_name", "disabled"], limit=1
-	)
-	if existing:
-		supplier = existing[0]
+	group = frappe.db.get_single_value("Treasury Settings", "payee_supplier_group")
+	# lock the Payee Supplier Group: two concurrent calls with the same name create one supplier
+	group_is_leaf = group and frappe.db.get_value("Supplier Group", group, "is_group", for_update=True) == 0
+
+	supplier = _find_payee(name, group if group_is_leaf else None)
+	if supplier:
 		if supplier.disabled:
 			frappe.throw(_("Supplier {0} is disabled.").format(frappe.bold(supplier.supplier_name)))
 		return _payee(supplier.name, supplier.supplier_name, created=False)
 
-	group = frappe.db.get_single_value("Treasury Settings", "payee_supplier_group")
-	if not group or frappe.db.get_value("Supplier Group", group, "is_group") in (None, 1):
+	if not group_is_leaf:
 		frappe.throw(_("Set a valid Payee Supplier Group in Treasury Settings."), title=_("Missing Settings"))
+	# a supplier of that name the user cannot read is neither selected nor duplicated
+	if frappe.db.exists("Supplier", {"supplier_name": name}):
+		frappe.throw(
+			_(
+				"A Supplier named {0} already exists but you cannot access it. Ask a user with access to Suppliers to select it."
+			).format(frappe.bold(name))
+		)
 
 	# the user's create permission on the cheque doctypes and role were checked above; Treasury users need
 	# not hold the Supplier create permission
 	with elevated() as user:
 		supplier = frappe.get_doc({"doctype": "Supplier", "supplier_name": name, "supplier_group": group})
 		supplier.insert(ignore_permissions=True)
-		frappe.db.set_value("Supplier", supplier.name, {"owner": user, "modified_by": user}, update_modified=False)
+		frappe.db.set_value(
+			"Supplier", supplier.name, {"owner": user, "modified_by": user}, update_modified=False
+		)
 	return _payee(supplier.name, supplier.supplier_name, created=True)
+
+
+def _find_payee(name: str, group: str | None) -> frappe._dict | None:
+	"""The Supplier named `name` that the user may pick: one they can read (User Permissions apply), else one
+	of the Payee Supplier Group (the payees Treasury created). The default collation compares
+	case-insensitively: "ali rent" finds "Ali Rent"."""
+	fields = ["name", "supplier_name", "disabled"]
+	if frappe.has_permission("Supplier", "read"):
+		readable = frappe.get_list("Supplier", filters={"supplier_name": name}, fields=fields, limit=1)
+		if readable:
+			return readable[0]
+	if group:
+		payees = frappe.get_all(
+			"Supplier", filters={"supplier_name": name, "supplier_group": group}, fields=fields, limit=1
+		)
+		if payees:
+			return payees[0]
+	return None
 
 
 def _payee(name: str, supplier_name: str, created: bool) -> dict:

@@ -980,7 +980,9 @@ def reverse_voucher(
 	already created for (source, event, cycle), of either doctype, is returned as it is."""
 	if doctype not in VOUCHER_DOCTYPES:
 		frappe.throw(_("Only Payment Entries and Journal Entries can be reversed here."))
-	source = frappe.db.get_value(doctype, name, ["treasury_source_doctype", "treasury_source_name"], as_dict=True)
+	source = frappe.db.get_value(
+		doctype, name, ["treasury_source_doctype", "treasury_source_name"], as_dict=True
+	)
 	if source and source.treasury_source_name:
 		for voucher_doctype in VOUCHER_DOCTYPES:
 			existing = find_voucher(

@@ -151,11 +151,13 @@ class SecurityCheque(Document):
 		self.set_onload("reference_doctypes", get_reference_doctypes())
 		if not self.is_new():
 			# a security cheque never posts itself: the vouchers are those of the PDC Cheque it was encashed
-			# into, and of the cheques that replaced that one
-			self.set_onload(
-				"voucher_summary",
-				voucher_summary.render_cheques(voucher_summary.cheque_chain(self.converted_pdc_cheque)),
-			)
+			# into, and of the cheques that replaced that one (only those the user can read)
+			cheques = [
+				name
+				for name in voucher_summary.cheque_chain(self.converted_pdc_cheque)
+				if frappe.has_permission("PDC Cheque", "read", doc=name)
+			]
+			self.set_onload("voucher_summary", voucher_summary.render_cheques(cheques))
 
 	def insert(self, *args, **kwargs):
 		# Frappe validates links before `before_insert`: reset whatever the client sent first.

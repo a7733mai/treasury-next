@@ -15,6 +15,7 @@ from treasury.bank_facilities.report.discounted_cheques.discounted_cheques impor
 from treasury.pdc.report.bounced_and_postponed_cheques.bounced_and_postponed_cheques import (
 	execute as bounced_report,
 )
+from treasury.pdc.report.cheque_book_usage.cheque_book_usage import get_book_payment_entries
 from treasury.pdc.report.pdc_maturity.pdc_maturity import execute as maturity_report
 from treasury.pdc.report.pdc_register.pdc_register import execute as register_report
 from treasury.security_cheques.report.security_cheque_register.security_cheque_register import (
@@ -25,11 +26,13 @@ from treasury.tests.utils import (
 	PE_SETTINGS,
 	SUPPLIER,
 	TreasuryTestMixin,
+	add_user_permission,
 	bank_account_name,
 	day,
 	ensure_instrument_accounts,
 	ensure_user,
 	make_bank_facility,
+	make_cheque_book,
 	make_cheque_discounting,
 	make_own_bank,
 	make_pdc_cheque,
@@ -42,6 +45,7 @@ from treasury.utils.print_helpers import treasury_payment_entries
 
 CHEQUE = "PDC Cheque"
 NO_ACCESS_USER = "treasury-vouchers-noaccess@example.com"
+ONE_CHEQUE_USER = "treasury-vouchers-onecheque@example.com"
 
 
 class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
@@ -49,6 +53,12 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 	def setUpClass(cls):
 		super().setUpClass()
 		ensure_user(NO_ACCESS_USER, [])  # no role: no read permission on PDC Cheque
+		# a Treasury role, restricted to single cheques by User Permissions (see `allow_only`)
+		ensure_user(ONE_CHEQUE_USER, ["Treasury User", "Accounts User"])
+
+	def allow_only(self, cheque: str):
+		"""Restrict ONE_CHEQUE_USER to `cheque` (a User Permission on PDC Cheque)."""
+		add_user_permission(ONE_CHEQUE_USER, CHEQUE, cheque)
 
 	def setUp(self):
 		super().setUp()
@@ -201,6 +211,20 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		self.assertIn(pdc.name, html)
 		self.assertIn(pdc.party_payment_entry, html)
 
+	def test_security_cheque_summary_hides_an_unreadable_pdc_cheque(self):
+		security = make_security_cheque(amount=5000, issue_date=day(-90))
+		security.receive(receipt_date=day(-80))
+		security.encash(encashment_date=day(-5), bank_account=bank_account_name("EGP"))
+		security.reload()
+		pdc = frappe.get_doc(CHEQUE, security.converted_pdc_cheque)
+		self.allow_only(make_pdc_cheque(amount=100, issue_date=day(-10), due_date=day(10)).name)
+
+		with self.set_user(ONE_CHEQUE_USER):
+			self.assertFalse(frappe.has_permission(CHEQUE, "read", doc=pdc.name))
+			html = self.load_summary(security)
+		self.assertNotIn(pdc.name, html)
+		self.assertNotIn(pdc.party_payment_entry, html)
+
 	def test_form_load_requires_read_permission(self):
 		cheque = self.outgoing_cleared()
 		getdoc(CHEQUE, cheque.name)
@@ -233,13 +257,37 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		cheque.deliver(handover_date=day(-59))
 		cheque.reload()
 		self.assertTrue(cheque.party_payment_entry)
-		_columns, data = maturity_report(
+		_columns, data, *_rest = maturity_report(
 			{"company": COMPANY, "direction": "Outgoing", "as_on": day(0), "group_by": "Party"}
 		)
 		row = next(r for r in data if r.get("group_key") == f"Supplier::{SUPPLIER}")
 		self.assertIn(cheque.party_payment_entry, row.payment_entry.split(", "))
 		total = next(r for r in data if r.get("is_total"))
 		self.assertEqual(total.payment_entry, "")
+
+	def test_cheque_book_usage_lists_readable_cheques_only(self):
+		# a leaf range of this test only
+		start = 100_000 + int(frappe.generate_hash(length=5), 16) % 800_000
+		book = make_cheque_book(start, start + 9)
+		allowed, hidden = (
+			make_pdc_cheque(
+				amount=100 * (i + 1), cheque_book=book.name, issue_date=day(-20), due_date=day(10)
+			)
+			for i in range(2)
+		)
+		for cheque in (allowed, hidden):
+			cheque.deliver(handover_date=day(-19))
+			cheque.reload()
+		self.assertEqual(
+			get_book_payment_entries([book.name]),
+			{book.name: f"{allowed.party_payment_entry}, {hidden.party_payment_entry}"},
+		)
+
+		self.allow_only(allowed.name)
+		with self.set_user(ONE_CHEQUE_USER):
+			self.assertEqual(get_book_payment_entries([book.name]), {book.name: allowed.party_payment_entry})
+		with self.set_user(NO_ACCESS_USER):
+			self.assertEqual(get_book_payment_entries([book.name]), {})
 
 	def test_bounced_report_payment_entry_column(self):
 		cheque = self.incoming_bounced()
@@ -305,6 +353,14 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 			[cheque.party_payment_entry, cheque.bank_payment_entry],
 		)
 
+	def test_jinja_helper_requires_read_permission(self):
+		cheque = self.outgoing_cleared()
+		self.assertEqual(len(treasury_payment_entries(cheque)), 2)
+		self.allow_only(make_pdc_cheque(amount=100, issue_date=day(-10), due_date=day(10)).name)
+		for user in (ONE_CHEQUE_USER, NO_ACCESS_USER):
+			with self.subTest(user=user), self.set_user(user):
+				self.assertEqual(treasury_payment_entries(cheque), [])
+
 	def test_receipt_without_payment_entry_prints_a_dash(self):
 		cheque = make_pdc_cheque(amount=700, issue_date=day(-60), due_date=day(-30))
 		html = frappe.get_print(CHEQUE, cheque.name, print_format="PDC Cheque Receipt")
@@ -313,6 +369,34 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(treasury_payment_entries(frappe._dict(doctype="Cheque Batch", name="X")), [])
 
 	def test_cheque_batch_receipt_prints_the_payment_entry_per_cheque(self):
+		batch = self.make_outgoing_batch()
+		entries = [
+			frappe.db.get_value(CHEQUE, row.pdc_cheque, "party_payment_entry") for row in batch.cheques
+		]
+		self.assertTrue(all(entries))
+
+		html = frappe.get_print("Cheque Batch", batch.name, print_format="Cheque Batch Receipt")
+		printed = re.findall(r'class="pdc-pe-no"[^>]*><bdi>([^<]*)</bdi>', html)
+		self.assertEqual(printed, entries)
+		self.assertIn('colspan="5"', html)
+
+	def test_cheque_batch_receipt_skips_cancelled_payment_entries(self):
+		# "Cancel Payment Entry" on bounce: the bounced cheque stays on the receipt, its cancelled Payment
+		# Entry does not (every view shows the submitted Payment Entries only)
+		self.use_company_settings(on_bounce="Cancel Payment Entry")
+		batch = self.make_outgoing_batch()
+		first, second = (frappe.get_doc(CHEQUE, row.pdc_cheque) for row in batch.cheques)
+		cancelled = first.party_payment_entry
+		first.bounce(bounce_date=day(-100), reason="Account closed")
+		self.assertEqual(frappe.db.get_value("Payment Entry", cancelled, "docstatus"), 2)
+
+		html = frappe.get_print("Cheque Batch", batch.name, print_format="Cheque Batch Receipt")
+		printed = re.findall(r'class="pdc-pe-no"[^>]*><bdi>([^<]*)</bdi>', html)
+		self.assertEqual(printed, ["—", second.party_payment_entry])
+		self.assertNotIn(cancelled, html)
+
+	def make_outgoing_batch(self):
+		"""A submitted outgoing batch of two cheques, handed over (a party Payment Entry each)."""
 		issue = day(-160)
 		batch = frappe.get_doc(
 			{
@@ -337,12 +421,4 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		).insert()
 		batch.submit()
 		batch.reload()
-		entries = [
-			frappe.db.get_value(CHEQUE, row.pdc_cheque, "party_payment_entry") for row in batch.cheques
-		]
-		self.assertTrue(all(entries))
-
-		html = frappe.get_print("Cheque Batch", batch.name, print_format="Cheque Batch Receipt")
-		printed = re.findall(r'class="pdc-pe-no"[^>]*><bdi>([^<]*)</bdi>', html)
-		self.assertEqual(printed, entries)
-		self.assertIn('colspan="5"', html)
+		return batch

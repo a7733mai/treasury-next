@@ -350,12 +350,6 @@ def get_linked_vouchers(row) -> str:
 	return ", ".join(row.get(f) for f in VOUCHER_FIELDS if row.get(f))
 
 
-def get_payment_entries(row) -> str:
-	"""Comma separated Payment Entries linked on a cheque row (fields PAYMENT_ENTRY_FIELDS, any docstatus);
-	the reports use `payment_entries_by_cheque`, which keeps the submitted ones only."""
-	return ", ".join(row.get(f) for f in PAYMENT_ENTRY_FIELDS if row.get(f))
-
-
 def payment_entries_by_cheque(cheque_names) -> dict[str, str]:
 	"""{cheque: comma separated submitted Payment Entries of its current cycle, oldest first} (the "Payment
 	Entry" report column: the numbers the cheque's papers are filed under). Two queries for any number of

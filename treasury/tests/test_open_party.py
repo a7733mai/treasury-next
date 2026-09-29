@@ -218,6 +218,21 @@ class TestOpenParty(TreasuryTestMixin, IntegrationTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
+		# a supplier outside the payee group that the user cannot read is neither selected nor duplicated
+		hidden_name = f"_Test Treasury Hidden Supplier {self.tag}"
+		hidden = ensure_supplier(hidden_name)
+		frappe.set_user(TREASURY_USER)
+		try:
+			self.assertFalse(frappe.has_permission("Supplier", "read"))
+			with self.assertRaisesRegex(frappe.ValidationError, "you cannot access it"):
+				create_payee(hidden_name)
+		finally:
+			frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.count("Supplier", {"supplier_name": hidden_name}), 1)
+		# a user who can read it selects it
+		found = create_payee(hidden_name)
+		self.assertEqual((found["party"], found["created"]), (hidden, False))
+
 		# a group node cannot hold suppliers
 		self.use_payee_group(frappe.db.get_value("Supplier Group", {"is_group": 1}, "name"))
 		self.assertRaises(frappe.ValidationError, create_payee, f"No Group {self.tag}")

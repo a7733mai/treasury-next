@@ -131,6 +131,28 @@ class TestPaymentModes(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual(self.map_rows(), [])
 
+	def test_generate_rejects_empty_lists(self):
+		# given but empty: an error, never silently the defaults
+		for args in (
+			{"methods": "[]"},
+			{"bank_accounts": "[]"},
+			{"methods": [], "bank_accounts": self.banks()},
+		):
+			with self.subTest(args=args):
+				with self.assertRaisesRegex(frappe.ValidationError, "Select at least one method"):
+					self.settings().generate_modes_of_payment(**args)
+		self.assertEqual(self.map_rows(), [])
+
+	def test_generate_uses_the_saved_settings(self):
+		egp = self.data.egp
+		doc = self.settings()
+		# unsaved edits of the document the client sent are ignored
+		doc.mode_name_template = "{method} Unsaved " + self.tag
+		result = doc.generate_modes_of_payment(methods=["Cheque Out"], bank_accounts=[egp.bank_account])
+		self.assertEqual(result["created"], [self.name("Cheque Out")])
+		self.assertEqual(self.map_rows(), [(egp.bank_account, "Cheque Out", self.name("Cheque Out"))])
+		self.assertEqual(self.settings().mode_name_template, "{method} - {bank} " + self.tag)
+
 	# ------------------------------------------------------------------ vouchers get the mode
 
 	def test_party_pe_gets_mapped_mode_and_override_wins(self):

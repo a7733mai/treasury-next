@@ -13,8 +13,8 @@ from frappe.utils import flt, getdate, money_in_words
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
-from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils import voucher_summary
+from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils.protected_fields import changed_fields, changed_tables
 
 NAMING_SERIES = {"Outgoing": "PDC-OUT-.YYYY.-.#####", "Incoming": "PDC-IN-.YYYY.-.#####"}

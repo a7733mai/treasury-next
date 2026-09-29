@@ -106,6 +106,22 @@ class TestPESeries(TreasuryTestMixin, IntegrationTestCase):
 			frappe.set_user("Administrator")
 		self.assertNotIn(self.series, pe_series())
 
+	def test_add_series_uses_the_saved_settings(self):
+		# a map row only in the document the client sent (unsaved, unvalidated) registers nothing
+		egp = self.data.egp
+		doc = self.settings()
+		doc.append(
+			"payment_modes",
+			{
+				"bank_account": egp.bank_account,
+				"method": "Cheque Out",
+				"mode_of_payment": ensure_mode(f"Series Mode Cheque Out {self.tag}", account=egp.bank_gl),
+				"pe_naming_series": self.series,
+			},
+		)
+		self.assertNotIn(self.series, doc.add_series_to_payment_entry(confirm=1))
+		self.assertNotIn(self.series, pe_series())
+
 	def test_series_of_another_doctype_is_refused(self):
 		# (a series ending with "#" would hit a KeyError in DocumentNamingSettings.check_duplicate)
 		options = frappe.get_meta("Journal Entry").get_naming_series_options()

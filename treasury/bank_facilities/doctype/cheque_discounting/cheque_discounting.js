@@ -83,7 +83,9 @@ frappe.ui.form.on("Cheque Discounting", {
 					},
 					...open_rows.map((row) => ({
 						fieldname: `cheque_${row.idx}`,
-						label: `${row.cheque_no} — ${row.party_name || row.party} — ${format_currency(
+						label: `${frappe.utils.escape_html(row.cheque_no)} — ${frappe.utils.escape_html(
+							row.party_name || row.party
+						)} — ${format_currency(
 							row.amount,
 							frm.doc.currency
 						)} — ${frappe.datetime.str_to_user(row.due_date)}`,

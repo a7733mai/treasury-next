@@ -17,6 +17,19 @@ Frappe file is changed.
 
 Version 1.0.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
 
+> [!IMPORTANT]
+> **Upgrading from 1.0.** The migrate patch `set_bank_settlement_voucher` switches **every existing company**
+> to *Bank Settlement Voucher* = **Payment Entry** (Treasury Company Settings, section *Vouchers*): from then
+> on the under-collection stage and the bank settlement of cheques are Internal Transfer Payment Entries (see
+> [Payment Entry settlement](#payment-entry-settlement)). In Payment Entry mode a **foreign-currency cheque is
+> settled at its carrying rate**: the realised exchange gain / loss is **no longer booked at clearance** (it
+> is left to ERPNext's *Exchange Rate Revaluation*). Companies with foreign-currency (e.g. USD) cheques that
+> want the realised exchange difference booked at clearance must set *Bank Settlement Voucher* = **Journal
+> Entry** after the migrate, before clearing any cheque (vouchers already posted are not changed either way).
+>
+> *Generate Modes of Payment* may **add an account row to an existing Mode of Payment** that has the same
+> name as a generated one (see [Modes of Payment](#modes-of-payment)).
+
 ---
 
 ### Contents
@@ -158,8 +171,14 @@ the mode and series of its bank and direction (a cheque may override the mode); 
 - *Generate Modes of Payment* (Treasury Manager / System Manager) creates the missing modes (type *Bank*,
   the bank's GL account as the company's default account) named by the *Mode Name Template* (`{method}`,
   `{bank}`, `{account}`; two accounts at the same bank get the account name appended) and fills the
-  missing rows. Existing modes and rows are never changed; a mode that already uses another account for the
-  company is skipped with the reason.
+  missing rows. Existing map rows are never changed, and a mode that already uses another account for the
+  company is skipped with the reason. **Note:** when a Mode of Payment with the generated name already exists
+  (created by hand, by another app or for another company) and has no account for this company, Generate
+  Modes of Payment **adds an account row** for this company (the bank's GL account) to that existing mode and
+  links it — Mode of Payment records are shared by all companies, and this happens even if the user has no
+  write permission on Mode of Payment. Choose a *Mode Name Template* that does not collide with modes you do
+  not want Treasury to touch. The action works on the saved settings (save your edits first); given lists of
+  methods / bank accounts must not be empty.
 - A series must be registered on Payment Entry before it is used: *Add Series to Payment Entry* (System
   Manager, with confirmation) adds the map's series through Document Naming Settings, keeping the current
   default series first. Posting on a bank whose series is not registered fails with a clear message.
@@ -177,8 +196,10 @@ A PDC Cheque or Cheque Batch may be of any ERPNext *Party Type* — Customer, Su
 Type's account type). Invoices and orders can be allocated only by an outgoing cheque to a Supplier / an
 incoming cheque from a Customer; any cheque may settle a Journal Entry. *New Payee* creates a Supplier from a
 name alone in the *Payee Supplier Group* of Treasury Settings (default *Treasury Payees*, created on
-install), or selects the existing enabled Supplier of that name. A security cheque of any party can be
-encashed (not one of an *Other* party).
+install), or selects the existing enabled Supplier of that name — one the user can read (User Permissions
+apply) or one of the Payee Supplier Group. A Supplier of that name the user cannot read is neither selected
+nor duplicated: the user is asked to have someone with access to Suppliers select it. A security cheque of
+any party can be encashed (not one of an *Other* party).
 
 ### Modules
 
