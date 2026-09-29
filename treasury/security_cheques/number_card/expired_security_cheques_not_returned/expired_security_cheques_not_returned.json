@@ -1,6 +1,6 @@
 {
  "color": "#FF5858",
- "creation": "2026-10-06 09:00:00.000000",
+ "creation": "2026-09-29 18:00:00.000000",
  "docstatus": 0,
  "doctype": "Number Card",
  "document_type": "Security Cheque",
@@ -12,7 +12,7 @@
  "is_standard": 1,
  "label": "Expired Security Cheques Not Returned",
  "method": "treasury.security_cheques.dashboard.get_security_card",
- "modified": "2026-10-06 09:00:00.000000",
+ "modified": "2026-09-29 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Cheques",
  "name": "Expired Security Cheques Not Returned",

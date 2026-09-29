@@ -49,9 +49,6 @@ msgid "PDC Account Mapping"
 msgstr "ربط حسابات الشيكات الآجلة"
 
 # Treasury Settings fields
-msgid "General"
-msgstr "عام"
-
 msgid "Default Alert Days"
 msgstr "أيام التنبيه الافتراضية"
 
@@ -62,9 +59,6 @@ msgid "Allow Future Clearance Date"
 msgstr "السماح بتاريخ صرف مستقبلي"
 
 # Treasury Company Settings fields
-msgid "Company"
-msgstr "الشركة"
-
 msgid "Outgoing Cheques"
 msgstr "الشيكات الصادرة"
 
@@ -95,16 +89,10 @@ msgstr "عند الارتداد"
 msgid "Bounce Charges Account"
 msgstr "حساب مصاريف الارتداد"
 
-msgid "Accounts"
-msgstr "الحسابات"
-
 msgid "PDC Accounts"
 msgstr "حسابات الشيكات الآجلة"
 
 # PDC Account Mapping fields
-msgid "Bank Account"
-msgstr "الحساب البنكي"
-
 msgid "PDC Payable Account"
 msgstr "حساب أوراق الدفع"
 
@@ -130,9 +118,6 @@ msgstr "في تاريخ الشيك"
 msgid "On Creation"
 msgstr "عند الإنشاء"
 
-msgid "Manual"
-msgstr "يدوي"
-
 msgid "On Actual Clearance"
 msgstr "عند الصرف الفعلي"
 
@@ -145,20 +130,11 @@ msgstr "عند الاستلام"
 msgid "On Deposit"
 msgstr "عند الإيداع"
 
-msgid "Disabled"
-msgstr "معطل"
-
 msgid "Cancel Payment Entry"
 msgstr "إلغاء سند الدفع"
 
 msgid "Reverse by Journal Entry"
 msgstr "عكس بقيد يومية"
-
-msgid "Liability"
-msgstr "خصوم"
-
-msgid "Asset"
-msgstr "أصول"
 
 # Custom fields on Payment Entry / Journal Entry
 msgid "Treasury"
@@ -179,9 +155,6 @@ msgstr "دورة الخزينة"
 # Messages
 msgid "Outgoing cheques will be posted to the party as soon as they are created, even if they are never handed over."
 msgstr "سيتم ترحيل الشيكات الصادرة على الطرف بمجرد إنشائها، حتى لو لم يتم تسليمها أبداً."
-
-msgid "Warning"
-msgstr "تحذير"
 
 msgid "Row #{0}: Bank Account {1} appears more than once."
 msgstr "الصف #{0}: الحساب البنكي {1} مكرر أكثر من مرة."
@@ -213,9 +186,6 @@ msgstr "{0} {1} لا يمكن أن يكون حساباً رئيسياً (مجم�
 msgid "{0} {1} must have Root Type '{2}'."
 msgstr "يجب أن يكون النوع الرئيسي للحساب {0} {1} هو '{2}'."
 
-msgid "Expense"
-msgstr "مصروفات"
-
 msgid "Row #{0}: {1} {2} must be in the company currency {3}."
 msgstr "الصف #{0}: يجب أن يكون الحساب {1} {2} بعملة الشركة {3}."
 
@@ -230,9 +200,6 @@ msgstr "الصف #{0}: يجب أن يكون نوع الحساب في دليل ا
 
 msgid "This voucher is managed by {0} {1}. Cancel it from there."
 msgstr "هذا السند تتم إدارته من {0} {1}. قم بإلغائه من هناك."
-
-msgid "Not Allowed"
-msgstr "غير مسموح"
 
 msgid "Treasury Company Settings are missing for company {0}."
 msgstr "إعدادات الخزينة غير موجودة للشركة {0}."
@@ -329,15 +296,10 @@ msgid "PDC Postponement"
 msgstr "تأجيل الشيك الآجل"
 
 # Cheque Book fields
-msgid "Series"
-msgstr "السلسلة"
-
 msgid "Book No"
 msgstr "رقم الدفتر"
 
-msgid "Status"
-msgstr "الحالة"
-
+msgctxt "Cheque Book"
 msgid "Leaves"
 msgstr "الأوراق"
 
@@ -359,23 +321,11 @@ msgstr "يتم إكمال أرقام الشيكات بأصفار على اليس
 msgid "Cancelled Leaves"
 msgstr "الأوراق الملغاة"
 
-msgid "Active"
-msgstr "نشط"
-
 msgid "Exhausted"
 msgstr "مستنفد"
 
-msgid "Closed"
-msgstr "مغلق"
-
 msgid "Cheque No"
 msgstr "رقم الشيك"
-
-msgid "Date"
-msgstr "التاريخ"
-
-msgid "Reason"
-msgstr "السبب"
 
 # PDC Cheque fields
 msgid "Direction"
@@ -387,21 +337,9 @@ msgstr "صادر"
 msgid "Incoming"
 msgstr "وارد"
 
-msgid "Party Type"
-msgstr "نوع الطرف"
-
 msgctxt "PDC Cheque"
 msgid "Party"
 msgstr "الطرف"
-
-msgid "Party Name"
-msgstr "اسم الطرف"
-
-msgid "Customer"
-msgstr "عميل"
-
-msgid "Supplier"
-msgstr "مورد"
 
 msgid "For incoming cheques: the bank the cheque is (or will be) deposited to."
 msgstr "للشيكات الواردة: البنك الذي تم (أو سيتم) إيداع الشيك فيه."
@@ -411,15 +349,6 @@ msgstr "اتركه فارغاً في الشيك الصادر ليتم أخذ ا�
 
 msgid "Drawer Bank"
 msgstr "بنك الساحب"
-
-msgid "Amount"
-msgstr "المبلغ"
-
-msgid "Currency"
-msgstr "العملة"
-
-msgid "Exchange Rate"
-msgstr "سعر الصرف"
 
 msgid "Cheque currency to company currency. Left empty on a foreign currency cheque, it is fetched at the party posting date."
 msgstr "من عملة الشيك إلى عملة الشركة. إذا ترك فارغاً في شيك بعملة أجنبية يتم جلبه بتاريخ ترحيل الطرف."
@@ -481,9 +410,6 @@ msgstr "التخصيص"
 msgid "Invoices / orders to settle. The allocation is final only when the cheque is posted to the party."
 msgstr "الفواتير / الأوامر المطلوب سدادها. يصبح التخصيص نهائياً فقط عند ترحيل الشيك على الطرف."
 
-msgid "References"
-msgstr "المراجع"
-
 msgid "Vouchers"
 msgstr "السندات"
 
@@ -520,12 +446,6 @@ msgstr "التأجيلات"
 msgid "Status Log"
 msgstr "سجل الحالات"
 
-msgid "More Information"
-msgstr "معلومات إضافية"
-
-msgid "Remarks"
-msgstr "ملاحظات"
-
 msgid "Cheque Image"
 msgstr "صورة الشيك"
 
@@ -559,9 +479,6 @@ msgstr "مخصوم"
 
 msgid "Replaced"
 msgstr "مستبدل"
-
-msgid "Cancelled"
-msgstr "ملغي"
 
 msgid "Not Posted"
 msgstr "غير مرحل"
@@ -597,23 +514,8 @@ msgid "Replacement Created"
 msgstr "تم إنشاء البديل"
 
 # Child table fields
-msgid "Reference Type"
-msgstr "نوع المرجع"
-
-msgid "Reference Name"
-msgstr "اسم المرجع"
-
-msgid "Allocated Amount"
-msgstr "المبلغ المخصص"
-
 msgid "Date and Time"
 msgstr "التاريخ والوقت"
-
-msgid "User"
-msgstr "المستخدم"
-
-msgid "Event"
-msgstr "الحدث"
 
 msgid "From Operational Status"
 msgstr "من الحالة التشغيلية"
@@ -627,29 +529,14 @@ msgstr "من الحالة المحاسبية"
 msgid "To Accounting Status"
 msgstr "إلى الحالة المحاسبية"
 
-msgid "Voucher Type"
-msgstr "نوع السند"
-
-msgid "Voucher No"
-msgstr "رقم السند"
-
 msgid "Old Due Date"
 msgstr "تاريخ الاستحقاق القديم"
 
 msgid "New Due Date"
 msgstr "تاريخ الاستحقاق الجديد"
 
-msgid "Contact Person"
-msgstr "الشخص المسؤول عن التواصل"
-
 msgid "Approved By"
 msgstr "اعتمده"
-
-msgid "Payment Entry"
-msgstr "سند دفع"
-
-msgid "Journal Entry"
-msgstr "قيد يومية"
 
 # Cheque Book messages
 msgid "Bank Account {0} must be a company bank account of {1}."
@@ -813,9 +700,6 @@ msgstr "فشل الإلغاء"
 msgid "This action requires one of the roles: {0}."
 msgstr "هذا الإجراء يتطلب أحد الأدوار: {0}."
 
-msgid "Not Permitted"
-msgstr "غير مصرح"
-
 msgid "Cheque {0} ({1})"
 msgstr "الشيك {0} ({1})"
 
@@ -847,9 +731,6 @@ msgid "Clearance Date {0} cannot be in the future (see Treasury Settings)."
 msgstr "لا يمكن أن يكون تاريخ الصرف {0} في المستقبل (راجع إعدادات الخزينة)."
 
 # PDC / Cheque Book UI
-msgid "Actions"
-msgstr "إجراءات"
-
 msgid "Cancel Leaf"
 msgstr "إلغاء ورقة"
 
@@ -858,9 +739,6 @@ msgstr "إغلاق الدفتر"
 
 msgid "Close this cheque book? No more cheque numbers will be allocated from it."
 msgstr "إغلاق دفتر الشيكات هذا؟ لن يتم أخذ أرقام شيكات منه بعد ذلك."
-
-msgid "Overdue"
-msgstr "متأخر"
 
 msgid "Receipt Date"
 msgstr "تاريخ الاستلام"
@@ -871,27 +749,25 @@ msgstr "تاريخ التسليم"
 msgid "No vouchers yet."
 msgstr "لا توجد سندات بعد."
 
-msgid "Draft"
-msgstr "مسودة"
-
-msgid "Submitted"
-msgstr "معتمد"
-
-msgid "Posting Date"
-msgstr "تاريخ الترحيل"
-
 msgid "Deliver"
 msgstr "تسليم"
 
+msgctxt "PDC Cheque"
+msgid "Receive"
+msgstr "استلام"
+
+msgctxt "Security Cheque"
 msgid "Receive"
 msgstr "استلام"
 
 msgid "Post to Party Now"
 msgstr "ترحيل على الطرف الآن"
 
+msgctxt "PDC Cheque"
 msgid "Deposit"
 msgstr "إيداع"
 
+msgctxt "PDC Cheque"
 msgid "Clear"
 msgstr "صرف"
 
@@ -919,17 +795,11 @@ msgstr "إرجاع للطرف"
 msgid "Return Date"
 msgstr "تاريخ الإرجاع"
 
-msgid "Replace"
-msgstr "استبدال"
-
 msgid "Cancel Cheque"
 msgstr "إلغاء الشيك"
 
 msgid "New Cheque No"
 msgstr "رقم الشيك الجديد"
-
-msgid "Due Date"
-msgstr "تاريخ الاستحقاق"
 
 msgid "Replacement Date"
 msgstr "تاريخ الاستبدال"
@@ -1621,9 +1491,6 @@ msgstr "اختياري. إذا تم تحديده، يتم تسليم / استل�
 msgid "Allocation Method"
 msgstr "طريقة التخصيص"
 
-msgid "Total Amount"
-msgstr "إجمالي المبلغ"
-
 msgid "Number of Cheques"
 msgstr "عدد الشيكات"
 
@@ -2085,9 +1952,6 @@ msgctxt "Security Cheque"
 msgid "Issue"
 msgstr "تسليم للطرف"
 
-msgid "Expired"
-msgstr "منتهي"
-
 msgid "The expiry date has passed and the cheque is still held / given."
 msgstr "انتهى تاريخ الضمان والشيك ما زال محفوظاً لدينا / لدى الطرف."
 
@@ -2111,9 +1975,6 @@ msgstr "تاريخ الشيك"
 
 msgid "The date written on the cheque, if any (a security cheque may be undated)."
 msgstr "التاريخ المكتوب على الشيك إن وجد (قد يكون شيك الضمان بدون تاريخ)."
-
-msgid "Expiry Date"
-msgstr "تاريخ الانتهاء"
 
 msgid "End of the guarantee: the cheque is due back after it."
 msgstr "نهاية الضمان: يجب رد الشيك بعده."
@@ -2589,9 +2450,6 @@ msgstr "إجمالي المتاح"
 msgid "Utilisation Refreshed On"
 msgstr "تاريخ تحديث الاستخدام"
 
-msgid "Start Date"
-msgstr "تاريخ البدء"
-
 msgid "Renewal Date"
 msgstr "تاريخ التجديد"
 
@@ -2900,9 +2758,6 @@ msgstr "الفائدة / الربح"
 
 msgid "Outstanding After"
 msgstr "المتبقي بعد القسط"
-
-msgid "Partially Paid"
-msgstr "مدفوع جزئياً"
 
 msgid "Paid Principal"
 msgstr "الأصل المدفوع"
@@ -3290,9 +3145,6 @@ msgstr "تعذر إرسال بريد تنبيه التسهيلات البنكي�
 
 msgid "Bank facility installments due up to the alert date and facilities expiring soon for {0}, as of {1}:"
 msgstr "أقساط التسهيلات البنكية المستحقة حتى تاريخ التنبيه والتسهيلات التي تنتهي قريباً لـ {0} في {1}:"
-
-msgid "Unpaid"
-msgstr "غير مدفوع"
 
 msgid "Facilities Expiring Soon"
 msgstr "تسهيلات تنتهي قريباً"
@@ -3822,9 +3674,6 @@ msgstr "إجمالي المصاريف والعمولة"
 msgid "Net Proceeds"
 msgstr "صافي المتحصلات"
 
-msgid "Outstanding Amount"
-msgstr "المبلغ القائم"
-
 msgid "The discounted cheques not paid or bounced yet (counting against the facility)."
 msgstr "الشيكات المخصومة التي لم تُسدَّد أو ترتد بعد (محسوبة على التسهيل)."
 
@@ -4004,9 +3853,6 @@ msgstr "اختر المستفيد."
 
 msgid "Bank Guarantee {0} is cancelled."
 msgstr "الضمان البنكي {0} ملغي."
-
-msgid "Reference Type must be one of: {0}."
-msgstr "يجب أن يكون نوع المرجع أحد: {0}."
 
 msgid "Select the Reference Name."
 msgstr "اختر اسم المرجع."

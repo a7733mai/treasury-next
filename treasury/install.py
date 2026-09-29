@@ -214,10 +214,15 @@ def get_custom_fields() -> dict[str, list[dict]]:
 	return {doctype: get_voucher_fields(after) for doctype, after in VOUCHER_INSERT_AFTER.items()}
 
 
+def custom_fields_to_delete() -> list[tuple[str, str]]:
+	"""(doctype, fieldname) of every custom field `before_uninstall` removes: exactly those `setup` creates."""
+	return [(doctype, fieldname) for doctype in VOUCHER_INSERT_AFTER for fieldname in TREASURY_FIELDNAMES]
+
+
 def delete_custom_fields():
+	for doctype, fieldname in custom_fields_to_delete():
+		name = frappe.db.get_value("Custom Field", {"dt": doctype, "fieldname": fieldname})
+		if name:
+			frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
 	for doctype in VOUCHER_INSERT_AFTER:
-		for fieldname in TREASURY_FIELDNAMES:
-			name = frappe.db.get_value("Custom Field", {"dt": doctype, "fieldname": fieldname})
-			if name:
-				frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
 		frappe.clear_cache(doctype=doctype)

@@ -244,7 +244,7 @@ frappe.ui.form.on("PDC Cheque", {
 			if (outgoing) {
 				pdc_action(frm, "deliver", __("Deliver"), [date("handover_date", __("Handover Date")), remarks]);
 			} else {
-				pdc_action(frm, "receive", __("Receive"), [date("receipt_date", __("Receipt Date")), remarks]);
+				pdc_action(frm, "receive", __("Receive", null, "PDC Cheque"), [date("receipt_date", __("Receipt Date")), remarks]);
 			}
 		}
 
@@ -262,7 +262,7 @@ frappe.ui.form.on("PDC Cheque", {
 		}
 
 		if (!outgoing && status === "Received") {
-			pdc_action(frm, "deposit", __("Deposit"), [
+			pdc_action(frm, "deposit", __("Deposit", null, "PDC Cheque"), [
 				date("deposit_date", __("Deposit Date")),
 				{
 					fieldname: "bank_account",
@@ -279,7 +279,7 @@ frappe.ui.form.on("PDC Cheque", {
 
 		const clearable = outgoing ? ["Delivered"] : ["Received", "Deposited"];
 		if (clearable.includes(status)) {
-			pdc_action(frm, "clear", __("Clear"), [
+			pdc_action(frm, "clear", __("Clear", null, "PDC Cheque"), [
 				date("clearance_date", __("Actual Clearance Date")),
 				{
 					// an incoming cheque received without a bank: the bank it was cleared into

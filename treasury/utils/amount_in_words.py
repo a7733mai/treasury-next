@@ -44,7 +44,7 @@ def treasury_amount_in_words(amount, currency: str | None = None, lang: str | No
 			fraction_name, fraction_units = values.fraction, cint(values.fraction_units)
 
 	main = int(amount)
-	fraction = int(round((amount - main) * fraction_units)) if fraction_units else 0
+	fraction = round((amount - main) * fraction_units) if fraction_units else 0
 	if fraction_units and fraction >= fraction_units:
 		main, fraction = main + 1, 0
 

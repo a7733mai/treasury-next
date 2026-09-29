@@ -195,7 +195,7 @@ frappe.ui.form.on("Security Cheque", {
 
 		if (status === "Created") {
 			if (incoming) {
-				sec_action(frm, "receive", __("Receive"), [
+				sec_action(frm, "receive", __("Receive", null, "Security Cheque"), [
 					date("receipt_date", __("Receipt Date")),
 					location(0),
 					custodian,

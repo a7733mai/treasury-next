@@ -5,15 +5,15 @@ from the first repayment date (default: one period after the drawdown date), cou
 the day never drifts, and a first date on a month end keeps every date on a month end
 (treasury.utils.dates.monthly_dates). Frequency Bullet: one installment at the end of the tenor.
 
-Interest of a row = outstanding principal before the row × rate × days of the period / day-count basis
+Interest of a row = outstanding principal before the row x rate x days of the period / day-count basis
 (Actual/365 or Actual/360), the period running from the previous due date (the drawdown date for the first
 row) to the row's due date. Every amount is rounded to the currency precision; the principal of the last row
 absorbs the rounding, so the principal always adds up to the drawdown amount exactly.
 
 Methods:
 - Equal Principal: the principal is split evenly over the amortising rows.
-- Equal Installment (annuity): installment = P·r / (1 − (1 + r)^−n) with r = rate × months per period / 12
-  (the periodic nominal rate); each row's principal = installment − its day-count interest, so the rows'
+- Equal Installment (annuity): installment = P*r / (1 - (1 + r)^-n) with r = rate x months per period / 12
+  (the periodic nominal rate); each row's principal = installment - its day-count interest, so the rows'
   totals are equal except the last one, which repays whatever principal is left.
 - Bullet: the whole principal on the last row; interest on every row.
 Grace months: the first rows (grace months / months per period) are interest only.

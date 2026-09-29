@@ -490,7 +490,7 @@ class TestProjectedPartyStatement(ReportTestCase):
 				**filters,
 			}
 		)
-		columns, data, _m, _chart, summary = report.run()
+		_columns, data, _m, _chart, summary = report.run()
 		return report, data, summary
 
 	@staticmethod

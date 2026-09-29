@@ -4,8 +4,8 @@ The job posts, for every submitted drawdown and every month that has ended, one 
 end: Dr Interest Expense / Cr the facility's Accrued Interest Account (event `interest_accrual:YYYY-MM`, so a
 second run finds it and posts nothing).
 
-Amount of a month = interest earned up to the month end − interest already recognised, never negative:
-- earned up to D = Σ over the schedule rows of row interest × elapsed days of its period up to D / days of the
+Amount of a month = interest earned up to the month end - interest already recognised, never negative:
+- earned up to D = sum over the schedule rows of row interest x elapsed days of its period up to D / days of the
   period (day-count interest accrues day by day, a Murabaha profit straight-line over its period);
 - recognised up to D = the accruals already posted up to D + the interest the repayments dated up to D
   booked straight to Interest Expense (the part not covered by accrued interest).

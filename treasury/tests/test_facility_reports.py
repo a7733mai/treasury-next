@@ -158,7 +158,7 @@ class TestBankPositionForecastIntegration(FacilityReportTestCase):
 				**filters,
 			}
 		)
-		columns, data, _message, _chart, summary = report.run()
+		_columns, data, _message, _chart, summary = report.run()
 		return report, data, summary
 
 	def test_unpaid_installments_are_outflows(self):

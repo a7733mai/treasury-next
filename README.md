@@ -1,71 +1,154 @@
-### Treasury
+## Treasury
 
-Post-dated cheques, security cheques, multi-cheque vouchers and bank facilities for ERPNext
+Post-dated cheques, security cheques, multi-cheque vouchers and bank facilities for ERPNext v16.
+
+**English.** Treasury manages the cheques a company writes and receives (post-dated cheques with their full
+lifecycle and configurable posting events), multi-cheque vouchers (e.g. 12 rent cheques in one document),
+guarantee cheques that never touch the ledger, and bank credit facilities (limits, loans, Murabaha,
+Letters of Guarantee / Credit, cheque discounting), with a bank position forecast and Arabic / English
+print formats. Every accounting effect is a standard ERPNext Payment Entry or Journal Entry; no ERPNext or
+Frappe file is changed.
+
+**العربية.** تطبيق الخزينة لـ ERPNext بيدير الشيكات الآجلة الصادرة والواردة بدورة حالات كاملة وأحداث ترحيل
+قابلة للضبط لكل شركة، وسند الشيكات المتعدد (زي 12 شيك إيجار في مستند واحد)، وشيكات الضمان من غير أي قيد
+محاسبي، والتسهيلات البنكية (الحدود، والقروض، والمرابحة، وخطابات الضمان، والاعتمادات المستندية، وخصم
+الأوراق التجارية)، ومعاهم تقرير مركز البنك المتوقع وطباعة عربي وإنجليزي. كل القيود بتطلع كـ Payment Entry
+أو Journal Entry قياسية، ومن غير أي تعديل على كود ERPNext أو Frappe.
+
+Version 1.0.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
+
+---
+
+### Contents
+
+1. [Installation](#installation)
+2. [Configuration](#configuration)
+3. [Modules](#modules): [PDC Cheques](#pdc-cheques), [Cheque Batch](#cheque-batch-multi-cheque-voucher),
+   [Security Cheques](#security-cheques), [Bank Facilities](#bank-facilities)
+4. [Reports and workspace](#reports-and-workspace)
+5. [Roles and permissions](#roles-and-permissions)
+6. [Scheduled jobs](#scheduled-jobs)
+7. [Known limitations and follow-ups](#known-limitations-and-follow-ups)
+8. [Testing](#testing)
+
+---
 
 ### Installation
-
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
 bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app treasury
+bench --site <site> install-app treasury
+bench compile-po-to-mo --app treasury      # Arabic translations (locale/ar.po -> sites/assets/locale)
 ```
 
-### Roles and permissions
+- Requires ERPNext (the app links to Company, Account, Bank Account, Payment Entry, Journal Entry ...).
+- **No Node.js needed.** The app ships no JS bundle (`*.bundle.js`, `app_include_js`): client code lives in
+  the DocType / report `.js` files and in `public/js/voucher_treasury_link.js`, loaded by `doctype_js`, so
+  `bench build` is not required for it. This is what makes it installable in **frappe_docker** runtime
+  containers (which have no Node): add the app to the image (or copy it into every Python container —
+  backend, queue workers, scheduler — and `pip install -e` it), then run `install-app` / `migrate` and
+  `compile-po-to-mo` from the backend container (the MO files land in the shared `sites` volume). Restart
+  the workers and the scheduler afterwards.
+- `after_install` / `after_migrate` (idempotent, safe on a fresh site without any Treasury Company
+  Settings): creates the module definitions and the roles *Treasury Manager*, *Treasury User*, *Cheque
+  Approver*; creates / updates the custom fields on Payment Entry and Journal Entry; stores the missing
+  Treasury Settings defaults; removes, once per site, the Custom DocPerm grants of development versions.
+- **Uninstall** (`before_uninstall`) removes exactly the custom fields the app created on Payment Entry /
+  Journal Entry (`treasury_section`, `treasury_source_doctype`, `treasury_source_name`, `treasury_event`,
+  `treasury_cycle`) and nothing else from core. The three roles and their assignment to users are kept on
+  purpose (without the app they grant nothing); delete them in *Role* if they are not wanted. The vouchers
+  created by Treasury stay ordinary Payment / Journal Entries.
 
-- **Treasury Manager**, **Treasury User** and **Cheque Approver** are *process* roles: they give access to
-  the Treasury doctypes (PDC Cheque, Cheque Book, PDC Bank Clearing, settings) and to the cheque actions
-  (Deliver, Receive, Deposit, Clear, Bounce, ...). The actions check the user's permission on the cheque
-  and, where required, the role (e.g. Bounce / Replace / Cancel need Treasury Manager).
-- **Posting needs no accounting permission.** The Payment Entries and Journal Entries of a cheque are
-  created, submitted and cancelled by the posting service (`treasury/accounting/posting.py`) in an elevated
-  context, only after the permission check on the cheque. A Treasury user does not need (and the app does
-  not grant) any permission on Payment Entry, Journal Entry, Account, Bank Transaction, etc.
-- **Masters used in the forms still need read access.** To pick a Customer / Supplier / Bank Account /
-  Company in the cheque form and the PDC Bank Clearing tool, and to open the linked vouchers, users need
-  read access to those masters, normally through a standard ERPNext role (e.g. *Accounts User*) or your
-  own role configured in Role Permission Manager. User Permissions (e.g. per company) are respected: the
-  PDC Bank Clearing tool only lists the cheques and bank accounts the user may read.
-- The vouchers' `owner` / `modified_by` is the user who ran the cheque action (Administrator for scheduled
-  postings), like the cheque's status log; their GL entries and version history show Administrator, the
-  user they were technically saved as.
-- The app changes no standard permission of ERPNext doctypes. Development versions before this one granted
-  the Treasury roles read access to some core doctypes through Custom DocPerm; the first `bench migrate`
-  removes those rows and resets doctypes whose permissions were only a copy of the standard ones.
-- Uninstalling the app keeps the three roles and their assignment to users (they have no permission left);
-  delete them in *Role* if they are no longer wanted.
+### Configuration
 
-### Reports and workspace
+**Treasury Settings** (single, global): *Default Alert Days* for PDC due alerts (default 3), *Security
+Cheque Alert Days* (default 15), *Facility Alert Days* (default 7), *Allow Future Clearance Date* (default
+off). `bench migrate` stores the default of any of these fields a site has no value for yet.
 
-- The **Treasury** workspace (sidebar + desktop icon) holds the PDC number cards, the *Expected Cash Flow*
-  and *PDC by Status* charts and links to the six PDC reports: Bank Position Forecast, Projected Party
-  Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage.
-- Reports only read data. Cheques are read with the user's permissions and User Permissions; a user
-  restricted to other companies gets a permission error for a forbidden Company filter.
-  The workspace and its desktop icon are shown to Treasury Manager / User, Accounts Manager / User and
-  System Manager. Bank accounts excluded by a User Permission (Bank Account, for PDC Cheque) are left out
-  of the forecast's GL balances.
-- **Bank Position Forecast**: opening and actual movements come from the bank GL only (it moves on the
-  bank posting of a cheque); every cheque whose bank posting is still to come is an expected flow on its
-  effective (possibly postponed) due date — or, for a cheque cleared but not bank posted yet (Manual
-  mode), on the bank transaction / clearance date. Past-dated flows form the *Overdue* row (counted as
-  today); with a From Date after today, the flows from today up to it form a *Brought Forward* row. Other
-  modules add flows through the `treasury_forecast_sources` hook (see `treasury/pdc/forecast_sources.py`).
-- **Projected Party Statement**: the projected rows stop at To Date; the exposure summary counts every
-  unposted cheque of the party, whatever its due date.
-- **Bounced and Postponed Cheques**: a bounce is dated by the bounce date the user entered, stored in the
-  status log's `Event Date` (every dated lifecycle action and voucher records its date there).
-- **Number cards vs. the forecast** (deliberate): the cards count cheques still in circulation — outgoing
-  Created + Delivered, incoming Received + Deposited — so a written but not handed over outgoing cheque is
-  outstanding, and a cheque already cleared by the bank (Manual bank posting pending) is not, although the
-  forecast still expects its bank posting. "Due in 7 Days" means due today or in the next 7 days (0 to 7
-  days, both included), the same convention as the *0-7 Days* bucket of PDC Maturity. Without a company
-  and a default company, the sum cards show 0.
-- Generic words of the reports are translated with the context `Treasury Report` (see `locale/ar.po`),
-  so the app never changes ERPNext's own translation of the same words.
+**Treasury Company Settings** (one per company) — the posting events, each set separately for outgoing and
+incoming cheques:
 
-### Cheque Batch (multi-cheque voucher)
+| Setting | Options (default first) |
+|---|---|
+| Outgoing Party Posting | **On Handover**, On Cheque Date, On Creation (warns: the cheque may never be handed over), Manual |
+| Outgoing Bank Posting | **On Actual Clearance**, On Bank Transaction Date, Manual |
+| Incoming Party Posting | **On Receipt**, On Cheque Date, Manual |
+| Incoming Under Collection Stage | **On Deposit**, Disabled |
+| Incoming Bank Posting | **On Actual Clearance**, On Bank Transaction Date, Manual |
+| On Bounce | **Reverse by Journal Entry**, Cancel Payment Entry |
+| Bounce Charges Account | Expense account (company currency) credited with the charges re-billed to the customer |
+| Accrue Facility Interest Monthly | off by default (see Bank Facilities) |
+
+**PDC Accounts** (child table *PDC Account Mapping*, one row per company bank account):
+
+| Account | Account Type | Root Type | Currency |
+|---|---|---|---|
+| PDC Payable Account (أوراق دفع) | Bank | Liability | the bank account's |
+| PDC Receivable Account (أوراق قبض) | Bank | Asset | the bank account's |
+| Under Collection Account (شيكات تحت التحصيل) | Bank | Asset | the bank account's; required when Under Collection is *On Deposit* |
+| Bank Charges Account | — | Expense | company currency |
+| Cheque Print Format | optional default print format for the cheque leaf | | |
+
+The PDC accounts have Account Type *Bank* because ERPNext's Payment Entry only pays from / to Bank or Cash
+accounts; they sit under current liabilities / assets, not with the real banks. The bank account's own GL
+account must have Account Type *Bank*.
+
+**Posting events matrix** (all vouchers are created and submitted by `treasury/accounting/posting.py`,
+linked back through the read-only `treasury_source_doctype` / `treasury_source_name` / `treasury_event` /
+`treasury_cycle` fields, and never created twice for the same event and cycle):
+
+| Event (when) | Voucher | Entry |
+|---|---|---|
+| Outgoing party posting (handover date / due date by the daily job / issue date / *Post to Party Now*) | Payment Entry (Pay) | Dr Supplier (or Customer) / Cr PDC Payable, allocated to the cheque's invoices / orders |
+| Incoming party posting (receipt date / due date by the daily job / *Post to Party Now*) | Payment Entry (Receive) | Dr PDC Receivable / Cr Customer (or Supplier), allocated |
+| Incoming deposit (Under Collection *On Deposit*) | Journal Entry | Dr Under Collection / Cr PDC Receivable |
+| Bank posting (clearance date / bank transaction date via *PDC Bank Clearing* / *Post to Bank*) | Journal Entry (clearance date set) | outgoing: Dr PDC Payable / Cr Bank; incoming: Dr Bank / Cr Under Collection (or PDC Receivable) — plus exchange gain / loss for foreign currency |
+| Bank charges at clearance | Journal Entry | Dr Bank Charges / Cr Bank |
+| Bounce after the party posting | Cancel of the Payment Entry, or reversal Journal Entry (per *On Bounce*) | the party owes / is owed again; later postings (under collection) are reversed too |
+| Bounce charges (incoming) | Journal Entry | Dr Customer / Cr Bounce Charges Account |
+| Clearing before the party posting | party posting first, then the bank posting | |
+| Security cheque (any action) | **none** | only an encashment creates a PDC Cheque, which posts as above |
+
+A Payment Entry or Journal Entry managed by Treasury cannot be cancelled or deleted from its own form (the
+form links to the cheque / facility document, which undoes it).
+
+### Modules
+
+#### PDC Cheques
+
+- **PDC Cheque** (PDC-OUT- / PDC-IN-): direction, party (Customer / Supplier), bank account, cheque book
+  (outgoing: the next free leaf is allocated when the Cheque No is left empty), cheque no, drawer bank,
+  amount, currency (always the bank account's; company currency while an incoming cheque has no bank),
+  exchange rate, references to invoices / orders (the allocation becomes final at the party posting; what
+  is no longer outstanding then stays an unallocated advance, with a message).
+- **Distinct dates**: issue, handover / receipt, original due, effective due (moved by postponements),
+  deposit, actual clearance, bank transaction, party posting, bank posting. The print date is never stored.
+- **Two statuses**, set only by the actions: operational (Created, Delivered / Received, Deposited,
+  Cleared, Bounced, Returned, Endorsed, Discounted, Replaced, Cancelled; *Postponed* is a flag with a
+  counter, *Overdue* an indicator) and accounting (Not Posted, Party Posted, Under Collection Posted, Bank
+  Posted, Reversed). Every transition appends a status log row (from / to statuses, date and time, event
+  date entered by the user, user, remarks, voucher).
+- **Actions** (POST only; they check the permission on the cheque and, where required, the role): Deliver /
+  Receive, Post to Party Now, Deposit, Clear (optionally with bank charges and the clearance rate), Post
+  to Bank, Postpone (new due date, reason, contact person — Cheque Approver or Treasury Manager), Bounce
+  (charges), Re-present, Replace (new cheque linked both ways), Return to Party, Cancel Cheque, plus the
+  discounting actions. Every action's date may not precede the cheque's issue date or its latest event.
+  Status, dates, links and vouchers cannot be written through the form or the REST API; identity fields
+  (party, bank, amount, cheque no ...) lock once the cheque is handed over / received or posted.
+- **Cheque Book**: bank account, leaf range, next number, cancelled leaves (with reason); numbers are
+  allocated under a lock, never reused, and the book becomes Exhausted on its last leaf. Cheque numbers are
+  unique per bank account across PDC and security cheques.
+- **PDC Bank Clearing** tool: suggests matches between open Bank Transactions and cheques (cheque no /
+  amount, date tolerance), clears the selected cheques with the bank transaction date and reconciles the
+  Bank Transaction against the bank Journal Entry — the engine of *On Bank Transaction Date*. It only
+  lists the cheques and bank accounts the user may read.
+- **Print formats**: *PDC Cheque Receipt* (receipt / delivery voucher with the print date = today, amounts
+  in words in Arabic or English) and *PDC Cheque Print* (the cheque leaf); right-to-left in Arabic.
+- **Multi-currency**: the cheque carries its rate (or the rate of the party posting date); the bank posting
+  uses the clearance rate and ERPNext books the exchange gain / loss.
+
+#### Cheque Batch (multi-cheque voucher)
 
 - **What it is.** One voucher for many post-dated cheques to / from one party, e.g. 12 monthly rent cheques
   to a landlord. The *Installment Generator* fills the rows (count, frequency — monthly to yearly, weekly
@@ -102,19 +185,15 @@ bench install-app treasury
 - **Why the Payment Entry is not changed.** A Payment Entry has one amount, one reference no / date and
   one clearance date, and the Bank Reconciliation matches it as a whole; a multi-cheque Payment Entry would
   need overriding ERPNext. Each cheque keeps its own Payment Entry / Journal Entries instead.
-- **Scope limits.** Party cheques only (Customer / Supplier): a payee without a party (e.g. rent booked
-  straight to an expense account, PLAN.md §6) is not supported yet, since a PDC Cheque requires a party.
-  One reference per row. FIFO needs the party account in the cheque currency. The batch's `cheque_batch` /
-  `cheque_batch_row` link on a cheque is set only by the batch and cannot be changed.
 
-### Security Cheques
+#### Security Cheques
 
 - **What it is.** A guarantee cheque (شيك ضمان) held from a party (*Incoming*: tender, contract performance,
   advance payment, rent, employee custody ...) or given to a party (*Outgoing*), numbered SEC-IN- / SEC-OUT-.
   The party is a Customer, Supplier, Employee or *Other* (a free-text name). A cheque may reference the
   document it guarantees (Project, Contract, Sales / Purchase Order, Quotation, Supplier Quotation,
-  Employee — and Bank Facility once that DocType exists), carries the *Required Amount* of that document,
-  an optional cheque date (a security cheque may be undated) and an expiry date (end of the guarantee).
+  Employee, Bank Facility), carries the *Required Amount* of that document, an optional cheque date (a
+  security cheque may be undated) and an expiry date (end of the guarantee).
 - **No accounting, ever.** A security cheque never creates a GL entry, Payment Ledger entry, Payment Entry
   or Journal Entry, whatever happens to it (receive, custody, return, lost, cancel). The tests check the
   company's ledgers after every action. The only way to accounting is *Encash*, through a PDC Cheque.
@@ -144,67 +223,36 @@ bench install-app treasury
   company changes, and a cheque inserted through the API without a currency gets the company currency.
 - **Open / Blank cheques** carry no amount (the Amount must stay empty). Creating one (or turning a cheque
   into one), receiving or issuing it needs the **Treasury Manager** role.
-- **Roles.** Treasury Users create and handle security cheques (receive, issue, custody, return, cancel);
-  *Mark as Lost* and *Encash* need Treasury Manager.
 - **Cheque book (outgoing).** An outgoing security cheque may take the next leaf of a Cheque Book of its
   bank account (Cheque No left empty). The leaf is consumed for good: cancelling, returning or losing the
   security cheque frees nothing, it is never allocated again, cannot be cancelled as an unused leaf, and
-  counts as *Used* in Cheque Book Usage. Our outgoing cheque numbers are unique per bank account across
-  security and PDC cheques. A security cheque that took a leaf, or on which any action happened, cannot be
-  deleted (cancel it instead).
-- **Encash → PDC Cheque** (Treasury Manager): allowed for a Customer / Supplier party only (Employee and
-  Other are refused for now). The user gives the encashment date, the amount (required for Open / Blank; a
-  Fixed cheque is encashed for its own amount), the due date (default: the encashment date) and, for an
-  incoming cheque, the bank account it is deposited to — it must be in the security cheque's currency (the
-  dialog offers only those; a bank in another currency is refused before anything is created).
+  counts as *Used* in Cheque Book Usage. A security cheque that took a leaf, or on which any action
+  happened, cannot be deleted (cancel it instead).
+- **Encash → PDC Cheque** (Treasury Manager): allowed for a Customer / Supplier party only. The user gives
+  the encashment date, the amount (required for Open / Blank; a Fixed cheque is encashed for its own
+  amount), the due date (default: the encashment date) and, for an incoming cheque, the bank account it is
+  deposited to — it must be in the security cheque's currency (the dialog offers only those).
   - Incoming: a PDC Cheque (Incoming, same party, cheque no and drawer bank) is created and **received**
-    on the encashment date, so it is posted per Treasury Company Settings like any cheque (e.g. `On
-    Receipt`: Payment Entry at once; `On Cheque Date`: by the daily job). Invoice / order references may
-    be passed to settle them; without references the amount is an advance of the party.
+    on the encashment date, so it is posted per Treasury Company Settings like any cheque. Invoice / order
+    references may be passed to settle them; without references the amount is an advance of the party.
   - Outgoing: a PDC Cheque (Outgoing, same bank account and cheque no, no cheque book) is created and
     **delivered** on the encashment date; clear it through the PDC flow when the bank pays it.
   - The PDC Cheque's issue date is the encashment date (an `On Creation` posting is never back-dated). It
-    links back through its read-only *Security Cheque* field (set only by the encashment), the security
-    cheque becomes Encashed with *Converted PDC Cheque* set. All or nothing: if the PDC Cheque cannot be
-    created or received / delivered, nothing is kept (the PDC Cheque, its `On Creation` posting and the
-    security cheque's Encashed state are rolled back together).
-  - Replacing that PDC Cheque carries the *Security Cheque* link to the replacement; the security cheque's
-    *Converted PDC Cheque* keeps pointing at the first one, whose *Replaced By* leads on.
-- **Alerts.** A daily job (`treasury.security_cheques.scheduler.send_security_expiry_alerts`) sends each
-  Treasury Manager / User one digest per company and day of the cheques still held / given that expired
-  (not returned) or expire within *Security Cheque Alert Days* (Treasury Settings, default 15) — only the
-  cheques they may read, in their language, as a notification and, if outgoing email is set up, by email.
-  A setting never stored counts as 15 (and `bench migrate` stores the missing Treasury Settings defaults);
-  an explicit 0 means "expired cheques only".
-- **Reports and cards** (Security Cheques section of the Treasury workspace): *Security Cheque Register*,
-  *Security Exposure* (held from others vs given to others, by party or by reference document with Required
-  / Actual / Shortfall — the requirement of a document is the highest Required Amount on its cheques, not
-  their sum; a cheque without a reference is its own row; Open / Blank cheques are counted, never summed,
-  and when a document's fixed cheques fall short but it also has Open / Blank ones the shortfall is left
-  blank — "Covered by Open / Blank" — and not counted in the Total Shortfall; a document guaranteed by
-  several parties shows "Several Parties"),
-  *Security Cheques by Custody*, *Expired Security Cheques Not Returned*; number cards *Security Held*
-  (incoming Received + In Custody), *Security Given* (outgoing Issued), *Security Cheques Expiring in 30
-  Days* (today to today + 30) and *Expired Security Cheques Not Returned*. Amounts are in the company
-  currency (a cheque in another currency is converted at today's rate; company currency cheques are never
-  converted); reports and cards read with the user's permissions and User Permissions. The register totals
-  each direction separately (held and given are never added together). A party of type Other has no
-  Party link in the reports (its name is in Party Name).
+    links back through its read-only *Security Cheque* field; the security cheque becomes Encashed with
+    *Converted PDC Cheque* set. All or nothing: if the PDC Cheque cannot be created or received /
+    delivered, nothing is kept. Replacing that PDC Cheque carries the *Security Cheque* link to the
+    replacement.
 - **Print.** *Security Cheque Receipt*: receipt (incoming) / handover acknowledgment (outgoing) with the
   print date (today), party, cheque, amount or "Open / Blank", purpose, reference, expiry, custody location
   and signatures; right-to-left in Arabic.
-- **Scope limits / follow-ups.** Encashing against a claim or penalty income account by Journal Entry
-  (PLAN.md §7: "a penalties / income account") is not implemented: an encashment settles the party's
-  invoices or stays an advance of the party, to be reconciled or adjusted later. Encashment for Employee /
-  Other parties, alerts before the end of the linked contract, approval workflow for open / blank cheques
-  and memo (off-balance-sheet) accounts are follow-ups.
 
-### Bank Facilities
+#### Bank Facilities
 
 Credit facilities with banks: the agreement and its sub-limits, drawdowns with their repayment schedules,
-repayments and interest. Everything is our own DocTypes; the Lending app is **not** used or required.
-All accounting goes through `treasury.accounting.posting` as standard Journal Entries linked back to the
-drawdown / repayment (`treasury_source_*`), idempotent per source, event and month.
+repayments and interest, Letters of Guarantee, Letters of Credit and cheque discounting. Everything is our
+own DocTypes; the Lending app is **not** used or required. All accounting goes through
+`treasury.accounting.posting` as standard Journal Entries (and one Payment Entry for LC settlements)
+linked back to the source document, idempotent per source, event and month.
 
 - **Bank Facility** (not submittable; statuses by actions only — Treasury Manager): Draft → *Activate* →
   Active ⇄ *Suspend* (reason required) / *Reactivate* → *Close* (only with nothing utilised and no unpaid
@@ -218,20 +266,19 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   while the facility has a submitted drawdown). Optional collateral notes and linked Security Cheques (no
   accounting).
 - **Sub-limits** (*Bank Facility Limit*): Overdraft, Short / Long Term Loan, Letter of Guarantee, Letter of
-  Credit, Cheque Discounting, Murabaha, Tawarruq, Other; rate type (fixed / variable reference + margin, the
-  all-in rate is entered; **a variable rate is informational only — nothing is repriced** when the reference
-  rate moves: enter the new rate on new drawdowns), day count (Actual/365, Actual/360), commission and cash margin. Each sub-limit is
-  at most the total limit; together they may exceed it (lines share the total). Loans / Murabaha / Tawarruq
-  / Other need a liability account in the facility currency.
+  Credit, Cheque Discounting, Murabaha, Tawarruq, Other; rate type (fixed / variable reference + margin,
+  the all-in rate is entered), day count (Actual/365, Actual/360), commission and cash margin. Each
+  sub-limit is at most the total limit; together they may exceed it (lines share the total). Loans /
+  Murabaha / Tawarruq / Other need a liability account in the facility currency.
 - **Utilisation** (`treasury.bank_facilities.utilisation.get_utilisation(facility, limit_type, as_on)`) is
   computed from the ledger, never from stored numbers: loans = the balance of each drawdown's liability
   account on the Journal Entries linked to the drawdown or its repayments (other postings on the same
   account never count); Overdraft = max(0, − GL balance of the Default Bank Account's GL account). Available
-  = min(sub-limit − its utilisation, total limit − total utilisation). Other documents (Letters of Guarantee
-  / Credit, Cheque Discounting — see below) add utilisation through the hook
-  `treasury_facility_utilisation_sources` (functions `(facility_doc, as_on) -> [{"limit_type", "amount"}]`).
-  The *Utilised* / *Available* fields on the facility are display only (refreshed after every action and
-  daily); reports, cards and the drawdown limit check use the API.
+  = min(sub-limit − its utilisation, total limit − total utilisation). Letters of Guarantee / Credit and
+  Cheque Discounting add utilisation through the hook `treasury_facility_utilisation_sources` (functions
+  `(facility_doc, as_on) -> [{"limit_type", "amount"}]`). The *Utilised* / *Available* fields on the
+  facility are display only (refreshed after every action and daily); reports, cards and the limit checks
+  use the API.
 - **Facility Drawdown** (submittable): limit type (not Overdraft), amount, bank account credited (default:
   the facility's), terms (rate defaults to the sub-limit's; or a fixed Murabaha profit amount), tenor,
   frequency (Monthly / Quarterly / Semi-Annually / Annually / Bullet), method (Equal Principal / Equal
@@ -239,205 +286,215 @@ drawdown / repayment (`treasury_source_*`), idempotent per source, event and mon
   (interest only), upfront fees. *Generate Schedule* (draft only) builds the rows: day-count interest on the
   outstanding principal per period, annuity installment P·r / (1 − (1 + r)^−n) with r = rate × months / 12,
   a Murabaha profit spread straight-line, every amount rounded and the last row absorbing the rounding
-  (principal always adds up to the amount), month-end dates kept on month ends (shared helper
-  `treasury.utils.dates`). **Annuity**: the installment uses the nominal periodic rate while each row's
-  interest uses the day count, so the rows' principal differs slightly from a textbook annuity and the last
-  row (repaying whatever is left) can differ noticeably from the others — more so with Actual/360 (31-day
-  months cost more than rate / 12). Rows may be edited before submit as long as the principal adds up.
-  Changing a term (amount, dates, rate, day count, profit, tenor, frequency, method, grace) requires a new
-  schedule: the form clears it (rebuilt on save) and the server refuses a changed term with an unchanged
-  schedule. Submit checks the facility is Active and the date inside its period, and the available amount of
-  the sub-limit and of the total, then posts Dr Bank / Cr Liability (and Dr Fees / Cr Bank for the upfront
-  fees). Cancel is refused while repayments are submitted and cancels its vouchers (accruals included).
-  System fields (vouchers, last accrual date, repayment status, the rows' paid amounts) are reset on save and
-  on submit, whatever the client sends.
+  (principal always adds up to the amount), month-end dates kept on month ends. **Annuity**: the
+  installment uses the nominal periodic rate while each row's interest uses the day count, so the last row
+  can differ noticeably from the others (more so with Actual/360). Rows may be edited before submit as long
+  as the principal adds up. Changing a term requires a new schedule: the form clears it (rebuilt on save)
+  and the server refuses a changed term with an unchanged schedule. Submit checks the facility is Active and
+  the date inside its period, and the available amount of the sub-limit and of the total, then posts Dr Bank
+  / Cr Liability (and Dr Fees / Cr Bank for the upfront fees). Cancel is refused while repayments are
+  submitted and cancels its vouchers (accruals included). System fields are reset on save and on submit,
+  whatever the client sends.
 - **Facility Repayment** (submittable): principal + interest / profit (empty: the next unpaid installment),
   optional penalty (+ account), allocation *Oldest First* or *Selected Row*. Posts Dr Liability (principal)
   + Dr Accrued Interest (the part already accrued, cleared first) + Dr Interest Expense (the rest) + Dr
   Penalty / Cr Bank, then records the paid amounts on the schedule rows (Pending / Partially Paid / Overdue /
   Paid; Overdue refreshed daily). **Prepayment**: principal beyond the installments due up to the repayment
   date is recorded as a paid prepayment row and the later untouched installments are rescheduled by
-  **reducing the installment amount** (the tenor is kept; interest recomputed on the reduced principal with
-  the day count; a Murabaha profit is not recomputed). Reducing the tenor instead is not implemented. A
-  repayment cannot be back-dated before a submitted one; only the last **submitted** one (highest *Submission
-  No*, stamped at submit under the drawdown lock — drafts may be submitted in any order) can be cancelled,
-  which restores the schedule exactly (snapshot) and cancels its Journal Entry.
-- **Bank clearance**: the drawdown, fees and repayment Journal Entries are cleared on their posting date
-  (`clearance_date` set, as the bank moved the money on that day), so they do not wait in the Bank
-  Reconciliation Tool. Accrual Journal Entries have no bank row.
+  **reducing the installment amount** (the tenor is kept). A repayment cannot be back-dated before a
+  submitted one; only the last **submitted** one (highest *Submission No*, stamped at submit under the
+  drawdown lock) can be cancelled, which restores the schedule exactly (snapshot) and cancels its Journal
+  Entry.
+- **Bank clearance**: drawdown, fees and repayment Journal Entries are cleared on their posting date, so
+  they do not wait in the Bank Reconciliation Tool. Accrual Journal Entries have no bank row.
 - **Concurrency**: drawdown submits lock the facility row, repayment submits / cancels and the accrual job
-  lock the drawdown row. Every change the checks depend on moves a stamp on that row (the facility's
-  utilisation stamp / status / modified; the drawdown's `schedule_version` / last accrual date), and the
-  stamp read before the lock is compared with the locking read: if another transaction committed meanwhile
-  the user is asked to try again instead of checking the limit or allocating on stale rows. (Overdraft
-  utilisation moves with any bank posting and is not covered by this check.)
+  lock the drawdown row; a stamp read before the lock is compared with the locking read, and the user is
+  asked to try again if another transaction committed meanwhile.
 - **Interest accrual** (Treasury Company Settings *Accrue Facility Interest Monthly*, default off): the
   daily job posts, per drawdown and month end, Dr Interest Expense / Cr Accrued Interest for the interest
-  earned up to the month end (day by day within each schedule period) less what was already accrued or
-  expensed by repayments — idempotent (event `interest_accrual:YYYY-MM`), catches up missed months, one
-  drawdown at a time (a failing one is rolled back and logged once a day, the others go on).
-- **Overdraft interest is not accrued**: the bank charges it on the statement; book it from the bank
-  statement (it does not appear in Cost of Financing, which reads facility-linked vouchers only).
-- **Forecast**: the unpaid part of every installment is an outflow on its due date from the drawdown's bank
-  account in the Bank Position Forecast (hook `treasury_forecast_sources`); paid installments disappear, a
-  partly paid one shows the rest. The summary gets an *Available Overdraft* card for the selected banks
-  through the new hook `treasury_forecast_summary_sources` (`(filters) -> [{"label", "value"}]`).
-- **Reports and cards** (Bank Facilities section of the Treasury workspace): *Facility Utilisation* (bank →
-  facility → sub-limit: limit, utilised, available, % used, expiry, days to expiry, company currency
-  totals), *Facility Repayment Schedule Report* (upcoming / overdue installments with the principal /
-  interest split and status), *Cost of Financing* (interest, commission, fees and penalties per facility
-  and month / quarter / year, from the GL); number cards *Total Facility Limits*, *Total Facility Utilised*,
-  *Installments Due in 30 Days* (sum) and *Overdue Facility Installments* (count). Company currency
-  amounts use today's rate; everything is read with the user's permissions and User Permissions.
-- **Alerts**: a daily digest per company and recipient (Treasury Manager / User) of the unpaid installments
-  due within *Facility Alert Days* (Treasury Settings, default 7; overdue ones included) and of the
-  facilities expiring within 30 days, as a notification and, if outgoing email is set up, by email.
+  earned up to the month end less what was already accrued or expensed by repayments — idempotent (event
+  `interest_accrual:YYYY-MM`), catches up missed months, one drawdown at a time (a failing one is rolled
+  back and logged once a day, the others go on).
+- **Forecast**: the unpaid part of every installment is an outflow on its due date in the Bank Position
+  Forecast (hook `treasury_forecast_sources`); the summary gets an *Available Overdraft* card through the
+  hook `treasury_forecast_summary_sources` (`(filters) -> [{"label", "value"}]`).
 
-#### Letters of Guarantee, Letters of Credit (shared rules)
+**Letters of Guarantee and Letters of Credit (shared rules)**
 
 - Both are submittable documents under a facility's *Letter of Guarantee* / *Letter of Credit* sub-limit.
   Company, bank and currency come from the facility; the bank account (default: the facility's) is in the
-  facility currency. **Submit = issue / open**: the facility row is locked (same stamp check as drawdowns),
-  the facility must be Active on the issue date, and the amount must fit the available sub-limit and total.
-  Journal Entries (source = the LG / LC, cleared on their date): cash margin **Dr Margin Account / Cr Bank**
-  (margin = amount × *Cash Margin (%)*, default from the sub-limit; the margin account is an Asset account in
-  the facility currency, e.g. "LG cash margins") and commission **Dr Commission Account / Cr Bank**
-  (*Commission Rate (%)* × amount when a rate is set — default from the sub-limit —, else the amount
-  entered; the account defaults to the facility's Commission Expense Account).
+  facility currency. **Submit = issue / open**: the facility row is locked, the facility must be Active on
+  the issue date, and the amount must fit the available sub-limit and total. Journal Entries (cleared on
+  their date): cash margin **Dr Margin Account / Cr Bank** (margin = amount × *Cash Margin (%)*, default from
+  the sub-limit; the margin account is an Asset account in the facility currency) and commission **Dr
+  Commission Account / Cr Bank** (*Commission Rate (%)* × amount when a rate is set, else the amount
+  entered).
 - After submit, the status (and the open amount, margin held, dates) changes **only through the actions**
-  (Treasury Manager + write permission); every action appends a row to the status log (*Bank Instrument
-  Status Log*: event date, from / to status, open amount after the event, voucher). An action may not be
-  dated before the issue date or the latest logged event. Foreign currency: the margin is carried at the
-  issue rate; the bank moves at the event's rate (entered, or the rate of the date); the difference goes to
-  the company's Exchange Gain / Loss account.
-- Utilisation = the open amount of the open documents; for a past date it is read from the status log. The
-  daily job sets documents past their **effective** expiry date (moved by extensions / amendments) to Expired
-  the day after (no accounting). Cancel cancels every voucher of the document (not once Claimed / Settled).
+  (Treasury Manager + write permission); every action appends a row to the *Bank Instrument Status Log*
+  (event date, from / to status, open amount after the event, voucher). Foreign currency: the margin is
+  carried at the issue rate; the bank moves at the event's rate; the difference goes to the company's
+  Exchange Gain / Loss account.
+- Utilisation = the open amount of the open documents (for a past date: read from the status log). The
+  daily job sets documents past their **effective** expiry date to Expired (no accounting). Cancel cancels
+  every voucher of the document (not once Claimed / Settled).
 
-#### Letter of Guarantee
+**Letter of Guarantee**: LG type (Bid Bond, Performance, Advance Payment, Retention, Financial, Customs,
+Other), beneficiary (Customer / Supplier / Other), reference document, optional read-only link to ERPNext's
+own *Bank Guarantee* (never changed). **Off-balance sheet**: the guaranteed amount itself is never booked.
+Actions: *Extend* (later expiry, optional commission), *Reduce* (margin released pro rata), *Release* (whole
+remaining margin back), *Claim (Liquidation)* (Dr the chosen claim / party account; Cr Margin first, Cr the
+LG sub-limit's Liability Account for what the bank paid beyond the margin), *Repay Claim* (Dr Liability /
+Cr Bank). Expired guarantees keep their margin until released; the facility digest lists them.
 
-- Fields: LG type (Bid Bond, Performance, Advance Payment, Retention, Financial, Customs, Other), bank
-  reference, beneficiary (Customer / Supplier / Other with a name), reference document (Project, Contract,
-  Sales Order, Purchase Order, Quotation), issue / original expiry / effective expiry / release / claim dates.
-- **Off-balance sheet**: the guaranteed amount itself is never booked (no memo accounts); only the margin,
-  commissions and claims are.
-- **ERPNext Bank Guarantee**: an optional read-only *link* to ERPNext's own `Bank Guarantee` record (for
-  users who already keep them); Treasury never creates or changes it.
-- Actions: *Extend* (later expiry date; optional extension commission Dr Commission / Cr Bank), *Reduce*
-  (lower open amount; the margin held is released pro rata Dr Bank / Cr Margin), *Release* (the whole
-  remaining margin back: Dr Bank / Cr Margin; status Released), *Claim (Liquidation)* (amount ≤ open amount,
-  debited to an account the user chooses — an expense / claim account, or the beneficiary's party account
-  with the party; never a Bank / Cash account nor the guarantee's own margin or liability account; one
-  Journal Entry: Dr that account; Cr Margin for the whole margin held — used first —;
-  Cr the **Liability Account of the LG sub-limit** for what the bank paid beyond the margin; Dr Bank for any
-  margin left over. Status Claimed.), *Repay Claim* (Dr Liability / Cr Bank). The bank-funded part of a claim
-  counts in the LG utilisation (GL balance of that liability account on the LG's vouchers) until repaid; the
-  sub-limit needs a liability account for such claims.
-- Expired guarantees keep their margin until the user releases it: the facility digest lists guarantees
-  expiring within *Facility Alert Days* and expired ones whose margin is still held.
+**Letter of Credit (import)**: Sight / Usance, supplier (+ Purchase Order), tolerance %, latest shipment
+date. Actions: *Amend* (amount / expiry / charges; an increase is checked against the limit; the margin
+follows the amount), *Receive Documents* (documents amount ≤ amount + tolerance), *Accept* (Usance: maturity
+date), *Settle* — the whole margin returns to the bank (Dr Bank / Cr Margin) and a standard **Payment
+Entry** pays the supplier from the bank (optionally allocated to a Purchase Invoice; ERPNext books the
+exchange difference). Both vouchers are cleared on the settlement date: match the bank statement's single
+net debit against both. A settlement below the credit amount records the *Unused Amount*, released from the
+facility. *Release Margin* for expired credits. An accepted Usance credit is an expected outflow on its
+maturity date in the Bank Position Forecast.
 
-#### Letter of Credit (import)
+**Cheque Discounting (خصم أوراق تجارية)**: a submittable batch under the *Cheque Discounting* sub-limit (which
+needs a Liability Account, "Discounted cheques"). Rows: incoming PDC Cheques that are Received and Party
+Posted (in PDC Receivable), due after the discount date, in the facility currency. Charges per cheque =
+amount × rate / 100 × days to its due date / 365 or 360; commission = sub-limit rate × total unless set
+manually. **Submit** (Treasury Manager): Dr Bank (net) + Dr Discount Expense / Cr Discounted Liability
+(total); each cheque becomes **Discounted** (still Party Posted) and leaves the expected inflows. **Paid at
+maturity** (*Settle Cheques* on the batch or on the cheque, not before its due date): Dr Discounted Liability
+/ Cr PDC Receivable, the cheque becomes Cleared / Bank Posted. **Bounce** (recourse): Dr Discounted
+Liability / Cr Bank, then the party posting is undone per *On Bounce*. Cancel only while no cheque is
+settled or bounced.
 
-- Fields: Sight / Usance (usance days), supplier (+ optional Purchase Order of that supplier), bank
-  reference, tolerance %, latest shipment date, opening / original expiry / effective expiry dates.
-- Actions: *Amend* (Opened / Amended: new amount and / or later expiry date, charges Dr Charges / Cr Bank;
-  an increase is checked against the available limit under the facility lock; the margin follows the new
-  amount — top-up Dr Margin / Cr Bank or release Dr Bank / Cr Margin), *Receive Documents* (documents amount
-  ≤ amount + tolerance becomes the open amount; charges), *Accept* (Usance only: maturity date, default
-  acceptance + usance days), *Settle* (Sight after the documents, Usance after the acceptance), *Release
-  Margin* (Expired only).
-- **Settlement accounting** (two vouchers): the whole margin held returns to the bank (Dr Bank / Cr Margin
-  at the settlement rate), and a standard **Payment Entry** pays the supplier from the bank (optionally
-  allocated to one of the supplier's Purchase Invoices). ERPNext's Payment Entry allocates the invoice and
-  books the exchange gain / loss of a foreign currency invoice itself (a separate system "Exchange Gain Or
-  Loss" Journal Entry linked to the Payment Entry; it carries company currency amounts only, so read the
-  Exchange Gain / Loss balance in the company currency); a single Journal Entry was not used because ERPNext
-  forces a Journal Entry row that references an invoice to the invoice's exchange rate. Result: supplier
-  cleared at the invoice rate, bank at the settlement rate, margin at its historical rate, the differences
-  on Exchange Gain / Loss. Economically this equals "margin first, bank for the rest".
-- **Bank reconciliation of a settlement**: both vouchers are marked cleared on the settlement date (the
-  margin release Journal Entry and the Payment Entry). The bank statement usually shows **one net debit**
-  (amount − margin), while the ledger shows the release credit and the full payment debit: match the
-  statement line against both vouchers together (or leave them as cleared by Treasury); they net exactly to
-  the statement amount at the settlement rate.
-- The credit closes with its settlement. A settlement below the credit amount records the difference as
-  **Unused Amount** (also noted on the status log): it no longer counts against the facility and involves no
-  accounting (the margin held was already returned in full). Documents above the open amount (within the
-  tolerance) are checked against the available limit like an amendment increase.
-- **Import loans are manual**: settlement is always paid from the bank account. When the bank finances the
-  settlement, record a *Facility Drawdown* for the loan (the LC does not create it).
-- Forecast: an accepted Usance credit is an expected outflow on its maturity date (documents amount less the
-  margin held) on its bank account in the Bank Position Forecast. Sight credits are not forecast (the
-  documents' arrival date is unknown).
-- Expiry: only credits without documents (Opened / Amended) expire; received documents are settled.
+### Reports and workspace
 
-#### Cheque Discounting (خصم أوراق تجارية)
+The **Treasury** workspace (sidebar + desktop icon; shown to Treasury Manager / User, Accounts Manager /
+User and System Manager) holds the number cards, the *Expected Cash Flow* and *PDC by Status* charts and
+the report links. Reports only read data, with the user's permissions and User Permissions (a user
+restricted to other companies gets a permission error for a forbidden Company filter). Company currency
+amounts of other currencies use today's rate.
 
-- *Cheque Discounting* (submittable batch) under the facility's *Cheque Discounting* sub-limit, which needs a
-  **Liability Account** ("Discounted cheques"). Rows: incoming PDC Cheques that are **Received** and **Party
-  Posted** (in PDC Receivable — not deposited, not under collection), due after the discount date, in the
-  facility currency. Discount rate (default: the sub-limit rate), day count (default: the sub-limit's).
-  **Charges per cheque = amount × rate / 100 × days to its effective due date / 365 (Actual/365) or 360
-  (Actual/360)**, rounded per cheque; commission = the sub-limit commission rate × total, recomputed on every
-  save (so it follows added / removed cheques) unless *Set Commission Manually* is checked; net
-  proceeds = total − charges − commission; expense account default: the facility's Interest Expense Account.
-- **Permissions**: a Treasury User or System Manager may prepare a draft batch; only a **Treasury Manager**
-  submits or cancels it (submit / cancel run the Treasury Manager cheque actions `discount` / `undiscount`),
-  and settles its cheques. System Manager therefore has no submit / cancel right on Cheque Discounting. (On
-  LG / LC, System Manager keeps submit / cancel — the issue and its cancellation touch no other document —
-  but every action after submit requires the Treasury Manager role.)
-- **Submit**: limit check (facility lock), then one Journal Entry **Dr Bank (net) + Dr Discount Expense
-  (charges + commission) / Cr Discounted Liability (total)**, and each cheque → PDC action `discount`:
-  operational status **Discounted**, accounting status unchanged (still Party Posted, in PDC Receivable);
-  the cheque records the batch and the discount date. A discounted cheque cannot be postponed, deposited,
-  cleared, returned or replaced.
-- **Paid at maturity** (*Settle Cheques* on the batch — ticks the ones due by the date — or *Paid at
-  Maturity (Discounted)* on the cheque): Journal Entry (source = the cheque) **Dr Discounted Liability / Cr
-  PDC Receivable**; the cheque becomes **Cleared / Bank Posted** and its *Bank Journal* is this entry (the
-  voucher that took it out of PDC Receivable; the bank itself credited the company at the discount, so there
-  is no bank row and nothing to reconcile). Settling is always a user action (no daily job): whether the
-  drawer paid is only known from the bank. It cannot be dated before the cheque's effective due date.
-- The outcome columns of a batch row (status, closed date, closing Journal Entry) are written only by these
-  cheque actions; they cannot be edited on the submitted batch.
-- **Bounce of a discounted cheque** (recourse): Journal Entry **Dr Discounted Liability / Cr Bank** (the bank
-  debits the company; cleared on the bounce date), then the party posting is undone exactly like any bounce
-  according to *On Bounce* (reversal Journal Entry, or cancel of the Payment Entry): the customer owes the
-  amount again and PDC Receivable is cleared. The batch row records Settled / Bounced with the date and
-  Journal Entry; the batch status follows (Discounted → Partially Settled → Settled).
-- **Cancel** the batch only while no cheque is settled or bounced: the cheques go back to Received (logged)
-  and the batch Journal Entry is cancelled.
-- Utilisation: the discounted cheques not settled / bounced (for a past date: discounted by then and not
-  closed by then). **Forecast**: discounted cheques are never expected inflows (the money came at the
-  discount); the Projected Party Statement still lists them as posted, not cleared (the drawer has not paid).
-- Reports and cards: *LG Register* (open / expiring guarantees, margins held), *LC Register* (status,
-  amounts, maturity), *Discounted Cheques* (per batch: maturity, charges, outcome); number cards *Open
-  Letters of Guarantee*, *Open Letters of Credit*, *Discounted Cheques Outstanding* (company currency).
-  *Facility Utilisation* shows the LG / LC / Cheque Discounting sub-limits through the utilisation hook.
-- No print formats are shipped for these documents (the standard print view applies).
+| Module | Reports | Number cards |
+|---|---|---|
+| PDC | Bank Position Forecast, Projected Party Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage | Outgoing / Incoming Cheques Due Today, Due in 7 Days, Overdue; Outstanding PDC Payable / Receivable |
+| Security Cheques | Security Cheque Register, Security Exposure, Security Cheques by Custody, Expired Security Cheques Not Returned | Security Held, Security Given, Security Cheques Expiring in 30 Days, Expired Security Cheques Not Returned |
+| Bank Facilities | Facility Utilisation, Facility Repayment Schedule Report, Cost of Financing, LG Register, LC Register, Discounted Cheques | Total Facility Limits, Total Facility Utilised, Installments Due in 30 Days, Overdue Facility Installments, Open Letters of Guarantee, Open Letters of Credit, Discounted Cheques Outstanding |
+
+- **Bank Position Forecast**: opening and actual movements come from the bank GL only (it moves on the bank
+  posting of a cheque); every cheque whose bank posting is still to come is an expected flow on its
+  effective (possibly postponed) due date — or, for a cheque cleared but not bank posted yet (Manual mode),
+  on the bank transaction / clearance date. Past-dated flows form the *Overdue* row (counted as today);
+  with a From Date after today, the flows from today up to it form a *Brought Forward* row. Other modules
+  add flows through the `treasury_forecast_sources` hook (see `treasury/pdc/forecast_sources.py`):
+  facility installments and accepted Usance LCs. Discounted cheques are never expected inflows.
+- **Projected Party Statement**: the party's GL statement plus the unposted / uncleared cheques as if paid
+  on their due date (actual and projected balance columns); the exposure summary counts every unposted
+  cheque of the party, whatever its due date.
+- **Bounced and Postponed Cheques**: a bounce is dated by the bounce date the user entered (status log
+  *Event Date*); the postponement view counts the party's postponements.
+- **Number cards vs. the forecast** (deliberate): the cards count cheques still in circulation — outgoing
+  Created + Delivered, incoming Received + Deposited. "Due in 7 Days" means today to today + 7, the same
+  convention as the *0-7 Days* bucket of PDC Maturity.
+- **Security Exposure**: held from others vs given to others, by party or by reference document with
+  Required / Actual / Shortfall (a document's requirement is the highest Required Amount on its cheques;
+  Open / Blank cheques are counted, never summed — "Covered by Open / Blank").
+- **Cost of Financing**: interest, commission, fees and penalties per facility and month / quarter / year,
+  from the GL (facility-linked vouchers only).
+
+### Roles and permissions
+
+- **Treasury Manager**, **Treasury User** and **Cheque Approver** are *process* roles: they give access to
+  the Treasury doctypes and to the actions. The actions check the user's permission on the document and,
+  where required, the role:
+
+  | Action | Role |
+  |---|---|
+  | Create / deliver / receive / post to party / deposit / clear / post to bank / return a PDC Cheque; Cheque Batch; security cheque create / receive / issue / custody / return / cancel / extend expiry; draft Cheque Discounting | Treasury User (write permission) |
+  | Postpone a PDC Cheque | Cheque Approver or Treasury Manager (the approver needs only read access) |
+  | Bounce, Re-present, Replace, Cancel a PDC Cheque; cancel a Cheque Batch; security cheque Mark as Lost / Encash / Open-Blank cheques; Cheque Discounting submit / cancel / settle; every Bank Facility, LG and LC action | Treasury Manager |
+  | Treasury Settings / Treasury Company Settings | System Manager, Treasury Manager (Treasury User reads) |
+
+- **Elevated posting.** The Payment Entries and Journal Entries are created, submitted and cancelled by the
+  posting service (`treasury/accounting/posting.py`) in an elevated context, only after the permission and
+  role check on the source document. A Treasury user does not need (and the app does not grant) any
+  permission on Payment Entry, Journal Entry, Account, Bank Transaction, etc. The vouchers' `owner` /
+  `modified_by` is the user who ran the action (Administrator for scheduled postings); their GL entries and
+  version history show Administrator.
+- **Masters still need read access.** To pick a Customer / Supplier / Bank Account / Company in the forms
+  and to open the linked vouchers, users need read access to those masters through a **standard ERPNext
+  role** (e.g. *Accounts User*) or a role of your own. User Permissions (e.g. per company) are respected.
+- The app changes no standard permission of ERPNext doctypes and creates no Custom DocPerm. Development
+  versions granted the Treasury roles read access to some core doctypes through Custom DocPerm; the first
+  `bench migrate` removes those rows once and resets doctypes whose permissions were only a copy of the
+  standard ones.
+
+### Scheduled jobs
+
+| Frequency | Job | What it does |
+|---|---|---|
+| daily_long | `treasury.pdc.scheduler.post_due_party_postings` | party postings of cheques in *On Cheque Date* mode due up to today (catches up missed days; one cheque at a time, errors logged once a day) |
+| daily_long | `treasury.pdc.scheduler.send_due_alerts` | digest of the cheques due within the alert days, per company and user, in the user's language |
+| daily_long | `treasury.bank_facilities.scheduler.refresh_facilities` | facility / LG / LC expiry, installment statuses (Overdue), displayed utilisation |
+| daily_long | `treasury.bank_facilities.interest.post_interest_accruals` | month-end interest accruals (when enabled) |
+| daily_long | `treasury.bank_facilities.scheduler.send_facility_alerts` | installments due / overdue, facilities and guarantees expiring |
+| daily | `treasury.security_cheques.scheduler.send_security_expiry_alerts` | security cheques expiring or expired and not returned |
+
+Scheduled postings run as Administrator; alerts go to Treasury Manager / User as notifications and, if outgoing email is
+set up, by email, listing only the documents each recipient may read.
+
+### Known limitations and follow-ups
+
+- **PDC**: *Endorsed* is a status the reports understand, but there is no endorsement action yet
+  (endorsing a received cheque to a supplier). A payee without a party (e.g. rent booked straight to an
+  expense account) is not supported: a PDC Cheque requires a Customer / Supplier. No list-view bulk
+  actions (bulk deposit / clear): use *PDC Bank Clearing* or the Cheque Batch actions. No approval workflow
+  for postponement / cancellation beyond the role checks. No warning when an outgoing cheque would make the
+  projected balance negative. No customer / supplier portal.
+- **Cheque Batch**: party cheques only; one reference per row; FIFO needs the party account in the cheque
+  currency; at most 120 cheques per batch; the batch link on a cheque is set only by the batch.
+- **Security Cheques**: encashing against a claim or penalty income account by Journal Entry is not
+  implemented (an encashment settles the party's invoices or stays an advance); encashment for Employee /
+  Other parties, alerts before the end of the linked contract, an approval workflow for Open / Blank
+  cheques and memo (off-balance-sheet) accounts are follow-ups.
+- **Bank Facilities**: a variable rate is informational only (nothing is repriced when the reference rate
+  moves); a prepayment reduces the installment, never the tenor, and a Murabaha profit is not recomputed;
+  overdraft interest is not accrued (book it from the bank statement) and overdraft utilisation is not
+  covered by the concurrency stamp; import loans are manual (an LC settlement does not create a drawdown);
+  Sight LCs are not forecast; no print formats for LG / LC / Cheque Discounting (the standard print view
+  applies); discounted cheques are settled by a user action (no daily job).
+- **Translations**: Arabic only. Generic words already translated by Frappe / ERPNext are left to the core
+  translation or given a context (`msgctxt`); a few PDC status words (Received, Delivered, Returned ...)
+  keep a plain entry with a compatible wording.
+
+### Testing
+
+```bash
+bench --site <test-site> set-config allow_tests true
+bench --site <test-site> run-tests --app treasury
+```
+
+About 400 integration tests (`frappe.tests.IntegrationTestCase`), independent of the execution order: each
+test file builds its own fixtures (test company in EGP, EGP and USD bank accounts, PDC account mapping,
+customer, supplier, invoices — `treasury/tests/utils.py`) and everything is rolled back. They assert exact
+GL rows, Payment Ledger outstanding, both statuses and idempotency for every posting-mode combination,
+security cheques leaving every ledger untouched, reports, alerts, translations (`test_translations.py`:
+valid `ar.po`, no duplicates, every `_()` / `__()` string translated, no plain generic core words) and the
+install / uninstall field list (`test_install.py`). One scheduler test is skipped when `freezegun` is not
+installed.
 
 ### Contributing
 
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
+This app uses `pre-commit` (ruff, eslint, prettier, pyupgrade):
 
 ```bash
 cd apps/treasury
 pre-commit install
 ```
 
-Pre-commit is configured to use the following tools for checking and formatting your code:
-
-- ruff
-- eslint
-- prettier
-- pyupgrade
-### CI
-
-This app can use GitHub Actions for CI. The following workflows are configured:
-
-- CI: Installs this app and runs unit tests on every push to `develop` branch.
-- Linters: Runs [Frappe Semgrep Rules](https://github.com/frappe/semgrep-rules) and [pip-audit](https://pypi.org/project/pip-audit/) on every pull request.
-
+Every user-facing string is wrapped in `_()` / `__()` and translated in `treasury/locale/ar.po`; all GL
+effects go through `treasury/accounting/posting.py`; patches go in `patches.txt`.
 
 ### License
 
-mit
+MIT

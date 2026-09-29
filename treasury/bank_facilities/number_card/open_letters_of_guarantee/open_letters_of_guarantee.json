@@ -1,6 +1,6 @@
 {
  "color": "#5E64FF",
- "creation": "2026-09-29 09:00:00.000000",
+ "creation": "2026-09-29 18:00:00.000000",
  "docstatus": 0,
  "doctype": "Number Card",
  "document_type": "Letter of Guarantee",
@@ -12,7 +12,7 @@
  "is_standard": 1,
  "label": "Open Letters of Guarantee",
  "method": "treasury.bank_facilities.dashboard.get_instrument_card",
- "modified": "2026-09-29 09:00:00.000000",
+ "modified": "2026-09-29 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Open Letters of Guarantee",

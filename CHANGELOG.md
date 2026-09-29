@@ -1,0 +1,61 @@
+# Changelog
+
+## 1.0.0 — 2026-09-29
+
+First release, for Frappe 16 / ERPNext 16 (Python 3.14). No Frappe / ERPNext file is modified: the app
+integrates through its own DocTypes, custom fields on Payment Entry / Journal Entry, `doc_events`,
+`doctype_js` and scheduler events. All accounting goes through `treasury/accounting/posting.py` as
+standard Payment Entries and Journal Entries, idempotent per source document, event and cycle.
+
+### Treasury Setup
+- Treasury Settings (alert days, future clearance dates) and Treasury Company Settings with separate
+  posting events for outgoing and incoming cheques (party posting, under collection stage, bank posting,
+  on bounce) and the PDC account mapping per bank account (PDC Payable / Receivable, Under Collection,
+  Bank Charges, cheque print format), fully validated.
+- Roles Treasury Manager, Treasury User, Cheque Approver; posting in an elevated context after the
+  permission check, without granting any permission on core doctypes.
+- Voucher guard: Treasury vouchers cannot be cancelled or deleted from their own form.
+
+### PDC Cheques
+- PDC Cheque with operational and accounting statuses, distinct dates, status log and postponement log;
+  actions Deliver / Receive, Post to Party Now, Deposit, Clear, Post to Bank, Postpone, Bounce (with
+  charges), Re-present, Replace, Return to Party, Cancel; lifecycle fields protected against form / API
+  writes; date ordering between events; multi-currency with exchange gain / loss.
+- Cheque Book with locked number allocation and cancelled leaves.
+- Daily party posting for *On Cheque Date* (catch-up of missed days) and due alerts.
+- PDC Bank Clearing tool matching Bank Transactions and reconciling them.
+- Print formats: cheque receipt / delivery voucher (print date = today, amount in words in Arabic or
+  English) and cheque leaf.
+- Reports: Bank Position Forecast (with extension hooks), Projected Party Statement, PDC Register, PDC
+  Maturity, Bounced and Postponed Cheques, Cheque Book Usage; Treasury workspace, number cards and charts.
+
+### Cheque Batch
+- Multi-cheque voucher with installment generator, manual / FIFO / advance allocation, all-or-nothing
+  submit creating one PDC Cheque per row, batch status, Deliver / Receive All, batch receipt built from the
+  live cheques, conditional cancel.
+
+### Security Cheques
+- Guarantee cheques that never create accounting entries: receive / issue, custody and custody transfer
+  (append-only log), return, lost, cancel, expiry extension; fixed or Open / Blank amounts (Treasury
+  Manager); encashment through a PDC Cheque only.
+- Expiry alerts, four reports (Register, Exposure, by Custody, Expired Not Returned), number cards and a
+  receipt / handover print format.
+
+### Bank Facilities
+- Bank Facility with sub-limits, status actions (activate, suspend, renew, close) and utilisation computed
+  from the ledger (with a hook for other documents).
+- Facility Drawdown with repayment schedules (equal principal, annuity, bullet, grace period, Murabaha
+  profit, day count), Facility Repayment with prepayment, optional monthly interest accrual.
+- Letters of Guarantee (margin, commission, extend, reduce, release, claim, repay claim), Letters of
+  Credit (margin, commission, amend, documents, acceptance, settlement by Payment Entry, release margin)
+  and Cheque Discounting (discount, settlement at maturity, bounce with recourse).
+- Facility installments and accepted LCs in the Bank Position Forecast; Facility Utilisation, Facility
+  Repayment Schedule, Cost of Financing, LG Register, LC Register and Discounted Cheques reports; number
+  cards and daily alerts.
+
+### Quality
+- Arabic translation (`locale/ar.po`) of every user-facing string; generic words already translated by
+  Frappe / ERPNext are left to the core or translated with a context, so the app never changes the core
+  wording.
+- Uninstall removes exactly the custom fields the app created.
+- About 400 integration tests, including translation catalogue and install / uninstall checks.

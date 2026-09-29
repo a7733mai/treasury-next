@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 0,
  "autoname": "naming_series:",
- "creation": "2026-10-12 09:00:00.000000",
+ "creation": "2026-09-29 18:00:00.000000",
  "description": "A drawing under a Bank Facility (loan, Murabaha, Tawarruq ...): the principal credited to the bank account, its repayment schedule and fees.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -368,7 +368,7 @@
    "link_fieldname": "drawdown"
   }
  ],
- "modified": "2026-10-13 09:00:00.000000",
+ "modified": "2026-09-29 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Facility Drawdown",
