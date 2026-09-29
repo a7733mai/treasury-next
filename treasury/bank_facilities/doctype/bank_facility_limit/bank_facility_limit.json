@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "creation": "2026-10-12 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "limit_type",
+  "limit_amount",
+  "liability_account",
+  "column_break_rate",
+  "rate_type",
+  "interest_rate",
+  "reference_rate_label",
+  "margin_rate",
+  "day_count",
+  "column_break_charges",
+  "commission_rate",
+  "cash_margin_percent",
+  "utilisation_section",
+  "utilised",
+  "column_break_utilisation",
+  "available"
+ ],
+ "fields": [
+  {
+   "fieldname": "limit_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Limit Type",
+   "options": "Overdraft\nShort Term Loan\nLong Term Loan\nLetter of Guarantee\nLetter of Credit\nCheque Discounting\nMurabaha\nTawarruq\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "limit_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Limit Amount",
+   "non_negative": 1,
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "description": "Liability account credited by drawdowns under this limit, in the facility currency. Required for loans, Murabaha, Tawarruq and Other; an Overdraft is used through the facility's bank account.",
+   "fieldname": "liability_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Liability Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_rate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Fixed",
+   "fieldname": "rate_type",
+   "fieldtype": "Select",
+   "label": "Rate Type",
+   "options": "Fixed\nVariable (reference + margin)"
+  },
+  {
+   "description": "All-in rate per annum (for a variable rate: the current reference rate plus the margin).",
+   "fieldname": "interest_rate",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Interest / Profit Rate (% p.a.)"
+  },
+  {
+   "depends_on": "eval:doc.rate_type=='Variable (reference + margin)'",
+   "description": "E.g. CBE corridor, SAIBOR 3M.",
+   "fieldname": "reference_rate_label",
+   "fieldtype": "Data",
+   "label": "Reference Rate"
+  },
+  {
+   "depends_on": "eval:doc.rate_type=='Variable (reference + margin)'",
+   "fieldname": "margin_rate",
+   "fieldtype": "Percent",
+   "label": "Margin (% p.a.)"
+  },
+  {
+   "default": "Actual/365",
+   "fieldname": "day_count",
+   "fieldtype": "Select",
+   "label": "Day Count",
+   "options": "Actual/365\nActual/360"
+  },
+  {
+   "fieldname": "column_break_charges",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "commission_rate",
+   "fieldtype": "Percent",
+   "label": "Commission Rate (%)"
+  },
+  {
+   "fieldname": "cash_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Cash Margin (%)"
+  },
+  {
+   "fieldname": "utilisation_section",
+   "fieldtype": "Section Break",
+   "label": "Utilisation"
+  },
+  {
+   "description": "Display only, refreshed after every facility action and daily. Reports compute the utilisation from the ledger.",
+   "fieldname": "utilised",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Utilised",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_utilisation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "available",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Available",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-12 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Bank Facility Limit",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

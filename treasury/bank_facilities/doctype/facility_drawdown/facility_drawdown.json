@@ -1,0 +1,427 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-12 09:00:00.000000",
+ "description": "A drawing under a Bank Facility (loan, Murabaha, Tawarruq ...): the principal credited to the bank account, its repayment schedule and fees.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "facility",
+  "company",
+  "bank",
+  "limit_type",
+  "drawdown_date",
+  "column_break_main",
+  "currency",
+  "amount",
+  "exchange_rate",
+  "bank_account",
+  "liability_account",
+  "repayment_status",
+  "terms_section",
+  "rate_type",
+  "interest_rate",
+  "day_count",
+  "profit_amount",
+  "column_break_terms",
+  "tenor_months",
+  "repayment_frequency",
+  "repayment_method",
+  "first_repayment_date",
+  "grace_months",
+  "fees_section",
+  "upfront_fees",
+  "column_break_fees",
+  "fees_account",
+  "schedule_section",
+  "repayment_schedule",
+  "total_principal",
+  "column_break_totals",
+  "total_interest",
+  "total_payable",
+  "accounting_section",
+  "journal_entry",
+  "fees_journal_entry",
+  "column_break_accounting",
+  "last_accrual_date",
+  "more_info_section",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "no_copy": 1,
+   "options": "FDD-.YYYY.-.#####",
+   "print_hide": 1
+  },
+  {
+   "fieldname": "facility",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bank Facility",
+   "options": "Bank Facility",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "facility.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "facility.bank",
+   "fieldname": "bank",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Bank",
+   "options": "Bank",
+   "read_only": 1
+  },
+  {
+   "fieldname": "limit_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Limit Type",
+   "options": "Short Term Loan\nLong Term Loan\nMurabaha\nTawarruq\nOther",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "drawdown_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Drawdown Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "facility.currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "bold": 1,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "non_negative": 1,
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Facility currency to company currency, on the drawdown date.",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "precision": "9"
+  },
+  {
+   "description": "The company bank account credited with the principal (default: the facility's bank account), in the facility currency.",
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "liability_account",
+   "fieldtype": "Link",
+   "label": "Liability Account",
+   "options": "Account",
+   "read_only": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "repayment_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Repayment Status",
+   "no_copy": 1,
+   "options": "Open\nRepaid",
+   "read_only": 1
+  },
+  {
+   "fieldname": "terms_section",
+   "fieldtype": "Section Break",
+   "label": "Terms"
+  },
+  {
+   "fieldname": "rate_type",
+   "fieldtype": "Select",
+   "label": "Rate Type",
+   "options": "Fixed\nVariable (reference + margin)"
+  },
+  {
+   "description": "All-in rate per annum (default: the sub-limit's rate). Ignored when a Profit Amount is entered.",
+   "fieldname": "interest_rate",
+   "fieldtype": "Percent",
+   "label": "Interest / Profit Rate (% p.a.)"
+  },
+  {
+   "fieldname": "day_count",
+   "fieldtype": "Select",
+   "label": "Day Count",
+   "options": "Actual/365\nActual/360"
+  },
+  {
+   "description": "Murabaha: a fixed profit instead of a rate, spread evenly over the installments.",
+   "fieldname": "profit_amount",
+   "fieldtype": "Currency",
+   "label": "Profit Amount",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "column_break_terms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tenor_months",
+   "fieldtype": "Int",
+   "label": "Tenor (Months)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Monthly",
+   "fieldname": "repayment_frequency",
+   "fieldtype": "Select",
+   "label": "Repayment Frequency",
+   "options": "Monthly\nQuarterly\nSemi-Annually\nAnnually\nBullet",
+   "reqd": 1
+  },
+  {
+   "default": "Equal Principal",
+   "fieldname": "repayment_method",
+   "fieldtype": "Select",
+   "label": "Repayment Method",
+   "options": "Equal Principal\nEqual Installment (annuity)\nBullet",
+   "reqd": 1
+  },
+  {
+   "description": "Default: one period after the drawdown date.",
+   "fieldname": "first_repayment_date",
+   "fieldtype": "Date",
+   "label": "First Repayment Date"
+  },
+  {
+   "description": "Interest-only months at the start (a multiple of the months of a period).",
+   "fieldname": "grace_months",
+   "fieldtype": "Int",
+   "label": "Grace (Months)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "fees_section",
+   "fieldtype": "Section Break",
+   "label": "Fees"
+  },
+  {
+   "description": "Paid from the bank account on the drawdown date.",
+   "fieldname": "upfront_fees",
+   "fieldtype": "Currency",
+   "label": "Upfront Fees",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "column_break_fees",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.upfront_fees",
+   "fieldname": "fees_account",
+   "fieldtype": "Link",
+   "label": "Fees Account",
+   "mandatory_depends_on": "eval:doc.upfront_fees",
+   "options": "Account"
+  },
+  {
+   "fieldname": "schedule_section",
+   "fieldtype": "Section Break",
+   "label": "Repayment Schedule"
+  },
+  {
+   "description": "Generated from the terms (Generate Schedule); may be adjusted before submit as long as the principal adds up to the amount.",
+   "fieldname": "repayment_schedule",
+   "fieldtype": "Table",
+   "label": "Repayment Schedule",
+   "options": "Facility Repayment Schedule"
+  },
+  {
+   "fieldname": "total_principal",
+   "fieldtype": "Currency",
+   "label": "Total Principal",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_interest",
+   "fieldtype": "Currency",
+   "label": "Total Interest / Profit",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_payable",
+   "fieldtype": "Currency",
+   "label": "Total Payable",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Drawdown Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fees_journal_entry",
+   "fieldtype": "Link",
+   "label": "Fees Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_accounting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The last month end the interest accrual job processed.",
+   "fieldname": "last_accrual_date",
+   "fieldtype": "Date",
+   "label": "Last Accrual Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Information"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Facility Drawdown",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Facility Repayment",
+   "link_fieldname": "drawdown"
+  }
+ ],
+ "modified": "2026-10-12 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Facility Drawdown",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "facility,limit_type",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

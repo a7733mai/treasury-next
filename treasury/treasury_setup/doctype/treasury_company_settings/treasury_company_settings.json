@@ -20,7 +20,9 @@
   "column_break_bounce",
   "bounce_charges_account",
   "accounts_section",
-  "pdc_accounts"
+  "pdc_accounts",
+  "facilities_section",
+  "accrue_facility_interest"
  ],
  "fields": [
   {
@@ -124,10 +126,22 @@
    "fieldtype": "Table",
    "label": "PDC Accounts",
    "options": "PDC Account Mapping"
+  },
+  {
+   "fieldname": "facilities_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Facilities"
+  },
+  {
+   "default": "0",
+   "description": "Post a month-end Journal Entry per facility drawdown for the interest / profit earned since the last accrual (Dr Interest Expense / Cr the facility's Accrued Interest Account). Repayments clear the accrued interest first.",
+   "fieldname": "accrue_facility_interest",
+   "fieldtype": "Check",
+   "label": "Accrue Facility Interest Monthly"
   }
  ],
  "links": [],
- "modified": "2026-09-28 12:00:00.000000",
+ "modified": "2026-10-12 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

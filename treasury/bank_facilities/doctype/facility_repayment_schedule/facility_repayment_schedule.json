@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "creation": "2026-10-12 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "installment_no",
+  "due_date",
+  "principal",
+  "interest",
+  "total",
+  "outstanding_after",
+  "column_break_paid",
+  "status",
+  "paid_principal",
+  "paid_interest",
+  "is_prepayment",
+  "payment_journal",
+  "repayment"
+ ],
+ "fields": [
+  {
+   "fieldname": "installment_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Installment No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "principal",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Principal",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "interest",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Interest / Profit",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "outstanding_after",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Outstanding After",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_paid",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Pending\nPartially Paid\nPaid\nOverdue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "paid_principal",
+   "fieldtype": "Currency",
+   "label": "Paid Principal",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "paid_interest",
+   "fieldtype": "Currency",
+   "label": "Paid Interest / Profit",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "An extra principal payment recorded by a Facility Repayment with Prepayment.",
+   "fieldname": "is_prepayment",
+   "fieldtype": "Check",
+   "label": "Prepayment",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_journal",
+   "fieldtype": "Link",
+   "label": "Payment Journal",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "repayment",
+   "fieldtype": "Link",
+   "label": "Last Repayment",
+   "no_copy": 1,
+   "options": "Facility Repayment",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-12 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Facilities",
+ "name": "Facility Repayment Schedule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

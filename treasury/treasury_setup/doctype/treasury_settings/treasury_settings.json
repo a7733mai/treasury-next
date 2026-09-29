@@ -7,6 +7,7 @@
   "alerts_section",
   "default_alert_days",
   "security_alert_days",
+  "facility_alert_days",
   "column_break_alerts",
   "allow_future_clearance_date"
  ],
@@ -33,6 +34,14 @@
    "non_negative": 1
   },
   {
+   "default": "7",
+   "description": "Number of days before the due date to send facility installment alerts (overdue installments are always included; facilities expiring within 30 days are listed too).",
+   "fieldname": "facility_alert_days",
+   "fieldtype": "Int",
+   "label": "Facility Alert Days",
+   "non_negative": 1
+  },
+  {
    "fieldname": "column_break_alerts",
    "fieldtype": "Column Break"
   },
@@ -45,7 +54,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-06 09:00:00.000000",
+ "modified": "2026-10-12 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Settings",

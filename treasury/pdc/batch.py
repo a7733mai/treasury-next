@@ -33,7 +33,7 @@ from contextlib import contextmanager
 import frappe
 from frappe import _
 from frappe.query_builder.functions import IfNull, Sum
-from frappe.utils import add_days, add_months, cint, flt, get_last_day, getdate
+from frappe.utils import add_days, cint, flt, getdate
 
 import erpnext
 from erpnext.accounts.doctype.account.account import get_account_currency
@@ -46,6 +46,7 @@ from treasury.pdc.batch_status import (
 	update_batch_status,
 )
 from treasury.pdc.doctype.cheque_book.cheque_book import SCAN_CHUNK
+from treasury.utils.dates import monthly_dates
 
 CHEQUE = "PDC Cheque"
 BATCH = "Cheque Batch"
@@ -92,13 +93,7 @@ def schedule_dates(first_due_date, count: int, frequency: str, interval_days=0, 
 	"""
 	first = getdate(first_due_date)
 	if frequency in MONTHLY_FREQUENCIES:
-		step = MONTHLY_FREQUENCIES[frequency]
-		keep_month_end = bool(month_end) and first == getdate(get_last_day(first))
-		dates = []
-		for i in range(count):
-			date = getdate(add_months(first, i * step))
-			dates.append(getdate(get_last_day(date)) if keep_month_end else date)
-		return dates
+		return monthly_dates(first, count, MONTHLY_FREQUENCIES[frequency], keep_month_end=month_end)
 	if frequency == WEEKLY:
 		days = 7
 	elif frequency == CUSTOM_DAYS:

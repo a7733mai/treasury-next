@@ -27,6 +27,7 @@ class TreasuryCompanySettings(Document):
 
 		from treasury.treasury_setup.doctype.pdc_account_mapping.pdc_account_mapping import PDCAccountMapping
 
+		accrue_facility_interest: DF.Check
 		bounce_charges_account: DF.Link | None
 		company: DF.Link
 		incoming_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
