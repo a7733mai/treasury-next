@@ -13,11 +13,11 @@ postponements of the same party in the result as a frequency indicator.
 
 from collections import Counter
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import add_months, date_diff, flt, getdate
 
-import erpnext
 from treasury.pdc.report_utils import (
 	CTX,
 	DOCTYPE,
@@ -71,7 +71,12 @@ def get_child_rows(doctype: str, parentfield: str, cheque_names: list[str], fiel
 		return []
 	return frappe.get_all(
 		doctype,
-		filters={"parenttype": DOCTYPE, "parentfield": parentfield, "parent": ["in", cheque_names], **filters},
+		filters={
+			"parenttype": DOCTYPE,
+			"parentfield": parentfield,
+			"parent": ["in", cheque_names],
+			**filters,
+		},
 		fields=["parent", "idx", *fields],
 		order_by="parent asc, idx asc",
 	)
@@ -191,7 +196,9 @@ def get_bounced_columns() -> list[dict]:
 		column("charges", _("Bounce Charges"), "Currency", 120, options="company_currency"),
 		column("represented", _("Re-presented"), "Check", 100),
 		column("operational_status", _("Operational Status"), width=120),
-		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
+		column(
+			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+		),
 	]
 
 
@@ -254,4 +261,3 @@ def get_postponed_columns() -> list[dict]:
 		column("approved_by", _("Approved By"), "Link", 140, options="User"),
 		column("party_postponements", _("Party Postponements"), "Int", 110),
 	]
-

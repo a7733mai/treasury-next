@@ -22,11 +22,11 @@ guarantees (on a past date: from the status log), plus the bank-funded claims no
 the Liability Account in the Journal Entries of the guarantee).
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import add_days, flt, formatdate, getdate
 
-import erpnext
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting, instruments
 from treasury.bank_facilities.utilisation import get_source_balances
@@ -101,7 +101,9 @@ def cancel(doc):
 # ---------------------------------------------------------------------------
 
 
-def extend_validity(name: str, new_expiry_date, extension_date=None, extra_commission=0, remarks=None) -> dict:
+def extend_validity(
+	name: str, new_expiry_date, extension_date=None, extra_commission=0, remarks=None
+) -> dict:
 	doc = instruments.begin(DOCTYPE, name)
 	instruments.require_status(doc, (*OPEN_STATUSES, EXPIRED))
 	date = instruments.action_date(extension_date)
@@ -292,7 +294,9 @@ def repay_claim(name: str, amount=None, repayment_date=None, exchange_rate=None,
 		posting_date=date,
 		accounts=[
 			accounting._row(company, currency, _claim_liability_account(doc), rate, debit=amount),
-			accounting._row(company, currency, accounting.bank_gl_account(doc.bank_account), rate, credit=amount),
+			accounting._row(
+				company, currency, accounting.bank_gl_account(doc.bank_account), rate, credit=amount
+			),
 		],
 		cheque_no=doc.lg_no or doc.name,
 		cheque_date=date,
@@ -343,7 +347,9 @@ def _claim_liability_account(doc) -> str:
 def _counter_row(doc, account: str, amount: float, rate: float, party_type=None, party=None) -> dict:
 	"""Debit of the claim account: in the guarantee currency, or converted when it is in the company currency."""
 	company_currency = erpnext.get_company_currency(doc.company)
-	details = instruments.validate_account(doc.company, account, _("Claim Account"), None, None, allow_party=True)
+	details = instruments.validate_account(
+		doc.company, account, _("Claim Account"), None, None, allow_party=True
+	)
 	if details.account_type in ("Bank", "Cash"):
 		# the claim is paid by the margin and the bank facility, never from a bank / cash balance
 		frappe.throw(_("The Claim Account cannot be a Bank or Cash account."))
@@ -393,7 +399,10 @@ def get_lg_utilisation(facility, as_on=None) -> list[dict]:
 	limit = instruments.get_limit(facility, LIMIT_TYPE)
 	if guarantees and limit and limit.liability_account:
 		balances = get_source_balances(
-			[(DOCTYPE, name) for name in guarantees], [limit.liability_account], as_on, credit_minus_debit=True
+			[(DOCTYPE, name) for name in guarantees],
+			[limit.liability_account],
+			as_on,
+			credit_minus_debit=True,
 		)
 		amount += sum(balances.values())
 	if not amount:

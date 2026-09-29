@@ -6,13 +6,13 @@ stored display fields. Schedule rows are read with `frappe.qb` for the drawdowns
 Amounts in the company currency are converted at the rate of the reports' today (`report_today`).
 """
 
+import erpnext
 import frappe
 from frappe.utils import flt, getdate
 
-import erpnext
 from treasury.accounting import posting
 from treasury.bank_facilities.repayment import PAID, row_status
-from treasury.pdc.report_utils import CTX, get_precision, report_today  # noqa: F401 (re-exported)
+from treasury.pdc.report_utils import CTX, get_precision, report_today
 
 FACILITY = "Bank Facility"
 DRAWDOWN = "Facility Drawdown"

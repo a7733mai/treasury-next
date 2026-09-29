@@ -102,7 +102,9 @@ def execute(filters=None):
 
 	for name in sorted(banks):
 		bank = banks[name]
-		bank.percent_used = flt(bank.utilised_company * 100 / bank.limit_company, 2) if bank.limit_company else 0
+		bank.percent_used = (
+			flt(bank.utilised_company * 100 / bank.limit_company, 2) if bank.limit_company else 0
+		)
 		data += [bank, *bank.pop("children")]
 	return get_columns(), data, None, None, get_summary(list(banks.values()), converter.company_currency)
 
@@ -146,5 +148,7 @@ def get_columns() -> list[dict]:
 		money("limit_company", _("Limit (Company Currency)"), "company_currency", 150),
 		money("utilised_company", _("Utilised (Company Currency)"), "company_currency", 150),
 		money("available_company", _("Available (Company Currency)"), "company_currency", 150),
-		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
+		column(
+			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+		),
 	]

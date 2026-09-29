@@ -110,7 +110,9 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		tool.get_suggestions()
 
 		row = self.row_for(tool, strong)
-		self.assertEqual((row.bank_transaction, row.match_quality, row.selected), (bt_strong.name, "Strong", 1))
+		self.assertEqual(
+			(row.bank_transaction, row.match_quality, row.selected), (bt_strong.name, "Strong", 1)
+		)
 		self.assertEqual(flt(row.amount), 1301.25)
 		self.assertEqual(getdate(row.transaction_date), day(-10))
 		row = self.row_for(tool, weak)
@@ -343,7 +345,10 @@ class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):
 		denied = self.delivered(1920.5)
 		for cheque in (allowed, denied):
 			make_bank_transaction(
-				self.data.egp.bank_account, day(-28), withdrawal=cheque.amount, reference_number=cheque.cheque_no
+				self.data.egp.bank_account,
+				day(-28),
+				withdrawal=cheque.amount,
+				reference_number=cheque.cheque_no,
 			)
 		tool = self.tool()
 		tool.get_suggestions()

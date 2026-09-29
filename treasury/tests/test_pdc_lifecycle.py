@@ -427,7 +427,10 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 				else:
 					reversals = frappe.get_all(
 						"Journal Entry",
-						filters={"treasury_source_name": cheque.name, "treasury_event": ["like", "%_reversal"]},
+						filters={
+							"treasury_source_name": cheque.name,
+							"treasury_event": ["like", "%_reversal"],
+						},
 						pluck="treasury_event",
 					)
 					self.assertCountEqual(
@@ -471,7 +474,9 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		self.assert_status(cheque, "Delivered", "Party Posted")
 		self.assertEqual(cheque.cycle, 2)
 		self.assertNotEqual(cheque.party_payment_entry, first_payment)
-		self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "treasury_cycle"), 2)
+		self.assertEqual(
+			frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "treasury_cycle"), 2
+		)
 		self.assertEqual(self.posting_date("Payment Entry", cheque.party_payment_entry), day(-5))
 		self.assertFalse(cheque.reversal_journal)
 		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)

@@ -120,7 +120,9 @@ class TestTreasuryCompanySettings(TreasuryTestMixin, IntegrationTestCase):
 		doc.bounce_charges_account = self.data.payable
 		self.assertRaises(frappe.ValidationError, doc.run_method, "validate")
 
-		doc.bounce_charges_account = ensure_account("Treasury USD Charges", "Indirect Expenses", currency="USD")
+		doc.bounce_charges_account = ensure_account(
+			"Treasury USD Charges", "Indirect Expenses", currency="USD"
+		)
 		self.assertRaises(frappe.ValidationError, doc.run_method, "validate")
 
 		doc = self.get_settings()

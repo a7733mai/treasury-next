@@ -98,9 +98,7 @@ class FacilityReportTestCase(TreasuryTestMixin, IntegrationTestCase):
 			upfront_fees=500,
 			fees_account=self.accounts.fees,
 		)
-		repayment = make_repayment(
-			drawdown, "2025-06-30", penalty=100, penalty_account=self.accounts.penalty
-		)
+		repayment = make_repayment(drawdown, "2025-06-30", penalty=100, penalty_account=self.accounts.penalty)
 		return frappe._dict(bank=bank, facility=facility, drawdown=drawdown, repayment=repayment)
 
 
@@ -223,11 +221,18 @@ class TestFacilityReports(FacilityReportTestCase):
 		self.assertEqual([r.indent for r in data], [0, 1, 2, 2])
 		bank_row, facility_row, loan, overdraft = data
 		self.assertEqual(
-			(facility_row.limit_amount, facility_row.utilised, facility_row.available, facility_row.percent_used),
+			(
+				facility_row.limit_amount,
+				facility_row.utilised,
+				facility_row.available,
+				facility_row.percent_used,
+			),
 			(1_000_000, 110_000, 890_000, 11),
 		)
 		self.assertEqual(facility_row.days_to_expiry, (D("2026-12-31") - T).days)
-		self.assertEqual((loan.limit_type, loan.utilised, loan.available), ("Short Term Loan", 110_000, 390_000))
+		self.assertEqual(
+			(loan.limit_type, loan.utilised, loan.available), ("Short Term Loan", 110_000, 390_000)
+		)
 		self.assertEqual((overdraft.utilised, overdraft.available), (0, 50_000))
 		self.assertEqual((bank_row.limit_company, bank_row.utilised_company), (1_000_000, 110_000))
 		cards = {c["label"]: c["value"] for c in summary}
@@ -307,7 +312,9 @@ class TestFacilityReports(FacilityReportTestCase):
 		small = flt(1000 + flt(2000 * 0.12 * 31 / 365, 2), 2)
 		self.assertEqual(flt(card("due_30") - before["due_30"], 2), flt(11121.10 + small, 2))
 		self.assertEqual(card("overdue") - before["overdue"], 1)
-		self.assertRaises(frappe.ValidationError, dashboard.get_facility_card, {"company": COMPANY, "scope": "x"})
+		self.assertRaises(
+			frappe.ValidationError, dashboard.get_facility_card, {"company": COMPANY, "scope": "x"}
+		)
 
 
 class TestFacilityReportPermissions(FacilityReportTestCase):

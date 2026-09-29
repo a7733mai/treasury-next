@@ -895,9 +895,7 @@ class TestBouncedAndPostponed(ReportTestCase):
 		for view in ("Bounced", "Postponed"):
 			columns, _rows = bounced_and_postponed({"company": COMPANY, "view": view})
 			self.assertTrue(columns)
-		self.assertRaises(
-			frappe.ValidationError, bounced_and_postponed, {"company": COMPANY, "view": "Lost"}
-		)
+		self.assertRaises(frappe.ValidationError, bounced_and_postponed, {"company": COMPANY, "view": "Lost"})
 
 
 # ---------------------------------------------------------------------------
@@ -935,9 +933,7 @@ class TestChequeBookUsage(ReportTestCase):
 			{"company": COMPANY, "bank_account": bank.bank_account, "status": "Closed"}
 		)
 		self.assertEqual(data, [])
-		self.assertRaises(
-			frappe.ValidationError, cheque_book_usage, {"company": COMPANY, "status": "Lost"}
-		)
+		self.assertRaises(frappe.ValidationError, cheque_book_usage, {"company": COMPANY, "status": "Lost"})
 
 	def test_default_filters(self):
 		columns, _data = cheque_book_usage({"company": COMPANY})

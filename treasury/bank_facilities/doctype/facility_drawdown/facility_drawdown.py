@@ -1,13 +1,13 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, fmt_money, formatdate, getdate
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting, schedule
 from treasury.bank_facilities.facility import ACTIVE
@@ -107,7 +107,9 @@ class FacilityDrawdown(Document):
 			outstanding = get_drawdown_outstanding(
 				[{"name": self.name, "liability_account": self.liability_account}]
 			)
-			self.set_onload("outstanding_principal", flt(outstanding.get(self.name), self.precision("amount")))
+			self.set_onload(
+				"outstanding_principal", flt(outstanding.get(self.name), self.precision("amount"))
+			)
 
 	def validate(self):
 		if self.resets_system_fields():
@@ -185,7 +187,9 @@ class FacilityDrawdown(Document):
 		self.company, self.bank, self.currency = facility.company, facility.bank, facility.currency
 		if self.limit_type not in LOAN_TYPES:
 			frappe.throw(
-				_("Limit Type must be one of: {0}.").format(", ".join(_(t, context=FACILITY) for t in LOAN_TYPES))
+				_("Limit Type must be one of: {0}.").format(
+					", ".join(_(t, context=FACILITY) for t in LOAN_TYPES)
+				)
 			)
 		limit = self.get_limit()
 		if not limit:
@@ -237,7 +241,9 @@ class FacilityDrawdown(Document):
 		if self.currency == erpnext.get_company_currency(self.company):
 			self.exchange_rate = 1
 		elif not flt(self.exchange_rate) or flt(self.exchange_rate) == 1:
-			self.exchange_rate = posting.get_cheque_exchange_rate(self.currency, self.company, self.drawdown_date)
+			self.exchange_rate = posting.get_cheque_exchange_rate(
+				self.currency, self.company, self.drawdown_date
+			)
 
 	def validate_amounts(self):
 		self.amount = flt(self.amount, self.precision("amount"))
@@ -253,7 +259,10 @@ class FacilityDrawdown(Document):
 		if not self.fees_account:
 			frappe.throw(_("Fees Account is required for the upfront fees."))
 		details = frappe.db.get_value(
-			"Account", self.fees_account, ["company", "is_group", "root_type", "account_currency"], as_dict=True
+			"Account",
+			self.fees_account,
+			["company", "is_group", "root_type", "account_currency"],
+			as_dict=True,
 		)
 		company_currency = erpnext.get_company_currency(self.company)
 		if (
@@ -340,7 +349,9 @@ class FacilityDrawdown(Document):
 		self.total_payable = flt(self.total_principal + self.total_interest, precision)
 		if self.repayment_schedule and self.total_principal != self.amount:
 			frappe.throw(
-				_("The principal of the repayment schedule ({0}) must equal the drawdown amount ({1}).").format(
+				_(
+					"The principal of the repayment schedule ({0}) must equal the drawdown amount ({1})."
+				).format(
 					fmt_money(self.total_principal, currency=self.currency),
 					fmt_money(self.amount, currency=self.currency),
 				)

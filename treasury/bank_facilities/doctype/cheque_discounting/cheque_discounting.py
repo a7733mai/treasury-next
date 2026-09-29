@@ -99,11 +99,15 @@ class ChequeDiscounting(Document):
 		if not before:
 			return
 		if _items_key(before) != _items_key(self):
-			frappe.throw(_("The cheques of a submitted Cheque Discounting cannot be changed."), title=_("Not Allowed"))
+			frappe.throw(
+				_("The cheques of a submitted Cheque Discounting cannot be changed."), title=_("Not Allowed")
+			)
 		if _items_outcome(before) != _items_outcome(self):
 			# written only by discounting.close_item, directly in the database
 			frappe.throw(
-				_("The status of the cheques of a Cheque Discounting changes only when they are settled or bounced."),
+				_(
+					"The status of the cheques of a Cheque Discounting changes only when they are settled or bounced."
+				),
 				title=_("Not Allowed"),
 			)
 
@@ -140,7 +144,11 @@ class ChequeDiscounting(Document):
 		seen = set()
 		for row in self.items:
 			if row.pdc_cheque in seen:
-				frappe.throw(_("Row #{0}: Cheque {1} appears more than once.").format(row.idx, frappe.bold(row.pdc_cheque)))
+				frappe.throw(
+					_("Row #{0}: Cheque {1} appears more than once.").format(
+						row.idx, frappe.bold(row.pdc_cheque)
+					)
+				)
 			seen.add(row.pdc_cheque)
 			row.status = discounting.ITEM_DISCOUNTED
 			for fieldname in ITEM_LIFECYCLE_FIELDS:
@@ -192,7 +200,9 @@ class ChequeDiscounting(Document):
 			if not self.discount_expense_account:
 				frappe.throw(_("Discount Expense Account is required for the charges."))
 		if self.discount_expense_account:
-			instruments.validate_expense_account(self, self.discount_expense_account, _("Discount Expense Account"))
+			instruments.validate_expense_account(
+				self, self.discount_expense_account, _("Discount Expense Account")
+			)
 
 	# ------------------------------------------------------------------ actions
 
@@ -211,7 +221,8 @@ def _items_key(doc) -> list[tuple]:
 
 def _items_outcome(doc) -> list[tuple]:
 	return [
-		(row.pdc_cheque, row.status, *(str(row.get(f) or "") for f in ITEM_LIFECYCLE_FIELDS)) for row in doc.items
+		(row.pdc_cheque, row.status, *(str(row.get(f) or "") for f in ITEM_LIFECYCLE_FIELDS))
+		for row in doc.items
 	]
 
 

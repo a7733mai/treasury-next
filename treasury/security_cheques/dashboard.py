@@ -6,11 +6,11 @@ of the cheques still held / given expiring within 30 days (today included) or al
 Cheques are read with `frappe.get_list` (permissions and User Permissions apply).
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt
 
-import erpnext
 from treasury.pdc.report_utils import get_precision, report_today, validate_company
 from treasury.security_cheques.lifecycle import INCOMING, LIVE_BY_DIRECTION, LIVE_STATUSES, OPEN, OUTGOING
 from treasury.security_cheques.report_utils import DOCTYPE, AmountConverter, get_security_cheques

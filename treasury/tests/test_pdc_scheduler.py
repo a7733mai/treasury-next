@@ -301,7 +301,9 @@ class TestPDCDueAlerts(TreasuryTestMixin, IntegrationTestCase):
 			self.assertIn(cheque.cheque_no, content)
 		self.assertNotIn(later.cheque_no, content)
 		self.assertNotIn(settled.cheque_no, content)
-		self.assertFalse(frappe.db.exists("Notification Log", {"for_user": OUTSIDER, "document_type": DOCTYPE}))
+		self.assertFalse(
+			frappe.db.exists("Notification Log", {"for_user": OUTSIDER, "document_type": DOCTYPE})
+		)
 
 	def test_digest_groups_and_overdue_flag(self):
 		soon = make_pdc_cheque(amount=1212, issue_date=day(-30), due_date=day(1))

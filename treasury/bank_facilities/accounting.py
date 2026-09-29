@@ -14,11 +14,11 @@ date, so these Journal Entries carry `clearance_date` = their posting date (like
 other modules) and do not wait in the Bank Reconciliation Tool. Accruals have no bank row.
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import flt
 
-import erpnext
 from treasury.accounting import posting
 
 DRAWDOWN = "Facility Drawdown"
@@ -122,12 +122,16 @@ def post_repayment(doc, drawdown, facility) -> str:
 		accounts.append(_row(company, currency, drawdown.liability_account, rate, debit=doc.principal_paid))
 	if flt(doc.accrued_interest_cleared):
 		accounts.append(
-			_row(company, currency, facility.accrued_interest_account, rate, debit=doc.accrued_interest_cleared)
+			_row(
+				company, currency, facility.accrued_interest_account, rate, debit=doc.accrued_interest_cleared
+			)
 		)
 	if flt(doc.interest_expensed):
 		if not facility.interest_expense_account:
 			frappe.throw(
-				_("Set the Interest Expense Account of Bank Facility {0}.").format(frappe.bold(facility.name)),
+				_("Set the Interest Expense Account of Bank Facility {0}.").format(
+					frappe.bold(facility.name)
+				),
 				title=_("Missing Settings"),
 			)
 		accounts.append(

@@ -22,12 +22,12 @@ Status log `event` values (and the from/to statuses) are stored in English, like
 translated when displayed (Select formatter / pdc_cheque.js).
 """
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
@@ -188,7 +188,9 @@ def _post_party_now(name: str, posting_date=None, system: bool = False) -> dict:
 	return _save(doc)
 
 
-def deposit(name: str, deposit_date=None, bank_account: str | None = None, remarks: str | None = None) -> dict:
+def deposit(
+	name: str, deposit_date=None, bank_account: str | None = None, remarks: str | None = None
+) -> dict:
 	doc = _begin(name)
 	_require_direction(doc, INCOMING)
 	_require_status(doc, ("Received",), "Deposited")
@@ -384,9 +386,9 @@ def discount_error(doc, discount_date) -> str | None:
 			formatdate(date), frappe.bold(doc.name), formatdate(latest)
 		)
 	if getdate(doc.effective_due_date) <= date:
-		return _("Cheque {0} is due on {1}: only cheques due after the Discount Date can be discounted.").format(
-			frappe.bold(doc.name), formatdate(doc.effective_due_date)
-		)
+		return _(
+			"Cheque {0} is due on {1}: only cheques due after the Discount Date can be discounted."
+		).format(frappe.bold(doc.name), formatdate(doc.effective_due_date))
 	return None
 
 
@@ -397,7 +399,9 @@ def undiscount(name: str, cheque_discounting: str, remarks: str | None = None) -
 	_require_status(doc, ("Discounted",))
 	if doc.cheque_discounting != cheque_discounting:
 		frappe.throw(
-			_("Cheque {0} is not discounted with {1}.").format(frappe.bold(doc.name), frappe.bold(cheque_discounting))
+			_("Cheque {0} is not discounted with {1}.").format(
+				frappe.bold(doc.name), frappe.bold(cheque_discounting)
+			)
 		)
 	doc.discount_date = None
 	doc.cheque_discounting = None
@@ -474,9 +478,7 @@ def represent(name: str, represent_date=None, new_due_date=None, remarks: str | 
 		doc.set(fieldname, None)
 	doc.bank_charges = 0
 	target = "Delivered" if doc.direction == OUTGOING else "Received"
-	_log(
-		doc, "Re-presented", operational=target, accounting=NOT_POSTED, remarks=remarks, event_date=date
-	)
+	_log(doc, "Re-presented", operational=target, accounting=NOT_POSTED, remarks=remarks, event_date=date)
 	if new_due_date and getdate(new_due_date) != getdate(doc.effective_due_date):
 		_apply_postponement(doc, new_due_date, remarks or _("Re-presented after bounce"))
 
@@ -707,7 +709,11 @@ def _post_bank(doc, posting_date, exchange_rate=None):
 	doc.bank_journal = journal
 	doc.bank_posting_date = getdate(posting_date)
 	_log(
-		doc, "Bank Posted", accounting=BANK_POSTED, voucher=("Journal Entry", journal), event_date=posting_date
+		doc,
+		"Bank Posted",
+		accounting=BANK_POSTED,
+		voucher=("Journal Entry", journal),
+		event_date=posting_date,
 	)
 
 	if flt(doc.bank_charges) > 0:
@@ -831,7 +837,11 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 		if voucher.treasury_event == EVENT_PARTY:
 			doc.reversal_journal = reversal
 		_log(
-			doc, "Voucher Reversed", voucher=("Journal Entry", reversal), remarks=remarks, event_date=posting_date
+			doc,
+			"Voucher Reversed",
+			voucher=("Journal Entry", reversal),
+			remarks=remarks,
+			event_date=posting_date,
 		)
 	_log(doc, "Reversed", accounting=REVERSED, remarks=remarks, event_date=posting_date)
 

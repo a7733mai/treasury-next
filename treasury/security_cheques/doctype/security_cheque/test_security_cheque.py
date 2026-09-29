@@ -163,9 +163,7 @@ class TestSecurityCheque(SecurityChequeTestCase):
 		self.assertRaises(frappe.ValidationError, cheque.save)
 
 	def test_bank_fields_only_on_outgoing(self):
-		self.assertRaises(
-			frappe.ValidationError, make_security_cheque, bank_account=bank_account_name("EGP")
-		)
+		self.assertRaises(frappe.ValidationError, make_security_cheque, bank_account=bank_account_name("EGP"))
 		self.assertRaises(frappe.ValidationError, make_security_cheque, "Outgoing", bank_account=None)
 
 	def test_party_types(self):

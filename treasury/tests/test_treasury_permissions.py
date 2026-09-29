@@ -8,12 +8,12 @@ on the cheque. Also covers the one-time removal of the Custom DocPerm grants of 
 from unittest.mock import patch
 
 import frappe
+from erpnext.accounts.doctype.payment_entry.payment_entry import PaymentEntry
 from frappe.cache_manager import clear_user_cache
 from frappe.permissions import add_permission
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
 
-from erpnext.accounts.doctype.payment_entry.payment_entry import PaymentEntry
 from treasury.install import (
 	LEGACY_CLEANUP_DONE_KEY,
 	LEGACY_PERMISSION_DOCTYPES,
@@ -186,7 +186,9 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 			self.assertEqual(frappe.session.user, TREASURY_MANAGER)
 
 		self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "docstatus"), 2)
-		self.assertEqual(frappe.db.get_value("Journal Entry", cheque.under_collection_journal, "docstatus"), 2)
+		self.assertEqual(
+			frappe.db.get_value("Journal Entry", cheque.under_collection_journal, "docstatus"), 2
+		)
 		self.assertEqual(
 			frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "modified_by"), TREASURY_MANAGER
 		)

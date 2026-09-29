@@ -167,7 +167,16 @@ def get_expiring_facilities(as_of, days: int = EXPIRY_ALERT_DAYS) -> list[frappe
 			"status": ["in", lifecycle.OPEN_STATUSES],
 			"expiry_date": ["<=", add_days(getdate(as_of), days)],
 		},
-		fields=["name", "company", "facility_name", "bank", "expiry_date", "status", "total_limit", "currency"],
+		fields=[
+			"name",
+			"company",
+			"facility_name",
+			"bank",
+			"expiry_date",
+			"status",
+			"total_limit",
+			"currency",
+		],
 		order_by="expiry_date asc, name asc",
 	)
 
@@ -204,7 +213,9 @@ def send_facility_alerts(as_of=None) -> dict:
 				f for f in items.facilities if frappe.has_permission(FACILITY, "read", doc=f.name, user=user)
 			]
 			guarantees = [
-				g for g in items.guarantees if frappe.has_permission(lg.DOCTYPE, "read", doc=g.name, user=user)
+				g
+				for g in items.guarantees
+				if frappe.has_permission(lg.DOCTYPE, "read", doc=g.name, user=user)
 			]
 			if (installments or facilities or guarantees) and _send_digest(
 				company, installments, facilities, user, as_of, guarantees
@@ -255,8 +266,12 @@ def _installment_row(row) -> frappe._dict:
 	return frappe._dict(
 		row,
 		due=formatdate(row.due_date),
-		principal_formatted=fmt_money(max(flt(row.principal) - flt(row.paid_principal), 0), currency=row.currency),
-		interest_formatted=fmt_money(max(flt(row.interest) - flt(row.paid_interest), 0), currency=row.currency),
+		principal_formatted=fmt_money(
+			max(flt(row.principal) - flt(row.paid_principal), 0), currency=row.currency
+		),
+		interest_formatted=fmt_money(
+			max(flt(row.interest) - flt(row.paid_interest), 0), currency=row.currency
+		),
 		unpaid_formatted=fmt_money(row.unpaid, currency=row.currency),
 	)
 
@@ -279,7 +294,9 @@ def _send_digest(
 			company, formatdate(as_of)
 		)
 		message = render_digest(company, installments, facilities, as_of, guarantees)
-	if frappe.db.exists("Notification Log", {"for_user": user, "document_type": DRAWDOWN, "subject": subject}):
+	if frappe.db.exists(
+		"Notification Log", {"for_user": user, "document_type": DRAWDOWN, "subject": subject}
+	):
 		return False
 	frappe.get_doc(
 		{

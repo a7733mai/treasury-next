@@ -22,10 +22,9 @@ displayed.
 """
 
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.utils import flt, formatdate, getdate, now_datetime, today
-
-from erpnext.accounts.doctype.account.account import get_account_currency
 
 from treasury.pdc import lifecycle as pdc_lifecycle
 from treasury.utils.context import real_user
@@ -279,7 +278,9 @@ def _encashment_amount(doc, amount) -> float:
 	if doc.amount_type == OPEN:
 		value = flt(amount, precision)
 		if value <= 0:
-			frappe.throw(_("Enter the amount to encash: security cheque {0} is Open / Blank.").format(doc.name))
+			frappe.throw(
+				_("Enter the amount to encash: security cheque {0} is Open / Blank.").format(doc.name)
+			)
 		return value
 	value = flt(doc.amount, precision)
 	if amount not in (None, "") and flt(amount, precision) != value:

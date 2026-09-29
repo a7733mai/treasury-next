@@ -62,7 +62,9 @@ def execute(filters=None):
 		row.cheque_count += 1
 
 	precision = get_precision()
-	data = [round_row(groups[k], precision) for k in sorted(groups, key=lambda k: groups[k].group_label or "")]
+	data = [
+		round_row(groups[k], precision) for k in sorted(groups, key=lambda k: groups[k].group_label or "")
+	]
 	if data:
 		data.append(round_row(total_row(data, converter.company_currency), precision))
 	return get_columns(group_by), data, None, get_chart(data[:-1])
@@ -125,7 +127,13 @@ def get_columns(group_by: str) -> list[dict]:
 	]
 	for fieldname, label in bucket_labels().items():
 		columns.append(
-			{"fieldname": fieldname, "label": label, "fieldtype": "Currency", "options": "currency", "width": 120}
+			{
+				"fieldname": fieldname,
+				"label": label,
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			}
 		)
 	columns += [
 		{
@@ -136,7 +144,13 @@ def get_columns(group_by: str) -> list[dict]:
 			"width": 130,
 		},
 		{"fieldname": "cheque_count", "label": _("Cheques"), "fieldtype": "Int", "width": 80},
-		{"fieldname": "currency", "label": _("Currency"), "fieldtype": "Link", "options": "Currency", "hidden": 1},
+		{
+			"fieldname": "currency",
+			"label": _("Currency"),
+			"fieldtype": "Link",
+			"options": "Currency",
+			"hidden": 1,
+		},
 	]
 	return columns
 

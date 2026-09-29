@@ -121,5 +121,7 @@ def get_columns() -> list[dict]:
 		money("claim_outstanding", _("Claim Owed to the Bank")),
 		money("open_company", _("Open (Company Currency)"), "company_currency", 150),
 		money("margin_company", _("Margin (Company Currency)"), "company_currency", 150),
-		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
+		column(
+			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+		),
 	]

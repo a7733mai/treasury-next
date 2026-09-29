@@ -218,9 +218,7 @@ class TestSecurityExposure(SecurityReportTestCase):
 		)
 		rows = {(r.reference_doctype, r.reference_name): r for r in data}
 		contract = rows[("Sales Order", order.name)]
-		self.assertEqual(
-			(contract.fixed_count, contract.open_count, flt(contract.amount)), (2, 1, 5000)
-		)
+		self.assertEqual((contract.fixed_count, contract.open_count, flt(contract.amount)), (2, 1, 5000))
 		# the requirement is the document's (the highest on its cheques), not the sum of the cheques' fields;
 		# the Open / Blank cheque can be filled in for the rest: no shortfall is claimed
 		self.assertEqual(flt(contract.required_amount), 10000)

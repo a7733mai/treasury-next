@@ -153,7 +153,12 @@ def amend(
 	if delta > 0:
 		journals.append(
 			instruments.post_margin(
-				doc, EVENT_MARGIN_TOPUP, date, delta, rate=rate, cycle=instruments.next_cycle(doc, EVENT_MARGIN_TOPUP)
+				doc,
+				EVENT_MARGIN_TOPUP,
+				date,
+				delta,
+				rate=rate,
+				cycle=instruments.next_cycle(doc, EVENT_MARGIN_TOPUP),
 			)
 		)
 	elif delta < 0:
@@ -185,7 +190,9 @@ def amend(
 	if new_amount != current:
 		changes.append(f"{_('Amount')}: {current} → {new_amount}")
 	if new_expiry != getdate(doc.effective_expiry_date):
-		changes.append(f"{_('Expiry Date')}: {formatdate(doc.effective_expiry_date)} → {formatdate(new_expiry)}")
+		changes.append(
+			f"{_('Expiry Date')}: {formatdate(doc.effective_expiry_date)} → {formatdate(new_expiry)}"
+		)
 	doc.current_amount = new_amount
 	doc.open_amount = new_amount
 	doc.effective_expiry_date = new_expiry
@@ -203,13 +210,15 @@ def receive_documents(
 	date = instruments.action_date(documents_date)
 	instruments.not_before(doc, date, "issue_date")
 	precision = doc.precision("amount")
-	amount = flt(documents_amount, precision) if documents_amount not in (None, "") else flt(doc.current_amount)
+	amount = (
+		flt(documents_amount, precision) if documents_amount not in (None, "") else flt(doc.current_amount)
+	)
 	ceiling = flt(flt(doc.current_amount) * (1 + flt(doc.tolerance_percent) / 100), precision)
 	if not 0 < amount <= ceiling:
 		frappe.throw(
-			_("The documents amount must be greater than zero and at most {0} (amount plus tolerance).").format(
-				ceiling
-			)
+			_(
+				"The documents amount must be greater than zero and at most {0} (amount plus tolerance)."
+			).format(ceiling)
 		)
 	charges = flt(charges, precision)
 	if charges < 0:
@@ -367,7 +376,9 @@ def expire(name: str, as_of) -> bool:
 def _charges_account(doc) -> str:
 	account = doc.charges_account or doc.commission_account
 	if not account:
-		frappe.throw(_("Set the Charges Account (or the Commission Account) of {0}.").format(frappe.bold(doc.name)))
+		frappe.throw(
+			_("Set the Charges Account (or the Commission Account) of {0}.").format(frappe.bold(doc.name))
+		)
 	return account
 
 
@@ -379,7 +390,12 @@ def _invoice_reference(doc, purchase_invoice: str | None, amount: float, rate: f
 	invoice = frappe.db.get_value(
 		"Purchase Invoice", purchase_invoice, ["supplier", "company", "docstatus"], as_dict=True
 	)
-	if not invoice or invoice.docstatus != 1 or invoice.company != doc.company or invoice.supplier != doc.supplier:
+	if (
+		not invoice
+		or invoice.docstatus != 1
+		or invoice.company != doc.company
+		or invoice.supplier != doc.supplier
+	):
 		frappe.throw(
 			_("Purchase Invoice {0} must be a submitted invoice of supplier {1} in company {2}.").format(
 				frappe.bold(purchase_invoice), frappe.bold(doc.supplier), frappe.bold(doc.company)
@@ -389,7 +405,11 @@ def _invoice_reference(doc, purchase_invoice: str | None, amount: float, rate: f
 	party_currency = frappe.get_cached_value("Account", party_account, "account_currency")
 	allocated = amount if party_currency == doc.currency else flt(amount * rate, accounting._precision())
 	return [
-		{"reference_doctype": "Purchase Invoice", "reference_name": purchase_invoice, "allocated_amount": allocated}
+		{
+			"reference_doctype": "Purchase Invoice",
+			"reference_name": purchase_invoice,
+			"allocated_amount": allocated,
+		}
 	]
 
 
@@ -429,7 +449,16 @@ def get_flows(filters) -> list[dict]:
 	for row in frappe.get_list(
 		DOCTYPE,
 		filters=conditions,
-		fields=["name", "company", "currency", "bank_account", "supplier", "open_amount", "margin_held", "maturity_date"],
+		fields=[
+			"name",
+			"company",
+			"currency",
+			"bank_account",
+			"supplier",
+			"open_amount",
+			"margin_held",
+			"maturity_date",
+		],
 	):
 		amount = flt(flt(row.open_amount) - flt(row.margin_held), precision)
 		if amount <= 0:

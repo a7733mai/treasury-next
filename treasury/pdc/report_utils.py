@@ -8,14 +8,14 @@ are not expected to hold any accounting permission (see README "Roles and permis
 
 import json
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.core.doctype.user_permission.user_permission import get_user_permissions
 from frappe.query_builder.functions import Sum
 from frappe.utils import flt, getdate, today
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 
 DOCTYPE = "PDC Cheque"
@@ -258,7 +258,9 @@ class AmountConverter:
 		if flt(row.exchange_rate):
 			return flt(row.exchange_rate)
 		if row.currency not in self._rates:
-			self._rates[row.currency] = posting.get_cheque_exchange_rate(row.currency, self.company, self.date)
+			self._rates[row.currency] = posting.get_cheque_exchange_rate(
+				row.currency, self.company, self.date
+			)
 		return self._rates[row.currency]
 
 	def company_amount(self, row) -> float:

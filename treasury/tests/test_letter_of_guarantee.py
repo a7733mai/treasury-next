@@ -142,7 +142,9 @@ class TestLetterOfGuarantee(LGTestCase):
 			lg.status_log[-1].voucher_no,
 			[(self.accounts.commission, 500, 0, None, date), (bank.bank_gl, 0, 500, None, date)],
 		)
-		self.assertRaises(frappe.ValidationError, lg.extend_validity, new_expiry_date="2026-01-31")  # not later
+		self.assertRaises(
+			frappe.ValidationError, lg.extend_validity, new_expiry_date="2026-01-31"
+		)  # not later
 
 		lg.reduce(new_amount=60_000, reduction_date="2025-06-01")
 		lg.reload()
@@ -162,7 +164,8 @@ class TestLetterOfGuarantee(LGTestCase):
 		lg.release(release_date="2025-09-01")
 		lg.reload()
 		self.assertEqual(
-			(lg.status, lg.open_amount, lg.margin_held, D(lg.release_date)), ("Released", 0, 0, D("2025-09-01"))
+			(lg.status, lg.open_amount, lg.margin_held, D(lg.release_date)),
+			("Released", 0, 0, D("2025-09-01")),
 		)
 		assert_gl_entries(
 			self,
@@ -228,7 +231,11 @@ class TestLetterOfGuarantee(LGTestCase):
 		receivable = self.data.receivable
 		# a Receivable account needs its party
 		self.assertRaises(
-			frappe.ValidationError, lg.claim, amount=4_000, counter_account=receivable, claim_date="2025-04-01"
+			frappe.ValidationError,
+			lg.claim,
+			amount=4_000,
+			counter_account=receivable,
+			claim_date="2025-04-01",
 		)
 		lg.claim(
 			amount=4_000,

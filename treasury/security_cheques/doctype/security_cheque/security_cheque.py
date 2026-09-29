@@ -1,13 +1,13 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate, today
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
 from treasury.security_cheques import lifecycle
 from treasury.utils.protected_fields import changed_fields, changed_tables

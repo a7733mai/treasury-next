@@ -162,7 +162,12 @@ class LetterofCredit(Document):
 		order = frappe.db.get_value(
 			"Purchase Order", self.purchase_order, ["supplier", "company", "docstatus"], as_dict=True
 		)
-		if not order or order.docstatus != 1 or order.company != self.company or order.supplier != self.supplier:
+		if (
+			not order
+			or order.docstatus != 1
+			or order.company != self.company
+			or order.supplier != self.supplier
+		):
 			frappe.throw(
 				_("Purchase Order {0} must be a submitted order of supplier {1} in company {2}.").format(
 					frappe.bold(self.purchase_order), frappe.bold(self.supplier), frappe.bold(self.company)

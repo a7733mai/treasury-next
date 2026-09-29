@@ -120,7 +120,9 @@ class LetterofGuarantee(Document):
 	def before_cancel(self):
 		if self.status == lg.CLAIMED:
 			frappe.throw(
-				_("Letter of Guarantee {0} was claimed and cannot be cancelled.").format(frappe.bold(self.name)),
+				_("Letter of Guarantee {0} was claimed and cannot be cancelled.").format(
+					frappe.bold(self.name)
+				),
 				title=_("Not Allowed"),
 			)
 
@@ -154,7 +156,10 @@ class LetterofGuarantee(Document):
 
 	def validate_reference(self):
 		# ERPNext's Bank Guarantee is only linked for reference (never changed by Treasury)
-		if self.bank_guarantee and frappe.db.get_value("Bank Guarantee", self.bank_guarantee, "docstatus") == 2:
+		if (
+			self.bank_guarantee
+			and frappe.db.get_value("Bank Guarantee", self.bank_guarantee, "docstatus") == 2
+		):
 			frappe.throw(_("Bank Guarantee {0} is cancelled.").format(frappe.bold(self.bank_guarantee)))
 		if not self.reference_doctype:
 			self.reference_name = None

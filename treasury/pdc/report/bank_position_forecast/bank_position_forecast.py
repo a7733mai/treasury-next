@@ -256,7 +256,9 @@ class BankPositionForecast:
 
 	def get_opening(self) -> float:
 		return flt(
-			get_gl_balance(self.company, self.get_gl_accounts(), add_days(self.from_date, -1), self.bank_view),
+			get_gl_balance(
+				self.company, self.get_gl_accounts(), add_days(self.from_date, -1), self.bank_view
+			),
 			self.precision,
 		)
 
@@ -395,7 +397,13 @@ class BankPositionForecast:
 				{"fieldname": "bank_account", "label": _("Bank Account"), "fieldtype": "Data", "width": 170},
 			]
 		columns.append(
-			{"fieldname": "currency", "label": _("Currency"), "fieldtype": "Link", "options": "Currency", "hidden": 1}
+			{
+				"fieldname": "currency",
+				"label": _("Currency"),
+				"fieldtype": "Link",
+				"options": "Currency",
+				"hidden": 1,
+			}
 		)
 		return columns
 
@@ -409,7 +417,11 @@ class BankPositionForecast:
 						"values": [r.closing for r in summary_rows],
 						"chartType": "line",
 					},
-					{"name": _("Expected In"), "values": [r.expected_in for r in summary_rows], "chartType": "bar"},
+					{
+						"name": _("Expected In"),
+						"values": [r.expected_in for r in summary_rows],
+						"chartType": "bar",
+					},
 					{
 						"name": _("Expected Out"),
 						"values": [r.expected_out for r in summary_rows],

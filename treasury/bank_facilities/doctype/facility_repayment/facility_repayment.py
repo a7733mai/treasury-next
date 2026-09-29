@@ -1,13 +1,13 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, formatdate, getdate
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting, repayment
 from treasury.bank_facilities.interest import accrued_balance
@@ -174,7 +174,9 @@ class FacilityRepayment(Document):
 		if self.currency == erpnext.get_company_currency(self.company):
 			self.exchange_rate = 1
 		elif not flt(self.exchange_rate) or flt(self.exchange_rate) == 1:
-			self.exchange_rate = posting.get_cheque_exchange_rate(self.currency, self.company, self.repayment_date)
+			self.exchange_rate = posting.get_cheque_exchange_rate(
+				self.currency, self.company, self.repayment_date
+			)
 
 	def set_default_amounts(self, drawdown):
 		"""Nothing entered: pay the unpaid principal and interest of the next installment (or the selected one)."""

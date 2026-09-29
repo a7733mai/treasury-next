@@ -5,11 +5,11 @@ hold cheques in several currencies), so they come from `get_cheque_total`, which
 `frappe.get_list` (permissions and User Permissions apply) and converts them like the reports do.
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import add_days
 
-import erpnext
 from treasury.pdc.report_utils import (
 	BANK_POSTED,
 	INCOMING,

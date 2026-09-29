@@ -231,6 +231,8 @@ def get_columns(group_field: str | None) -> list[dict]:
 		column("accounting_status", _("Accounting Status"), width=130),
 		column("postponement_count", _("Postponement Count"), "Int", 90),
 		column("vouchers", _("Linked Vouchers"), width=260),
-		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
+		column(
+			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+		),
 	]
 	return columns

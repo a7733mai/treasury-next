@@ -16,12 +16,12 @@ Letters of Credit (lc.py) and Cheque Discounting batches (discounting.py).
   foreign currency difference goes to the company's Exchange Gain / Loss account.
 """
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.utils import cint, flt, fmt_money, formatdate, getdate, now_datetime, today
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting
 from treasury.bank_facilities.facility import ACTIVE
@@ -366,9 +366,7 @@ def require_status(doc, allowed: tuple[str, ...], already: str | None = None):
 # ---------------------------------------------------------------------------
 
 
-def open_amounts(
-	doctype: str, facility: str, open_statuses: tuple[str, ...], as_on=None
-) -> dict[str, float]:
+def open_amounts(doctype: str, facility: str, open_statuses: tuple[str, ...], as_on=None) -> dict[str, float]:
 	"""{instrument: open amount} of the submitted `doctype` documents of `facility` that are open (status in
 	`open_statuses`) now, or on `as_on`: then the status and the open amount after the last event dated up to
 	`as_on` (the log rows are dated in order: `not_before`). Cancelled documents never count."""

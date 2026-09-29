@@ -30,13 +30,13 @@ Once the batch is submitted, the identity and amount of its cheques are frozen o
 import re
 from contextlib import contextmanager
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.query_builder.functions import IfNull, Sum
 from frappe.utils import add_days, cint, flt, getdate
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.pdc import lifecycle
 from treasury.pdc.batch_status import (
@@ -331,7 +331,9 @@ def validate_allocations(batch):
 				indicator="orange",
 			)
 		return
-	party_currency = get_account_currency(posting.get_party_account(batch.party_type, batch.party, batch.company))
+	party_currency = get_account_currency(
+		posting.get_party_account(batch.party_type, batch.party, batch.company)
+	)
 	for (doctype, name), allocated in totals.items():
 		outstanding = posting.get_reference_outstanding(
 			doctype, name, batch.party_type, batch.party, party_currency, precision
@@ -644,7 +646,10 @@ def validate_cancellation(batch):
 			),
 			title=_("Cancellation Not Allowed"),
 		)
-	if any(c.operational_status == "Created" for c in cheques) and lifecycle.MANAGER not in frappe.get_roles():
+	if (
+		any(c.operational_status == "Created" for c in cheques)
+		and lifecycle.MANAGER not in frappe.get_roles()
+	):
 		frappe.throw(
 			_("Cancelling Cheque Batch {0} cancels its cheques, which requires the role {1}.").format(
 				frappe.bold(batch.name), _(lifecycle.MANAGER)
@@ -838,5 +843,7 @@ def _drop_error_message(exc: Exception):
 	exc_id = getattr(exc, "__frappe_exc_id", None)
 	if exc_id:
 		frappe.local.message_log = [
-			m for m in frappe.local.message_log if not (isinstance(m, dict) and m.get("__frappe_exc_id") == exc_id)
+			m
+			for m in frappe.local.message_log
+			if not (isinstance(m, dict) and m.get("__frappe_exc_id") == exc_id)
 		]

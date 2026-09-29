@@ -103,7 +103,9 @@ def accrued_balance(drawdown, upto) -> float:
 		return 0.0
 	sources = [(DRAWDOWN, drawdown.name)] + [
 		(REPAYMENT, name)
-		for name in frappe.get_all(REPAYMENT, filters={"drawdown": drawdown.name, "docstatus": 1}, pluck="name")
+		for name in frappe.get_all(
+			REPAYMENT, filters={"drawdown": drawdown.name, "docstatus": 1}, pluck="name"
+		)
 	]
 	balances = get_source_balances(sources, accounts, upto, credit_minus_debit=True)
 	return max(flt(sum(balances.values()), drawdown.precision("amount")), 0.0)

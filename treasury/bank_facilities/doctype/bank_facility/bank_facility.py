@@ -1,13 +1,13 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.bank_facilities import facility as lifecycle
 from treasury.bank_facilities.utilisation import LOAN_TYPES, get_utilisation, refresh_utilisation
 from treasury.utils.protected_fields import changed_fields, changed_tables
@@ -87,9 +87,9 @@ class BankFacility(Document):
 	def on_trash(self):
 		if self.status != lifecycle.DRAFT or frappe.db.exists("Facility Drawdown", {"facility": self.name}):
 			frappe.throw(
-				_("Bank Facility {0} cannot be deleted once activated or when it has drawdowns. Close it instead.").format(
-					frappe.bold(self.name)
-				)
+				_(
+					"Bank Facility {0} cannot be deleted once activated or when it has drawdowns. Close it instead."
+				).format(frappe.bold(self.name))
 			)
 
 	# ------------------------------------------------------------------ validation
@@ -155,7 +155,9 @@ class BankFacility(Document):
 			for fieldname in ("interest_rate", "margin_rate", "commission_rate", "cash_margin_percent"):
 				if flt(row.get(fieldname)) < 0:
 					frappe.throw(
-						_("Row #{0}: {1} cannot be negative.").format(row.idx, _(row.meta.get_label(fieldname)))
+						_("Row #{0}: {1} cannot be negative.").format(
+							row.idx, _(row.meta.get_label(fieldname))
+						)
 					)
 			if row.limit_type in LOAN_TYPES and not row.liability_account:
 				frappe.throw(
@@ -191,7 +193,9 @@ class BankFacility(Document):
 				)
 			)
 		if not bank_account.account:
-			frappe.throw(_("Bank Account {0} has no GL account.").format(frappe.bold(self.default_bank_account)))
+			frappe.throw(
+				_("Bank Account {0} has no GL account.").format(frappe.bold(self.default_bank_account))
+			)
 		currency = get_account_currency(bank_account.account)
 		if currency != self.currency:
 			frappe.throw(
@@ -262,9 +266,7 @@ class BankFacility(Document):
 				_("{0} {1} cannot be a Payable or Receivable account.").format(label, frappe.bold(account))
 			)
 		if details.account_currency != currency:
-			frappe.throw(
-				_("{0} {1} must be in {2}.").format(label, frappe.bold(account), currency)
-			)
+			frappe.throw(_("{0} {1} must be in {2}.").format(label, frappe.bold(account), currency))
 
 	def validate_security_cheques(self):
 		seen = set()

@@ -45,7 +45,9 @@ USER = "treasury-lc-user@example.com"
 
 
 def company_currency_balance(account: str, date) -> float:
-	return flt(get_balance_on(account=account, date=date, in_account_currency=False, ignore_account_permission=True))
+	return flt(
+		get_balance_on(account=account, date=date, in_account_currency=False, ignore_account_permission=True)
+	)
 
 
 class LCTestCase(TreasuryTestMixin, IntegrationTestCase):

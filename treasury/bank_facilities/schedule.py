@@ -107,7 +107,9 @@ def build_schedule(
 		)
 	if grace_months < 0 or grace_months % months:
 		frappe.throw(
-			_("Grace (Months) must be a multiple of the {0} months of a {1} period.").format(months, _(frequency))
+			_("Grace (Months) must be a multiple of the {0} months of a {1} period.").format(
+				months, _(frequency)
+			)
 		)
 	count = tenor_months // months
 	grace = grace_months // months
@@ -151,7 +153,9 @@ def build_schedule(
 			principal = flt(installment - interest, precision)
 			if principal < 0:
 				frappe.throw(
-					_("The interest of installment {0} exceeds the installment {1}.").format(index + 1, installment)
+					_("The interest of installment {0} exceeds the installment {1}.").format(
+						index + 1, installment
+					)
 				)
 			principal = min(principal, outstanding)
 		outstanding = flt(outstanding - principal, precision)

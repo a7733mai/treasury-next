@@ -357,9 +357,7 @@ class TestBankFacility(FacilityTestCase):
 class TestFacilityDrawdown(FacilityTestCase):
 	def test_submit_posts_principal_and_fees(self):
 		facility = make_bank_facility()
-		drawdown = make_drawdown(
-			facility, amount=100000, upfront_fees=1000, fees_account=self.accounts.fees
-		)
+		drawdown = make_drawdown(facility, amount=100000, upfront_fees=1000, fees_account=self.accounts.fees)
 		self.assertEqual(drawdown.bank_account, bank_account_name("EGP"))
 		self.assertEqual(drawdown.liability_account, self.accounts.loan_egp)
 		self.assertEqual(drawdown.interest_rate, 12)  # from the sub-limit
@@ -486,7 +484,9 @@ class TestFacilityDrawdown(FacilityTestCase):
 		self.assertRaises(frappe.ValidationError, drawdown.submit)
 		drawdown.reload()
 		drawdown.submit()
-		self.assertEqual(drawdown.total_interest, flt(sum(r.interest for r in drawdown.repayment_schedule), 2))
+		self.assertEqual(
+			drawdown.total_interest, flt(sum(r.interest for r in drawdown.repayment_schedule), 2)
+		)
 
 	def test_system_fields_sent_on_submit_are_ignored(self):
 		facility = make_bank_facility()
@@ -539,9 +539,7 @@ class TestFacilityDrawdown(FacilityTestCase):
 
 	def test_usd_facility_on_usd_bank(self):
 		facility = make_bank_facility(currency="USD", total_limit=100000)
-		drawdown = make_drawdown(
-			facility, amount=10000, upfront_fees=100, fees_account=self.accounts.fees
-		)
+		drawdown = make_drawdown(facility, amount=10000, upfront_fees=100, fees_account=self.accounts.fees)
 		self.assertEqual(drawdown.exchange_rate, 50)
 		assert_gl_entries(
 			self,
@@ -604,7 +602,9 @@ class TestFacilityRepayment(FacilityTestCase):
 				(self.egp_bank_gl, 0, 11104.66, None, date),
 			],
 		)
-		self.assertEqual(frappe.db.get_value("Journal Entry", repayment.journal_entry, "clearance_date"), date)
+		self.assertEqual(
+			frappe.db.get_value("Journal Entry", repayment.journal_entry, "clearance_date"), date
+		)
 		first = self.rows(drawdown)[0]
 		self.assertEqual((first.paid_principal, first.paid_interest, first.status), (10000, 1104.66, "Paid"))
 		self.assertEqual(first.payment_journal, repayment.journal_entry)
@@ -677,7 +677,9 @@ class TestFacilityRepayment(FacilityTestCase):
 		rows = self.rows(drawdown)
 		self.assertEqual(len(rows), 13)
 		prepayment = [r for r in rows if r.is_prepayment]
-		self.assertEqual([(r.principal, r.paid_principal, r.status) for r in prepayment], [(30000, 30000, "Paid")])
+		self.assertEqual(
+			[(r.principal, r.paid_principal, r.status) for r in prepayment], [(30000, 30000, "Paid")]
+		)
 		installments = [r for r in rows if not r.is_prepayment]
 		self.assertEqual(installments[0].principal, 10000)
 		self.assertEqual([r.principal for r in installments[1:-1]], [7272.73] * 10)
@@ -793,4 +795,6 @@ class TestFacilityRepayment(FacilityTestCase):
 		make_repayment(drawdown, "2025-02-28")
 		self.assertEqual(frappe.db.get_value("Facility Drawdown", drawdown.name, "repayment_status"), "Open")
 		make_repayment(drawdown, "2025-03-31")
-		self.assertEqual(frappe.db.get_value("Facility Drawdown", drawdown.name, "repayment_status"), "Repaid")
+		self.assertEqual(
+			frappe.db.get_value("Facility Drawdown", drawdown.name, "repayment_status"), "Repaid"
+		)

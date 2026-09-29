@@ -10,13 +10,14 @@
 Facilities and drawdowns are read with `frappe.get_list` (permissions and User Permissions apply).
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import add_days, flt, getdate
 
-import erpnext
 from treasury.bank_facilities import discounting, lc, lg
 from treasury.bank_facilities.facility import OPEN_STATUSES
+from treasury.bank_facilities.repayment import OVERDUE
 from treasury.bank_facilities.report_utils import (
 	FACILITY,
 	CompanyConverter,
@@ -24,7 +25,6 @@ from treasury.bank_facilities.report_utils import (
 	get_installments,
 	report_today,
 )
-from treasury.bank_facilities.repayment import OVERDUE
 from treasury.bank_facilities.utilisation import get_utilisation
 from treasury.pdc.report_utils import get_precision, validate_company
 
@@ -75,7 +75,12 @@ INSTRUMENT_SCOPES = {
 	# scope: (doctype, open statuses, amount field, report)
 	"open_lgs": (lg.DOCTYPE, lg.OPEN_STATUSES, "open_amount", "LG Register"),
 	"open_lcs": (lc.DOCTYPE, lc.OPEN_STATUSES, "open_amount", "LC Register"),
-	"discounted": (discounting.DOCTYPE, discounting.OPEN_STATUSES, "outstanding_amount", "Discounted Cheques"),
+	"discounted": (
+		discounting.DOCTYPE,
+		discounting.OPEN_STATUSES,
+		"outstanding_amount",
+		"Discounted Cheques",
+	),
 }
 
 

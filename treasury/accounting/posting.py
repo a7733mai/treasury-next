@@ -20,16 +20,16 @@ history keep Administrator, the user the voucher was actually saved as.
 
 from functools import wraps
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
+from erpnext.accounts.party import get_party_account as erpnext_get_party_account
+from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
 from frappe.utils import cint, flt, getdate
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
-from erpnext.accounts.party import get_party_account as erpnext_get_party_account
-from erpnext.setup.utils import get_exchange_rate
 from treasury.utils.context import elevated, real_user
 
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
@@ -390,7 +390,9 @@ def _allocate_references(
 			continue
 
 		if key in allocations:
-			allocations[key]["allocated_amount"] = flt(allocations[key]["allocated_amount"] + allowed, precision)
+			allocations[key]["allocated_amount"] = flt(
+				allocations[key]["allocated_amount"] + allowed, precision
+			)
 		else:
 			allocations[key] = {
 				"reference_doctype": doctype,
@@ -568,7 +570,9 @@ def _exchange_difference_row(company: str, accounts: list[dict]) -> dict | None:
 		else:
 			rate = flt(row.get("exchange_rate"))
 			if not rate:
-				frappe.throw(_("Exchange rate is required for account {0}.").format(frappe.bold(row["account"])))
+				frappe.throw(
+					_("Exchange rate is required for account {0}.").format(frappe.bold(row["account"]))
+				)
 		debit = flt(flt(row.get("debit_in_account_currency")) * rate, precision)
 		credit = flt(flt(row.get("credit_in_account_currency")) * rate, precision)
 		difference += debit - credit

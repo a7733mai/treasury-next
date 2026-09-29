@@ -41,9 +41,7 @@ def execute(filters=None):
 	periodicity = filters.periodicity or MONTHLY
 	if periodicity not in PERIOD_MONTHS:
 		frappe.throw(
-			_("Periodicity must be one of: {0}.").format(
-				", ".join(_(p, context=CTX) for p in PERIOD_MONTHS)
-			)
+			_("Periodicity must be one of: {0}.").format(", ".join(_(p, context=CTX) for p in PERIOD_MONTHS))
 		)
 
 	conditions = {"company": company}
@@ -166,7 +164,11 @@ def get_costs(company: str, facilities: dict, from_date, to_date) -> dict[str, l
 			& (je.treasury_source_name.isin(sorted({s[1] for s in sources})))
 		)
 		.groupby(
-			je.treasury_source_doctype, je.treasury_source_name, je.treasury_event, gle.account, gle.posting_date
+			je.treasury_source_doctype,
+			je.treasury_source_name,
+			je.treasury_event,
+			gle.account,
+			gle.posting_date,
 		)
 	)
 	exchange_account = frappe.get_cached_value("Company", company, "exchange_gain_loss_account")

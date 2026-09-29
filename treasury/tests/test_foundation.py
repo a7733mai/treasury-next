@@ -1,8 +1,8 @@
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, getdate, today
 
-from erpnext.setup.utils import get_exchange_rate
 from treasury.accounting import posting
 from treasury.install import TREASURY_FIELDNAMES, TREASURY_ROLES, VOUCHER_INSERT_AFTER
 from treasury.overrides import voucher_guard
@@ -331,7 +331,9 @@ class TestFoundation(TreasuryTestMixin, IntegrationTestCase):
 		# re-presented cheque: cycle 2 posts again, and a second bounce reverses it again
 		second = self.pay("cycle_pay", cycle=2)
 		self.assertNotEqual(second, first)
-		second_doc = frappe.db.get_value("Payment Entry", second, ["docstatus", "treasury_cycle"], as_dict=True)
+		second_doc = frappe.db.get_value(
+			"Payment Entry", second, ["docstatus", "treasury_cycle"], as_dict=True
+		)
 		self.assertEqual((second_doc.docstatus, second_doc.treasury_cycle), (1, 2))
 		second_reversal = posting.make_reversal("Payment Entry", second, today(), "cycle_reversal", cycle=2)
 		self.assertNotEqual(second_reversal, first_reversal)

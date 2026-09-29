@@ -114,9 +114,7 @@ class ProjectedPartyStatement:
 					projected=projected,
 				)
 			)
-		data.append(
-			self.make_row(PROJECTED_CLOSING, _("Projected Closing Balance"), projected=projected)
-		)
+		data.append(self.make_row(PROJECTED_CLOSING, _("Projected Closing Balance"), projected=projected))
 
 		summary = self.get_summary(balance, sum(self.signed_amount(c) for c in unposted))
 		return self.get_columns(), data, None, None, summary

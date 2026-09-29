@@ -39,7 +39,9 @@ def compute_batch_status(docstatus: int, direction: str, statuses: list[str]) ->
 		return "Cleared" if settled == len(active) else "Partially Cleared"
 	handed_over = sum(1 for s in active if s != "Created")
 	delivered, partially = (
-		("Received", "Partially Received") if direction == "Incoming" else ("Delivered", "Partially Delivered")
+		("Received", "Partially Received")
+		if direction == "Incoming"
+		else ("Delivered", "Partially Delivered")
 	)
 	if not handed_over:
 		return "Submitted"

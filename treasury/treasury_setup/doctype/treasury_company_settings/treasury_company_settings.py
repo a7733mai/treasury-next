@@ -1,11 +1,10 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.model.document import Document
-
-import erpnext
 
 # PDC accounts must be of type "Bank" so that Payment Entry accepts them as the bank side,
 # and must sit on the correct side of the balance sheet.

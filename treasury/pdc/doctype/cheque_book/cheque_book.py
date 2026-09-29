@@ -233,9 +233,9 @@ def cancel_leaf(cheque_book: str, cheque_no: str, reason: str | None = None):
 		frappe.throw(_("Cheque No {0} is already cancelled.").format(frappe.bold(cheque_no)))
 	if book.used_numbers([number], exclude_cancelled_cheques=True):
 		frappe.throw(
-			_("Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead.").format(
-				frappe.bold(cheque_no)
-			)
+			_(
+				"Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead."
+			).format(frappe.bold(cheque_no))
 		)
 	book.add_cancelled_leaf(number, reason)
 	book.save()

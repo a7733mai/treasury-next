@@ -13,6 +13,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate
 
+from treasury.bank_facilities.repayment import OVERDUE, PAID
 from treasury.bank_facilities.report_utils import (
 	DRAWDOWN,
 	FACILITY,
@@ -20,7 +21,6 @@ from treasury.bank_facilities.report_utils import (
 	get_installments,
 	report_today,
 )
-from treasury.bank_facilities.repayment import OVERDUE, PAID
 from treasury.pdc.report_utils import CTX, column, get_precision, validate_company, validate_date_range
 
 DEFAULT_DAYS = 90
@@ -115,5 +115,7 @@ def get_columns() -> list[dict]:
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 		money("unpaid_company", _("Unpaid (Company Currency)"), "company_currency", 150),
 		column("bank_account", _("Bank Account"), "Link", 160, options="Bank Account"),
-		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
+		column(
+			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+		),
 	]

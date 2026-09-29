@@ -6,10 +6,9 @@ and creates only what Treasury needs, inside the IntegrationTestCase transaction
 """
 
 import frappe
+from erpnext.accounts.utils import get_balance_on
 from frappe.utils import add_days, add_years, flt, getdate, today
 from frappe.utils.nestedset import get_root_of
-
-from erpnext.accounts.utils import get_balance_on
 
 COMPANY = "_Test Treasury Co"
 ABBR = "_TTC"
@@ -74,11 +73,19 @@ def ensure_base_masters():
 	_ensure("UOM", UOM, {"uom_name": UOM, "must_be_whole_number": 1})
 	_ensure_tree_leaf("Item Group", "item_group_name", "parent_item_group", "All Item Groups", ITEM_GROUP)
 	_ensure_tree_leaf(
-		"Customer Group", "customer_group_name", "parent_customer_group", "All Customer Groups", CUSTOMER_GROUP
+		"Customer Group",
+		"customer_group_name",
+		"parent_customer_group",
+		"All Customer Groups",
+		CUSTOMER_GROUP,
 	)
 	_ensure_tree_leaf("Territory", "territory_name", "parent_territory", "All Territories", TERRITORY)
 	_ensure_tree_leaf(
-		"Supplier Group", "supplier_group_name", "parent_supplier_group", "All Supplier Groups", SUPPLIER_GROUP
+		"Supplier Group",
+		"supplier_group_name",
+		"parent_supplier_group",
+		"All Supplier Groups",
+		SUPPLIER_GROUP,
 	)
 	ensure_currencies()
 	_ensure(
@@ -216,7 +223,9 @@ def ensure_bank_setup(currency: str) -> frappe._dict:
 		bank_account=ensure_bank_account(BANK_SETUP[currency]["bank_account_name"], bank_gl),
 		pdc_payable=ensure_account(f"PDC Payable {currency}", "Current Liabilities", "Bank", cur),
 		pdc_receivable=ensure_account(f"PDC Receivable {currency}", "Current Assets", "Bank", cur),
-		under_collection=ensure_account(f"Cheques Under Collection {currency}", "Current Assets", "Bank", cur),
+		under_collection=ensure_account(
+			f"Cheques Under Collection {currency}", "Current Assets", "Bank", cur
+		),
 		bank_charges=ensure_account("Treasury Bank Charges", "Indirect Expenses"),
 	)
 
@@ -267,7 +276,9 @@ def ensure_parties():
 def ensure_supplier(name: str) -> str:
 	"""An extra EGP supplier (default payable account), e.g. for scenarios that need a party of their own."""
 	return _ensure(
-		"Supplier", name, {"supplier_name": name, "supplier_group": SUPPLIER_GROUP, "supplier_type": "Company"}
+		"Supplier",
+		name,
+		{"supplier_name": name, "supplier_group": SUPPLIER_GROUP, "supplier_type": "Company"},
 	)
 
 
@@ -331,8 +342,7 @@ def setup_treasury_test_data() -> frappe._dict:
 		egp=egp,
 		usd=usd,
 		settings=settings,
-		payable=frappe.get_cached_value("Company", COMPANY, "default_payable_account")
-		or acc("Creditors"),
+		payable=frappe.get_cached_value("Company", COMPANY, "default_payable_account") or acc("Creditors"),
 		receivable=frappe.get_cached_value("Company", COMPANY, "default_receivable_account")
 		or acc("Debtors"),
 	)
@@ -678,7 +688,9 @@ def ensure_instrument_accounts() -> frappe._dict:
 		lc_margin_usd=ensure_account("Treasury LC Margins USD", "Current Assets", currency="USD"),
 		lg_liability=ensure_account("Treasury LG Claims Funded EGP", "Current Liabilities"),
 		discounted=ensure_account("Treasury Discounted Cheques EGP", "Current Liabilities"),
-		discounted_usd=ensure_account("Treasury Discounted Cheques USD", "Current Liabilities", currency="USD"),
+		discounted_usd=ensure_account(
+			"Treasury Discounted Cheques USD", "Current Liabilities", currency="USD"
+		),
 		claims_expense=ensure_account("Treasury LG Claims Expense", "Indirect Expenses"),
 		discount_expense=ensure_account("Treasury Discount Expense", "Indirect Expenses"),
 		lc_charges=ensure_account("Treasury LC Charges", "Indirect Expenses"),
@@ -1002,7 +1014,11 @@ def get_ledger_open_amount(voucher_type: str, voucher_no: str) -> float:
 		sum(
 			frappe.get_all(
 				"Payment Ledger Entry",
-				filters={"against_voucher_type": voucher_type, "against_voucher_no": voucher_no, "delinked": 0},
+				filters={
+					"against_voucher_type": voucher_type,
+					"against_voucher_no": voucher_no,
+					"delinked": 0,
+				},
 				pluck="amount_in_account_currency",
 			)
 		),

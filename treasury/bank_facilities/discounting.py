@@ -92,7 +92,9 @@ def post_batch(doc) -> str:
 	rate = flt(doc.exchange_rate) or 1.0
 	company, currency = doc.company, doc.currency
 	rows = [
-		accounting._row(company, currency, accounting.bank_gl_account(doc.bank_account), rate, debit=doc.net_proceeds)
+		accounting._row(
+			company, currency, accounting.bank_gl_account(doc.bank_account), rate, debit=doc.net_proceeds
+		)
 	]
 	if flt(doc.total_charges):
 		rows.append(
@@ -121,9 +123,9 @@ def validate_cancel(doc):
 	closed = [row.pdc_cheque for row in doc.items if row.status != ITEM_DISCOUNTED]
 	if closed:
 		frappe.throw(
-			_("Cheque Discounting {0} cannot be cancelled: cheques {1} are already settled or bounced.").format(
-				frappe.bold(doc.name), ", ".join(frappe.bold(c) for c in closed)
-			),
+			_(
+				"Cheque Discounting {0} cannot be cancelled: cheques {1} are already settled or bounced."
+			).format(frappe.bold(doc.name), ", ".join(frappe.bold(c) for c in closed)),
 			title=_("Not Allowed"),
 		)
 
@@ -162,7 +164,9 @@ def settle_cheques(name: str, cheques: list[str] | None = None, settlement_date=
 	else:
 		selected = [c for c, row in open_rows.items() if getdate(row.due_date) <= date]
 	if not selected:
-		frappe.throw(_("No discounted cheque of {0} is due by {1}.").format(frappe.bold(name), formatdate(date)))
+		frappe.throw(
+			_("No discounted cheque of {0} is due by {1}.").format(frappe.bold(name), formatdate(date))
+		)
 	return [lifecycle.settle_discounted(cheque, date) for cheque in selected]
 
 
@@ -190,7 +194,9 @@ def post_settlement(cheque, posting_date) -> str:
 		company=cheque.company,
 		posting_date=posting_date,
 		accounts=[
-			lifecycle._row(cheque, batch.liability_account, flt(batch.exchange_rate) or 1.0, debit=cheque.amount),
+			lifecycle._row(
+				cheque, batch.liability_account, flt(batch.exchange_rate) or 1.0, debit=cheque.amount
+			),
 			lifecycle._row(
 				cheque, mapping.pdc_receivable_account, lifecycle._carrying_rate(cheque), credit=cheque.amount
 			),
@@ -218,7 +224,9 @@ def post_recourse(cheque, posting_date) -> str:
 		company=cheque.company,
 		posting_date=posting_date,
 		accounts=[
-			lifecycle._row(cheque, batch.liability_account, flt(batch.exchange_rate) or 1.0, debit=cheque.amount),
+			lifecycle._row(
+				cheque, batch.liability_account, flt(batch.exchange_rate) or 1.0, debit=cheque.amount
+			),
 			lifecycle._row(
 				cheque, accounting.bank_gl_account(batch.bank_account), bank_rate, credit=cheque.amount
 			),
@@ -244,7 +252,9 @@ def close_item(batch: str, cheque: str, status: str, date, journal: str):
 		for_update=True,
 	)
 	if not row:
-		frappe.throw(_("Cheque {0} is not open in Cheque Discounting {1}.").format(frappe.bold(cheque), batch))
+		frappe.throw(
+			_("Cheque {0} is not open in Cheque Discounting {1}.").format(frappe.bold(cheque), batch)
+		)
 	frappe.db.set_value(
 		ITEM_DOCTYPE, row, {"status": status, "closed_date": getdate(date), "closing_journal": journal}
 	)
@@ -258,7 +268,9 @@ def refresh_batch(name: str):
 		return
 	open_rows = [row for row in doc.items if row.status == ITEM_DISCOUNTED]
 	outstanding = flt(sum(flt(row.amount) for row in open_rows), doc.precision("total_amount"))
-	status = DISCOUNTED if len(open_rows) == len(doc.items) else (SETTLED if not open_rows else PARTIALLY_SETTLED)
+	status = (
+		DISCOUNTED if len(open_rows) == len(doc.items) else (SETTLED if not open_rows else PARTIALLY_SETTLED)
+	)
 	if status != doc.status or outstanding != flt(doc.outstanding_amount):
 		doc.outstanding_amount = outstanding
 		dates = [getdate(row.closed_date) for row in doc.items if row.closed_date]

@@ -137,7 +137,12 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 	@staticmethod
 	def numbered_rows(count: int, amount=1000, first_due=FIRST_DUE, **values) -> list[dict]:
 		return [
-			{"due_date": add_days(first_due, 30 * i), "amount": amount, "cheque_no": unique_cheque_no(), **values}
+			{
+				"due_date": add_days(first_due, 30 * i),
+				"amount": amount,
+				"cheque_no": unique_cheque_no(),
+				**values,
+			}
 			for i in range(count)
 		]
 
@@ -201,7 +206,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(doc.status, "Delivered")
 		self.assertEqual([r.cheque_no for r in doc.cheques], self.leaves(book, 0, 12))
 		for row, cheque in zip(doc.cheques, self.cheques(doc), strict=True):
-			self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted"))
+			self.assertEqual(
+				(cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted")
+			)
 			self.assertEqual((cheque.cheque_batch, cheque.cheque_batch_row), (doc.name, row.name))
 			self.assertEqual((cheque.cheque_no, cheque.cheque_book), (row.cheque_no, book.name))
 			self.assertEqual(getdate(cheque.original_due_date), getdate(row.due_date))
@@ -243,7 +250,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 
 		self.assertEqual([n for n in result["posted"] if n in names], names[:3])
 		for row, cheque in zip(doc.cheques[:3], self.cheques(doc)[:3], strict=True):
-			self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted"))
+			self.assertEqual(
+				(cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted")
+			)
 			assert_gl_entries(
 				self,
 				"Payment Entry",
@@ -420,7 +429,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 			[(r.reference_name, r.allocated_amount) for r in doc.cheques],
 			[(first.name, 500), (first.name, 200), (second.name, 400)],
 		)
-		self.assertEqual((summary["allocated"], summary["unallocated"], summary["not_covered"]), (1100, 400, 0))
+		self.assertEqual(
+			(summary["allocated"], summary["unallocated"], summary["not_covered"]), (1100, 400, 0)
+		)
 		doc.insert()  # within what is still available
 
 	def test_fifo_incoming_sales_invoices(self):
@@ -448,7 +459,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 				("Sales Invoice", second.name, 1000),
 			],
 		)
-		self.assertEqual((summary["allocated"], summary["unallocated"], summary["not_covered"]), (2500, 500, 500))
+		self.assertEqual(
+			(summary["allocated"], summary["unallocated"], summary["not_covered"]), (2500, 500, 500)
+		)
 
 		doc.insert()
 		doc.submit()
@@ -488,7 +501,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		def allocated_batch(*allocations, method="Manual"):
 			rows = self.numbered_rows(len(allocations), amount=600)
 			for row, allocated in zip(rows, allocations, strict=True):
-				row.update(reference_doctype="Purchase Invoice", reference_name=pi.name, allocated_amount=allocated)
+				row.update(
+					reference_doctype="Purchase Invoice", reference_name=pi.name, allocated_amount=allocated
+				)
 			return self.make_batch(allocation_method=method, rows=rows)
 
 		# two rows together allocating more than the invoice outstanding
@@ -496,7 +511,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		# a row allocating more than its own amount
 		self.assertRaises(frappe.ValidationError, allocated_batch(700).insert)
 		# Advance means no allocation
-		self.assertRaises(frappe.ValidationError, allocated_batch(100, method="Advance (no allocation)").insert)
+		self.assertRaises(
+			frappe.ValidationError, allocated_batch(100, method="Advance (no allocation)").insert
+		)
 		# within the outstanding
 		allocated_batch(600, 400).insert()
 
@@ -521,7 +538,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 			self.make_batch(rows=rows).insert()
 		self.assertIn("Row #1", str(ctx.exception))
 
-		self.assertRaises(frappe.ValidationError, self.make_batch(rows=self.numbered_rows(1, amount=0)).insert)
+		self.assertRaises(
+			frappe.ValidationError, self.make_batch(rows=self.numbered_rows(1, amount=0)).insert
+		)
 		self.assertRaises(
 			frappe.ValidationError,
 			self.make_batch(rows=self.numbered_rows(1), handover_date=add_days(ISSUE, -1)).insert,
@@ -566,7 +585,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		cheques = self.cheques(doc)
 		self.assertEqual([c.cheque_no for c in cheques], ["IN-0001", "IN-0002", "IN-0003"])
 		for cheque in cheques:
-			self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Received", "Party Posted"))
+			self.assertEqual(
+				(cheque.operational_status, cheque.accounting_status), ("Received", "Party Posted")
+			)
 			self.assertEqual(cheque.drawer_bank, "Drawer Bank Y")
 			assert_gl_entries(
 				self,
@@ -581,7 +602,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		first = cheques[0]
 		first.deposit(deposit_date=day(-61))
 		first.reload()
-		self.assertEqual((first.operational_status, first.accounting_status), ("Deposited", "Under Collection Posted"))
+		self.assertEqual(
+			(first.operational_status, first.accounting_status), ("Deposited", "Under Collection Posted")
+		)
 		assert_gl_entries(
 			self,
 			"Journal Entry",
@@ -625,7 +648,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(tuple(frappe.db.get_value(DOCTYPE, doc.name, ["docstatus", "status"])), (0, "Draft"))
 		self.assertEqual(frappe.db.count(CHEQUE, {"cheque_batch": doc.name}), 0)
 		self.assertEqual(frappe.db.count(CHEQUE), cheques_before)
-		self.assertEqual(frappe.db.count("Payment Entry", {"treasury_source_doctype": CHEQUE}), vouchers_before)
+		self.assertEqual(
+			frappe.db.count("Payment Entry", {"treasury_source_doctype": CHEQUE}), vouchers_before
+		)
 		self.assertFalse(
 			any(frappe.get_all("Cheque Batch Item", filters={"parent": doc.name}, pluck="pdc_cheque"))
 		)
@@ -758,7 +783,9 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		for name in calls:
 			self.assertFalse(frappe.db.exists(CHEQUE, name))
 			self.assertEqual(get_voucher_count(CHEQUE, name), 0)
-		self.assertEqual(frappe.db.count("Payment Entry", {"treasury_source_doctype": CHEQUE}), vouchers_before)
+		self.assertEqual(
+			frappe.db.count("Payment Entry", {"treasury_source_doctype": CHEQUE}), vouchers_before
+		)
 		book.reload()
 		self.assertEqual(book.next_no, book.start_no)
 
@@ -873,7 +900,11 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 
 		old = frappe.get_doc(CHEQUE, doc.cheques[0].pdc_cheque)
 		result = old.replace(
-			new_cheque_values={"cheque_no": unique_cheque_no(), "replacement_date": day(-150), "reason": "Torn"}
+			new_cheque_values={
+				"cheque_no": unique_cheque_no(),
+				"replacement_date": day(-150),
+				"reason": "Torn",
+			}
 		)
 
 		new = frappe.get_doc(CHEQUE, result["replaced_by"])
@@ -1011,9 +1042,13 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 			self.assertRaises(frappe.PermissionError, doc.cancel)
 
 		for cheque in self.cheques(doc):
-			self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted"))
+			self.assertEqual(
+				(cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted")
+			)
 			self.assertEqual(cheque.owner, TREASURY_USER)
-			self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "owner"), TREASURY_USER)
+			self.assertEqual(
+				frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "owner"), TREASURY_USER
+			)
 
 	def test_submit_needs_pdc_cheque_create_permission(self):
 		frappe.db.savepoint(PERMISSION_SAVEPOINT)

@@ -224,7 +224,9 @@ class PDCBankClearing(Document):
 
 	def check_access(self, ptype: str):
 		if not frappe.has_permission(self.doctype, ptype):
-			frappe.throw(_("You are not permitted to use the PDC Bank Clearing tool."), frappe.PermissionError)
+			frappe.throw(
+				_("You are not permitted to use the PDC Bank Clearing tool."), frappe.PermissionError
+			)
 
 	def clear_row(self, row) -> str | None:
 		"""Clear and reconcile one match in its own savepoint. Returns the reason it was skipped, if so."""
@@ -245,7 +247,14 @@ class PDCBankClearing(Document):
 	def validate_row(self, row):
 		if not row.cheque or not row.bank_transaction:
 			frappe.throw(_("The cheque or the bank transaction no longer exists."))
-		cheque_fields = ["company", "bank_account", "currency", "amount", "direction", "bank_transaction_date"]
+		cheque_fields = [
+			"company",
+			"bank_account",
+			"currency",
+			"amount",
+			"direction",
+			"bank_transaction_date",
+		]
 		cheque = frappe.db.get_value(
 			CHEQUE, row.cheque, [*cheque_fields, "operational_status", "accounting_status"], as_dict=True
 		)
@@ -254,7 +263,10 @@ class PDCBankClearing(Document):
 		if not cheque or not bt:
 			frappe.throw(_("The cheque or the bank transaction no longer exists."))
 		open_statuses = (*CLEARABLE[cheque.direction], "Cleared")
-		if cheque.accounting_status == lifecycle.BANK_POSTED or cheque.operational_status not in open_statuses:
+		if (
+			cheque.accounting_status == lifecycle.BANK_POSTED
+			or cheque.operational_status not in open_statuses
+		):
 			frappe.throw(_("Cheque {0} is already cleared or no longer open.").format(row.cheque))
 		if cheque.company != self.company or cheque.bank_account != self.bank_account:
 			frappe.throw(

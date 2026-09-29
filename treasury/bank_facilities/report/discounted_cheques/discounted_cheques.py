@@ -187,5 +187,7 @@ def get_columns() -> list[dict]:
 		column("closed_date", _("Closed Date"), "Date", 100),
 		column("closing_journal", _("Closing Journal Entry"), "Link", 150, options="Journal Entry"),
 		money("outstanding_company", _("Outstanding (Company Currency)"), "company_currency", 150),
-		column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1),
+		column(
+			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+		),
 	]

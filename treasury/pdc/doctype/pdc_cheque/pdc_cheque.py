@@ -1,13 +1,13 @@
 # Copyright (c) 2026, Ahmed Abdelmageed and contributors
 # For license information, please see license.txt
 
+import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate, money_in_words
 
-import erpnext
-from erpnext.accounts.doctype.account.account import get_account_currency
 from treasury.accounting import posting
 from treasury.pdc import lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
@@ -259,9 +259,7 @@ class PDCCheque(Document):
 
 	def validate_party(self):
 		if self.party_type not in PARTY_TYPES:
-			frappe.throw(
-				_("Party Type must be one of: {0}.").format(", ".join(_(d) for d in PARTY_TYPES))
-			)
+			frappe.throw(_("Party Type must be one of: {0}.").format(", ".join(_(d) for d in PARTY_TYPES)))
 		if not self.party:
 			frappe.throw(_("Party is required."))
 		name_field = "customer_name" if self.party_type == "Customer" else "supplier_name"
@@ -285,9 +283,7 @@ class PDCCheque(Document):
 				)
 			)
 		if not bank_account.account:
-			frappe.throw(
-				_("Bank Account {0} has no GL account.").format(frappe.bold(self.bank_account))
-			)
+			frappe.throw(_("Bank Account {0} has no GL account.").format(frappe.bold(self.bank_account)))
 		# throws when the bank account has no PDC Account Mapping row
 		posting.get_account_mapping(self.company, self.bank_account)
 
@@ -309,7 +305,11 @@ class PDCCheque(Document):
 		if flt(self.exchange_rate) < 0:
 			frappe.throw(_("Exchange Rate cannot be negative."))
 		before = None if self.is_new() else self.get_doc_before_save()
-		if before and before.currency != self.currency and flt(before.exchange_rate) == flt(self.exchange_rate):
+		if (
+			before
+			and before.currency != self.currency
+			and flt(before.exchange_rate) == flt(self.exchange_rate)
+		):
 			# the rate of the previous currency (e.g. 1 for the company currency) is meaningless now;
 			# it is fetched again at the party posting date
 			self.exchange_rate = 0
@@ -334,9 +334,7 @@ class PDCCheque(Document):
 				)
 			)
 		if self.is_new() and book.status != "Active" and not self.flags.cheque_no_allocated:
-			frappe.throw(
-				_("Cheque Book {0} is {1}.").format(frappe.bold(self.cheque_book), _(book.status))
-			)
+			frappe.throw(_("Cheque Book {0} is {1}.").format(frappe.bold(self.cheque_book), _(book.status)))
 		if self.cheque_no and self.has_value_changed("cheque_no"):
 			cheque_book = frappe.get_doc("Cheque Book", self.cheque_book)
 			if cheque_book.parse_leaf(self.cheque_no) in cheque_book.cancelled_numbers():
