@@ -151,7 +151,9 @@ class TestApprovalAmount(ControlsTestCase):
 		with patch("treasury.bank_transfers.lifecycle.get_exchange_rate", return_value=None):
 			self.assertIsNone(lifecycle.approval_amount(doc))
 			with self.set_user(USER):
-				self.assertRaisesRegex(frappe.PermissionError, "no exchange rate", lifecycle.check_approval, doc)
+				self.assertRaisesRegex(
+					frappe.PermissionError, "no exchange rate", lifecycle.check_approval, doc
+				)
 			with self.set_user(MANAGER):
 				lifecycle.check_approval(doc)  # a manager may submit it
 		# without a threshold there is no rule at all
@@ -176,7 +178,12 @@ class TestLimitLocking(ControlsTestCase):
 	def test_every_path_locks_then_counts(self):
 		"""Submit, Reschedule, Send Now and the daily job lock the Bank Account row, then count with a locking
 		read (review Majors 1 / 3, security Major 2)."""
-		limit = {"bank_account": self.b1, "method": "Fawran", "per_transaction_limit": 0, "daily_limit": 1000000}
+		limit = {
+			"bank_account": self.b1,
+			"method": "Fawran",
+			"per_transaction_limit": 0,
+			"daily_limit": 1000000,
+		}
 		set_transfer_limits(self, [limit])
 		fawran = {"method": "Fawran"}
 		calls = Mock()
@@ -191,7 +198,9 @@ class TestLimitLocking(ControlsTestCase):
 				names = [c[0] for c in calls.mock_calls]
 				self.assertIn("lock", names, path)
 				first_lock = names.index("lock")
-				locking = [i for i, c in enumerate(calls.mock_calls) if c[0] == "used" and c.kwargs.get("lock")]
+				locking = [
+					i for i, c in enumerate(calls.mock_calls) if c[0] == "used" and c.kwargs.get("lock")
+				]
 				self.assertTrue(locking, f"{path}: no locking count")
 				self.assertLess(first_lock, locking[0], f"{path}: counted before the lock")
 				lock.assert_called_with(self.b1)
@@ -301,7 +310,9 @@ class TestHelperPermissions(ControlsTestCase):
 			own_iban = make_iban("DOHB")
 			doc = make_bank_transfer(submit=False, beneficiary_iban=own_iban)
 			self.assertFalse(doc.party_bank_account)  # the default is not filled in
-			chosen = make_bank_transfer(submit=False, beneficiary_iban=None, party_bank_account=self.party_account)
+			chosen = make_bank_transfer(
+				submit=False, beneficiary_iban=None, party_bank_account=self.party_account
+			)
 			self.assertEqual(chosen.party_bank_account, self.party_account)  # still checked against the party
 			self.assertFalse(chosen.beneficiary_iban)  # but its IBAN is not copied
 		with self.set_user(READER):

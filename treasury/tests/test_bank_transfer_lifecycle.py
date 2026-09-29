@@ -47,7 +47,9 @@ OTHER_SUPPLIER = "_Test Treasury Transfer Other Supplier"
 
 
 def references(invoice, amount):
-	return [{"reference_doctype": invoice.doctype, "reference_name": invoice.name, "allocated_amount": amount}]
+	return [
+		{"reference_doctype": invoice.doctype, "reference_name": invoice.name, "allocated_amount": amount}
+	]
 
 
 class TestBankTransferLifecycle(TreasuryTestMixin, IntegrationTestCase):
@@ -66,7 +68,9 @@ class TestBankTransferLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		self.today = getdate(today())
 		previous = frappe.db.get_single_value("Treasury Settings", "allow_future_clearance_date")
 		frappe.db.set_single_value("Treasury Settings", "allow_future_clearance_date", 0)
-		self.addCleanup(frappe.db.set_single_value, "Treasury Settings", "allow_future_clearance_date", previous)
+		self.addCleanup(
+			frappe.db.set_single_value, "Treasury Settings", "allow_future_clearance_date", previous
+		)
 
 	def day(self, offset: int):
 		return getdate(add_days(self.today, offset))
@@ -395,7 +399,9 @@ class TestBankTransferLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		foreign_pi = make_purchase_invoice(500, supplier=OTHER_SUPPLIER)
 		si = make_sales_invoice(500)
 		pi = make_purchase_invoice(500)
-		other_account = ensure_party_bank_account("Supplier", OTHER_SUPPLIER, iban=make_iban("OTHB"), is_default=0)
+		other_account = ensure_party_bank_account(
+			"Supplier", OTHER_SUPPLIER, iban=make_iban("OTHB"), is_default=0
+		)
 		internal = {"transfer_type": "Internal Transfer"}
 		cases = {
 			"same source and target": {**internal, "to_bank_account": egp.bank_account},

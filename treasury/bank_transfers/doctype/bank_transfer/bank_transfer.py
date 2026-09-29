@@ -294,9 +294,15 @@ class BankTransfer(Document):
 		if flt(self.exchange_rate) < 0:
 			frappe.throw(_("Exchange Rate cannot be negative."))
 		before = None if self.is_new() else self.get_doc_before_save()
-		stale = before and before.currency != self.currency and flt(before.exchange_rate) == flt(self.exchange_rate)
+		stale = (
+			before
+			and before.currency != self.currency
+			and flt(before.exchange_rate) == flt(self.exchange_rate)
+		)
 		if stale or flt(self.exchange_rate) in (0, 1):
-			self.exchange_rate = posting.get_cheque_exchange_rate(self.currency, self.company, self.execution_date)
+			self.exchange_rate = posting.get_cheque_exchange_rate(
+				self.currency, self.company, self.execution_date
+			)
 
 	def set_fee(self):
 		"""The fee of the matching Transfer Fee Rule, or the user's fee (`override_fee`, with a reason)."""
@@ -397,7 +403,9 @@ class BankTransfer(Document):
 			if value and self.meta.has_field(fieldname) and not self.get(fieldname):
 				self.set(fieldname, value)
 		self._validate_cost_center_and_project()
-		if self.mode_of_payment and not frappe.db.get_value("Mode of Payment", self.mode_of_payment, "enabled"):
+		if self.mode_of_payment and not frappe.db.get_value(
+			"Mode of Payment", self.mode_of_payment, "enabled"
+		):
 			frappe.throw(_("Mode of Payment {0} is disabled.").format(frappe.bold(self.mode_of_payment)))
 		self._validate_contact()
 
@@ -412,7 +420,9 @@ class BankTransfer(Document):
 				self.set(fieldname, None)
 
 	def _validate_cost_center_and_project(self):
-		cost_center = frappe.db.get_value("Cost Center", self.cost_center, ["company", "is_group"], as_dict=True)
+		cost_center = frappe.db.get_value(
+			"Cost Center", self.cost_center, ["company", "is_group"], as_dict=True
+		)
 		if self.cost_center and (not cost_center or cost_center.company != self.company):
 			frappe.throw(
 				_("Cost Center {0} does not belong to company {1}.").format(

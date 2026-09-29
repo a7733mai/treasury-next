@@ -42,7 +42,9 @@ DOCTYPE = "Bank Transfer"
 
 
 def pi_reference(invoice, amount):
-	return [{"reference_doctype": invoice.doctype, "reference_name": invoice.name, "allocated_amount": amount}]
+	return [
+		{"reference_doctype": invoice.doctype, "reference_name": invoice.name, "allocated_amount": amount}
+	]
 
 
 class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
@@ -72,13 +74,17 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 	def test_party_payment_normal_other_bank(self):
 		egp = self.data.egp
 		mode = ensure_mode(f"Transfer Mode {frappe.generate_hash(length=4)}", account=egp.bank_gl)
-		set_mode_map(self, [{"bank_account": egp.bank_account, "method": "Bank Transfer", "mode_of_payment": mode}])
+		set_mode_map(
+			self, [{"bank_account": egp.bank_account, "method": "Bank Transfer", "mode_of_payment": mode}]
+		)
 		pi = make_purchase_invoice(20000)
 		transfer = make_bank_transfer(amount=20000, references=pi_reference(pi, 20000))
 
 		self.assertEqual((transfer.status, transfer.accounting_status), ("Sent", "Posted"))
 		pe = self.pe_of(transfer)
-		self.assertEqual((pe.payment_type, flt(pe.paid_amount), flt(pe.received_amount)), ("Pay", 20030, 20030))
+		self.assertEqual(
+			(pe.payment_type, flt(pe.paid_amount), flt(pe.received_amount)), ("Pay", 20030, 20030)
+		)
 		assert_deductions(self, pe, [(self.charges, 30, 0)])
 		self.assertEqual((flt(pe.unallocated_amount), flt(pe.difference_amount)), (0, 0))
 		assert_gl_entries(
@@ -121,7 +127,9 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual((transfer.fee_amount, transfer.bank_amount), (5, 19995))
 		pe = self.pe_of(transfer)
-		self.assertEqual((pe.payment_type, flt(pe.paid_amount), flt(pe.received_amount)), ("Receive", 19995, 19995))
+		self.assertEqual(
+			(pe.payment_type, flt(pe.paid_amount), flt(pe.received_amount)), ("Receive", 19995, 19995)
+		)
 		assert_deductions(self, pe, [(self.charges, 5, 0)])
 		assert_gl_entries(
 			self,
@@ -142,7 +150,9 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 		pe = self.pe_of(transfer)
 		self.assertEqual(pe.payment_type, "Internal Transfer")
 		self.assertFalse(pe.deductions)
-		assert_gl_entries(self, "Payment Entry", pe.name, [(second.bank_gl, 50000, 0), (egp.bank_gl, 0, 50000)])
+		assert_gl_entries(
+			self, "Payment Entry", pe.name, [(second.bank_gl, 50000, 0), (egp.bank_gl, 0, 50000)]
+		)
 
 	def test_internal_other_bank_fee(self):
 		egp, second = self.data.egp, ensure_second_egp_bank()
@@ -243,7 +253,11 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 					# ERPNext's own Exchange Gain / Loss Journal Entry against the invoice (not a Treasury voucher)
 					fx = frappe.get_all(
 						"Journal Entry Account",
-						filters={"reference_type": "Purchase Invoice", "reference_name": pi.name, "docstatus": 1},
+						filters={
+							"reference_type": "Purchase Invoice",
+							"reference_name": pi.name,
+							"docstatus": 1,
+						},
 						pluck="parent",
 					)
 					self.assertTrue(fx)
@@ -267,8 +281,16 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 					"mode_of_payment": fawran_mode,
 					"pe_naming_series": series,
 				},
-				{"bank_account": egp.bank_account, "method": "Bank Transfer", "mode_of_payment": transfer_mode},
-				{"bank_account": egp.bank_account, "method": "Internal Transfer", "mode_of_payment": internal_mode},
+				{
+					"bank_account": egp.bank_account,
+					"method": "Bank Transfer",
+					"mode_of_payment": transfer_mode,
+				},
+				{
+					"bank_account": egp.bank_account,
+					"method": "Internal Transfer",
+					"mode_of_payment": internal_mode,
+				},
 			],
 		)
 		frappe.get_doc("Treasury Company Settings", COMPANY).add_series_to_payment_entry(confirm=1)
@@ -279,7 +301,9 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 
 		second = ensure_second_egp_bank()
 		internal = self.pe_of(
-			make_bank_transfer(transfer_type="Internal Transfer", amount=700, to_bank_account=second.bank_account)
+			make_bank_transfer(
+				transfer_type="Internal Transfer", amount=700, to_bank_account=second.bank_account
+			)
 		)
 		self.assertEqual(internal.mode_of_payment, internal_mode)
 
@@ -289,7 +313,9 @@ class TestBankTransferPosting(TreasuryTestMixin, IntegrationTestCase):
 			[{"bank_account": egp.bank_account, "method": "Bank Transfer", "mode_of_payment": transfer_mode}],
 		)
 		internal = self.pe_of(
-			make_bank_transfer(transfer_type="Internal Transfer", amount=701, to_bank_account=second.bank_account)
+			make_bank_transfer(
+				transfer_type="Internal Transfer", amount=701, to_bank_account=second.bank_account
+			)
 		)
 		self.assertEqual(internal.mode_of_payment, transfer_mode)
 

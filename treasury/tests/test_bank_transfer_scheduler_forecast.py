@@ -60,7 +60,9 @@ class TestBankTransferScheduler(TreasuryTestMixin, IntegrationTestCase):
 		self.addCleanup(frappe.db.set_value, "Account", acc("Treasury Bank Charges"), "disabled", 0)
 
 		def errors():
-			return frappe.db.count("Error Log", {"reference_doctype": DOCTYPE, "reference_name": failing.name})
+			return frappe.db.count(
+				"Error Log", {"reference_doctype": DOCTYPE, "reference_name": failing.name}
+			)
 
 		# Error Logs survive the test rollback and transfer names repeat between runs: start from none
 		frappe.db.delete("Error Log", {"reference_doctype": DOCTYPE, "reference_name": failing.name})
@@ -102,7 +104,9 @@ class TestBankTransferForecast(TreasuryTestMixin, IntegrationTestCase):
 		)
 
 	def flows_of(self, transfer, banks, **kwargs):
-		return [f for f in forecast.get_flows(self.filters(banks, **kwargs)) if f["reference_name"] == transfer]
+		return [
+			f for f in forecast.get_flows(self.filters(banks, **kwargs)) if f["reference_name"] == transfer
+		]
 
 	def test_get_flows(self):
 		day3 = getdate(add_days(self.today, 3))

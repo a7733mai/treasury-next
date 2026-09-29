@@ -65,7 +65,8 @@ class TestBankTransferClearing(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(bt.status, "Reconciled")
 		self.assertEqual(flt(bt.unallocated_amount), 0)
 		self.assertEqual(
-			[(p.payment_document, p.payment_entry) for p in bt.payment_entries], [("Payment Entry", payment_entry)]
+			[(p.payment_document, p.payment_entry) for p in bt.payment_entries],
+			[("Payment Entry", payment_entry)],
 		)
 
 	# ------------------------------------------------------------------ source side
@@ -99,7 +100,8 @@ class TestBankTransferClearing(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(getdate(transfer.bank_transaction_date), self.day(-4))
 		self.assert_reconciled(bt, transfer.payment_entry)
 		self.assertEqual(
-			getdate(frappe.db.get_value("Payment Entry", transfer.payment_entry, "clearance_date")), self.day(-4)
+			getdate(frappe.db.get_value("Payment Entry", transfer.payment_entry, "clearance_date")),
+			self.day(-4),
 		)
 
 	def test_receipt_matched(self):
@@ -109,7 +111,9 @@ class TestBankTransferClearing(TreasuryTestMixin, IntegrationTestCase):
 		tool = self.tool()
 		tool.get_suggestions()
 		row = self.row_for(tool, receipt)
-		self.assertEqual((row.bank_transaction, row.match_quality, row.direction), (bt.name, "Weak", "Incoming"))
+		self.assertEqual(
+			(row.bank_transaction, row.match_quality, row.direction), (bt.name, "Weak", "Incoming")
+		)
 		self.select_only(tool, receipt.name)
 		self.assertEqual(tool.clear_selected()["cleared"], [receipt.name])
 		self.assertEqual(frappe.db.get_value("Bank Transfer", receipt.name, "status"), "Completed")

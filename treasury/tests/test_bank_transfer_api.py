@@ -47,7 +47,9 @@ class TestBankTransferAPI(TreasuryTestMixin, IntegrationTestCase):
 		values = build_transfer("Purchase Invoice", pi.name)
 
 		self.assertEqual(values["doctype"], "Bank Transfer")
-		self.assertFalse(frappe.db.exists("Bank Transfer", {"party": SUPPLIER, "amount": 20000, "docstatus": 0}))
+		self.assertFalse(
+			frappe.db.exists("Bank Transfer", {"party": SUPPLIER, "amount": 20000, "docstatus": 0})
+		)
 		self.assertEqual(
 			(values["transfer_type"], values["party_type"], values["party"], values["amount"]),
 			("Party Payment", "Supplier", SUPPLIER, 20000),
@@ -56,7 +58,10 @@ class TestBankTransferAPI(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(values["party_bank_account"], bank_account)
 		self.assertEqual(values.get("cost_center"), pi.get("cost_center"))
 		self.assertEqual(
-			[(r["reference_doctype"], r["reference_name"], r["allocated_amount"]) for r in values["references"]],
+			[
+				(r["reference_doctype"], r["reference_name"], r["allocated_amount"])
+				for r in values["references"]
+			],
 			[("Purchase Invoice", pi.name, 20000)],
 		)
 		# an explicit method takes that method's default bank

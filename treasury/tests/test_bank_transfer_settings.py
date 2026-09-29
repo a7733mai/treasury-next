@@ -40,7 +40,9 @@ class TestBankTransferSettings(TreasuryTestMixin, IntegrationTestCase):
 				fee_rule(b1, "Fawran", scope="Same Bank", fixed_fee=0),
 				fee_rule(b1, "Normal", charge_bearer="SHA", fixed_fee=10),  # cleared: SWIFT only
 			],
-			limits=[{"bank_account": b1, "method": "Fawran", "per_transaction_limit": 50000, "daily_limit": 0}],
+			limits=[
+				{"bank_account": b1, "method": "Fawran", "per_transaction_limit": 50000, "daily_limit": 0}
+			],
 			default_fawran_bank_account=b1,
 		)
 		doc.validate()

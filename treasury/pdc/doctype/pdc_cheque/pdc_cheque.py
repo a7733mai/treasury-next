@@ -16,7 +16,7 @@ from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
 from treasury.utils import references, voucher_summary
 from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils.protected_fields import changed_fields, changed_tables
-from treasury.utils.references import reference_rules  # noqa: F401 (re-exported: moved to utils)
+from treasury.utils.references import reference_rules
 
 NAMING_SERIES = {"Outgoing": "PDC-OUT-.YYYY.-.#####", "Incoming": "PDC-IN-.YYYY.-.#####"}
 # Accounting details copied to every voucher of the cheque (with the accounting dimension fields); defaulted

@@ -175,7 +175,12 @@ class TestFeePreview(BankTransferUXTestCase):
 			self.assertFalse(self.preview(amount=150000)["approval_required"])
 
 	def test_limit(self):
-		limit = {"bank_account": self.b1, "method": "Fawran", "per_transaction_limit": 50000, "daily_limit": 100000}
+		limit = {
+			"bank_account": self.b1,
+			"method": "Fawran",
+			"per_transaction_limit": 50000,
+			"daily_limit": 100000,
+		}
 		set_transfer_limits(self, [limit])
 		day = getdate(add_days(today(), -1))
 		existing = make_bank_transfer(method="Fawran", amount=45000, execution_date=day)

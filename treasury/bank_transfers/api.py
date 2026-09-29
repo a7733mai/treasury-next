@@ -88,7 +88,9 @@ def make_bank_transfer(
 	dimensions.copy_dimensions(source, doc)
 	if source_doctype not in PARTY_MASTERS:
 		_set_amount(doc, source)
-		label = _("Payment of {0} {1}") if transfer_type == lifecycle.PARTY_PAYMENT else _("Receipt of {0} {1}")
+		label = (
+			_("Payment of {0} {1}") if transfer_type == lifecycle.PARTY_PAYMENT else _("Receipt of {0} {1}")
+		)
 		doc.remarks = label.format(_(source_doctype), source_name)
 	return doc.as_dict()
 
@@ -96,7 +98,9 @@ def make_bank_transfer(
 def _set_amount(doc, source):
 	"""The outstanding of the invoice / order (party account currency), in the bank currency."""
 	if source.docstatus != 1:
-		frappe.throw(_("{0} {1} has nothing outstanding.").format(_(source.doctype), frappe.bold(source.name)))
+		frappe.throw(
+			_("{0} {1} has nothing outstanding.").format(_(source.doctype), frappe.bold(source.name))
+		)
 	precision = frappe.get_precision(DOCTYPE, "amount") or 2
 	party_account = posting.get_party_account(doc.party_type, doc.party, doc.company)
 	party_currency = get_account_currency(party_account)
@@ -104,7 +108,9 @@ def _set_amount(doc, source):
 		source.doctype, source.name, doc.party_type, doc.party, party_currency, precision
 	)
 	if outstanding <= 0:
-		frappe.throw(_("{0} {1} has nothing outstanding.").format(_(source.doctype), frappe.bold(source.name)))
+		frappe.throw(
+			_("{0} {1} has nothing outstanding.").format(_(source.doctype), frappe.bold(source.name))
+		)
 	if party_currency == doc.currency or not doc.currency:
 		doc.amount = outstanding
 	elif party_currency == erpnext.get_company_currency(doc.company) and flt(doc.exchange_rate):

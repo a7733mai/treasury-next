@@ -50,7 +50,9 @@ def _transfers(filters, status: str, to_date=None) -> list:
 	conditions = {"company": filters.company, "docstatus": 1, "status": status}
 	if to_date:
 		conditions["execution_date"] = ["<=", getdate(to_date)]
-	return frappe.get_list(DOCTYPE, filters=conditions, fields=FIELDS, order_by="execution_date asc, name asc")
+	return frappe.get_list(
+		DOCTYPE, filters=conditions, fields=FIELDS, order_by="execution_date asc, name asc"
+	)
 
 
 def get_flows(filters) -> list[dict]:

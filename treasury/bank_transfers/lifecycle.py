@@ -308,7 +308,9 @@ def _cancel_voucher(doctype: str, name: str):
 		posting.cancel_voucher(doctype, name)
 	except frappe.ValidationError:
 		frappe.throw(
-			_("{0} {1} could not be cancelled (see the message above).").format(_(doctype), frappe.bold(name)),
+			_("{0} {1} could not be cancelled (see the message above).").format(
+				_(doctype), frappe.bold(name)
+			),
 			title=_("Cancellation Failed"),
 		)
 
@@ -487,7 +489,9 @@ def return_transfer(name: str, return_date=None, reason=None) -> dict:
 	_not_before(date, doc.completion_date or doc.execution_date, _label(doc, "return_date"))
 	if date > getdate(today()):
 		# the reversal is posted on the return date: the money has not come back yet
-		frappe.throw(_("{0} ({1}) cannot be in the future.").format(_label(doc, "return_date"), formatdate(date)))
+		frappe.throw(
+			_("{0} ({1}) cannot be in the future.").format(_label(doc, "return_date"), formatdate(date))
+		)
 
 	fee = flt(doc.fee_amount)
 	refund = bool(_settings(doc).refund_fees_on_return)

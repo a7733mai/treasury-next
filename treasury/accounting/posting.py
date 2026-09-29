@@ -542,7 +542,13 @@ def create_internal_transfer(
 		if fee >= paid:
 			frappe.throw(_("Charges must be less than the amount."))
 		rate, target_rate = _cross_currency_rates(
-			source, target, company_currency, flt(paid - fee, precision), received, exchange_rate, posting_date
+			source,
+			target,
+			company_currency,
+			flt(paid - fee, precision),
+			received,
+			exchange_rate,
+			posting_date,
 		)
 		difference = flt(fee * rate)
 	else:

@@ -98,11 +98,14 @@ def _beneficiary_side(doc) -> frappe._dict:
 	account = frappe._dict()
 	if doc.get("party_bank_account"):
 		account = (
-			frappe.db.get_value("Bank Account", doc.party_bank_account, ["bank", "iban"], as_dict=True) or account
+			frappe.db.get_value("Bank Account", doc.party_bank_account, ["bank", "iban"], as_dict=True)
+			or account
 		)
 	bank = doc.get("beneficiary_bank") or account.get("bank")
 	return _side(
-		bank, doc.get("beneficiary_iban") or account.get("iban"), doc.get("beneficiary_swift") or _bank_swift(bank)
+		bank,
+		doc.get("beneficiary_iban") or account.get("iban"),
+		doc.get("beneficiary_swift") or _bank_swift(bank),
 	)
 
 
@@ -262,7 +265,9 @@ def check_limits(doc, execution_date=None, lock: bool = False) -> list[str]:
 		used = used_on(doc, date, lock=lock)
 		if used + amount > daily:
 			messages.append(
-				_("Transfers of {0} on {1} would reach {2}, above the daily {3} limit {4} of Bank Account {5}.").format(
+				_(
+					"Transfers of {0} on {1} would reach {2}, above the daily {3} limit {4} of Bank Account {5}."
+				).format(
 					fmt_money(used, currency=currency),
 					formatdate(date),
 					fmt_money(used + amount, currency=currency),

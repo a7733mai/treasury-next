@@ -110,7 +110,9 @@ class TestBankTransferReports(TreasuryTestMixin, IntegrationTestCase):
 
 	def test_register_summary(self):
 		make_bank_transfer(amount=20000, execution_date=self.day(1))  # Sent, fee 30
-		make_bank_transfer(amount=5000, execution_date=self.day(2)).mark_completed(completion_date=self.day(3))
+		make_bank_transfer(amount=5000, execution_date=self.day(2)).mark_completed(
+			completion_date=self.day(3)
+		)
 		make_bank_transfer(amount=100, execution_date=add_days(today(), 20))  # Scheduled: outside the range
 		_columns, data, _message, _chart, summary = register(self.filters())
 		values = [flt(c["value"], 2) for c in summary]
@@ -128,7 +130,9 @@ class TestBankTransferReports(TreasuryTestMixin, IntegrationTestCase):
 		make_bank_transfer(amount=20000, execution_date=self.day(1))  # Normal, fee 30
 		make_bank_transfer(amount=100000, execution_date=self.day(2))  # Normal, fee 50
 		make_bank_transfer(method="Fawran", amount=800, execution_date=self.day(35))  # Fawran, fee 0.5
-		make_bank_transfer(amount=100, bank_account=usd.bank_account, execution_date=self.day(3))  # 5 USD = 250
+		make_bank_transfer(
+			amount=100, bank_account=usd.bank_account, execution_date=self.day(3)
+		)  # 5 USD = 250
 		make_bank_transfer(submit=False, amount=20000, execution_date=self.day(4))  # draft: excluded
 		cancelled = make_bank_transfer(amount=20000, execution_date=self.day(5))
 		cancelled.cancel()

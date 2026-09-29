@@ -1180,7 +1180,9 @@ def set_transfer_limits(testcase, rows: list[dict]):
 	testcase.addCleanup(_write_child_rows, LIMIT_DOCTYPE, "transfer_limits", previous)
 
 
-def fee_rule(bank_account: str, method: str, direction: str = "Outgoing", scope: str = "Other Bank", **values):
+def fee_rule(
+	bank_account: str, method: str, direction: str = "Outgoing", scope: str = "Other Bank", **values
+):
 	return {
 		"bank_account": bank_account,
 		"method": method,

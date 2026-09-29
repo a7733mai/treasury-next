@@ -100,8 +100,12 @@ class TestBankTransferFees(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(self.fee("Normal", 100, fees.OTHER).fee, 2)
 		self.assertEqual(self.fee("Normal", 100, fees.SAME).fee, 1)
 		# an exact bearer wins over an empty one, the empty one applies to another bearer
-		self.assertEqual(self.fee("SWIFT", 100, fees.INTERNATIONAL, bank_account=self.bu, bearer="SHA").fee, 4)
-		self.assertEqual(self.fee("SWIFT", 100, fees.INTERNATIONAL, bank_account=self.bu, bearer="OUR").fee, 3)
+		self.assertEqual(
+			self.fee("SWIFT", 100, fees.INTERNATIONAL, bank_account=self.bu, bearer="SHA").fee, 4
+		)
+		self.assertEqual(
+			self.fee("SWIFT", 100, fees.INTERNATIONAL, bank_account=self.bu, bearer="OUR").fee, 3
+		)
 		# lowest row on a tie
 		result = self.fee("Fawran", 100, fees.SAME)
 		self.assertEqual((result.fee, result.rule_idx), (5, 5))
@@ -121,7 +125,10 @@ class TestBankTransferFees(TreasuryTestMixin, IntegrationTestCase):
 		cases = {
 			"same Bank link": ({"beneficiary_bank": BANK}, fees.SAME),
 			"other Bank link": ({"beneficiary_bank": OTHER_BANK}, fees.OTHER),
-			"IBAN of our bank code vs our SWIFT": ({"beneficiary_iban": make_iban(BANK_SWIFT[:4])}, fees.SAME),
+			"IBAN of our bank code vs our SWIFT": (
+				{"beneficiary_iban": make_iban(BANK_SWIFT[:4])},
+				fees.SAME,
+			),
 			"IBAN of another bank code": ({"beneficiary_iban": make_iban("DOHB")}, fees.OTHER),
 			"IBAN of another country": (
 				{"beneficiary_iban": make_iban(BANK_SWIFT[:4], country="DE")},
@@ -154,7 +161,8 @@ class TestBankTransferFees(TreasuryTestMixin, IntegrationTestCase):
 	def test_check_limits(self):
 		b1 = self.b1
 		set_transfer_limits(
-			self, [{"bank_account": b1, "method": "Fawran", "per_transaction_limit": 50000, "daily_limit": 100000}]
+			self,
+			[{"bank_account": b1, "method": "Fawran", "per_transaction_limit": 50000, "daily_limit": 100000}],
 		)
 		day = getdate(add_days(today(), -1))
 		messages = fees.check_limits(frappe._dict(self.transient(60000, day)))
@@ -171,7 +179,8 @@ class TestBankTransferFees(TreasuryTestMixin, IntegrationTestCase):
 	def test_daily_limit_counts_only_the_same_bank_method_and_day(self):
 		b1 = self.b1
 		set_transfer_limits(
-			self, [{"bank_account": b1, "method": "Fawran", "per_transaction_limit": 0, "daily_limit": 100000}]
+			self,
+			[{"bank_account": b1, "method": "Fawran", "per_transaction_limit": 0, "daily_limit": 100000}],
 		)
 		day = getdate(add_days(today(), -2))
 		counted = make_bank_transfer(method="Fawran", amount=45000, execution_date=day)
