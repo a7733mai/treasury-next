@@ -38,6 +38,7 @@ from treasury.tests.utils import (
 	make_sales_invoice,
 	unique_cheque_no,
 )
+from treasury.utils.amount_in_words import treasury_amount_in_words
 
 # Fixtures are built by treasury.tests.utils; don't let Frappe pull ERPNext's global test records.
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -457,13 +458,15 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(get_party_outstanding("Sales Invoice", first.name), 0)
 		self.assertEqual(get_party_outstanding("Sales Invoice", second.name), 500)
 		cheque = frappe.get_doc(CHEQUE, doc.cheques[1].pdc_cheque)
+		# ERPNext books one party row per reference and a separate one for the unallocated (advance) part
 		assert_gl_entries(
 			self,
 			"Payment Entry",
 			cheque.party_payment_entry,
 			[
 				(egp.pdc_receivable, 1000, 0, None, day(-150)),
-				(self.data.receivable, 0, 1000, FIFO_CUSTOMER, day(-150)),
+				(self.data.receivable, 0, 500, FIFO_CUSTOMER, day(-150)),
+				(self.data.receivable, 0, 500, FIFO_CUSTOMER, day(-150)),
 			],
 		)
 		self.assertEqual(abs(get_ledger_open_amount("Payment Entry", cheque.party_payment_entry)), 500)
@@ -952,7 +955,10 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 		self.assertIn(formatdate(add_days(FIRST_DUE, 45)), html)
 		total = re.search(r'class="pdc-number pdc-total-amount">([^<]*)<', html).group(1)
 		self.assertIn("3,500", total)
-		self.assertIn("Three Thousand Five Hundred", html)
+		words = re.search(r'class="pdc-amount-words">([^<]*)<', html).group(1)
+		self.assertEqual(words, treasury_amount_in_words(3500, doc.currency, "en"))
+		# the number formatter may put commas between groups; the words must still cover the live total
+		self.assertIn("three thousand five hundred", words.replace(",", "").lower())
 		# the frozen rows are untouched: the receipt no longer relies on them
 		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "total_amount"), 3000)
 
