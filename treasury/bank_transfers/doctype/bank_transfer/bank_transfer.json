@@ -3,6 +3,7 @@
  "allow_rename": 0,
  "autoname": "naming_series:",
  "creation": "2026-09-30 12:00:00.000000",
+ "default_print_format": "Bank Transfer Order",
  "description": "A bank transfer order (Normal, Fawran or SWIFT): a payment to a party, a receipt from a party or an internal transfer between two company bank accounts, with its bank fee. Posted as one Payment Entry on the execution date.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -47,6 +48,7 @@
   "charge_bearer",
   "bank_amount",
   "fees_section",
+  "fee_summary_html",
   "computed_fee",
   "correspondent_fee",
   "fee_rule",
@@ -76,6 +78,7 @@
   "bank_transaction_date",
   "return_date",
   "return_reason",
+  "voucher_table_section",
   "vouchers_html",
   "status_log_section",
   "status_log",
@@ -103,7 +106,6 @@
    "default": "Party Payment",
    "fieldname": "transfer_type",
    "fieldtype": "Select",
-   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Transfer Type",
    "options": "Party Payment\nParty Receipt\nInternal Transfer",
@@ -147,6 +149,7 @@
    "description": "Value date: the bank executes the transfer; posting date of the Payment Entry. A future date schedules the transfer.",
    "fieldname": "execution_date",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Execution Date",
    "reqd": 1,
@@ -155,9 +158,9 @@
   {
    "allow_on_submit": 1,
    "default": "Draft",
+   "depends_on": "eval:doc.docstatus>0",
    "fieldname": "status",
    "fieldtype": "Select",
-   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
    "no_copy": 1,
@@ -167,6 +170,7 @@
   {
    "allow_on_submit": 1,
    "default": "Not Posted",
+   "depends_on": "eval:doc.docstatus>0",
    "fieldname": "accounting_status",
    "fieldtype": "Select",
    "label": "Accounting Status",
@@ -382,6 +386,11 @@
    "label": "Fees"
   },
   {
+   "fieldname": "fee_summary_html",
+   "fieldtype": "HTML",
+   "label": "Fee Summary"
+  },
+  {
    "description": "Fee of the matching Transfer Fee Rule, correspondent fee included.",
    "fieldname": "computed_fee",
    "fieldtype": "Currency",
@@ -464,6 +473,8 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:(doc.references||[]).length",
    "depends_on": "eval:doc.transfer_type!=='Internal Transfer'",
    "fieldname": "references_section",
    "fieldtype": "Section Break",
@@ -587,6 +598,11 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "voucher_table_section",
+   "fieldtype": "Section Break"
+  },
+  {
    "fieldname": "vouchers_html",
    "fieldtype": "HTML",
    "label": "Payment Entries and Vouchers"
@@ -608,6 +624,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.remarks",
    "fieldname": "more_info_section",
    "fieldtype": "Section Break",
    "label": "More Info"
@@ -630,7 +647,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-30 12:00:00.000000",
+ "modified": "2026-09-30 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Transfers",
  "name": "Bank Transfer",

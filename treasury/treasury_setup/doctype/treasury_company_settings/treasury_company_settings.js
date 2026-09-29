@@ -16,6 +16,11 @@ const TCS_METHODS = [
 ];
 const TCS_DEFAULT_METHODS = ["Cheque Out", "Cheque In", "Bank Transfer"];
 const TCS_GENERATE_ROLES = ["Treasury Manager", "System Manager"];
+const TCS_CTX = "Treasury Company Settings";
+const TCS_FEE_RULE = "Bank Transfer Fee Rule";
+const TCS_LIMIT = "Bank Transfer Limit";
+const TCS_BT_CTX = "Bank Transfer";
+const TCS_SCOPE_COLORS = { "Same Bank": "green", "Other Bank": "blue", International: "purple" };
 
 frappe.ui.form.on("Treasury Company Settings", {
 	setup(frm) {
@@ -47,6 +52,17 @@ frappe.ui.form.on("Treasury Company Settings", {
 			filters: { company: frm.doc.company, is_company_account: 1 },
 		}));
 		frm.set_query("mode_of_payment", "payment_modes", () => ({ filters: { enabled: 1 } }));
+
+		// Bank Transfers
+		const company_bank = () => ({ filters: { company: frm.doc.company, is_company_account: 1 } });
+		["default_normal_bank_account", "default_fawran_bank_account", "default_swift_bank_account"].forEach(
+			(fieldname) => frm.set_query(fieldname, company_bank)
+		);
+		frm.set_query("bank_account", "transfer_fee_rules", company_bank);
+		frm.set_query("bank_account", "transfer_limits", company_bank);
+		frm.set_query("expense_account", "transfer_fee_rules", () => ({
+			filters: { company: frm.doc.company, root_type: "Expense", is_group: 0 },
+		}));
 	},
 
 	refresh(frm) {
@@ -54,6 +70,192 @@ frappe.ui.form.on("Treasury Company Settings", {
 		frm.events.mark_unregistered_series(frm);
 		frm.events.set_series_headline(frm);
 		frm.events.add_mode_buttons(frm);
+		frm.events.render_transfer_fees_help(frm);
+		frm.events.format_transfer_grids(frm);
+		frm.events.add_transfer_buttons(frm);
+	},
+
+	transfer_completion(frm) {
+		const messages = {
+			"On Send": __(
+				"Sent transfers will be marked Completed at once and their Payment Entries cleared on the execution date, without waiting for the bank statement."
+			),
+			"On Send for Fawran": __(
+				"Fawran transfers will be marked Completed at once; other methods wait for bank confirmation."
+			),
+		};
+		const message = messages[frm.doc.transfer_completion];
+		if (message) {
+			frappe.show_alert({ message, indicator: "orange" });
+		}
+	},
+
+	render_transfer_fees_help(frm) {
+		const field = frm.get_field("transfer_fees_help");
+		if (!field) {
+			return;
+		}
+		const esc = frappe.utils.escape_html;
+		const examples = [
+			__("Fawran up to 1,000 → 0.50; above → 2.00: two rows, 0 – 1,000 fixed 0.50 and 1,000.01 – 50,000 fixed 2."),
+			__("Transfer to another bank: 10 + 0.1 %, min 15, max 50: one row, Scope Other Bank, range 0 – 0."),
+			__("Incoming transfer fee 5: Direction Incoming, Scope Any, fixed 5."),
+			__("SWIFT, all charges on us: Scope International, Charge Bearer OUR, fixed 25, Correspondent Fee 15."),
+		];
+		field.$wrapper.html(`<div class="text-muted small">
+			<p><b>${esc(__("How a fee is chosen:"))}</b> ${esc(
+			__(
+				'The rule with the same bank account, method and direction whose amount range contains the transfer amount. An exact scope beats "Any", an exact charge bearer beats an empty one, and then the upper row wins. Amounts are in the bank account currency.'
+			)
+		)}</p>
+			<p><b>${esc(__("Examples", null, TCS_CTX))}</b></p>
+			<ul>${examples.map((text) => `<li>${esc(text)}</li>`).join("")}</ul>
+		</div>`);
+	},
+
+	format_transfer_grids(frm) {
+		const esc = frappe.utils.escape_html;
+		const muted = (text, title) =>
+			`<span class="text-muted"${title ? ` title="${esc(title)}"` : ""}>${esc(text)}</span>`;
+		const number = (value) => esc(format_number(flt(value), null, 2));
+		const set_formatter = (doctype, fieldname, formatter) => {
+			for (const name of [null, frm.doc.name]) {
+				const df = frappe.meta.get_docfield(doctype, fieldname, name);
+				if (df) {
+					df.formatter = formatter;
+				}
+			}
+		};
+		set_formatter(TCS_FEE_RULE, "amount_to", (value) =>
+			flt(value) ? number(value) : muted("∞", __("no upper limit"))
+		);
+		set_formatter(TCS_FEE_RULE, "max_fee", (value) => (flt(value) ? number(value) : muted("—")));
+		["method", "direction", "scope"].forEach((fieldname) =>
+			set_formatter(TCS_FEE_RULE, fieldname, (value) => esc(value ? __(value, null, TCS_FEE_RULE) : ""))
+		);
+		["per_transaction_limit", "daily_limit"].forEach((fieldname) =>
+			set_formatter(TCS_LIMIT, fieldname, (value) => (flt(value) ? number(value) : muted("—")))
+		);
+		set_formatter(TCS_LIMIT, "method", (value) => esc(value ? __(value, null, TCS_LIMIT) : ""));
+		frm.refresh_field("transfer_fee_rules");
+		frm.refresh_field("transfer_limits");
+	},
+
+	add_transfer_buttons(frm) {
+		const can_preview = frappe.model.can_create("Bank Transfer") || frappe.model.can_write("Bank Transfer");
+		if (frm.is_new() || frm.is_dirty() || !(frm.doc.transfer_fee_rules || []).length || !can_preview) {
+			return;
+		}
+		frm.add_custom_button(
+			__("Test Fee Rules"),
+			() => frm.events.test_fee_rules(frm),
+			__("Bank Transfers", null, TCS_CTX)
+		);
+	},
+
+	test_fee_rules(frm) {
+		// the saved rules, through the read-only fee preview of the transfer form
+		const esc = frappe.utils.escape_html;
+		const options = (values, context) => values.map((value) => ({ value, label: __(value, null, context) }));
+		const dialog = new frappe.ui.Dialog({
+			title: __("Test Fee Rules"),
+			fields: [
+				{
+					fieldname: "bank_account",
+					label: __("Bank Account", null, TCS_BT_CTX),
+					fieldtype: "Link",
+					options: "Bank Account",
+					reqd: 1,
+					default: frm.doc.transfer_fee_rules[0].bank_account,
+					get_query: () => ({ filters: { company: frm.doc.company, is_company_account: 1 } }),
+				},
+				{
+					fieldname: "method",
+					label: __("Method", null, TCS_BT_CTX),
+					fieldtype: "Select",
+					options: options(["Normal", "Fawran", "SWIFT"], TCS_BT_CTX),
+					default: "Normal",
+				},
+				{
+					fieldname: "transfer_type",
+					label: __("Transfer Type", null, TCS_BT_CTX),
+					fieldtype: "Select",
+					options: options(["Party Payment", "Party Receipt", "Internal Transfer"], TCS_BT_CTX),
+					default: "Party Payment",
+				},
+				{ fieldname: "column_break_test", fieldtype: "Column Break" },
+				{
+					fieldname: "amount",
+					label: __("Amount", null, TCS_BT_CTX),
+					fieldtype: "Float",
+					precision: 2,
+					reqd: 1,
+				},
+				{
+					fieldname: "beneficiary_bank",
+					label: __("Beneficiary Bank", null, TCS_BT_CTX),
+					fieldtype: "Link",
+					options: "Bank",
+					depends_on: "eval:doc.transfer_type!=='Internal Transfer' && doc.method!=='SWIFT'",
+					description: __("Same bank as the bank account → Same Bank scope."),
+				},
+				{
+					fieldname: "to_bank_account",
+					label: __("To Bank Account", null, TCS_BT_CTX),
+					fieldtype: "Link",
+					options: "Bank Account",
+					depends_on: "eval:doc.transfer_type==='Internal Transfer'",
+					get_query: () => ({ filters: { company: frm.doc.company, is_company_account: 1 } }),
+				},
+				{
+					fieldname: "charge_bearer",
+					label: __("Charge Bearer", null, TCS_BT_CTX),
+					fieldtype: "Select",
+					options: options(["OUR", "SHA", "BEN"], TCS_BT_CTX),
+					default: frm.doc.default_charge_bearer || "SHA",
+					depends_on: "eval:doc.method==='SWIFT'",
+				},
+				{ fieldname: "section_result", fieldtype: "Section Break" },
+				{ fieldname: "result", fieldtype: "HTML" },
+			],
+			primary_action_label: __("Calculate"),
+			primary_action(values) {
+				const internal = values.transfer_type === "Internal Transfer";
+				frappe
+					.xcall("treasury.bank_transfers.api.get_fee_preview", {
+						company: frm.doc.company,
+						bank_account: values.bank_account,
+						method: values.method,
+						transfer_type: values.transfer_type,
+						amount: flt(values.amount),
+						charge_bearer: values.charge_bearer,
+						beneficiary_bank: internal ? null : values.beneficiary_bank,
+						to_bank_account: internal ? values.to_bank_account : null,
+					})
+					.then((r) => {
+						// the dialog stays open for the next try
+						const scope = r.scope
+							? `<span class="indicator-pill ${TCS_SCOPE_COLORS[r.scope] || "gray"}">${esc(
+									__(r.scope, null, TCS_BT_CTX)
+							  )}</span>`
+							: "";
+						const messages = (r.limit_messages || [])
+							.map((message) => {
+								const text = new DOMParser().parseFromString(message, "text/html").body.textContent;
+								return `<p class="text-warning">${esc(text || "")}</p>`;
+							})
+							.join("");
+						dialog.get_field("result").$wrapper.html(`<div>
+							<p>${scope} <b>${esc(__("Fee", null, TCS_BT_CTX))}:</b>
+								<bdi>${esc(format_currency(r.computed_fee, r.currency))}</bdi>
+								${r.fee_rule ? `· ${esc(r.fee_rule)}` : ""}</p>
+							<p class="text-muted small">${esc(r.fee_basis || "")}</p>
+							${messages}
+						</div>`);
+					});
+			},
+		});
+		dialog.show();
 	},
 
 	outgoing_party_posting(frm) {
@@ -309,5 +511,51 @@ frappe.ui.form.on("Treasury Company Settings", {
 			}
 		);
 		dialog && dialog.set_title && dialog.set_title(__("Add Series to Payment Entry"));
+	},
+});
+
+// Tiered fee rules are typed as a sequence of rows: a new row continues the previous one.
+frappe.ui.form.on(TCS_FEE_RULE, {
+	transfer_fee_rules_add(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		const previous = (frm.doc.transfer_fee_rules || []).find((r) => r.idx === row.idx - 1);
+		if (!previous) {
+			return;
+		}
+		const values = {};
+		// the expense account first: the bank account trigger only fills an empty one
+		["expense_account", "bank_account", "method", "direction", "scope", "charge_bearer"].forEach((fieldname) => {
+			if (previous[fieldname]) {
+				values[fieldname] = previous[fieldname];
+			}
+		});
+		if (flt(previous.amount_to) > 0) {
+			values.amount_from = flt(previous.amount_to) + 0.01;
+		}
+		frappe.model.set_value(cdt, cdn, values);
+	},
+
+	bank_account(frm, cdt, cdn) {
+		// mirrors TreasuryCompanySettings.default_fee_expense_account
+		const row = locals[cdt][cdn];
+		if (row.expense_account || !row.bank_account) {
+			return;
+		}
+		const mapping = (frm.doc.pdc_accounts || []).find(
+			(r) => r.bank_account === row.bank_account && r.bank_charges_account
+		);
+		const account = (mapping && mapping.bank_charges_account) || frm.doc.bounce_charges_account;
+		if (account) {
+			frappe.model.set_value(cdt, cdn, "expense_account", account);
+		}
+	},
+});
+
+frappe.ui.form.on(TCS_LIMIT, {
+	transfer_limits_add(frm, cdt, cdn) {
+		// limits are mostly for Fawran (the JSON default method)
+		if (frm.doc.default_fawran_bank_account && !locals[cdt][cdn].bank_account) {
+			frappe.model.set_value(cdt, cdn, "bank_account", frm.doc.default_fawran_bank_account);
+		}
 	},
 });

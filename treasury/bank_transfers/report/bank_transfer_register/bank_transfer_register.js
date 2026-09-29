@@ -2,6 +2,14 @@
 // For license information, please see license.txt
 
 const BT_REGISTER_CTX = "Bank Transfer";
+const BT_REGISTER_COLORS = {
+	Draft: "gray",
+	Scheduled: "purple",
+	Sent: "blue",
+	Completed: "green",
+	Returned: "red",
+	Cancelled: "darkgrey",
+};
 
 function bt_register_options(values) {
 	return ["", ...values].map((value) => ({ value, label: value ? __(value, null, BT_REGISTER_CTX) : "" }));
@@ -69,4 +77,26 @@ frappe.query_reports["Bank Transfer Register"] = {
 			options: "party_type",
 		},
 	],
+
+	formatter: function (value, row, column, data, default_formatter) {
+		const esc = frappe.utils.escape_html;
+		// the status as a coloured pill (the server sends the English status too, for the colour)
+		if (column.fieldname === "status_label" && data && data.status) {
+			const label =
+				data.status === "Sent" && data.transfer_type === "Party Receipt"
+					? __("Received", null, BT_REGISTER_CTX)
+					: __(data.status, null, BT_REGISTER_CTX);
+			return `<span class="indicator-pill ${BT_REGISTER_COLORS[data.status] || "gray"}">${esc(label)}</span>`;
+		}
+		// the paper-filing key, as a link
+		if (column.fieldname === "payment_entry" && data && value) {
+			return `<a href="/app/payment-entry/${encodeURIComponent(value)}"><bdi>${esc(value)}</bdi></a>`;
+		}
+		value = default_formatter(value, row, column, data);
+		// cancelled transfers (listed only when that status is chosen) are muted
+		if (data && data.status === "Cancelled") {
+			return `<span class="text-muted">${value}</span>`;
+		}
+		return value;
+	},
 };

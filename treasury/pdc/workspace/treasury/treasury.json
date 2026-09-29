@@ -441,7 +441,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-30 12:00:00.000000",
+ "modified": "2026-09-30 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",
@@ -591,8 +591,10 @@
   },
   {
    "color": "Blue",
+   "format": "{} Awaiting Confirmation",
    "label": "Bank Transfer",
    "link_to": "Bank Transfer",
+   "stats_filter": "[[\"Bank Transfer\",\"status\",\"=\",\"Sent\",false],[\"Bank Transfer\",\"docstatus\",\"=\",1,false]]",
    "type": "DocType"
   }
  ],

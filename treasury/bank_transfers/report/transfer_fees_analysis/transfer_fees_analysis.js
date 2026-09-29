@@ -54,4 +54,18 @@ frappe.query_reports["Transfer Fees Analysis"] = {
 			})),
 		},
 	],
+
+	formatter: function (value, row, column, data, default_formatter) {
+		const group_by = frappe.query_report.get_filter_value("group_by");
+		const routes = { Bank: "bank", "Bank Account": "bank-account" };
+		// a bank / bank account group opens its record
+		if (column.fieldname === "group" && data && !data.is_total && value && value !== "-" && routes[group_by]) {
+			const esc = frappe.utils.escape_html;
+			value = `<a href="/app/${routes[group_by]}/${encodeURIComponent(value)}"><bdi>${esc(value)}</bdi></a>`;
+		} else {
+			value = default_formatter(value, row, column, data);
+		}
+		// the total row is built by the server (its Fee % is not a sum of percentages)
+		return data && data.is_total ? `<b>${value}</b>` : value;
+	},
 };

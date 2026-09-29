@@ -41,6 +41,7 @@
   "transfer_approval_threshold",
   "transfer_fees_section",
   "transfer_fee_rules",
+  "transfer_fees_help",
   "transfer_limits_section",
   "transfer_limits",
   "facilities_section",
@@ -207,6 +208,7 @@
   },
   {
    "default": "SHA",
+   "description": "SWIFT: OUR = all charges on us · SHA = shared · BEN = on the beneficiary.",
    "fieldname": "default_charge_bearer",
    "fieldtype": "Select",
    "label": "Default Charge Bearer",
@@ -253,6 +255,7 @@
   },
   {
    "default": "Warn",
+   "description": "Warn: show a message and allow submitting. Block: refuse the submit.",
    "fieldname": "transfer_limit_action",
    "fieldtype": "Select",
    "label": "Transfer Limit Action",
@@ -268,6 +271,8 @@
    "non_negative": 1
   },
   {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!(doc.transfer_fee_rules||[]).length",
    "fieldname": "transfer_fees_section",
    "fieldtype": "Section Break",
    "label": "Transfer Fees"
@@ -279,6 +284,13 @@
    "options": "Bank Transfer Fee Rule"
   },
   {
+   "fieldname": "transfer_fees_help",
+   "fieldtype": "HTML"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!(doc.transfer_limits||[]).length",
+   "description": "Amounts in the bank account currency. The daily limit counts submitted, non-cancelled transfers by execution date.",
    "fieldname": "transfer_limits_section",
    "fieldtype": "Section Break",
    "label": "Transfer Limits"
@@ -303,7 +315,7 @@
   }
  ],
  "links": [],
- "modified": "2026-09-30 12:00:00.000000",
+ "modified": "2026-09-30 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

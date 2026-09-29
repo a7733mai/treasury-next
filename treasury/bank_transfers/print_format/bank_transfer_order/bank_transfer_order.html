@@ -1,0 +1,242 @@
+{#- Bank Transfer Order: fixed bilingual layout (bank forms are English + Arabic side by side), whatever the
+    print language. English labels are literal, Arabic labels are translated with lang="ar" (msgctxt
+    "Bank Transfer Order"); every value is escaped or formatted. -#}
+{%- set C = "Bank Transfer Order" -%}
+{%- set BT = "Bank Transfer" -%}
+{%- set payment = doc.transfer_type == "Party Payment" -%}
+{%- set receipt = doc.transfer_type == "Party Receipt" -%}
+{%- set internal = doc.transfer_type == "Internal Transfer" -%}
+{%- set swift = doc.method == "SWIFT" -%}
+{%- set bank_fields = ["account_name", "bank_account_no", "iban", "branch_code"] -%}
+{%- set ours = (frappe.db.get_value("Bank Account", doc.bank_account, bank_fields, as_dict=1) if doc.bank_account else None) or {} -%}
+{%- set target = (frappe.db.get_value("Bank Account", doc.to_bank_account, bank_fields, as_dict=1) if internal and doc.to_bank_account else None) or {} -%}
+{%- set party_account_no = frappe.db.get_value("Bank Account", doc.party_bank_account, "bank_account_no") if doc.party_bank_account and not internal else None -%}
+{%- set company_currency = frappe.db.get_value("Company", doc.company, "default_currency") -%}
+{%- set pes = treasury_payment_entries(doc) -%}
+{%- set fee = doc.fee_amount or 0 -%}
+
+{%- macro iban(value) -%}
+{{ ((value or "") | replace(" ", "") | upper | batch(4) | map("join") | join(" ")) | e }}
+{%- endmacro -%}
+
+{%- macro row(en, value, ar, cls="") -%}
+<tr>
+	<td class="bt-en">{{ en }}</td>
+	<td class="bt-value {{ cls }}"><bdi>{{ value }}</bdi></td>
+	<td class="bt-ar" dir="rtl">{{ ar }}</td>
+</tr>
+{%- endmacro -%}
+
+{%- macro section(en, ar) -%}
+<tr class="bt-section">
+	<td class="bt-en">{{ en }}</td>
+	<td></td>
+	<td class="bt-ar" dir="rtl">{{ ar }}</td>
+</tr>
+{%- endmacro -%}
+
+{%- macro account_rows(account, bank) -%}
+{{ row("Account Name", (account.account_name or "") | e, _("Account Name", context=C, lang="ar")) }}
+{%- if account.bank_account_no %}
+{{ row("Account No.", account.bank_account_no | e, _("Account No.", context=C, lang="ar")) }}
+{%- endif %}
+{%- if account.iban %}
+{{ row("IBAN", iban(account.iban), _("IBAN", context=C, lang="ar")) }}
+{%- endif %}
+{%- if bank %}
+{{ row("Bank", bank | e, _("Bank", context=C, lang="ar")) }}
+{%- endif %}
+{%- endmacro -%}
+
+<div class="bt-order" dir="ltr" style="text-align: left;">
+	<style>
+		.bt-order { position: relative; }
+		.bt-order table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+		.bt-order th, .bt-order td { border: 1px solid #999; padding: 4px 6px; vertical-align: top; }
+		.bt-order .bt-en { width: 22%; font-weight: bold; background: #f5f5f5; }
+		.bt-order .bt-ar { width: 22%; direction: rtl; text-align: right; font-family: inherit; font-weight: bold; background: #f5f5f5; }
+		.bt-order .bt-section td { background: #e8e8e8; font-weight: bold; }
+		.bt-order .bt-title { width: 100%; margin: 8px 0 12px; border: none; }
+		.bt-order .bt-title td { border: none; font-size: 1.3em; font-weight: bold; }
+		.bt-order .bt-title small { font-size: .7em; font-weight: normal; }
+		.bt-order .bt-amount { font-size: 1.2em; font-weight: bold; }
+		.bt-order .bt-muted { color: #666; }
+		.bt-order .bt-pe td { border: 2px solid #333; }
+		.bt-order .bt-pe-no { font-size: 1.25em; font-weight: bold; letter-spacing: .5px; }
+		.bt-order .bt-pe-no small { font-size: .7em; font-weight: normal; letter-spacing: 0; }
+		.bt-order .bt-intro td { border: none; padding: 2px 6px; width: 50%; }
+		.bt-order .bt-signatures td { border: none; text-align: center; padding-top: 48px; width: 33%; }
+		.bt-order .bt-print-date td { border: none; }
+		.bt-order .bt-watermark { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 6em;
+			font-weight: bold; color: #000; opacity: .12; transform: rotate(-30deg); z-index: 0; pointer-events: none; }
+	</style>
+
+	{% if doc.docstatus == 0 %}
+	<div class="bt-watermark">DRAFT / {{ _("DRAFT", context=C, lang="ar") }}</div>
+	{% elif doc.docstatus == 2 %}
+	<div class="bt-watermark">CANCELLED / {{ _("CANCELLED", context=C, lang="ar") }}</div>
+	{% endif %}
+
+	{% if letter_head and not no_letterhead %}
+	<div class="letter-head">{{ letter_head }}</div>
+	{% else %}
+	<h3 style="text-align: center;">{{ doc.company | e }}</h3>
+	{% endif %}
+
+	<table class="bt-title">
+		<tr>
+			<td>
+				{%- if internal %}INTERNAL TRANSFER ORDER{% elif receipt %}TRANSFER RECEIPT ADVICE{% else %}BANK TRANSFER ORDER{% endif %}
+				<br><small>{{ doc.method | e }} · {{ doc.transfer_type | e }}</small>
+			</td>
+			<td dir="rtl" style="text-align: right;">
+				{%- if internal %}{{ _("Internal Transfer Order", context=C, lang="ar") }}{% elif receipt %}{{ _("Transfer Receipt Advice", context=C, lang="ar") }}{% else %}{{ _("Bank Transfer Order", context=C, lang="ar") }}{% endif %}
+				<br><small>{{ _(doc.method, context=BT, lang="ar") }} · {{ _(doc.transfer_type, context=BT, lang="ar") }}</small>
+			</td>
+		</tr>
+	</table>
+
+	{#- the paper-filing key: the Payment Entry of the transfer (a blank line to write it on before posting) -#}
+	<table class="bt-pe">
+		<tr>
+			<td class="bt-en">Payment Entry No.</td>
+			<td class="bt-pe-no">
+				{%- for pe in pes %}
+				<bdi>{{ pe.name | e }}</bdi> <small>({{ pe.event_label | e }} · {{ frappe.utils.formatdate(pe.posting_date) }})</small>{% if not loop.last %}<br>{% endif %}
+				{%- else %}— ____________
+				{%- if doc.docstatus == 1 and doc.status == "Scheduled" %}
+				{%- set scheduled = frappe.utils.formatdate(doc.execution_date) %}
+				<br><small class="bt-muted bt-scheduled">Scheduled for {{ scheduled }} / {{ _("Scheduled for {0}", context=C, lang="ar") | replace("{0}", scheduled) }}</small>
+				{%- endif %}
+				{%- endfor %}
+			</td>
+			<td class="bt-ar" dir="rtl">{{ _("Payment Entry No.", context=C, lang="ar") }}</td>
+		</tr>
+		{{ row("Transfer No.", doc.name | e, _("Transfer No.", context=C, lang="ar")) }}
+	</table>
+
+	{% if not receipt %}
+	<table class="bt-intro">
+		<tr>
+			<td>
+				To: {{ (doc.bank or "") | e }}{% if ours.branch_code %} — Branch {{ ours.branch_code | e }}{% endif %}<br>
+				{% if internal %}Please transfer the amount below between our accounts.{% else %}Please debit our account below and transfer the amount below to the beneficiary.{% endif %}
+			</td>
+			<td dir="rtl" style="text-align: right;">
+				{{ _("To:", context=C, lang="ar") }} {{ (doc.bank or "") | e }}{% if ours.branch_code %} — {{ _("Branch", context=C, lang="ar") }} {{ ours.branch_code | e }}{% endif %}<br>
+				{% if internal %}{{ _("Please transfer the amount below between our accounts.", context=C, lang="ar") }}{% else %}{{ _("Please debit our account below and transfer the amount below to the beneficiary.", context=C, lang="ar") }}{% endif %}
+			</td>
+		</tr>
+	</table>
+	{% endif %}
+
+	<table>
+		{{ row("Request Date", frappe.utils.formatdate(doc.request_date), _("Request Date", context=C, lang="ar")) }}
+		{{ row("Execution Date", frappe.utils.formatdate(doc.execution_date), _("Execution Date", context=C, lang="ar")) }}
+
+		{%- if receipt %}
+		{{ section("To Account", _("To Account", context=C, lang="ar")) }}
+		{%- else %}
+		{{ section("From", _("From", context=C, lang="ar")) }}
+		{%- endif %}
+		{{ account_rows(ours, doc.bank) }}
+
+		{%- if internal %}
+		{{ section("To Account", _("To Account", context=C, lang="ar")) }}
+		{{ account_rows(target, doc.to_bank) }}
+		{%- elif receipt %}
+		{{ section("Payer", _("Payer", context=C, lang="ar")) }}
+		{{ row("Payer", (doc.party_name or doc.party or "") | e, _("Payer", context=C, lang="ar")) }}
+		{%- if doc.beneficiary_bank %}
+		{{ row("Payer Bank", doc.beneficiary_bank | e, _("Payer Bank", context=C, lang="ar")) }}
+		{%- endif %}
+		{%- if doc.beneficiary_iban %}
+		{{ row("IBAN", iban(doc.beneficiary_iban), _("IBAN", context=C, lang="ar")) }}
+		{%- endif %}
+		{%- else %}
+		{{ section("Beneficiary", _("Beneficiary", context=C, lang="ar")) }}
+		{{ row("Beneficiary Name", (doc.party_name or doc.party or "") | e, _("Beneficiary Name", context=C, lang="ar")) }}
+		{%- if doc.beneficiary_bank %}
+		{{ row("Beneficiary Bank", doc.beneficiary_bank | e, _("Beneficiary Bank", context=C, lang="ar")) }}
+		{%- endif %}
+		{%- if party_account_no %}
+		{{ row("Account No.", party_account_no | e, _("Account No.", context=C, lang="ar")) }}
+		{%- endif %}
+		{%- if doc.beneficiary_iban %}
+		{{ row("IBAN", iban(doc.beneficiary_iban), _("IBAN", context=C, lang="ar")) }}
+		{%- endif %}
+		{%- if swift and doc.beneficiary_swift %}
+		{{ row("SWIFT / BIC", doc.beneficiary_swift | e, _("SWIFT / BIC", context=C, lang="ar")) }}
+		{%- endif %}
+		{%- endif %}
+
+		{{ section("Amount", _("Amount", context=C, lang="ar")) }}
+		{%- if receipt %}
+		{{ row("Amount Paid by Party", doc.get_formatted("amount"), _("Amount Paid by Party", context=C, lang="ar"), "bt-amount") }}
+		{%- else %}
+		{{ row("Amount", doc.get_formatted("amount"), _("Amount", context=C, lang="ar"), "bt-amount") }}
+		{%- endif %}
+		<tr>
+			<td class="bt-en">Amount in Words</td>
+			<td class="bt-value bt-words-en">{{ treasury_amount_in_words(doc.amount, doc.currency, "en") | e }}</td>
+			<td class="bt-ar" dir="rtl">{{ _("Amount in Words", context=C, lang="ar") }}</td>
+		</tr>
+		<tr>
+			<td class="bt-en"></td>
+			<td class="bt-value bt-words-ar" dir="rtl" style="text-align: right;">{{ treasury_amount_in_words(doc.amount, doc.currency, "ar") | e }}</td>
+			<td class="bt-ar"></td>
+		</tr>
+
+		{%- if internal and doc.to_currency and doc.to_currency != doc.currency and doc.amount and doc.received_amount %}
+		{{ row("Amount to Credit", doc.get_formatted("received_amount"), _("Amount to Credit", context=C, lang="ar")) }}
+		{%- if doc.currency != company_currency %}
+		{%- set rate_text = "1 " ~ doc.currency ~ " = " ~ frappe.utils.fmt_money(doc.received_amount / doc.amount, 4) ~ " " ~ doc.to_currency %}
+		{%- else %}
+		{%- set rate_text = "1 " ~ doc.to_currency ~ " = " ~ frappe.utils.fmt_money(doc.amount / doc.received_amount, 4) ~ " " ~ doc.currency %}
+		{%- endif %}
+		{{ row("Rate", rate_text | e, _("Rate", context=C, lang="ar")) }}
+		{%- endif %}
+
+		{%- if swift and not receipt and doc.charge_bearer %}
+		{%- if doc.charge_bearer == "OUR" %}
+		{%- set bearer_en, bearer_ar = "all charges on us", _("all charges on us", context=C, lang="ar") %}
+		{%- elif doc.charge_bearer == "BEN" %}
+		{%- set bearer_en, bearer_ar = "on the beneficiary", _("on the beneficiary", context=C, lang="ar") %}
+		{%- else %}
+		{%- set bearer_en, bearer_ar = "shared", _("shared", context=C, lang="ar") %}
+		{%- endif %}
+		{{ row("Charges", (doc.charge_bearer ~ " — " ~ bearer_en ~ " / " ~ bearer_ar) | e, _("Charges", context=C, lang="ar")) }}
+		{%- endif %}
+
+		{%- if receipt %}
+		{%- if fee > 0 %}
+		{{ row("Bank Fee", doc.get_formatted("fee_amount"), _("Bank Fee", context=C, lang="ar")) }}
+		{%- endif %}
+		{{ row("Net Credited", doc.get_formatted("bank_amount"), _("Net Credited", context=C, lang="ar"), "bt-amount") }}
+		{%- elif fee > 0 and not (swift and doc.charge_bearer == "BEN") %}
+		{{ row("Bank Charges", doc.get_formatted("fee_amount") ~ " (debited separately / " ~ _("debited separately", context=C, lang="ar") ~ ")", _("Bank Charges", context=C, lang="ar")) }}
+		{%- endif %}
+
+		{%- if doc.remarks %}
+		{{ row("Purpose / Remarks", doc.remarks | e, _("Purpose / Remarks", context=C, lang="ar"), "bt-remarks") }}
+		{%- endif %}
+		{%- if doc.bank_reference %}
+		{{ row("Bank Reference", doc.bank_reference | e, _("Bank Reference", context=C, lang="ar")) }}
+		{%- endif %}
+	</table>
+
+	<table class="bt-signatures">
+		<tr>
+			<td>Prepared by / {{ _("Prepared by", context=C, lang="ar") }}<br>________________</td>
+			<td>Authorised Signatory<br>{{ _("Authorised Signatory", context=C, lang="ar") }} ________________</td>
+			<td>Authorised Signatory<br>{{ _("Authorised Signatory", context=C, lang="ar") }} ________________</td>
+		</tr>
+	</table>
+
+	<table class="bt-print-date">
+		<tr>
+			<td>Print Date: <span class="bt-print-date-value">{{ treasury_print_date() }}</span></td>
+			<td dir="rtl" style="text-align: right;">{{ _("Print Date", context=C, lang="ar") }}: {{ treasury_print_date() }}</td>
+		</tr>
+	</table>
+</div>

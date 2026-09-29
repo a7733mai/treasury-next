@@ -116,11 +116,11 @@ class TestClientCalls(UnitTestCase):
 
 		from frappe.handler import is_valid_http_method
 
-		from treasury.bank_transfers.api import get_fee_preview, make_bank_transfer
+		from treasury.bank_transfers.api import get_fee_preview, get_transfer_settings, make_bank_transfer
 
 		previous = getattr(frappe.local, "request", None)
 		try:
-			for method in (make_bank_transfer, get_fee_preview):
+			for method in (make_bank_transfer, get_fee_preview, get_transfer_settings):
 				with self.subTest(method=method.__qualname__):
 					self.assertIn(method, frappe.whitelisted)
 					frappe.local.request = SimpleNamespace(method="GET")

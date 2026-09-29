@@ -87,6 +87,7 @@ class BankTransfer(Document):
 		fee_basis: DF.SmallText | None
 		fee_override_reason: DF.SmallText | None
 		fee_rule: DF.Data | None
+		fee_summary_html: DF.HTML | None
 		fees_refunded: DF.Check
 		method: DF.Literal["Normal", "Fawran", "SWIFT"]
 		mode_of_payment: DF.Link | None
@@ -496,7 +497,7 @@ class BankTransfer(Document):
 
 def transfer_settings(company: str | None) -> dict:
 	"""The Bank Transfer values of the company's Treasury Company Settings the form needs (defaults of a new
-	transfer, the approval threshold)."""
+	transfer, the approval threshold, the completion and fee refund rules its messages describe)."""
 	if not company or not frappe.db.exists("Treasury Company Settings", company):
 		return {}
 	fields = [
@@ -505,6 +506,7 @@ def transfer_settings(company: str | None) -> dict:
 		"transfer_completion",
 		"transfer_limit_action",
 		"transfer_approval_threshold",
+		"refund_fees_on_return",
 		*TRANSFER_DEFAULT_BANK_FIELDS.values(),
 	]
 	values = frappe.db.get_value("Treasury Company Settings", company, fields, as_dict=True)

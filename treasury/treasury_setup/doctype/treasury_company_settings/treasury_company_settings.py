@@ -71,6 +71,7 @@ class TreasuryCompanySettings(Document):
 		transfer_approval_threshold: DF.Currency
 		transfer_completion: DF.Literal["On Bank Confirmation", "On Send for Fawran", "On Send"]
 		transfer_fee_rules: DF.Table[BankTransferFeeRule]
+		transfer_fees_help: DF.HTML | None
 		transfer_limit_action: DF.Literal["Warn", "Block"]
 		transfer_limits: DF.Table[BankTransferLimit]
 		vouchers_help: DF.HTML | None
@@ -125,7 +126,12 @@ class TreasuryCompanySettings(Document):
 
 	def validate_fee_rule(self, row):
 		self.validate_bank_account(row)
-		self.validate_expense_account(row.expense_account, _(row.meta.get_label("expense_account")), row.idx)
+		if not row.expense_account:
+			# not a grid column: the bank's charges account (else the mandatory check names the field)
+			row.expense_account = self.default_fee_expense_account(row.bank_account)
+		if row.expense_account:
+			label = _(row.meta.get_label("expense_account"))
+			self.validate_expense_account(row.expense_account, label, row.idx)
 		for fieldname in ("amount_from", "amount_to", "fixed_fee", "min_fee", "max_fee", "correspondent_fee"):
 			if flt(row.get(fieldname)) < 0:
 				frappe.throw(
@@ -150,6 +156,13 @@ class TreasuryCompanySettings(Document):
 				frappe.throw(_("Row #{0}: Scope International is only for SWIFT.").format(row.idx))
 			row.charge_bearer = None
 			row.correspondent_fee = 0
+
+	def default_fee_expense_account(self, bank_account: str | None) -> str | None:
+		"""The Bank Charges Account of the bank's PDC Accounts row, else the Bounce Charges Account."""
+		for row in self.get("pdc_accounts"):
+			if row.bank_account == bank_account and row.bank_charges_account:
+				return row.bank_charges_account
+		return self.bounce_charges_account or None
 
 	def validate_fee_rule_overlaps(self):
 		"""Two rules of the same bank, method, direction, scope and charge bearer may not share an amount."""
