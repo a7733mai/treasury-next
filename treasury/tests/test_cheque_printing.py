@@ -644,7 +644,7 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		# security Major 1: "Print Unprinted Only" prints the leaf it registered, never the skipped cheque
 		html = self.render(BATCH, batch.name, FORMAT_BATCH, result["print_job"])
 		self.assertEqual(html.count('class="treasury-cheque-page"'), 1)
-		self.assertEqual(html.count("tcl-figures"), 1)
+		self.assertEqual(html.count('class="tcl-box tcl-figures'), 1)  # the leaf, not the stylesheet rule
 		self.assertIn(fmt_money(2000, precision=2), html)  # the replacement of the 2000 cheque
 		self.assertNotIn(fmt_money(3000, precision=2), html)  # the skipped, already printed cheque
 		# no job, a made-up job: nothing prints

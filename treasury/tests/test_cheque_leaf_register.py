@@ -331,7 +331,9 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual((cards[-1]["value"], cards[-1]["indicator"]), (0, "Red"))
 
 	def test_max_leaves(self):
-		book = self.book(size=MAX_LEAVES + 1)
+		# a bank account of its own: the book stays until the class rolls back, and a later test listing the
+		# shared EGP bank account would otherwise be over the limit
+		book = self.book(size=MAX_LEAVES + 1, bank_account=ensure_alert_bank().bank_account)
 		with self.assertRaises(frappe.ValidationError) as ctx:
 			leaf_register({"company": COMPANY})
 		self.assertIn(str(MAX_LEAVES), str(ctx.exception))

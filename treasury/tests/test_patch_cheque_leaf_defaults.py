@@ -82,10 +82,13 @@ class TestPatchChequeLeafDefaults(TreasuryTestMixin, IntegrationTestCase):
 		book = make_cheque_book(start, start + 9, leaf_digits=8)
 		first = make_pdc_cheque(cheque_book=book.name)
 		first.cancel_cheque(reason="Wrong amount")
-		# a second cancelled cheque of the book written with the same number by hand
-		second = make_pdc_cheque(cheque_no=first.cheque_no)
+		# a second cancelled cheque of the book with the same number, as data saved before 7f: validation now
+		# refuses a hand-typed cancelled leaf, so the number is written directly
+		second = make_pdc_cheque(cheque_no=str(unique_leaf_start(1)).zfill(8))
 		frappe.db.set_value(
-			"PDC Cheque", second.name, {"cheque_book": book.name, "operational_status": "Cancelled"}
+			"PDC Cheque",
+			second.name,
+			{"cheque_no": first.cheque_no, "cheque_book": book.name, "operational_status": "Cancelled"},
 		)
 		self.as_before_7f(book.name)
 		set_cheque_leaf_defaults.execute()

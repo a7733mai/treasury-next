@@ -21,10 +21,12 @@
 .treasury-cheque-leaf .tcl-crossing{border-top:.4mm solid #000;border-bottom:.4mm solid #000;text-align:center;font-weight:bold;-webkit-transform-origin:center;transform-origin:center}
 .treasury-cheque-leaf .tcl-crossing:lang(en){text-transform:uppercase}
 .treasury-cheque-leaf .tcl-signature-text{position:absolute;top:0;left:0;right:0;text-align:center;white-space:nowrap}
+{%- if test_grid %}
 .treasury-cheque-leaf.tcl-grid{background-color:#fff;background-image:repeating-linear-gradient(0deg,#ccc 0,#ccc .2mm,transparent .2mm,transparent 10mm),repeating-linear-gradient(90deg,#ccc 0,#ccc .2mm,transparent .2mm,transparent 10mm),repeating-linear-gradient(0deg,#eee 0,#eee .1mm,transparent .1mm,transparent 1mm),repeating-linear-gradient(90deg,#eee 0,#eee .1mm,transparent .1mm,transparent 1mm)}
 .treasury-cheque-leaf .tcl-leaf-outline{position:absolute;border:.2mm solid #000;box-sizing:border-box}
 .treasury-cheque-leaf .tcl-outline{outline:.2mm dashed #2490EF}
 .treasury-cheque-leaf .tcl-label{position:absolute;top:-3mm;left:0;font-size:6pt;font-weight:normal;line-height:1;color:#2490EF;font-family:Arial,Tahoma,sans-serif;white-space:nowrap;text-transform:none}
+{%- endif %}
 </style>
 <div class="treasury-cheque-leaf{{ ' tcl-grid' if test_grid else '' }}" dir="{{ leaf.dir }}" lang="{{ leaf.lang }}" style="position:relative;width:{{ leaf.page_width }};height:{{ leaf.page_height }};overflow:hidden;font-family:{{ leaf.font_family | e }};font-size:{{ leaf.font_size }};">
 	{%- if test_grid %}
