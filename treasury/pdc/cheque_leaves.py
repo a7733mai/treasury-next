@@ -332,9 +332,7 @@ def _covering_book(books, number: int) -> str | None:
 def _load_details(context: frappe._dict, filters: dict, or_filters: list):
 	"""The documents the user may read, and the Payment Entries of the readable PDC Cheques on the leaves."""
 	if frappe.has_permission(PDC, "read"):
-		context.readable_pdc = set(
-			frappe.get_list(PDC, filters=filters, or_filters=or_filters, pluck="name")
-		)
+		context.readable_pdc = set(frappe.get_list(PDC, filters=filters, or_filters=or_filters, pluck="name"))
 	if frappe.has_permission(SECURITY, "read"):
 		context.readable_security = set(
 			frappe.get_list(SECURITY, filters=filters, or_filters=or_filters, pluck="name")
@@ -383,12 +381,20 @@ def _pick(context: frappe._dict, book, number: int) -> tuple:
 		return status, None, cancelled, None, _leaf_pdc(pdc_rows)
 	security = _newest(context.security.get(book.name, {}).get(number, []))
 	if security:
-		pdc = context.pdc_by_name.get(security.converted_pdc_cheque) if security.converted_pdc_cheque else None
+		pdc = (
+			context.pdc_by_name.get(security.converted_pdc_cheque) if security.converted_pdc_cheque else None
+		)
 		status = SEC_LEAF_STATUS.get(security.status, security.status)
 		return status, USAGE_SECURITY, None, security, pdc
 	pdc = _leaf_pdc(pdc_rows)
 	if pdc:
-		return PDC_LEAF_STATUS.get(pdc.operational_status, pdc.operational_status), USAGE_PAYMENT, None, None, pdc
+		return (
+			PDC_LEAF_STATUS.get(pdc.operational_status, pdc.operational_status),
+			USAGE_PAYMENT,
+			None,
+			None,
+			pdc,
+		)
 	return UNUSED, None, None, None, None
 
 

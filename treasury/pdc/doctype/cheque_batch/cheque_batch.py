@@ -172,9 +172,7 @@ class ChequeBatch(Document):
 		if not layout:
 			# legacy: no counter without a layout (lifecycle.record_print needs one), the cheques' own format
 			return batch.get_print_info(self)
-		result = cheque_printing.register_prints(
-			names, language, cint(reprint), reason, cint(only_unprinted)
-		)
+		result = cheque_printing.register_prints(names, language, cint(reprint), reason, cint(only_unprinted))
 		return {
 			"doctype": self.doctype,
 			"name": self.name,

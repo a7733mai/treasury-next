@@ -598,7 +598,9 @@ def check_printable(doc):
 	layout = cheque_printing.get_layout(doc.bank_account)
 	if not layout:
 		frappe.throw(
-			_("Bank Account {0} has no Cheque Layout. Create one first.").format(frappe.bold(doc.bank_account))
+			_("Bank Account {0} has no Cheque Layout. Create one first.").format(
+				frappe.bold(doc.bank_account)
+			)
 		)
 	return layout
 

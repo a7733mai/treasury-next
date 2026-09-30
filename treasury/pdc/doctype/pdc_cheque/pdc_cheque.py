@@ -193,7 +193,9 @@ class PDCCheque(Document):
 				"payment_entries", voucher_summary.payment_entries(self.doctype, [self.name], cycle=cycle)
 			)
 			layout = (
-				cheque_printing.get_layout(self.bank_account) if self.direction == lifecycle.OUTGOING else None
+				cheque_printing.get_layout(self.bank_account)
+				if self.direction == lifecycle.OUTGOING
+				else None
 			)
 			self.set_onload("cheque_print_format", self.get_cheque_print_format(layout))
 			self.set_onload("batch_locked", self.is_batch_locked())

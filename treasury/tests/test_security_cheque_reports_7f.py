@@ -234,7 +234,8 @@ class TestSecurityChequeReports7f(TreasuryTestMixin, IntegrationTestCase):
 		rows = {r.event: r for r in data}
 		self.assertEqual((rows["Stored"].from_location, rows["Stored"].to_location), (None, SAFE))
 		self.assertEqual(
-			(rows["Custody Transferred"].from_location, rows["Custody Transferred"].to_location), (SAFE, VAULT)
+			(rows["Custody Transferred"].from_location, rows["Custody Transferred"].to_location),
+			(SAFE, VAULT),
 		)
 		self.assertEqual((rows["Returned"].from_location, rows["Returned"].to_location), (VAULT, None))
 		self.assertEqual(
@@ -290,7 +291,9 @@ class TestSecurityChequeReports7f(TreasuryTestMixin, IntegrationTestCase):
 		allowed = self.moved_cheque((self.today,) * 3, party=PERMISSION_CUSTOMER)
 		hidden = self.moved_cheque((self.today,) * 3, party=PERMISSION_CUSTOMER)
 		ensure_user(RESTRICTED_USER, ["Treasury User"])
-		add_user_permission(RESTRICTED_USER, "Security Cheque", allowed.name, applicable_for="Security Cheque")
+		add_user_permission(
+			RESTRICTED_USER, "Security Cheque", allowed.name, applicable_for="Security Cheque"
+		)
 		with self.set_user(RESTRICTED_USER):
 			_columns, data, *_rest = self.run_movements(PERMISSION_CUSTOMER)
 		self.assertEqual({r.security_cheque for r in data}, {allowed.name})

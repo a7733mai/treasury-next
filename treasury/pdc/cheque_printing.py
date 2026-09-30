@@ -155,7 +155,7 @@ def resolve_print_format(company: str | None, bank_account: str | None, layout=N
 
 
 def lang_code(language: str | None, layout=None) -> str:
-	""""ar" / "en" from a code or a language name; the layout's default language when none is given."""
+	""" "ar" / "en" from a code or a language name; the layout's default language when none is given."""
 	if not language:
 		return LANGUAGES.get(layout.default_language, "en") if layout else "en"
 	if language in LANGUAGES.values():
@@ -267,7 +267,11 @@ def split_words(text: str, max_chars: int) -> tuple[str, str]:
 def format_cheque_date(date, date_format: str) -> str:
 	value = getdate(date)
 	text = date_format or "dd/mm/yyyy"
-	for token, part in (("yyyy", f"{value.year:04d}"), ("mm", f"{value.month:02d}"), ("dd", f"{value.day:02d}")):
+	for token, part in (
+		("yyyy", f"{value.year:04d}"),
+		("mm", f"{value.month:02d}"),
+		("dd", f"{value.day:02d}"),
+	):
 		text = text.replace(token, part)
 	return text
 
@@ -383,10 +387,7 @@ def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frapp
 def is_valid_font_family(value: str | None) -> bool:
 	"""Font names, commas, spaces and balanced quotes only: the value is written into a style attribute."""
 	return bool(
-		value
-		and FONT_FAMILY_PATTERN.match(value)
-		and value.count('"') % 2 == 0
-		and value.count("'") % 2 == 0
+		value and FONT_FAMILY_PATTERN.match(value) and value.count('"') % 2 == 0 and value.count("'") % 2 == 0
 	)
 
 
@@ -609,7 +610,14 @@ def batch_print_summary(batch) -> dict | None:
 			c
 			for c in get_batch_cheques(
 				batch.name,
-				fields=["name", "cheque_no", "amount", "operational_status", "print_count", "cheque_batch_row"],
+				fields=[
+					"name",
+					"cheque_no",
+					"amount",
+					"operational_status",
+					"print_count",
+					"cheque_batch_row",
+				],
 				as_user=True,
 			)
 			if c.operational_status in PRINTABLE_STATUSES
@@ -638,7 +646,9 @@ def get_cheque_text(name: str, language: str | None = None) -> dict:
 	layout = get_layout(cheque.bank_account)
 	if not layout:
 		frappe.throw(
-			_("Bank Account {0} has no Cheque Layout. Create one first.").format(frappe.bold(cheque.bank_account))
+			_("Bank Account {0} has no Cheque Layout. Create one first.").format(
+				frappe.bold(cheque.bank_account)
+			)
 		)
 	lang = lang_code(language, layout)
 	leaf = build_leaf(

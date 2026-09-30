@@ -174,7 +174,9 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		book = self.book()
 		security = self.security(book)
 		row = self.row(book, 0)
-		self.assertEqual((row.status, row.usage, row.document), ("Security Created", "Security", security.name))
+		self.assertEqual(
+			(row.status, row.usage, row.document), ("Security Created", "Security", security.name)
+		)
 		self.assertEqual(getdate(row.expiry_date), day(200))
 
 		security.issue(handover_date=day(-25))
@@ -206,7 +208,9 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		pdc.reload()
 
 		row = self.row(book, 0)
-		self.assertEqual((row.status, row.usage, row.document), ("Security Encashed", "Security", security.name))
+		self.assertEqual(
+			(row.status, row.usage, row.document), ("Security Encashed", "Security", security.name)
+		)
 		self.assertEqual((row.pdc_cheque, row.pdc_status), (pdc.name, "Cleared"))
 		self.assertEqual(getdate(row.clearance_date), day(-9))
 		self.assertEqual(row.payment_entry, payment_entries_by_cheque([pdc.name])[pdc.name])
@@ -233,7 +237,8 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		_columns, data = cheque_book_usage({"company": COMPANY, "bank_account": book.bank_account})
 		usage = next(r for r in data if r.cheque_book == book.name)
 		self.assertEqual(
-			(usage.used_leaves, usage.cancelled_leaves, usage.void_leaves, usage.remaining_leaves), (4, 1, 2, 13)
+			(usage.used_leaves, usage.cancelled_leaves, usage.void_leaves, usage.remaining_leaves),
+			(4, 1, 2, 13),
 		)
 		self.assertEqual(usage.used_percent, 35.0)
 
@@ -304,7 +309,8 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(chart["data"]["datasets"][0]["values"], [7, 1, 1, 0, 1])
 		self.assertEqual(cards[-1]["indicator"], "Green")  # 7 left
 		self.assertEqual(
-			self.row(book, 1).amount_type, frappe.db.get_value("Security Cheque", security.name, "amount_type")
+			self.row(book, 1).amount_type,
+			frappe.db.get_value("Security Cheque", security.name, "amount_type"),
 		)
 
 		# a status filter changes the rows, not the chart of the book
@@ -314,7 +320,9 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(filtered["data"]["datasets"][0]["values"], [7, 1, 1, 0, 1])
 
 		columns, *_rest = leaf_register({"company": COMPANY, "bank_account": book.bank_account})
-		self.assertEqual({"cheque_book", "bank_account", "book_no"} - {c["fieldname"] for c in columns}, set())
+		self.assertEqual(
+			{"cheque_book", "bank_account", "book_no"} - {c["fieldname"] for c in columns}, set()
+		)
 		_columns, _data, _message, chart, _cards = leaf_register(
 			{"company": COMPANY, "cheque_book": book.name, "view": "Books"}
 		)
@@ -388,7 +396,8 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 			self.assertEqual(rows[book.start_no + 1].restricted, 1)
 		cancelled = self.row(book, 0)
 		self.assertEqual(
-			(cancelled.cancel_reason, cancelled.cancelled_by), (f"{OTHER_SUPPLIER} refused it", "Administrator")
+			(cancelled.cancel_reason, cancelled.cancelled_by),
+			(f"{OTHER_SUPPLIER} refused it", "Administrator"),
 		)
 
 	def test_usage_agrees_on_cancelled_cheque_without_book(self):

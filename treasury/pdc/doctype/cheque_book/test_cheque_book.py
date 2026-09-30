@@ -188,10 +188,20 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 			**args,
 		)
 		self.assert_error(
-			"A reason is required", void_leaf, book.name, self.leaf(book, 2), reason_type="Damaged", reason=" "
+			"A reason is required",
+			void_leaf,
+			book.name,
+			self.leaf(book, 2),
+			reason_type="Damaged",
+			reason=" ",
 		)
 		self.assert_error(
-			"Select the reason type", void_leaf, book.name, self.leaf(book, 2), reason_type="Spoilt", reason="x"
+			"Select the reason type",
+			void_leaf,
+			book.name,
+			self.leaf(book, 2),
+			reason_type="Spoilt",
+			reason="x",
 		)
 		self.assert_error("is outside the range", void_leaf, book.name, str(book.end_no + 1), **args)
 		# a range reaching a used leaf (a security cheque's leaf included) is refused as a whole
@@ -308,9 +318,7 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		leaf; a leaf taken that way cannot be voided."""
 		book = self.book(size=5)
 		void_leaf(book.name, self.leaf(book, 1), reason_type="Lost", reason="Lost")
-		self.assert_error(
-			"is a cancelled leaf of Cheque Book", make_pdc_cheque, cheque_no=self.leaf(book, 1)
-		)
+		self.assert_error("is a cancelled leaf of Cheque Book", make_pdc_cheque, cheque_no=self.leaf(book, 1))
 		make_pdc_cheque(cheque_no=self.leaf(book, 2))
 		self.assert_error(
 			"is used by a PDC Cheque",

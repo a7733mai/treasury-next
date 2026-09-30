@@ -69,7 +69,9 @@ def execute(filters=None):
 		frappe.throw(_("Invalid View: {0}").format(view))
 
 	books = get_books(filters, company)
-	row_filtered = bool(statuses or filters.usage or filters.party_type or filters.from_date or filters.to_date)
+	row_filtered = bool(
+		statuses or filters.usage or filters.party_type or filters.from_date or filters.to_date
+	)
 	chart = None
 	if view == VIEW_BOOKS and not row_filtered:
 		summaries = cheque_leaves.book_summaries(books)
@@ -175,7 +177,9 @@ def get_chart(leaves: list) -> dict | None:
 			"datasets": [
 				{
 					"name": _("Leaves", context="Cheque Leaf"),
-					"values": [counts[key] for key in ("unused", USAGE_PAYMENT, USAGE_SECURITY, CANCELLED_LEAF, VOID)],
+					"values": [
+						counts[key] for key in ("unused", USAGE_PAYMENT, USAGE_SECURITY, CANCELLED_LEAF, VOID)
+					],
 				}
 			],
 		},
@@ -203,7 +207,12 @@ def get_summary(data: list) -> list[dict]:
 
 	return [
 		{"value": total("total_leaves"), "label": _("Total Leaves"), "datatype": "Int", "indicator": "Blue"},
-		{"value": total("used_leaves"), "label": _("Used", context=CTX), "datatype": "Int", "indicator": "Blue"},
+		{
+			"value": total("used_leaves"),
+			"label": _("Used", context=CTX),
+			"datatype": "Int",
+			"indicator": "Blue",
+		},
 		{
 			"value": total("cancelled_leaves"),
 			"label": _("Cancelled Leaves"),
@@ -228,7 +237,9 @@ def get_columns(one_book: bool = False) -> list[dict]:
 		if one_book
 		else [
 			column("cheque_book", _("Cheque Book"), "Link", 140, options=BOOK),
-			column("bank_account", _("Bank Account", context="Treasury"), "Link", 180, options="Bank Account"),
+			column(
+				"bank_account", _("Bank Account", context="Treasury"), "Link", 180, options="Bank Account"
+			),
 			column("book_no", _("Book No"), width=80),
 		]
 	)
@@ -243,9 +254,16 @@ def get_columns(one_book: bool = False) -> list[dict]:
 		column("due_date", _("Due Date", context="Treasury"), "Date", 95),
 		{**payment_entry_column(), "width": 170},
 		column(
-			"document_type", _("Document Type", context="Cheque Leaf"), "Link", 100, options="DocType", hidden=1
+			"document_type",
+			_("Document Type", context="Cheque Leaf"),
+			"Link",
+			100,
+			options="DocType",
+			hidden=1,
 		),
-		column("document", _("Document", context="Cheque Leaf"), "Dynamic Link", 150, options="document_type"),
+		column(
+			"document", _("Document", context="Cheque Leaf"), "Dynamic Link", 150, options="document_type"
+		),
 		column("clearance_date", _("Clearance Date", context="Cheque Leaf"), "Date", 95),
 		column("issue_date", _("Issue Date", context="Treasury"), "Date", 95),
 		column("handover_date", _("Handover Date"), "Date", 95),

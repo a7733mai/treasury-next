@@ -24,7 +24,6 @@ from treasury.pdc.cheque_printing import (
 	render_leaf,
 	split_words,
 )
-from treasury.utils.amount_in_words import treasury_amount_in_words
 from treasury.tests.utils import (
 	COMPANY,
 	CUSTOMER,
@@ -45,6 +44,7 @@ from treasury.tests.utils import (
 	make_pdc_cheque,
 	unique_cheque_no,
 )
+from treasury.utils.amount_in_words import treasury_amount_in_words
 
 CHEQUE = "PDC Cheque"
 BATCH = "Cheque Batch"
@@ -139,7 +139,7 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 
 	@staticmethod
 	def words_line(html: str) -> str:
-		match = re.search(r'tcl-words-1[^>]*>\s*([^<]*)<', html)
+		match = re.search(r"tcl-words-1[^>]*>\s*([^<]*)<", html)
 		return match.group(1).strip() if match else ""
 
 	def disable_layouts(self):
@@ -310,7 +310,9 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		self.set_lang("en")
 		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job)
 		self.assertIn("One Thousand", self.words_line(html))
-		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 1)  # a view never counts
+		self.assertEqual(
+			frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 1
+		)  # a view never counts
 
 	def test_reprint_flow(self):
 		self.cheque.print_cheque(language="ar")
@@ -575,7 +577,9 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 			self.assertRaises(frappe.PermissionError, preview_layout, values, "en")
 			preview = preview_layout({**values, "bank_account": other_bank}, "en")
 			self.assertIn("tcl-grid", preview)
-		self.assertEqual(frappe.db.get_value(LAYOUT, self.layout.name, "bank_account"), bank_account_name("EGP"))
+		self.assertEqual(
+			frappe.db.get_value(LAYOUT, self.layout.name, "bank_account"), bank_account_name("EGP")
+		)
 
 	def test_currency_fractions(self):
 		"""Review Minor 7: decimals only from a power of 10; a currency without fraction units still words its
@@ -736,7 +740,7 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 0)
 
 		doc = frappe.get_doc(CHEQUE, self.cheque.name)
-		doc.payee_on_cheque = "Tom's \"ACME\" & Co"  # no "<": stored as typed (Frappe sanitizes HTML only)
+		doc.payee_on_cheque = 'Tom\'s "ACME" & Co'  # no "<": stored as typed (Frappe sanitizes HTML only)
 		doc.save()
 		self.assertEqual(
 			get_cheque_text(self.cheque.name, "en")["payee"], "Tom&apos;s &quot;ACME&quot; &amp; Co"
@@ -759,7 +763,8 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		batch.run_method("onload")
 		summary = batch.get_onload().cheque_print_summary
 		self.assertEqual(
-			(summary["printable"], summary["printed"], summary["unprinted"], summary["total"]), (2, 1, 1, 5000)
+			(summary["printable"], summary["printed"], summary["unprinted"], summary["total"]),
+			(2, 1, 1, 5000),
 		)
 		self.assertEqual((summary["leaves"], summary["unprinted_leaves"]), (leaves, leaves[1:]))
 		self.assertEqual(

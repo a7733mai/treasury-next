@@ -173,7 +173,9 @@ class ChequeBook(Document):
 		if not value.isdigit():
 			# the value may be anything the client sent: escaped in the message
 			frappe.throw(
-				_("Cheque No {0} is not a valid leaf number.").format(frappe.bold(escape_html(str(cheque_no))))
+				_("Cheque No {0} is not a valid leaf number.").format(
+					frappe.bold(escape_html(str(cheque_no)))
+				)
 			)
 		number = int(value)
 		if not cint(self.start_no) <= number <= cint(self.end_no):

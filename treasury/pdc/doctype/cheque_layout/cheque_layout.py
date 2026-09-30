@@ -58,7 +58,9 @@ class ChequeLayout(Document):
 		currency_name_en: DF.Data | None
 		date_char_spacing_mm: DF.Float
 		date_font_size_pt: DF.Float
-		date_format: DF.Literal["dd/mm/yyyy", "dd-mm-yyyy", "dd.mm.yyyy", "ddmmyyyy", "yyyy/mm/dd", "mm/dd/yyyy"]
+		date_format: DF.Literal[
+			"dd/mm/yyyy", "dd-mm-yyyy", "dd.mm.yyyy", "ddmmyyyy", "yyyy/mm/dd", "mm/dd/yyyy"
+		]
 		date_left_mm: DF.Float
 		date_top_mm: DF.Float
 		date_width_mm: DF.Float

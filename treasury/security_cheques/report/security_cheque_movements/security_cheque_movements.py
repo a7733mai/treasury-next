@@ -86,7 +86,9 @@ def execute(filters=None):
 
 	cheques = {
 		c.name: c
-		for c in get_security_cheques(get_filters(filters, company), fields=CHEQUE_FIELDS, order_by="name asc")
+		for c in get_security_cheques(
+			get_filters(filters, company), fields=CHEQUE_FIELDS, order_by="name asc"
+		)
 	}
 	names = list(cheques)
 	status_rows, custody_rows = [], []
