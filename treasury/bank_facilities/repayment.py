@@ -23,6 +23,13 @@ at submit under the drawdown lock: submission order, not creation order, since d
 order); the schedule is restored from the snapshot the repayment took before changing it, and its prepayment
 row is removed.
 
+Installment cheques (PDC to Lender, spec 7g §3.5): a row with a live cheque is paid only by that cheque (I1:
+Oldest First skips it, Selected Row refuses it, it is never rescheduled, no prepayment while later rows have
+live cheques). A cheque repayment (settlement "PDC Cheque": one Selected Row, exactly the row's unpaid amount,
+no prepayment or penalty, I2) may be cancelled at any time, by the cheque's bounce / replacement: it is undone
+by subtracting its own allocations (delta undo); the snapshot of any other repayment never overwrites rows paid
+by a cheque (I3). Istisna'a: no principal beyond what was disbursed and not yet repaid.
+
 Concurrency: submit and cancel lock the drawdown row (`lock_drawdown`) and every schedule change increments
 the drawdown's `schedule_version`, so a repayment never acts on schedule rows read before another repayment
 committed.
@@ -37,10 +44,14 @@ from frappe.utils import cint, date_diff, flt, getdate, today
 from treasury.bank_facilities import schedule
 
 DRAWDOWN = "Facility Drawdown"
+REPAYMENT = "Facility Repayment"
 SCHEDULE = "Facility Repayment Schedule"
 OLDEST_FIRST = "Oldest First"
 SELECTED_ROW = "Selected Row"
+SETTLED_BY_CHEQUE = "PDC Cheque"
+ISTISNA = "Istisna'a"
 PENDING, PARTIALLY_PAID, PAID, OVERDUE = "Pending", "Partially Paid", "Paid", "Overdue"
+# `pdc_cheque` is not in the snapshot: the installment cheques own it (treasury.bank_facilities.facility_cheques)
 SNAPSHOT_FIELDS = (
 	"principal",
 	"interest",
@@ -49,9 +60,20 @@ SNAPSHOT_FIELDS = (
 	"paid_principal",
 	"paid_interest",
 	"status",
+	"payment_voucher_type",
 	"payment_journal",
 	"repayment",
 )
+
+
+def _live_cheques(drawdown_name: str) -> dict:
+	from treasury.bank_facilities import facility_cheques
+
+	return facility_cheques.live_cheques(drawdown_name)
+
+
+def is_cheque_repayment(repayment) -> bool:
+	return repayment.get("settlement") == SETTLED_BY_CHEQUE
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +130,8 @@ def allocate(drawdown, repayment) -> frappe._dict:
 	principal = flt(repayment.principal_paid, precision)
 	interest = flt(repayment.interest_paid, precision)
 	date = getdate(repayment.repayment_date)
+	validate_disbursed_principal(drawdown, principal)
+	live = _live_cheques(drawdown.name)
 	rows = sorted(
 		(r for r in drawdown.repayment_schedule if not r.is_prepayment),
 		key=lambda r: (getdate(r.due_date), cint(r.installment_no)),
@@ -129,9 +153,16 @@ def allocate(drawdown, repayment) -> frappe._dict:
 					repayment.installment_no, frappe.bold(drawdown.name)
 				)
 			)
+		cheque = live.get(row.name)
+		if cheque and not (is_cheque_repayment(repayment) and repayment.get("pdc_cheque") == cheque.name):
+			frappe.throw(
+				_("Installment {0} is settled by cheque {1}.").format(row.installment_no, frappe.bold(cheque.name))
+			)
 		interest = take(row, "interest", interest, unpaid_interest(row))
 		principal = take(row, "principal", principal, unpaid_principal(row))
 	else:
+		# I1: an installment with a live cheque is paid by that cheque only
+		rows = [r for r in rows if r.name not in live]
 		for row in rows:
 			interest = take(row, "interest", interest, unpaid_interest(row))
 		for row in rows:
@@ -154,6 +185,16 @@ def allocate(drawdown, repayment) -> frappe._dict:
 				).format(principal)
 			)
 		prepayment = principal
+		with_cheques = sorted(
+			(r for r in drawdown.repayment_schedule if r.name in live and getdate(r.due_date) > date),
+			key=lambda r: cint(r.installment_no),
+		)
+		if with_cheques:
+			frappe.throw(
+				_(
+					"Installments {0} are settled by cheques: cancel or replace those cheques before a prepayment."
+				).format(", ".join(str(r.installment_no) for r in with_cheques))
+			)
 		# the installments this repayment pays something on are not rescheduled
 		reschedulable = sum(
 			flt(r.principal) for r in reschedulable_rows(drawdown, date) if r.name not in allocations
@@ -168,18 +209,38 @@ def allocate(drawdown, repayment) -> frappe._dict:
 
 
 def reschedulable_rows(drawdown, date) -> list:
-	"""Untouched installments (nothing paid) due after `date`, in date order."""
+	"""Untouched installments (nothing paid, no live installment cheque) due after `date`, in date order."""
+	live = _live_cheques(drawdown.name)
 	return sorted(
 		(
 			r
 			for r in drawdown.repayment_schedule
 			if not r.is_prepayment
+			and r.name not in live
 			and getdate(r.due_date) > getdate(date)
 			and not flt(r.paid_principal)
 			and not flt(r.paid_interest)
 		),
 		key=lambda r: getdate(r.due_date),
 	)
+
+
+def validate_disbursed_principal(drawdown, principal: float):
+	"""Istisna'a: the principal repaid cannot exceed what was disbursed and is still outstanding (the ledger:
+	the stages disbursed less the principal already repaid)."""
+	if drawdown.limit_type != ISTISNA or flt(principal) <= 0:
+		return
+	from treasury.bank_facilities.utilisation import get_drawdown_outstanding
+
+	precision = drawdown.precision("amount")
+	source = {"name": drawdown.name, "liability_account": drawdown.liability_account}
+	outstanding = flt(get_drawdown_outstanding([source]).get(drawdown.name), precision)
+	if flt(principal, precision) > outstanding:
+		frappe.throw(
+			_("The principal paid {0} exceeds the disbursed principal outstanding {1}.").format(
+				flt(principal, precision), outstanding
+			)
+		)
 
 
 # ---------------------------------------------------------------------------
@@ -194,9 +255,11 @@ def snapshot(drawdown) -> str:
 	)
 
 
-def apply_repayment(drawdown, repayment, journal: str):
-	"""Record the allocation of a submitted repayment on the schedule rows (and the prepayment reschedule)."""
+def apply_repayment(drawdown, repayment, voucher: tuple[str, str]):
+	"""Record the allocation of a submitted repayment on the schedule rows (and the prepayment reschedule).
+	`voucher`: (doctype, name) of the repayment's voucher (Payment Entry or Journal Entry)."""
 	precision = drawdown.precision("amount")
+	voucher_type, voucher_no = voucher
 	rows = {r.name: r for r in drawdown.repayment_schedule}
 	for allocation in repayment.allocations:
 		row = rows.get(allocation.schedule_row)
@@ -204,7 +267,7 @@ def apply_repayment(drawdown, repayment, journal: str):
 			frappe.throw(_("Schedule row {0} no longer exists.").format(allocation.schedule_row))
 		row.paid_principal = flt(flt(row.paid_principal) + flt(allocation.principal), precision)
 		row.paid_interest = flt(flt(row.paid_interest) + flt(allocation.interest), precision)
-		row.payment_journal = journal
+		row.payment_voucher_type, row.payment_journal = voucher_type, voucher_no
 		row.repayment = repayment.name
 	if flt(repayment.prepayment_amount):
 		reschedule(drawdown, repayment.repayment_date, flt(repayment.prepayment_amount))
@@ -219,7 +282,8 @@ def apply_repayment(drawdown, repayment, journal: str):
 				"paid_principal": flt(repayment.prepayment_amount),
 				"paid_interest": 0,
 				"is_prepayment": 1,
-				"payment_journal": journal,
+				"payment_voucher_type": voucher_type,
+				"payment_journal": voucher_no,
 				"repayment": repayment.name,
 			},
 		)
@@ -267,14 +331,16 @@ def next_submission_seq(drawdown_name: str) -> int:
 
 
 def check_no_later_repayment(drawdown_name: str, repayment):
-	"""Only the last submitted repayment of a drawdown (highest submission number) may be cancelled."""
+	"""Only the last submitted repayment of a drawdown (highest submission number) may be cancelled; the
+	cheque repayments do not count (they are undone by delta, I3)."""
 	later = frappe.get_all(
-		"Facility Repayment",
+		REPAYMENT,
 		filters={
 			"drawdown": drawdown_name,
 			"docstatus": 1,
 			"name": ["!=", repayment.name],
 			"submission_seq": [">", cint(repayment.submission_seq)],
+			"settlement": ["!=", SETTLED_BY_CHEQUE],
 		},
 		pluck="name",
 	)
@@ -287,21 +353,111 @@ def check_no_later_repayment(drawdown_name: str, repayment):
 		)
 
 
-def undo_repayment(drawdown, repayment):
-	"""Restore the schedule rows as they were before the repayment (its snapshot)."""
+def check_can_cancel(drawdown, repayment):
+	"""I3: a cheque repayment may be cancelled at any time (by its cheque); any other only when it is the last
+	submitted non-cheque repayment of the drawdown."""
+	if is_cheque_repayment(repayment):
+		return
 	check_no_later_repayment(drawdown.name, repayment)
-	saved = {r["name"]: r for r in json.loads(repayment.schedule_snapshot or "[]")}
-	for row in list(drawdown.repayment_schedule):
-		if row.is_prepayment and row.repayment == repayment.name:
-			frappe.db.delete(SCHEDULE, {"name": row.name})
-			drawdown.repayment_schedule.remove(row)
-			continue
-		if row.name in saved:
-			for fieldname in SNAPSHOT_FIELDS:
-				row.set(fieldname, saved[row.name].get(fieldname))
+
+
+def undo_repayment(drawdown, repayment):
+	"""Undo a cancelled repayment on the schedule: a cheque repayment by subtracting its allocations (delta),
+	any other by restoring its snapshot, except on the rows a live cheque or a submitted cheque repayment owns
+	(those only lose this repayment's own allocations)."""
+	if is_cheque_repayment(repayment):
+		_undo_delta(drawdown, repayment, [a.schedule_row for a in repayment.allocations])
+	else:
+		check_no_later_repayment(drawdown.name, repayment)
+		owned = set(_live_cheques(drawdown.name)) | _rows_paid_by_cheques(drawdown.name, repayment.name)
+		saved = {r["name"]: r for r in json.loads(repayment.schedule_snapshot or "[]")}
+		for row in list(drawdown.repayment_schedule):
+			if row.is_prepayment and row.repayment == repayment.name:
+				frappe.db.delete(SCHEDULE, {"name": row.name})
+				drawdown.repayment_schedule.remove(row)
+				continue
+			if row.name in saved and row.name not in owned:
+				for fieldname in SNAPSHOT_FIELDS:
+					row.set(fieldname, saved[row.name].get(fieldname))
+		_undo_delta(drawdown, repayment, [r for r in owned if r in saved])
 	_save_rows(drawdown)
 	_bump_schedule_version(drawdown.name)
 	refresh_repayment_status(drawdown.name)
+
+
+def _undo_delta(drawdown, repayment, row_names: list[str]):
+	"""Subtract the repayment's allocations from `row_names`; their last repayment / voucher become those of the
+	latest other submitted repayment allocated to them (or none)."""
+	precision = drawdown.precision("amount")
+	rows = {r.name: r for r in drawdown.repayment_schedule}
+	wanted = set(row_names)
+	for allocation in repayment.allocations:
+		row = rows.get(allocation.schedule_row)
+		if not row or row.name not in wanted:
+			continue
+		row.paid_principal = flt(max(flt(row.paid_principal) - flt(allocation.principal), 0), precision)
+		row.paid_interest = flt(max(flt(row.paid_interest) - flt(allocation.interest), 0), precision)
+	latest = _latest_other_repayments(list(wanted), repayment.name)
+	for name in wanted:
+		row = rows.get(name)
+		if not row or row.repayment != repayment.name:
+			continue
+		other = latest.get(name)
+		row.repayment = other.name if other else None
+		row.payment_voucher_type = other.voucher_type if other else None
+		row.payment_journal = other.voucher_no if other else None
+
+
+def _latest_other_repayments(row_names: list[str], exclude: str) -> dict[str, frappe._dict]:
+	"""{schedule row: {name, voucher_type, voucher_no}} of the latest submitted repayment (other than
+	`exclude`) allocated to each row."""
+	if not row_names:
+		return {}
+	allocation = frappe.qb.DocType("Facility Repayment Allocation")
+	parent = frappe.qb.DocType(REPAYMENT)
+	rows = (
+		frappe.qb.from_(allocation)
+		.join(parent)
+		.on(parent.name == allocation.parent)
+		.select(allocation.schedule_row, parent.name, parent.payment_entry, parent.journal_entry)
+		.where(
+			(allocation.parenttype == REPAYMENT)
+			& (allocation.schedule_row.isin(row_names))
+			& (parent.docstatus == 1)
+			& (parent.name != exclude)
+		)
+		.orderby(parent.submission_seq)
+	).run(as_dict=True)
+	latest = {}
+	for row in rows:
+		if row.payment_entry:
+			voucher = ("Payment Entry", row.payment_entry)
+		elif row.journal_entry:
+			voucher = ("Journal Entry", row.journal_entry)
+		else:
+			voucher = (None, None)
+		latest[row.schedule_row] = frappe._dict(name=row.name, voucher_type=voucher[0], voucher_no=voucher[1])
+	return latest
+
+
+def _rows_paid_by_cheques(drawdown_name: str, exclude: str) -> set[str]:
+	"""The schedule rows with an allocation of a submitted cheque repayment of the drawdown."""
+	allocation = frappe.qb.DocType("Facility Repayment Allocation")
+	parent = frappe.qb.DocType(REPAYMENT)
+	return set(
+		frappe.qb.from_(allocation)
+		.join(parent)
+		.on(parent.name == allocation.parent)
+		.select(allocation.schedule_row)
+		.where(
+			(allocation.parenttype == REPAYMENT)
+			& (parent.drawdown == drawdown_name)
+			& (parent.docstatus == 1)
+			& (parent.settlement == SETTLED_BY_CHEQUE)
+			& (parent.name != exclude)
+		)
+		.run(pluck=True)
+	)
 
 
 def _save_rows(drawdown):

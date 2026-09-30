@@ -32,6 +32,7 @@ from treasury.tests.utils import (
 	BANK_CHARGE_SETTINGS,
 	COMPANY,
 	DEFAULT_PDC_SETTINGS,
+	FACILITY_JE,
 	OTHER_ABBR,
 	OTHER_BANK,
 	OTHER_COMPANY,
@@ -118,6 +119,7 @@ class TestBankChargesAnalysis(TreasuryTestMixin, IntegrationTestCase):
 			**DEFAULT_PDC_SETTINGS,
 			**TRANSFER_SETTINGS,
 			**BANK_CHARGE_SETTINGS,
+			**FACILITY_JE,  # the 1.0 facility vouchers (Payment Entry mode: test_facility_reports_7g)
 			accrue_facility_interest=0,
 		)
 		cls.set_settings(bounce_charges_account=acc(CHARGES_ACCOUNT), refund_fees_on_return=1)

@@ -18,7 +18,9 @@ SOURCES = {
 		"Letter of Credit",
 		("lc_commission", "lc_amendment_charges", "lc_document_charges"),
 	),
-	"Facility Fees": ("Facility Drawdown", ("facility_upfront_fees",)),
+	# Payment Entry mode (spec 7g §4.2): the fees are a deduction row of the drawdown's own Payment Entry (only its
+	# Expense rows count: the liability row is not a charge)
+	"Facility Fees": ("Facility Drawdown", ("facility_upfront_fees", "facility_drawdown")),
 }
 
 

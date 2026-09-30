@@ -288,13 +288,34 @@ def get_voucher_fields(insert_after: str) -> list[dict]:
 	]
 
 
+def get_other_fields() -> dict[str, list[dict]]:
+	"""Custom fields on other core doctypes (spec 7g §2.8: ERPNext's Invoice Discounting under a facility)."""
+	return {
+		"Invoice Discounting": [
+			{
+				"fieldname": "treasury_facility",
+				"fieldtype": "Link",
+				"options": "Bank Facility",
+				"label": "Bank Facility",
+				"insert_after": "company",
+				"module": TREASURY_MODULE,
+				"description": "Treasury: counts against the facility's Invoice Discounting sub-limit.",
+			}
+		]
+	}
+
+
 def get_custom_fields() -> dict[str, list[dict]]:
-	return {doctype: get_voucher_fields(after) for doctype, after in VOUCHER_INSERT_AFTER.items()}
+	fields = {doctype: get_voucher_fields(after) for doctype, after in VOUCHER_INSERT_AFTER.items()}
+	fields.update(get_other_fields())
+	return fields
 
 
 def custom_fields_to_delete() -> list[tuple[str, str]]:
 	"""(doctype, fieldname) of every custom field `before_uninstall` removes: exactly those `setup` creates."""
-	return [(doctype, fieldname) for doctype in VOUCHER_INSERT_AFTER for fieldname in TREASURY_FIELDNAMES]
+	fields = [(doctype, fieldname) for doctype in VOUCHER_INSERT_AFTER for fieldname in TREASURY_FIELDNAMES]
+	fields += [(doctype, df["fieldname"]) for doctype, dfs in get_other_fields().items() for df in dfs]
+	return fields
 
 
 def delete_custom_fields():
@@ -302,7 +323,7 @@ def delete_custom_fields():
 		name = frappe.db.get_value("Custom Field", {"dt": doctype, "fieldname": fieldname})
 		if name:
 			frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
-	for doctype in VOUCHER_INSERT_AFTER:
+	for doctype in (*VOUCHER_INSERT_AFTER, *get_other_fields()):
 		frappe.clear_cache(doctype=doctype)
 
 

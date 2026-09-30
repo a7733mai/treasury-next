@@ -433,7 +433,68 @@ linked back to the source document, idempotent per source, event and month.
   back and logged once a day, the others go on).
 - **Forecast**: the unpaid part of every installment is an outflow on its due date in the Bank Position
   Forecast (hook `treasury_forecast_sources`); the summary gets an *Available Overdraft* card through the
-  hook `treasury_forecast_summary_sources` (`(filters) -> [{"label", "value"}]`).
+  hook `treasury_forecast_summary_sources` (`(filters) -> [{"label", "value"}]`). An installment with a live
+  installment cheque (see below) is left out: the cheque is the expected outflow.
+
+**Lenders, Islamic products and repayment modes (Qatar facilities and finance companies)**
+
+- **Lender**: a facility's *Lender Type* is Bank (the Bank is required) or Finance Company (the *Lender*
+  Supplier is required, the bank optional; no Overdraft, LG, LC, Trust Receipt or Cheque Discounting
+  sub-limit). The lender of a bank facility is the Bank's Supplier (Treasury Settings → Bank Suppliers),
+  created and stored on the facility on first use. *Lender Name* is shown on the forms and reports. Lender
+  type, lender and the Islamic flag are locked once the facility is activated.
+- **Islamic**: a Murabaha, Tawarruq, Ijarah or Istisna'a sub-limit makes the facility Islamic (*Islamic
+  Facility*): forms, reports and remarks say *Profit* instead of *Interest*. *Late Payment Penalty*: paid to
+  the lender with the installment, or *Payable to Charity*: the repayment's penalty is then not paid through
+  the bank but booked Dr *Late Payment (Charity) Account* / Cr *Charity Payable Account* (its own Journal
+  Entry, cancelled with the repayment).
+- **Voucher** (Treasury Company Settings *Facility Voucher*, default Payment Entry): in the company currency,
+  drawdowns (Receive from the lender: Dr Bank, Dr Fees / Cr Liability), repayments (Pay to the lender: Dr
+  Liability, Dr Interest or Accrued Interest, Dr Penalty / Cr Bank), stage disbursements to the bank and
+  Trust Receipts are **Payment Entries** with the lender as Supplier and the whole amount in deduction rows:
+  no party GL row and no Payment Ledger Entry, the lender's balance is untouched. Foreign currency
+  facilities (deduction rows are booked in the company currency) and the setting *Journal Entry* keep the
+  Journal Entries. Reports read both voucher types.
+- **Ijarah** (finance lease, liability + profit): the rentals are the schedule's installments (principal +
+  profit); *Disburse To* Other Account (e.g. the asset / CWIP account) when the financier pays the supplier
+  directly (Journal Entry Dr that account / Cr Ijarah Liability). Operating Ijarah (rental expense only) is
+  not supported.
+- **Istisna'a** (staged): the drawdown lists its *Disbursement Stages* (adding up to the amount); submit posts
+  only the upfront fees, *Disburse Stage* (Treasury Manager) posts each stage (to the bank or another
+  account). The pending stages count against the sub-limit as a commitment; the principal repaid cannot
+  exceed what was disbursed.
+- **Trust Receipt**: *Settle* on a Letter of Credit with *Finance by Trust Receipt* creates and submits a
+  Trust Receipt drawdown for the settlement less the margin held (bullet, the sub-limit's *Default Tenor* and
+  rate unless given), in the same transaction: a Trust Receipt above the available limit rolls the whole
+  settlement back.
+- **Invoice Discounting**: ERPNext's own Invoice Discounting gets a *Bank Facility* field; its total counts
+  against the facility's *Invoice Discounting* sub-limit while Sanctioned / Disbursed (checked on submit).
+  ERPNext posts its own entries; Treasury posts nothing. Historical utilisation uses the current status.
+- **Repayment Mode** (per drawdown, may change after submit):
+  - *Manual*: the user records the repayments (settled by the bank).
+  - *Auto Debit*: the bank debits each installment. Treasury Company Settings *Auto Debit Posting*: *On Due
+    Date* — the daily job records the repayment of every installment due (on its due date, catching up missed
+    days; never blocked by the low balance guard), and *PDC Bank Clearing* only reconciles the statement line;
+    *On Bank Statement Match* — *PDC Bank Clearing* proposes the open installment for a statement debit of
+    the same amount (Strong: the drawdown or contract number in the description; Weak: near the due date) and
+    records it on the statement date, cleared and reconciled (needs the Facility Repayment submit permission).
+    A debit of another amount (extra charges) is recorded by hand.
+  - *PDC to Lender* (company currency only): *Generate Installment Cheques* prepares a Cheque Batch with one
+    cheque per open installment to the lender, for its unpaid amount, dated its due date. **No double
+    posting**: an installment cheque posts to the party on its cheque date whatever the settings say, and
+    that party posting *is* the repayment — one Payment Entry from PDC Payable (Dr Liability, Dr Interest /
+    Cr PDC Payable) and a Facility Repayment settled by the cheque; the cheque's clearance then moves PDC
+    Payable to the bank. A bounce / return / replacement undoes the repayment (the installment is unpaid
+    again); cancelling or replacing the cheque frees the installment. An installment with a live cheque is
+    paid by that cheque only (Oldest First skips it; no prepayment while later installments have cheques).
+    These cheques are left out of the Projected Party Statement (they settle the facility, not the supplier).
+- **Security cheque to the lender**: *Create → Security Cheque* on the facility prepares an outgoing security
+  cheque (Facility Collateral) to the lender for the total limit, until the facility's expiry, linked to the
+  facility's Security Cheques on save (no accounting).
+- **Reports**: Cost of Financing splits Interest, Profit, Ijarah Rentals (Profit), Commission, Fees,
+  Penalties and Late Payment (Charity) and includes the installment cheques' postings; the utilisation and
+  schedule reports show the lender (filter *Lender Type*), the schedule report the repayment mode, the
+  installment cheque and its status and the payment voucher.
 
 **Letters of Guarantee and Letters of Credit (shared rules)**
 
@@ -797,6 +858,7 @@ amounts of other currencies use today's rate.
 | daily_long | `treasury.pdc.scheduler.send_due_alerts` | digest of the cheques due within the alert days, per company and user, in the user's language |
 | daily_long | `treasury.bank_facilities.scheduler.refresh_facilities` | facility / LG / LC expiry, installment statuses (Overdue), displayed utilisation |
 | daily_long | `treasury.bank_facilities.interest.post_interest_accruals` | month-end interest accruals (when enabled) |
+| daily_long | `treasury.bank_facilities.auto_debit.post_due_auto_debits` | repayments of the Auto Debit installments due (setting *On Due Date*; catches up missed days on their due dates) |
 | daily_long | `treasury.bank_facilities.scheduler.send_facility_alerts` | installments due / overdue, facilities and guarantees expiring |
 | daily | `treasury.security_cheques.scheduler.send_security_expiry_alerts` | security cheques expiring or expired and not returned |
 | hourly | `treasury.balance_alerts.scheduler.run_hourly` | bank position digest (once a day from the digest hour) and critical / warning balance alerts |
@@ -824,9 +886,13 @@ set up, by email, listing only the documents each recipient may read.
 - **Bank Facilities**: a variable rate is informational only (nothing is repriced when the reference rate
   moves); a prepayment reduces the installment, never the tenor, and a Murabaha profit is not recomputed;
   overdraft interest is not accrued (book it from the bank statement) and overdraft utilisation is not
-  covered by the concurrency stamp; import loans are manual (an LC settlement does not create a drawdown);
+  covered by the concurrency stamp; import loans are financed by a Trust Receipt at the LC settlement (the
+  margin held is used first); a settled Letter of Credit (financed or not) cannot be cancelled;
   Sight LCs are not forecast; no print formats for LG / LC / Cheque Discounting (the standard print view
-  applies); discounted cheques are settled by a user action (no daily job).
+  applies); discounted cheques are settled by a user action (no daily job). Phase 7g: Operating Ijarah, a
+  Murabaha profit recomputation, installment cheques to the lender and Payment Entry vouchers of foreign
+  currency facilities, Invoice Discounting charges in Cost of Financing, an auto debit of another amount
+  than the schedule's (record it by hand) and a tenor-reducing prepayment are not supported.
 - **Translations**: Arabic only. The core Arabic wording of many generic financial words is wrong for a
   treasury ("Amount" = quantity, "Issue Date" = the date of a lawsuit, "Total" = total excluding tax ...),
   and a context-less entry in the app would replace it in every ERPNext screen. So the app never translates

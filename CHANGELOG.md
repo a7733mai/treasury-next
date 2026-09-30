@@ -2,6 +2,32 @@
 
 ## Unreleased (1.1)
 
+### Qatar Facilities and Finance Companies (Phase 7g)
+- **Bank Facility**: *Lender Type* (Bank / Finance Company), *Lender* (Supplier; a bank's is created on first
+  use), *Lender Name*, *Islamic Facility* (Profit wording; set by Murabaha / Tawarruq / Ijarah / Istisna'a
+  sub-limits), late payment penalties paid to the lender or payable to charity (own accounts, charity Journal
+  Entry). New sub-limits **Ijarah**, **Istisna'a**, **Trust Receipt** (*Default Tenor*) and **Invoice
+  Discounting**.
+- **Facility vouchers as Payment Entries** (Treasury Company Settings *Facility Voucher*, default Payment
+  Entry): drawdowns, repayments, stage disbursements and trust receipts in the company currency are Pay /
+  Receive Payment Entries to / from the lender with the whole amount in deductions
+  (`posting.create_deductions_payment`: no party row, no Payment Ledger Entry); foreign currency keeps the
+  Journal Entries. Utilisation, accrued interest and Cost of Financing read both voucher types.
+- **Repayment Mode** per drawdown: Manual, **Auto Debit** (daily job on the due date, or posted from the bank
+  statement in PDC Bank Clearing: *Auto Debit Posting*) and **PDC to Lender** (Generate Installment Cheques:
+  one cheque per installment whose party posting is the repayment, one Payment Entry from PDC Payable; bounce /
+  replace reopen the installment; no double posting).
+- **Istisna'a** stages (*Disburse Stage*, commitment utilisation), **Ijarah** disbursement to another account,
+  **Trust Receipt** created by the LC settlement (*Finance by Trust Receipt*, atomic), ERPNext **Invoice
+  Discounting** counted against the facility (custom field `treasury_facility`, doc events).
+- *Create → Security Cheque* on a facility (collateral cheque to the lender, linked to the facility).
+- Reports: Cost of Financing categories (Interest, Profit, Ijarah Rentals, Commission, Fees, Penalties, Late
+  Payment (Charity)) with the installment cheques; lender columns and the *Lender Type* filter; schedule report
+  repayment mode, installment cheque, cheque status and payment voucher. Forecast: no double count of an
+  installment and its cheque; installment cheques left out of the Projected Party Statement.
+- Patch `set_facility_defaults` (the schedule's `payment_journal` becomes a Dynamic Link on
+  `payment_voucher_type`).
+
 ### Cheque Leaves, Cheque Printing and Security Reports (Phase 7f)
 - **Cheque Leaf Register** (every leaf of the outgoing books with its status, usage, party, dates, Payment
   Entries; view Leaves / Books) on a read-only leaf engine (`treasury.pdc.cheque_leaves`); print format

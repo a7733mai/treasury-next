@@ -144,7 +144,8 @@ def customer(data):
 
 
 def supplier(data):
-	return _party("Supplier", data, extra={"Letter of Credit": "supplier"})
+	# the facilities of a lender (spec 7g §3.12): its `lender` Supplier
+	return _party("Supplier", data, extra={"Letter of Credit": "supplier", "Bank Facility": "lender"})
 
 
 def employee(data):

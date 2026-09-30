@@ -3,7 +3,7 @@
  "allow_rename": 0,
  "autoname": "naming_series:",
  "creation": "2026-09-29 18:00:00.000000",
- "description": "A drawing under a Bank Facility (loan, Murabaha, Tawarruq ...): the principal credited to the bank account, its repayment schedule and fees.",
+ "description": "A drawing under a Bank Facility (loan, Murabaha, Tawarruq, Ijarah, Istisna'a, Trust Receipt ...): the principal credited to the bank account, its repayment schedule and fees.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -11,6 +11,9 @@
   "facility",
   "company",
   "bank",
+  "lender_type",
+  "lender_name",
+  "is_islamic",
   "limit_type",
   "drawdown_date",
   "column_break_main",
@@ -18,8 +21,12 @@
   "amount",
   "exchange_rate",
   "bank_account",
+  "repayment_mode",
+  "disburse_to",
+  "disbursement_account",
   "liability_account",
   "repayment_status",
+  "letter_of_credit",
   "terms_section",
   "rate_type",
   "interest_rate",
@@ -31,6 +38,11 @@
   "repayment_method",
   "first_repayment_date",
   "grace_months",
+  "ijarah_asset",
+  "ownership_transfer",
+  "stages_section",
+  "disbursement_stages",
+  "disbursed_amount",
   "fees_section",
   "upfront_fees",
   "column_break_fees",
@@ -43,6 +55,7 @@
   "total_payable",
   "accounting_section",
   "journal_entry",
+  "payment_entry",
   "fees_journal_entry",
   "column_break_accounting",
   "last_accrual_date",
@@ -92,11 +105,33 @@
    "read_only": 1
   },
   {
+   "fetch_from": "facility.lender_type",
+   "fieldname": "lender_type",
+   "fieldtype": "Data",
+   "label": "Lender Type",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "facility.lender_name",
+   "fieldname": "lender_name",
+   "fieldtype": "Data",
+   "label": "Lender Name",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "facility.is_islamic",
+   "fieldname": "is_islamic",
+   "fieldtype": "Check",
+   "label": "Islamic Facility",
+   "read_only": 1
+  },
+  {
    "fieldname": "limit_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Limit Type",
-   "options": "Short Term Loan\nLong Term Loan\nMurabaha\nTawarruq\nOther",
+   "options": "Short Term Loan\nLong Term Loan\nMurabaha\nTawarruq\nIjarah\nIstisna'a\nTrust Receipt\nOther",
    "reqd": 1
   },
   {
@@ -146,6 +181,34 @@
    "reqd": 1
   },
   {
+   "allow_on_submit": 1,
+   "default": "Manual",
+   "description": "Auto Debit: the bank debits each installment (Treasury Company Settings: Auto Debit Posting). PDC to Lender: one post-dated cheque per installment (Generate Installment Cheques).",
+   "fieldname": "repayment_mode",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Repayment Mode",
+   "options": "Manual\nAuto Debit\nPDC to Lender",
+   "reqd": 1
+  },
+  {
+   "default": "Bank Account",
+   "depends_on": "eval:['Ijarah',\"Istisna'a\"].includes(doc.limit_type)",
+   "fieldname": "disburse_to",
+   "fieldtype": "Select",
+   "label": "Disburse To",
+   "options": "Bank Account\nOther Account"
+  },
+  {
+   "depends_on": "eval:doc.disburse_to=='Other Account'",
+   "description": "E.g. Capital Work in Progress: the financier pays the supplier / contractor directly.",
+   "fieldname": "disbursement_account",
+   "fieldtype": "Link",
+   "label": "Disbursement Account",
+   "mandatory_depends_on": "eval:doc.disburse_to=='Other Account'",
+   "options": "Account"
+  },
+  {
    "fieldname": "liability_account",
    "fieldtype": "Link",
    "label": "Liability Account",
@@ -161,6 +224,15 @@
    "label": "Repayment Status",
    "no_copy": 1,
    "options": "Open\nRepaid",
+   "read_only": 1
+  },
+  {
+   "description": "Trust Receipt created by the settlement of this Letter of Credit.",
+   "fieldname": "letter_of_credit",
+   "fieldtype": "Link",
+   "label": "Letter of Credit",
+   "no_copy": 1,
+   "options": "Letter of Credit",
    "read_only": 1
   },
   {
@@ -233,6 +305,41 @@
    "fieldtype": "Int",
    "label": "Grace (Months)",
    "non_negative": 1
+  },
+  {
+   "depends_on": "eval:doc.limit_type=='Ijarah'",
+   "fieldname": "ijarah_asset",
+   "fieldtype": "Small Text",
+   "label": "Leased Asset"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.limit_type=='Ijarah'",
+   "fieldname": "ownership_transfer",
+   "fieldtype": "Check",
+   "label": "Ownership Transfers at the End (Ijarah Muntahia Bittamleek)"
+  },
+  {
+   "depends_on": "eval:doc.limit_type==\"Istisna'a\"",
+   "fieldname": "stages_section",
+   "fieldtype": "Section Break",
+   "label": "Disbursement Stages"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The financier pays the Istisna'a in stages (Disburse Stage); the stages add up to the amount.",
+   "fieldname": "disbursement_stages",
+   "fieldtype": "Table",
+   "label": "Disbursement Stages",
+   "options": "Facility Disbursement Stage"
+  },
+  {
+   "fieldname": "disbursed_amount",
+   "fieldtype": "Currency",
+   "label": "Disbursed Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
   },
   {
    "fieldname": "fees_section",
@@ -308,6 +415,14 @@
    "label": "Drawdown Journal Entry",
    "no_copy": 1,
    "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Drawdown Payment Entry",
+   "no_copy": 1,
+   "options": "Payment Entry",
    "read_only": 1
   },
   {

@@ -91,7 +91,19 @@ CYCLE_FIELDS = (
 	"bank_transaction_date",
 	"party_posting_date",
 	"bank_posting_date",
+	"facility_repayment",
 )
+# Outgoing installment cheques to the lender of a Facility Drawdown (spec 7g §3.4) post to the party on their
+# cheque date, whatever the settings say: the party posting is the repayment of the installment (interest of
+# future periods is never expensed at the handover).
+FACILITY_PARTY_MODE = "On Cheque Date"
+
+
+def _facility_cheques():
+	# imported late: the facility services import the PDC modules
+	from treasury.bank_facilities import facility_cheques
+
+	return facility_cheques
 
 
 # ---------------------------------------------------------------------------
@@ -120,8 +132,7 @@ def log_creation(doc):
 
 def after_insert(doc):
 	"""Outgoing cheques in `On Creation` mode are posted to the party as soon as they exist."""
-	settings = posting.get_company_settings(doc.company)
-	if doc.direction != OUTGOING or settings.outgoing_party_posting != "On Creation":
+	if doc.direction != OUTGOING or _party_mode(doc) != "On Creation":
 		return
 	# No `_begin` permission check here: the user's *create* permission on PDC Cheque, checked by
 	# `Document.insert` before this hook runs, is what authorises this posting. Only after it does the
@@ -531,6 +542,8 @@ def replace(name: str, new_cheque_values: dict | str | None = None) -> dict:
 	was_handed_over = doc.operational_status != "Created"
 
 	_undo_postings(doc, date, values.reason)
+	if doc.get("facility_drawdown"):
+		_facility_cheques().on_cheque_released(doc)
 	_log(doc, "Replaced", operational="Replaced", remarks=values.reason, event_date=date)
 	_save(doc)
 
@@ -563,6 +576,8 @@ def cancel_cheque(name: str, reason: str | None = None) -> dict:
 	_log(doc, "Cancelled", operational="Cancelled", remarks=reason)
 	if doc.direction == OUTGOING and doc.cheque_book:
 		record_cancelled_leaf(doc.cheque_book, doc.cheque_no, reason, source=(DOCTYPE, doc.name))
+	if doc.get("facility_drawdown"):
+		_facility_cheques().on_cheque_released(doc)
 	return _save(doc)
 
 
@@ -690,33 +705,38 @@ def _post_party(doc, posting_date):
 	# e.g. the bank chosen at the deposit: its mode of payment, not the one of the bank the cheque had
 	doc.set_accounting_defaults()
 
-	payment_entry = posting.create_payment_entry(
-		source_doctype=DOCTYPE,
-		source_name=doc.name,
-		event=EVENT_PARTY,
-		payment_type="Pay" if outgoing else "Receive",
-		company=doc.company,
-		posting_date=posting_date,
-		party_type=doc.party_type,
-		party=doc.party,
-		amount=doc.amount,
-		bank_account_head=mapping.pdc_payable_account if outgoing else mapping.pdc_receivable_account,
-		reference_no=doc.cheque_no,
-		reference_date=doc.effective_due_date,
-		currency=doc.currency,
-		exchange_rate=doc.exchange_rate,
-		references=[
-			{
-				"reference_doctype": ref.reference_doctype,
-				"reference_name": ref.reference_name,
-				"allocated_amount": ref.allocated_amount,
-			}
-			for ref in doc.references
-		],
-		remarks=_voucher_remarks(doc),
-		cycle=_cycle(doc),
-		details=_details(doc),
-	)
+	if doc.get("facility_drawdown"):
+		# an installment cheque to the lender: its party posting is the repayment of the installment (one
+		# Payment Entry from PDC Payable to the liability / interest accounts, spec 7g §3.4)
+		payment_entry = _facility_cheques().settle_by_cheque(doc, posting_date)
+	else:
+		payment_entry = posting.create_payment_entry(
+			source_doctype=DOCTYPE,
+			source_name=doc.name,
+			event=EVENT_PARTY,
+			payment_type="Pay" if outgoing else "Receive",
+			company=doc.company,
+			posting_date=posting_date,
+			party_type=doc.party_type,
+			party=doc.party,
+			amount=doc.amount,
+			bank_account_head=mapping.pdc_payable_account if outgoing else mapping.pdc_receivable_account,
+			reference_no=doc.cheque_no,
+			reference_date=doc.effective_due_date,
+			currency=doc.currency,
+			exchange_rate=doc.exchange_rate,
+			references=[
+				{
+					"reference_doctype": ref.reference_doctype,
+					"reference_name": ref.reference_name,
+					"allocated_amount": ref.allocated_amount,
+				}
+				for ref in doc.references
+			],
+			remarks=_voucher_remarks(doc),
+			cycle=_cycle(doc),
+			details=cheque_details(doc),
+		)
 	doc.party_payment_entry = payment_entry
 	doc.party_posting_date = getdate(posting_date)
 	_log(
@@ -772,7 +792,7 @@ def _post_under_collection(doc, posting_date):
 			reference_no=doc.cheque_no,
 			reference_date=doc.effective_due_date,
 			remarks=_voucher_remarks(doc),
-			details=_details(doc),
+			details=cheque_details(doc),
 			cycle=_cycle(doc),
 		)
 		doc.under_collection_payment_entry = payment_entry
@@ -918,7 +938,7 @@ def _post_bank_payment_entry(doc, mapping, bank_gl: str, posting_date, exchange_
 		reference_no=doc.cheque_no,
 		reference_date=doc.effective_due_date,
 		remarks=_voucher_remarks(doc),
-		details=_details(doc),
+		details=cheque_details(doc),
 		cycle=_cycle(doc),
 		clearance_date=clearance_date,
 	)
@@ -1051,6 +1071,10 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 	each voucher, not the current settings). Nothing to do if nothing was posted (edge rule)."""
 	if doc.accounting_status in (NOT_POSTED, REVERSED):
 		return
+	if doc.get("facility_drawdown"):
+		# the installment's repayment is cancelled first (its schedule rows and the repayment link the party
+		# Payment Entry, which "Cancel Payment Entry" cancels below): the installment is unpaid again
+		_facility_cheques().on_postings_undone(doc, posting_date, remarks)
 	cancel = _settings(doc).on_bounce == "Cancel Payment Entry"
 	vouchers = [
 		v
@@ -1160,9 +1184,10 @@ def _settlement_voucher(doc) -> str:
 	return _settings(doc).bank_settlement_voucher or PAYMENT_ENTRY_MODE
 
 
-def _details(doc) -> dict:
+def cheque_details(doc) -> dict:
 	"""Accounting details of the cheque's Payment Entries (posting._apply_details): the cheque's own values,
-	else the Mode of Payment / series mapped to its bank and direction, else the company's cost center."""
+	else the Mode of Payment / series mapped to its bank and direction, else the company's cost center (also
+	the details of an installment cheque's repayment Payment Entry, treasury.bank_facilities)."""
 	mode = payment_modes.resolve(doc.company, doc.bank_account, payment_modes.CHEQUE_METHOD[doc.direction])
 	return {
 		"mode_of_payment": doc.get("mode_of_payment") or mode.mode_of_payment,
@@ -1177,6 +1202,10 @@ def _details(doc) -> dict:
 
 
 def _party_mode(doc) -> str:
+	"""The party posting mode of the cheque: the settings of its direction, `On Cheque Date` for an
+	installment cheque to a lender (FACILITY_PARTY_MODE)."""
+	if doc.direction == OUTGOING and doc.get("facility_drawdown"):
+		return FACILITY_PARTY_MODE
 	settings = _settings(doc)
 	return settings.outgoing_party_posting if doc.direction == OUTGOING else settings.incoming_party_posting
 
@@ -1321,7 +1350,9 @@ def _make_replacement(doc, values: frappe._dict, date):
 	if flt(values.exchange_rate):
 		new.exchange_rate = flt(values.exchange_rate)
 	new.replaces = doc.name
-	# keeps `replaces` and the carried batch / security cheque links (lifecycle-only fields) on insert
+	if doc.get("facility_drawdown"):
+		_facility_cheques().copy_to_replacement(doc, new)
+	# keeps `replaces` and the carried batch / security cheque / installment links (lifecycle-only) on insert
 	new.flags.treasury_lifecycle = True
 	for ref in doc.references:
 		new.append(
@@ -1333,6 +1364,8 @@ def _make_replacement(doc, values: frappe._dict, date):
 			},
 		)
 	new.insert()
+	if new.get("facility_drawdown"):
+		_facility_cheques().link_cheque(new)
 	return new
 
 

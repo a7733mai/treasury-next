@@ -50,6 +50,10 @@
   "cycle",
   "references_section",
   "references",
+  "facility_section",
+  "facility_drawdown",
+  "facility_schedule_row",
+  "facility_repayment",
   "accounting_details_section",
   "cost_center",
   "project",
@@ -194,6 +198,40 @@
    "hidden": 1,
    "label": "Cheque Batch Row",
    "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.facility_drawdown",
+   "fieldname": "facility_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Facility"
+  },
+  {
+   "description": "An installment cheque to the lender of this drawdown (PDC to Lender): its party posting is the repayment of the installment.",
+   "fieldname": "facility_drawdown",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Facility Drawdown",
+   "no_copy": 1,
+   "options": "Facility Drawdown",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "facility_schedule_row",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Facility Schedule Row",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "facility_repayment",
+   "fieldtype": "Link",
+   "label": "Facility Repayment",
+   "no_copy": 1,
+   "options": "Facility Repayment",
    "read_only": 1
   },
   {

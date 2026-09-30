@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt, getdate
 
-from treasury.bank_facilities import instruments, lc
+from treasury.bank_facilities import instruments, lc, trust_receipt
 from treasury.bank_facilities.utilisation import refresh_utilisation
 from treasury.utils import voucher_summary
 
@@ -24,6 +24,7 @@ LIFECYCLE_FIELDS = (
 	"unused_amount",
 	"payment_entry",
 	"margin_held",
+	"trust_receipt_drawdown",
 )
 SYSTEM_FIELDS = ("margin_journal", "commission_journal")
 
@@ -84,6 +85,7 @@ class LetterofCredit(Document):
 		supplier: DF.Link
 		supplier_name: DF.Data | None
 		tolerance_percent: DF.Percent
+		trust_receipt_drawdown: DF.Link | None
 		unused_amount: DF.Currency
 		usance_days: DF.Int
 		vouchers_html: DF.HTML | None
@@ -94,6 +96,11 @@ class LetterofCredit(Document):
 	def onload(self):
 		if not self.is_new():
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
+		if self.facility:
+			# the settle dialog offers "Finance by Trust Receipt" (spec 7g §3.9)
+			limit = trust_receipt.get_limit(self.facility)
+			self.set_onload("has_trust_receipt_limit", bool(limit))
+			self.set_onload("trust_receipt_tenor", limit.default_tenor_months if limit else 0)
 
 	def insert(self, *args, **kwargs):
 		# a new credit starts with an empty log, whatever the client sent (before_insert writes the first row)
@@ -222,7 +229,16 @@ class LetterofCredit(Document):
 
 	@frappe.whitelist(methods=["POST"])
 	def settle(
-		self, settlement_date=None, amount=None, exchange_rate=None, purchase_invoice=None, remarks=None
+		self,
+		settlement_date=None,
+		amount=None,
+		exchange_rate=None,
+		purchase_invoice=None,
+		remarks=None,
+		finance_by_trust_receipt=0,
+		tr_tenor_months=None,
+		tr_first_repayment_date=None,
+		tr_interest_rate=None,
 	):
 		return lc.settle(
 			self.name,
@@ -231,6 +247,10 @@ class LetterofCredit(Document):
 			flt(exchange_rate) or None,
 			purchase_invoice or None,
 			remarks,
+			finance_by_trust_receipt=cint(finance_by_trust_receipt),
+			tr_tenor_months=cint(tr_tenor_months) or None,
+			tr_first_repayment_date=tr_first_repayment_date or None,
+			tr_interest_rate=None if tr_interest_rate in (None, "") else flt(tr_interest_rate),
 		)
 
 	@frappe.whitelist(methods=["POST"])

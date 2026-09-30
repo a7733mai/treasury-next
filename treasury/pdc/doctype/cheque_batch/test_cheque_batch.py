@@ -56,6 +56,8 @@ IGNORE_TEST_RECORD_DEPENDENCIES = [
 	"PDC Cheque",
 	"User",
 	"Print Format",
+	# Phase 7g: installment cheques to a lender
+	"Facility Drawdown",
 	*PHASE_7A_TEST_RECORD_IGNORES,
 ]
 

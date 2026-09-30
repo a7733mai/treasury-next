@@ -178,6 +178,8 @@ def preview_leaves(cheque_book: str, count: int, reserved=()) -> list[str]:
 
 def generate_rows(batch) -> dict:
 	"""Replace the rows of a draft batch by the ones described in its generator section."""
+	if batch.get("facility_drawdown"):
+		_refuse_generator()
 	count = cint(batch.gen_count)
 	if count <= 0:
 		frappe.throw(_("Number of Cheques must be greater than zero."))
@@ -364,6 +366,15 @@ def validate_batch(batch):
 		batch.cheque_book = None
 	header.validate_cheque_book()
 	batch.posting_mode = get_posting_mode(batch.company, batch.direction)
+	if batch.get("facility_drawdown"):
+		# installment cheques to a lender (treasury.bank_facilities.facility_cheques): posted on the cheque date
+		from treasury.bank_facilities import facility_cheques
+
+		facility_cheques.validate_batch(batch)
+		batch.posting_mode = lifecycle.FACILITY_PARTY_MODE
+	else:
+		for row in batch.cheques:
+			row.facility_schedule_row, row.installment_no = None, 0
 	if batch.handover_date and getdate(batch.handover_date) < getdate(batch.issue_date):
 		frappe.throw(_("The Handover / Receipt Date cannot be before the Issue Date."))
 	if not batch.cheques:
@@ -739,8 +750,15 @@ def _insert_cheque(batch, row):
 		cheque.append("references", _reference(row))
 	cheque.cheque_batch = batch.name
 	cheque.cheque_batch_row = row.name
-	cheque.flags.treasury_cheque_batch = True  # keeps the (insert-only) batch link fields
+	if batch.get("facility_drawdown"):
+		cheque.facility_drawdown = batch.facility_drawdown
+		cheque.facility_schedule_row = row.facility_schedule_row
+	cheque.flags.treasury_cheque_batch = True  # keeps the (insert-only) batch / installment link fields
 	cheque.insert()  # the user's own create permission (check_can_create_cheques)
+	if cheque.facility_drawdown:
+		from treasury.bank_facilities import facility_cheques
+
+		facility_cheques.link_cheque(cheque)
 	return cheque
 
 
@@ -982,6 +1000,14 @@ def current_status(batch) -> str:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _refuse_generator():
+	frappe.throw(
+		_(
+			"Generate Cheques is not available for installment cheques; use Generate Installment Cheques on the drawdown."
+		)
+	)
 
 
 def _uses_cheque_book(batch) -> bool:

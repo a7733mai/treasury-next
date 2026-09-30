@@ -26,7 +26,10 @@ SOURCES = {
 	"Customer": (lifecycle.INCOMING, "Other", "Customer", None),
 	"Supplier": (lifecycle.INCOMING, "Other", "Supplier", None),
 	"Employee": (lifecycle.INCOMING, "Employee Custody", "Employee", None),
+	# spec 7g §3.11: our cheque to the lender as facility collateral
+	"Bank Facility": (lifecycle.OUTGOING, "Facility Collateral", "Supplier", "lender"),
 }
+FACILITY = "Bank Facility"
 QUOTATIONS = ("Quotation", "Supplier Quotation")
 # The bond kind and its Treasury Company Settings % of the source's grand total: tender bonds go with a bid
 # (quotations), performance bonds with a contract (orders).
@@ -79,7 +82,9 @@ def _make_security_cheque(source_doctype: str, source_name: str, company: str | 
 
 	if direction == lifecycle.OUTGOING:
 		if has_settings:
-			doc.bank_account = sd.default_cheque_bank(company, direction, company_currency)
+			doc.bank_account = _facility_bank(source) or sd.default_cheque_bank(
+				company, direction, company_currency
+			)
 			doc.cheque_book = sd.default_cheque_book(company, doc.bank_account)
 		doc.currency = sd.bank_currency(doc.bank_account) or company_currency
 	else:
@@ -87,7 +92,9 @@ def _make_security_cheque(source_doctype: str, source_name: str, company: str | 
 		doc.currency = doc.currency or company_currency
 
 	bond = None
-	if source_doctype not in sd.PARTY_MASTERS:
+	if source_doctype == FACILITY:
+		_set_facility_values(doc, source)
+	elif source_doctype not in sd.PARTY_MASTERS:
 		doc.reference_doctype, doc.reference_name = source_doctype, source_name
 		kind = TENDER_BOND if source_doctype in QUOTATIONS else PERFORMANCE_BOND
 		bond = _set_amount(doc, source, kind, flt(settings.get(BOND_PERCENT_FIELDS[kind])), company_currency)
@@ -108,12 +115,40 @@ def _remarks(kind: str, source_doctype: str, source_name: str, bond: dict | None
 	return _("Performance bond for {0} {1}").format(_(source_doctype), source_name)
 
 
+def _facility_bank(source) -> str | None:
+	"""A facility's collateral cheque is drawn on its Default Bank Account when that is in its currency."""
+	if source.doctype != FACILITY or not source.get("default_bank_account"):
+		return None
+	if sd.bank_currency(source.default_bank_account) != source.currency:
+		return None
+	return source.default_bank_account
+
+
+def _set_facility_values(doc, source):
+	"""Facility collateral (spec 7g §3.11): the whole limit (in the facility currency only), until the facility
+	expires, referencing the facility."""
+	if source.status in ("Draft", "Closed"):
+		frappe.throw(
+			_("{0} {1} is {2}.").format(_(FACILITY), frappe.bold(source.name), _(source.status, context=FACILITY))
+		)
+	if doc.currency == source.currency:
+		doc.amount = doc.required_amount = flt(source.total_limit)
+	doc.expiry_date = getdate(source.expiry_date)
+	doc.reference_doctype, doc.reference_name = FACILITY, source.name
+	doc.remarks = _("Security cheque for Bank Facility {0}").format(source.name)
+
+
 def _set_party(doc, source):
-	"""The party of the source; a quotation to a Lead / Prospect: party "Other" with the customer name."""
+	"""The party of the source; a quotation to a Lead / Prospect: party "Other" with the customer name; a
+	facility without a lender Supplier yet: party "Other" with the lender's name."""
 	_direction, _purpose, party_type, party_field = SOURCES[source.doctype]
 	if source.doctype == "Quotation" and source.get("quotation_to") != "Customer":
 		doc.party_type = lifecycle.OTHER
 		doc.party_name_other = source.get("customer_name") or source.get("party_name")
+		return
+	if source.doctype == FACILITY and not source.get("lender"):
+		doc.party_type = lifecycle.OTHER
+		doc.party_name_other = source.get("lender_name") or source.get("bank")
 		return
 	doc.party_type = party_type
 	doc.party = source.get(party_field) if party_field else source.name

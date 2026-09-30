@@ -15,6 +15,7 @@ from treasury.accounting import posting
 from treasury.bank_facilities import interest, scheduler
 from treasury.tests.utils import (
 	COMPANY,
+	FACILITY_JE,
 	TreasuryTestMixin,
 	assert_gl_entries,
 	ensure_facility_accounts,
@@ -52,7 +53,8 @@ class FacilityJobTestCase(TreasuryTestMixin, IntegrationTestCase):
 
 	def setUp(self):
 		super().setUp()
-		self.use_company_settings(accrue_facility_interest=1)
+		# the 1.0 Journal Entry vouchers (the Payment Entry mode: test_facility_payment_entries)
+		self.use_company_settings(accrue_facility_interest=1, **FACILITY_JE)
 
 
 class TestInterestAccrual(FacilityJobTestCase):

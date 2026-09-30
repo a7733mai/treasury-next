@@ -17,6 +17,10 @@
   "currency",
   "exchange_rate",
   "bank_account",
+  "settlement",
+  "pdc_cheque",
+  "cheque_cycle",
+  "bank_transaction",
   "total_paid",
   "amounts_section",
   "allocation_mode",
@@ -28,6 +32,7 @@
   "prepayment_amount",
   "penalty",
   "penalty_account",
+  "penalty_treatment",
   "allocation_section",
   "allocations",
   "accounting_section",
@@ -35,6 +40,8 @@
   "interest_expensed",
   "column_break_accounting",
   "journal_entry",
+  "payment_entry",
+  "charity_journal_entry",
   "submission_seq",
   "schedule_snapshot",
   "vouchers_section",
@@ -128,6 +135,42 @@
    "reqd": 1
   },
   {
+   "default": "Bank",
+   "description": "Bank: entered by a user. Auto Debit: debited by the bank (daily job or bank statement). PDC Cheque: the party posting of an installment cheque to the lender.",
+   "fieldname": "settlement",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Settled By",
+   "options": "Bank\nAuto Debit\nPDC Cheque",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.settlement=='PDC Cheque'",
+   "fieldname": "pdc_cheque",
+   "fieldtype": "Link",
+   "label": "Installment Cheque",
+   "no_copy": 1,
+   "options": "PDC Cheque",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cheque_cycle",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Cheque Cycle",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.bank_transaction",
+   "fieldname": "bank_transaction",
+   "fieldtype": "Link",
+   "label": "Bank Transaction",
+   "no_copy": 1,
+   "options": "Bank Transaction",
+   "read_only": 1
+  },
+  {
    "bold": 1,
    "fieldname": "total_paid",
    "fieldtype": "Currency",
@@ -207,6 +250,15 @@
    "options": "Account"
   },
   {
+   "depends_on": "eval:doc.penalty",
+   "description": "From the facility's Late Payment Penalty setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank).",
+   "fieldname": "penalty_treatment",
+   "fieldtype": "Select",
+   "label": "Penalty Treatment",
+   "options": "Paid to Lender\nPayable to Charity",
+   "read_only": 1
+  },
+  {
    "fieldname": "allocation_section",
    "fieldtype": "Section Break",
    "label": "Allocation to Installments"
@@ -251,6 +303,22 @@
    "fieldname": "journal_entry",
    "fieldtype": "Link",
    "label": "Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "no_copy": 1,
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "charity_journal_entry",
+   "fieldtype": "Link",
+   "label": "Charity Journal Entry",
    "no_copy": 1,
    "options": "Journal Entry",
    "read_only": 1

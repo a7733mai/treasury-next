@@ -185,6 +185,14 @@ doc_events = {
 		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
 		"on_trash": "treasury.overrides.voucher_guard.on_trash",
 	},
+	# ERPNext's Invoice Discounting under a Bank Facility (custom field `treasury_facility`): its limit check and
+	# the facility's utilisation (treasury.bank_facilities.invoice_discounting)
+	"Invoice Discounting": {
+		"validate": "treasury.bank_facilities.invoice_discounting.validate",
+		"before_submit": "treasury.bank_facilities.invoice_discounting.before_submit",
+		"on_submit": "treasury.bank_facilities.invoice_discounting.refresh",
+		"on_cancel": "treasury.bank_facilities.invoice_discounting.refresh",
+	},
 }
 
 # Scheduled Tasks
@@ -206,6 +214,8 @@ scheduler_events = {
 		"treasury.pdc.scheduler.send_due_alerts",
 		"treasury.bank_facilities.scheduler.refresh_facilities",
 		"treasury.bank_facilities.interest.post_interest_accruals",
+		# Auto Debit installments on their due dates (catches up missed days on their own dates)
+		"treasury.bank_facilities.auto_debit.post_due_auto_debits",
 		"treasury.bank_facilities.scheduler.send_facility_alerts",
 		# Bank Transfers whose execution date has come (catches up missed days on their own dates)
 		"treasury.bank_transfers.scheduler.post_scheduled_transfers",
@@ -229,11 +239,14 @@ treasury_forecast_summary_sources = [
 ]
 
 # Utilisation of Bank Facility sub-limits from other documents (Letters of Guarantee / Credit, Cheque
-# Discounting); see treasury.bank_facilities.utilisation.
+# Discounting, the pending stages of an Istisna'a, ERPNext's Invoice Discounting); see
+# treasury.bank_facilities.utilisation.
 treasury_facility_utilisation_sources = [
 	"treasury.bank_facilities.lg.get_lg_utilisation",
 	"treasury.bank_facilities.lc.get_lc_utilisation",
 	"treasury.bank_facilities.discounting.get_discounting_utilisation",
+	"treasury.bank_facilities.istisna.get_commitment_utilisation",
+	"treasury.bank_facilities.invoice_discounting.get_invoice_discounting_utilisation",
 ]
 
 # scheduler_events = {

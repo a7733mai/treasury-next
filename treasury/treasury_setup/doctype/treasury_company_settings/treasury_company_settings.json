@@ -65,7 +65,10 @@
   "tender_bond_percent",
   "performance_bond_percent",
   "facilities_section",
-  "accrue_facility_interest"
+  "accrue_facility_interest",
+  "column_break_facilities",
+  "facility_voucher",
+  "auto_debit_posting"
  ],
  "fields": [
   {
@@ -464,6 +467,28 @@
    "fieldname": "accrue_facility_interest",
    "fieldtype": "Check",
    "label": "Accrue Facility Interest Monthly"
+  },
+  {
+   "fieldname": "column_break_facilities",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Payment Entry",
+   "description": "Payment Entry: drawdowns and repayments in the company currency are Payment Entries with the lender as Supplier (the whole amount in deductions, the supplier balance is not affected). Foreign currency facilities always use Journal Entries.",
+   "fieldname": "facility_voucher",
+   "fieldtype": "Select",
+   "label": "Facility Voucher",
+   "options": "Payment Entry\nJournal Entry",
+   "reqd": 1
+  },
+  {
+   "default": "On Due Date",
+   "description": "Auto Debit drawdowns: the daily job posts each installment on its due date, or the installment is posted when matched with the bank statement line in PDC Bank Clearing.",
+   "fieldname": "auto_debit_posting",
+   "fieldtype": "Select",
+   "label": "Auto Debit Posting",
+   "options": "On Due Date\nOn Bank Statement Match",
+   "reqd": 1
   }
  ],
  "links": [],

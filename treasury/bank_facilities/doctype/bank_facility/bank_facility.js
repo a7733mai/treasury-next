@@ -19,6 +19,9 @@ frappe.ui.form.on("Bank Facility", {
 		frm.set_query("interest_expense_account", () => account_query("Expense", frm.company_currency));
 		frm.set_query("commission_expense_account", () => account_query("Expense", frm.company_currency));
 		frm.set_query("accrued_interest_account", () => account_query("Liability", frm.doc.currency));
+		frm.set_query("late_payment_charity_account", () => account_query("Expense", frm.company_currency));
+		frm.set_query("charity_payable_account", () => account_query("Liability", frm.company_currency));
+		frm.set_query("lender", () => ({ filters: { disabled: 0 } }));
 		frm.set_query("liability_account", "limits", () => account_query("Liability", frm.doc.currency));
 		frm.set_query("security_cheque", "security_cheques", () => ({
 			filters: { company: frm.doc.company },
@@ -65,9 +68,17 @@ frappe.ui.form.on("Bank Facility", {
 	lock_fields(frm) {
 		// mirrors BankFacility.validate_locked_fields: key terms move through Renew only once activated
 		const locked = !frm.is_new() && frm.doc.status !== "Draft";
-		["company", "bank", "currency", "total_limit", "start_date", "expiry_date"].forEach((fieldname) =>
-			frm.set_df_property(fieldname, "read_only", locked ? 1 : 0)
-		);
+		[
+			"company",
+			"bank",
+			"currency",
+			"total_limit",
+			"start_date",
+			"expiry_date",
+			"lender_type",
+			"lender",
+			"is_islamic",
+		].forEach((fieldname) => frm.set_df_property(fieldname, "read_only", locked ? 1 : 0));
 	},
 
 	translate_logs(frm) {
@@ -107,6 +118,38 @@ frappe.ui.form.on("Bank Facility", {
 			frm.add_custom_button(
 				__("Facility Drawdown"),
 				() => frappe.new_doc("Facility Drawdown", { facility: frm.doc.name }),
+				__("Create")
+			);
+		}
+		if (!["Draft", "Closed"].includes(status) && frappe.model.can_create("Security Cheque")) {
+			// our cheque to the lender as collateral (the 7c mapper pattern)
+			frm.add_custom_button(
+				__("Security Cheque"),
+				() =>
+					frappe
+						.xcall("treasury.security_cheques.api.make_security_cheque", {
+							source_doctype: frm.doc.doctype,
+							source_name: frm.doc.name,
+						})
+						.then((doc) => {
+							const synced = frappe.model.sync(doc)[0];
+							frappe.set_route("Form", synced.doctype, synced.name);
+						}),
+				__("Create")
+			);
+		}
+		if (
+			status === "Active" &&
+			(frm.doc.limits || []).some((row) => row.limit_type === "Invoice Discounting") &&
+			frappe.model.can_create("Invoice Discounting")
+		) {
+			frm.add_custom_button(
+				__("Invoice Discounting"),
+				() =>
+					frappe.new_doc("Invoice Discounting", {
+						company: frm.doc.company,
+						treasury_facility: frm.doc.name,
+					}),
 				__("Create")
 			);
 		}

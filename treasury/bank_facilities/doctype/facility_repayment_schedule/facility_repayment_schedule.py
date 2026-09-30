@@ -23,7 +23,9 @@ class FacilityRepaymentSchedule(Document):
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data
-		payment_journal: DF.Link | None
+		payment_journal: DF.DynamicLink | None
+		payment_voucher_type: DF.Link | None
+		pdc_cheque: DF.Link | None
 		principal: DF.Currency
 		repayment: DF.Link | None
 		status: DF.Literal["Pending", "Partially Paid", "Paid", "Overdue"]

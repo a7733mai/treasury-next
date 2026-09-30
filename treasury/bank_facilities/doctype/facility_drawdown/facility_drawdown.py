@@ -6,10 +6,10 @@ import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, fmt_money, formatdate, getdate
+from frappe.utils import cint, flt, fmt_money, formatdate, getdate
 
 from treasury.accounting import posting
-from treasury.bank_facilities import accounting, schedule
+from treasury.bank_facilities import accounting, lenders, schedule
 from treasury.bank_facilities.facility import ACTIVE
 from treasury.bank_facilities.repayment import refresh_repayment_status
 from treasury.bank_facilities.utilisation import (
@@ -21,10 +21,31 @@ from treasury.bank_facilities.utilisation import (
 from treasury.utils import voucher_summary
 
 FACILITY = "Bank Facility"
-# Filled by the posting / accrual services; never taken from the client.
-SYSTEM_FIELDS = ("journal_entry", "fees_journal_entry", "last_accrual_date", "schedule_version")
-# Written by the repayments only.
-PAYMENT_FIELDS = ("paid_principal", "paid_interest", "payment_journal", "repayment")
+IJARAH, ISTISNA, TRUST_RECEIPT = "Ijarah", "Istisna'a", "Trust Receipt"
+MANUAL, AUTO_DEBIT, PDC_TO_LENDER = "Manual", "Auto Debit", "PDC to Lender"
+REPAYMENT_MODES = (MANUAL, AUTO_DEBIT, PDC_TO_LENDER)
+STAGE_PENDING, STAGE_DISBURSED = "Pending", "Disbursed"
+# Filled by the posting / accrual / stage services; never taken from the client.
+SYSTEM_FIELDS = (
+	"journal_entry",
+	"fees_journal_entry",
+	"payment_entry",
+	"disbursed_amount",
+	"last_accrual_date",
+	"schedule_version",
+)
+# Written by the repayments (and the installment cheques, spec 7g §3.4) only.
+PAYMENT_FIELDS = (
+	"paid_principal",
+	"paid_interest",
+	"payment_voucher_type",
+	"payment_journal",
+	"repayment",
+	"pdc_cheque",
+)
+# Written by `treasury.bank_facilities.istisna.disburse_stage` only.
+STAGE_SYSTEM_FIELDS = ("status", "disbursed_on", "voucher_type", "voucher_no")
+STAGE_FIELDS = ("stage_date", "amount", "description")
 # The terms the repayment schedule is built from: changing one requires a new schedule.
 TERM_FIELDS = (
 	"amount",
@@ -51,6 +72,9 @@ class FacilityDrawdown(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		from treasury.bank_facilities.doctype.facility_disbursement_stage.facility_disbursement_stage import (
+			FacilityDisbursementStage,
+		)
 		from treasury.bank_facilities.doctype.facility_repayment_schedule.facility_repayment_schedule import (
 			FacilityRepaymentSchedule,
 		)
@@ -62,6 +86,10 @@ class FacilityDrawdown(Document):
 		company: DF.Link | None
 		currency: DF.Link | None
 		day_count: DF.Literal["Actual/365", "Actual/360"]
+		disburse_to: DF.Literal["Bank Account", "Other Account"]
+		disbursed_amount: DF.Currency
+		disbursement_account: DF.Link | None
+		disbursement_stages: DF.Table[FacilityDisbursementStage]
 		drawdown_date: DF.Date
 		exchange_rate: DF.Float
 		facility: DF.Link
@@ -69,17 +97,34 @@ class FacilityDrawdown(Document):
 		fees_journal_entry: DF.Link | None
 		first_repayment_date: DF.Date | None
 		grace_months: DF.Int
+		ijarah_asset: DF.SmallText | None
 		interest_rate: DF.Percent
+		is_islamic: DF.Check
 		journal_entry: DF.Link | None
 		last_accrual_date: DF.Date | None
+		lender_name: DF.Data | None
+		lender_type: DF.Data | None
+		letter_of_credit: DF.Link | None
 		liability_account: DF.Link | None
-		limit_type: DF.Literal["Short Term Loan", "Long Term Loan", "Murabaha", "Tawarruq", "Other"]
+		limit_type: DF.Literal[
+			"Short Term Loan",
+			"Long Term Loan",
+			"Murabaha",
+			"Tawarruq",
+			"Ijarah",
+			"Istisna'a",
+			"Trust Receipt",
+			"Other",
+		]
 		naming_series: DF.Literal["FDD-.YYYY.-.#####"]
+		ownership_transfer: DF.Check
+		payment_entry: DF.Link | None
 		profit_amount: DF.Currency
 		rate_type: DF.Literal["Fixed", "Variable (reference + margin)"]
 		remarks: DF.SmallText | None
 		repayment_frequency: DF.Literal["Monthly", "Quarterly", "Semi-Annually", "Annually", "Bullet"]
 		repayment_method: DF.Literal["Equal Principal", "Equal Installment (annuity)", "Bullet"]
+		repayment_mode: DF.Literal["Manual", "Auto Debit", "PDC to Lender"]
 		repayment_schedule: DF.Table[FacilityRepaymentSchedule]
 		repayment_status: DF.Literal["Open", "Repaid"]
 		schedule_version: DF.Int
@@ -107,6 +152,8 @@ class FacilityDrawdown(Document):
 	def onload(self):
 		if not self.is_new():
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
+		# "Profit" / "Rental" wording of an Islamic facility (design 7g, the form relabels its fields)
+		self.set_onload("terms", lenders.terms(cint(self.is_islamic)))
 		if self.docstatus == 1:
 			outstanding = get_drawdown_outstanding(
 				[{"name": self.name, "liability_account": self.liability_account}]
@@ -121,16 +168,22 @@ class FacilityDrawdown(Document):
 				self.set(fieldname, None)
 			self.schedule_version = 0
 			self.repayment_status = "Open"
+			if not self.flags.treasury_trust_receipt:
+				# set only by the settlement of a Letter of Credit (treasury.bank_facilities.trust_receipt)
+				self.letter_of_credit = None
 		self.set_facility_details()
 		self.set_terms_defaults()
 		self.validate_bank_account()
 		self.set_exchange_rate()
 		self.validate_amounts()
 		self.validate_fees_account()
+		self.validate_disbursement()
+		self.validate_repayment_mode()
 		if not self.repayment_schedule:
 			self.make_schedule()
 		self.validate_schedule_matches_terms()
 		self.validate_schedule()
+		self.validate_stages()
 
 	def resets_system_fields(self) -> bool:
 		"""Draft saves and the submit itself: the submitted document comes from the client too."""
@@ -163,11 +216,64 @@ class FacilityDrawdown(Document):
 			)
 
 	def on_submit(self):
-		journal, fees_journal = accounting.post_drawdown(self)
-		self.db_set({"journal_entry": journal, "fees_journal_entry": fees_journal})
+		if self.limit_type == ISTISNA:
+			# the principal is disbursed stage by stage (Disburse Stage); only the upfront fees now
+			self.db_set("fees_journal_entry", accounting.post_fees(self))
+		else:
+			vouchers = accounting.post_drawdown(self)
+			self.db_set(
+				{
+					"journal_entry": vouchers.journal_entry,
+					"fees_journal_entry": vouchers.fees_journal_entry,
+					"payment_entry": vouchers.payment_entry,
+				}
+			)
 		refresh_utilisation(self.facility)
 
+	def before_update_after_submit(self):
+		"""Only the Repayment Mode changes after submit (the stage rows' status and vouchers change through
+		Disburse Stage only). The values the services write directly (schedule rows, voucher links, statuses)
+		are taken from the database, whatever the client sent."""
+		from treasury.bank_facilities import facility_cheques
+
+		stored = frappe.get_doc(self.doctype, self.name)
+		for fieldname in (*SYSTEM_FIELDS, "repayment_status"):
+			self.set(fieldname, stored.get(fieldname))
+		self.set("repayment_schedule", stored.repayment_schedule)
+		self.validate_stage_rows_unchanged(stored)
+		self.validate_repayment_mode()
+		if stored.repayment_mode == PDC_TO_LENDER and self.repayment_mode != PDC_TO_LENDER:
+			live = facility_cheques.live_cheques(self.name)
+			if live:
+				frappe.throw(
+					_("Drawdown {0} has installment cheques in use ({1}); cancel or replace them first.").format(
+						frappe.bold(self.name), ", ".join(sorted(c.name for c in live.values()))
+					),
+					title=_("Not Allowed"),
+				)
+
+	def validate_stage_rows_unchanged(self, stored):
+		rows = {row.name: row for row in self.disbursement_stages}
+		changed = len(rows) != len(stored.disbursement_stages)
+		for old in stored.disbursement_stages:
+			new = rows.get(old.name)
+			if not new:
+				changed = True
+				break
+			if (
+				getdate(new.stage_date) != getdate(old.stage_date)
+				or flt(new.amount, 2) != flt(old.amount, 2)
+				or (new.description or None) != (old.description or None)
+			):
+				changed = True
+			for fieldname in STAGE_SYSTEM_FIELDS:
+				new.set(fieldname, old.get(fieldname))
+		if changed:
+			frappe.throw(_("Disbursement stages can only change through Disburse Stage."), title=_("Not Allowed"))
+
 	def before_cancel(self):
+		from treasury.bank_facilities import facility_cheques
+
 		repayments = frappe.get_all(
 			"Facility Repayment", filters={"drawdown": self.name, "docstatus": 1}, pluck="name"
 		)
@@ -178,9 +284,17 @@ class FacilityDrawdown(Document):
 				),
 				title=_("Not Allowed"),
 			)
+		live = facility_cheques.live_cheques(self.name)
+		if live:
+			frappe.throw(
+				_("Drawdown {0} has installment cheques in use ({1}); cancel or replace them first.").format(
+					frappe.bold(self.name), ", ".join(sorted(c.name for c in live.values()))
+				),
+				title=_("Not Allowed"),
+			)
 
 	def on_cancel(self):
-		# the drawdown, fees and accrual Journal Entries (before Frappe's check for submitted back links)
+		# the drawdown, fees, stage and accrual vouchers (before Frappe's check for submitted back links)
 		accounting.cancel_vouchers(self.doctype, self.name)
 		refresh_utilisation(self.facility)
 
@@ -189,6 +303,8 @@ class FacilityDrawdown(Document):
 	def set_facility_details(self):
 		facility = self.facility_doc
 		self.company, self.bank, self.currency = facility.company, facility.bank, facility.currency
+		self.lender_type, self.lender_name = facility.lender_type, facility.lender_name
+		self.is_islamic = cint(facility.is_islamic)
 		if self.limit_type not in LOAN_TYPES:
 			frappe.throw(
 				_("Limit Type must be one of: {0}.").format(
@@ -279,6 +395,78 @@ class FacilityDrawdown(Document):
 			frappe.throw(
 				_("Fees Account {0} must be a ledger Expense account of {1} in {2}.").format(
 					frappe.bold(self.fees_account), frappe.bold(self.company), company_currency
+				)
+			)
+
+	def validate_disbursement(self):
+		"""Ijarah / Istisna'a may be disbursed to another account (the financier pays the supplier or the
+		contractor directly, e.g. Capital Work in Progress); every other drawdown is credited to the bank."""
+		if self.limit_type not in (IJARAH, ISTISNA) or not self.disburse_to:
+			self.disburse_to = accounting.DISBURSE_TO_BANK
+		if self.disburse_to != accounting.DISBURSE_TO_OTHER:
+			self.disbursement_account = None
+			return
+		if not self.disbursement_account:
+			frappe.throw(_("Disbursement Account is required when disbursing to another account."))
+		details = frappe.db.get_value(
+			"Account",
+			self.disbursement_account,
+			["company", "is_group", "account_type", "account_currency"],
+			as_dict=True,
+		)
+		if (
+			not details
+			or details.company != self.company
+			or details.is_group
+			or details.account_type in ("Payable", "Receivable")
+			or details.account_currency != self.currency
+			or self.disbursement_account == self.liability_account
+		):
+			frappe.throw(
+				_("Disbursement Account {0} must be a ledger account of {1} in {2}, not a party account.").format(
+					frappe.bold(self.disbursement_account), frappe.bold(self.company), self.currency
+				)
+			)
+
+	def validate_repayment_mode(self):
+		self.repayment_mode = self.repayment_mode or MANUAL
+		if self.repayment_mode not in REPAYMENT_MODES:
+			frappe.throw(
+				_("Repayment Mode must be one of: {0}.").format(
+					", ".join(_(m, context=self.doctype) for m in REPAYMENT_MODES)
+				)
+			)
+		company_currency = erpnext.get_company_currency(self.company)
+		if self.repayment_mode == PDC_TO_LENDER and self.currency != company_currency:
+			frappe.throw(
+				_("Installment cheques to the lender are only supported in the company currency {0}.").format(
+					company_currency
+				)
+			)
+
+	def validate_stages(self):
+		"""The disbursement stages of an Istisna'a: on or after the drawdown date, adding up to the amount."""
+		if self.limit_type != ISTISNA:
+			self.set("disbursement_stages", [])
+			return
+		if not self.disbursement_stages:
+			frappe.throw(_("Add the disbursement stages of the Istisna'a."))
+		precision = self.precision("amount")
+		total = 0.0
+		for row in self.disbursement_stages:
+			row.amount = flt(row.amount, precision)
+			if row.amount <= 0:
+				frappe.throw(_("Row #{0}: Amount must be greater than zero.").format(row.idx))
+			if not row.stage_date or getdate(row.stage_date) < getdate(self.drawdown_date):
+				frappe.throw(_("Row #{0}: the Stage Date cannot be before the Drawdown Date.").format(row.idx))
+			if self.resets_system_fields():
+				row.status = STAGE_PENDING
+				row.disbursed_on = row.voucher_type = row.voucher_no = None
+			total = flt(total + row.amount, precision)
+		if total != flt(self.amount, precision):
+			frappe.throw(
+				_("The disbursement stages ({0}) must add up to the drawdown amount ({1}).").format(
+					fmt_money(total, currency=self.currency), fmt_money(self.amount, currency=self.currency)
 				)
 			)
 
@@ -416,6 +604,22 @@ class FacilityDrawdown(Document):
 		# stored payments and today's date (what the daily job does); no user input is written.
 		self.check_permission("read")
 		refresh_repayment_status(self.name)
+
+	@frappe.whitelist(methods=["POST"])
+	def make_installment_cheques(self):
+		"""An unsaved Cheque Batch of one cheque per open installment to the lender (PDC to Lender)."""
+		from treasury.bank_facilities import facility_cheques
+
+		return facility_cheques.make_installment_batch(self.name)
+
+	@frappe.whitelist(methods=["POST"])
+	def disburse_stage(self, stage=None, disbursement_date=None, exchange_rate=None, remarks=None):
+		"""Disburse one stage of an Istisna'a (treasury.bank_facilities.istisna)."""
+		from treasury.bank_facilities import istisna
+
+		return istisna.disburse_stage(
+			self.name, stage, disbursement_date or None, flt(exchange_rate) or None, remarks
+		)
 
 
 def _term_value(doc, fieldname: str):

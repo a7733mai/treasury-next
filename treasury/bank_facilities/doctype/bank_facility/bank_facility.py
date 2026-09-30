@@ -9,14 +9,28 @@ from frappe.model.document import Document
 from frappe.utils import flt, getdate
 
 from treasury.bank_facilities import facility as lifecycle
+from treasury.bank_facilities import lenders
 from treasury.bank_facilities.utilisation import LOAN_TYPES, get_utilisation, refresh_utilisation
 from treasury.utils.protected_fields import changed_fields, changed_tables
 
 # Written only by treasury.bank_facilities.facility (flag `treasury_lifecycle`).
 PROTECTED_FIELDS = ("status", "renewal_date")
 PROTECTED_TABLES = ("status_log",)
-# The agreement's key terms: fixed once the facility left Draft (they move through Renew only).
-LOCKED_FIELDS = ("company", "bank", "currency", "total_limit", "start_date", "expiry_date")
+# The agreement's key terms: fixed once the facility left Draft (they move through Renew only). An empty
+# `lender` of a bank facility is the one exception: `lenders.get_lender_supplier` fills it (db write).
+LOCKED_FIELDS = (
+	"company",
+	"bank",
+	"currency",
+	"total_limit",
+	"start_date",
+	"expiry_date",
+	"lender_type",
+	"lender",
+	"is_islamic",
+)
+LATE_PAYMENT_TO_LENDER = "Paid to Lender"
+LATE_PAYMENT_TO_CHARITY = "Payable to Charity"
 # A sub-limit row keeps these once the facility left Draft (new sub-limits may still be added).
 LOCKED_LIMIT_FIELDS = ("limit_type", "limit_amount", "liability_account")
 # Display fields refreshed by treasury.bank_facilities.utilisation (never trusted from the client).
@@ -41,7 +55,8 @@ class BankFacility(Document):
 		)
 
 		accrued_interest_account: DF.Link | None
-		bank: DF.Link
+		bank: DF.Link | None
+		charity_payable_account: DF.Link | None
 		collateral_notes: DF.SmallText | None
 		commission_expense_account: DF.Link | None
 		company: DF.Link
@@ -51,6 +66,12 @@ class BankFacility(Document):
 		expiry_date: DF.Date
 		facility_name: DF.Data
 		interest_expense_account: DF.Link | None
+		is_islamic: DF.Check
+		late_payment_charity_account: DF.Link | None
+		late_payment_mode: DF.Literal["Paid to Lender", "Payable to Charity"]
+		lender: DF.Link | None
+		lender_name: DF.Data | None
+		lender_type: DF.Literal["Bank", "Finance Company"]
 		limits: DF.Table[BankFacilityLimit]
 		naming_series: DF.Literal["BF-.YYYY.-.#####"]
 		renewal_date: DF.Date | None
@@ -78,6 +99,7 @@ class BankFacility(Document):
 	def validate(self):
 		self.validate_protected_fields()
 		self.validate_dates()
+		self.validate_lender()
 		self.validate_limits()
 		self.validate_bank_account()
 		self.validate_accounts()
@@ -126,6 +148,40 @@ class BankFacility(Document):
 	def validate_dates(self):
 		if getdate(self.expiry_date) < getdate(self.start_date):
 			frappe.throw(_("The Expiry Date cannot be before the Start Date."))
+
+	def validate_lender(self):
+		"""The lender (a Supplier; for a bank created on demand, `lenders.get_lender_supplier`), the sub-limit
+		types a finance company may grant, the lender's name and the Islamic flag (spec 7g §2.1)."""
+		self.lender_type = self.lender_type or lenders.BANK
+		if self.lender_type == lenders.FINANCE_COMPANY:
+			if not self.lender:
+				frappe.throw(_("A Finance Company facility needs a Lender (Supplier)."))
+			for row in self.limits:
+				if row.limit_type not in lenders.FINANCE_COMPANY_TYPES:
+					frappe.throw(
+						_("Row #{0}: A finance company facility cannot have a {1} sub-limit.").format(
+							row.idx, _(row.limit_type, context=self.doctype)
+						)
+					)
+		elif not self.bank:
+			frappe.throw(_("Bank is required when the Lender Type is Bank."))
+		if not self.lender and not self.is_new() and self.status != lifecycle.DRAFT:
+			# (locked) filled by `lenders.get_lender_supplier` since the form was loaded
+			self.lender = frappe.db.get_value(self.doctype, self.name, "lender")
+		self.lender_name = None
+		if self.lender:
+			supplier = frappe.db.get_value("Supplier", self.lender, ["supplier_name", "disabled"], as_dict=True)
+			if not supplier:
+				frappe.throw(_("{0} {1} does not exist").format(_("Supplier"), self.lender))
+			if supplier.disabled:
+				frappe.throw(_("Supplier {0} is disabled.").format(frappe.bold(self.lender)))
+			self.lender_name = supplier.supplier_name
+		elif self.bank:
+			self.lender_name = frappe.db.get_value("Bank", self.bank, "bank_name") or self.bank
+		if self.status in (None, "", lifecycle.DRAFT) and any(
+			row.limit_type in lenders.ISLAMIC_TYPES for row in self.limits
+		):
+			self.is_islamic = 1
 
 	def validate_limits(self):
 		precision = self.precision("total_limit")
@@ -186,7 +242,7 @@ class BankFacility(Document):
 					frappe.bold(self.default_bank_account), frappe.bold(self.company)
 				)
 			)
-		if bank_account.bank != self.bank:
+		if self.lender_type == lenders.BANK and bank_account.bank != self.bank:
 			frappe.throw(
 				_("Bank Account {0} is not at bank {1}.").format(
 					frappe.bold(self.default_bank_account), frappe.bold(self.bank)
@@ -223,6 +279,22 @@ class BankFacility(Document):
 						)
 					)
 		self.validate_accrued_interest_account_unchanged()
+		self.validate_late_payment_settings(company_currency)
+
+	def validate_late_payment_settings(self, company_currency: str):
+		"""Late payment penalties (spec 7g §2.1): the charity expense account and, when they are payable to
+		charity, the liability account they are credited to."""
+		self.late_payment_mode = self.late_payment_mode or LATE_PAYMENT_TO_LENDER
+		if self.late_payment_charity_account:
+			label = _(self.meta.get_label("late_payment_charity_account"))
+			self.validate_account(self.late_payment_charity_account, label, "Expense", company_currency)
+		if self.charity_payable_account:
+			label = _(self.meta.get_label("charity_payable_account"))
+			self.validate_account(self.charity_payable_account, label, "Liability", company_currency)
+		if self.late_payment_mode == LATE_PAYMENT_TO_CHARITY and not (
+			self.late_payment_charity_account and self.charity_payable_account
+		):
+			frappe.throw(_("Set the Late Payment (Charity) Account and the Charity Payable Account."))
 
 	def validate_accrued_interest_account_unchanged(self):
 		"""The accrued interest of submitted drawdowns sits on this account (accruals credit it, repayments clear

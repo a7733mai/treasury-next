@@ -61,7 +61,9 @@ def _commit():
 
 
 def _cheque_date_companies() -> dict[str, list[str]]:
-	"""{company: [directions]} of the companies posting to the party on the cheque date."""
+	"""{company: [directions]} of the companies posting to the party on the cheque date; a company with
+	installment cheques to a lender (always `On Cheque Date`, lifecycle.FACILITY_PARTY_MODE) is included with
+	no direction of its own (`_due_cheques` adds those cheques)."""
 	companies = {}
 	for settings in frappe.get_all(
 		"Treasury Company Settings",
@@ -74,29 +76,53 @@ def _cheque_date_companies() -> dict[str, list[str]]:
 			directions.append(lifecycle.INCOMING)
 		if directions:
 			companies[settings.company] = directions
+	for company in frappe.get_all(
+		DOCTYPE,
+		filters={"facility_drawdown": ["is", "set"], "accounting_status": lifecycle.NOT_POSTED},
+		pluck="company",
+		distinct=True,
+	):
+		companies.setdefault(company, [])
 	return companies
 
 
 def _due_cheques(company: str, directions: list[str], as_of) -> list[str]:
 	"""Not posted cheques of `company` due up to `as_of`, oldest due date first (so the posting order
-	follows the calendar). Cheques without a bank account cannot be posted and are left to the user."""
-	names = []
+	follows the calendar). Cheques without a bank account cannot be posted and are left to the user.
+	Installment cheques to a lender are due whatever the company's outgoing party posting mode."""
+	base = {
+		"company": company,
+		"accounting_status": lifecycle.NOT_POSTED,
+		"effective_due_date": ["<=", as_of],
+		"bank_account": ["is", "set"],
+	}
+	rows = {}
 	for direction in directions:
-		names += frappe.get_all(
+		for row in frappe.get_all(
 			DOCTYPE,
 			filters={
-				"company": company,
+				**base,
 				"direction": direction,
-				"accounting_status": lifecycle.NOT_POSTED,
 				"operational_status": ["in", POSTABLE_STATUSES[direction]],
-				"effective_due_date": ["<=", as_of],
-				"bank_account": ["is", "set"],
 			},
-			fields=["name", "effective_due_date"],
+			fields=["name", "effective_due_date", "creation"],
 			order_by="effective_due_date asc, creation asc",
-		)
-	names.sort(key=lambda d: getdate(d.effective_due_date))
-	return [d.name for d in names]
+		):
+			rows[row.name] = row
+	for row in frappe.get_all(
+		DOCTYPE,
+		filters={
+			**base,
+			"direction": lifecycle.OUTGOING,
+			"facility_drawdown": ["is", "set"],
+			"operational_status": ["in", POSTABLE_STATUSES[lifecycle.OUTGOING]],
+		},
+		fields=["name", "effective_due_date", "creation"],
+		order_by="effective_due_date asc, creation asc",
+	):
+		rows[row.name] = row
+	ordered = sorted(rows.values(), key=lambda d: getdate(d.effective_due_date))
+	return [d.name for d in ordered]
 
 
 def _post_one(name: str) -> bool:

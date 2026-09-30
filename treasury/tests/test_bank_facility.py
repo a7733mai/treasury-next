@@ -16,6 +16,7 @@ from treasury.bank_facilities import facility as lifecycle
 from treasury.bank_facilities.repayment import lock_drawdown, refresh_repayment_status, row_status
 from treasury.bank_facilities.utilisation import get_utilisation
 from treasury.tests.utils import (
+	FACILITY_JE,
 	TreasuryTestMixin,
 	assert_gl_entries,
 	bank_account_name,
@@ -61,7 +62,8 @@ class FacilityTestCase(TreasuryTestMixin, IntegrationTestCase):
 
 	def setUp(self):
 		super().setUp()
-		self.use_company_settings(accrue_facility_interest=0)
+		# the 1.0 Journal Entry vouchers (the Payment Entry mode: test_facility_payment_entries)
+		self.use_company_settings(accrue_facility_interest=0, **FACILITY_JE)
 
 
 # ---------------------------------------------------------------------------
@@ -387,8 +389,10 @@ class TestFacilityDrawdown(FacilityTestCase):
 		self.assertEqual(frappe.db.get_value("Bank Facility", facility.name, "total_utilised"), 100000)
 
 		# idempotent
+		vouchers = accounting.post_drawdown(drawdown)
 		self.assertEqual(
-			accounting.post_drawdown(drawdown), (drawdown.journal_entry, drawdown.fees_journal_entry)
+			(vouchers.journal_entry, vouchers.fees_journal_entry, vouchers.payment_entry),
+			(drawdown.journal_entry, drawdown.fees_journal_entry, None),
 		)
 		self.assertEqual(get_voucher_count("Facility Drawdown", drawdown.name), 2)
 
@@ -610,7 +614,9 @@ class TestFacilityRepayment(FacilityTestCase):
 		self.assertEqual(first.payment_journal, repayment.journal_entry)
 		self.assertEqual(get_utilisation(facility.name).utilised, 110000)
 		# idempotent
-		self.assertEqual(accounting.post_repayment(repayment, drawdown, facility), repayment.journal_entry)
+		self.assertEqual(
+			accounting.post_repayment(repayment, drawdown, facility), ("Journal Entry", repayment.journal_entry)
+		)
 		self.assertEqual(get_voucher_count("Facility Repayment", repayment.name), 1)
 
 	def test_partial_payment_and_status(self):

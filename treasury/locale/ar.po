@@ -11645,3 +11645,663 @@ msgstr "لا يجوز أن تحتوي عائلة الخط إلا على أسما
 
 msgid "Row #{0}: the reason type {1} is recorded only when a cheque is cancelled."
 msgstr "الصف #{0}: نوع السبب {1} لا يُسجَّل إلا عند إلغاء شيك."
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 7g — Qatar facilities and finance companies: lenders, Islamic products, repayment modes
+# ---------------------------------------------------------------------------------------------------------
+
+# Terms (treasury.bank_facilities.lenders), limit types, options
+msgid "Profit"
+msgstr "الربح"
+
+msgid "Interest"
+msgstr "الفائدة"
+
+msgid "Profit Rate (% p.a.)"
+msgstr "معدل الربح (% سنوياً)"
+
+msgid "Interest Rate (% p.a.)"
+msgstr "سعر الفائدة (% سنوياً)"
+
+msgid "Profit Paid"
+msgstr "الربح المدفوع"
+
+msgid "Interest Paid"
+msgstr "الفائدة المدفوعة"
+
+msgid "Accrued Profit"
+msgstr "الربح المستحق"
+
+msgid "Accrued Interest"
+msgstr "الفائدة المستحقة"
+
+msgid "Profit Expense Account"
+msgstr "حساب مصروف الربح"
+
+msgid "Lender"
+msgstr "الممول"
+
+msgid "Lender Type"
+msgstr "نوع الممول"
+
+msgid "Finance Company"
+msgstr "شركة تمويل"
+
+msgid "Ijarah"
+msgstr "إجارة"
+
+msgid "Istisna'a"
+msgstr "استصناع"
+
+msgid "Trust Receipt"
+msgstr "إيصال أمانة"
+
+msgid "Invoice Discounting"
+msgstr "خصم الفواتير"
+
+msgid "Late Payment (Charity)"
+msgstr "غرامة التأخير (تبرع خيري)"
+
+msgid "Ijarah Rentals (Profit)"
+msgstr "أقساط الإجارة (الربح)"
+
+msgid "Rental"
+msgstr "قسط الإجارة"
+
+msgid "Rental {0}"
+msgstr "قسط الإجارة {0}"
+
+msgid "Installment Cheque"
+msgstr "شيك القسط"
+
+msgid "Repayment Mode"
+msgstr "طريقة السداد"
+
+msgid "Payment Voucher"
+msgstr "سند الدفع"
+
+msgid "Unpaid {0}"
+msgstr "{0} غير المدفوع"
+
+msgid "Paid to Lender"
+msgstr "تُدفع للممول"
+
+msgid "Payable to Charity"
+msgstr "مستحقة للأعمال الخيرية"
+
+msgid "PDC to Lender"
+msgstr "شيكات آجلة للممول"
+
+msgid "Other Account"
+msgstr "حساب آخر"
+
+msgid "Facility Disbursement Stage"
+msgstr "مرحلة صرف التسهيل"
+
+msgid "Stage"
+msgstr "المرحلة"
+
+msgctxt "Bank Facility"
+msgid "Finance Company"
+msgstr "شركة تمويل"
+
+msgctxt "Bank Facility"
+msgid "Trust Receipt"
+msgstr "إيصال أمانة"
+
+msgctxt "Bank Facility"
+msgid "Invoice Discounting"
+msgstr "خصم الفواتير"
+
+msgctxt "Bank Facility"
+msgid "Ijarah"
+msgstr "إجارة"
+
+msgctxt "Bank Facility"
+msgid "Istisna'a"
+msgstr "استصناع"
+
+msgctxt "Bank Facility"
+msgid "Paid to Lender"
+msgstr "تُدفع للممول"
+
+msgctxt "Bank Facility"
+msgid "Payable to Charity"
+msgstr "مستحقة للأعمال الخيرية"
+
+msgctxt "Treasury Voucher"
+msgid "Stage Disbursement"
+msgstr "صرف مرحلة"
+
+msgctxt "Treasury Voucher"
+msgid "Late Payment (Charity)"
+msgstr "غرامة التأخير (تبرع خيري)"
+
+# Bank Facility fields
+msgctxt "Bank Facility"
+msgid "Lender Type"
+msgstr "نوع الممول"
+
+msgctxt "Bank Facility"
+msgid "Lender"
+msgstr "الممول"
+
+msgctxt "Bank Facility"
+msgid "Lender Name"
+msgstr "اسم الممول"
+
+msgctxt "Bank Facility"
+msgid "Islamic Facility"
+msgstr "تسهيل إسلامي"
+
+msgctxt "Bank Facility"
+msgid "Late Payment Penalty"
+msgstr "غرامة التأخير"
+
+msgctxt "Bank Facility"
+msgid "Late Payment (Charity) Account"
+msgstr "حساب غرامة التأخير (تبرع خيري)"
+
+msgctxt "Bank Facility"
+msgid "Charity Payable Account"
+msgstr "حساب الأعمال الخيرية المستحقة"
+
+msgid "A credit facility agreement with a bank or a finance company: total limit, sub-limits per type (overdraft, loans, LG, LC, trust receipts, discounting, Murabaha / Tawarruq / Ijarah / Istisna'a), rates, dates and collateral."
+msgstr "اتفاقية تسهيل ائتماني مع بنك أو شركة تمويل: الحد الإجمالي والحدود الفرعية حسب النوع (سحب على المكشوف، قروض، خطابات ضمان، اعتمادات مستندية، إيصالات أمانة، خصم، مرابحة / تورق / إجارة / استصناع) والأسعار والتواريخ والضمانات."
+
+msgid "The financier as a Supplier (e.g. Al Jazeera Finance). For a bank, created from the Bank on first use."
+msgstr "الممول كمورد (مثل الجزيرة للتمويل). للبنك يُنشأ من البنك عند أول استخدام."
+
+msgid "Islamic terms: Profit instead of Interest. Set automatically for Murabaha, Tawarruq, Ijarah and Istisna'a sub-limits."
+msgstr "مصطلحات إسلامية: الربح بدلاً من الفائدة. يُضبط تلقائياً للحدود الفرعية للمرابحة والتورق والإجارة والاستصناع."
+
+msgid "A late payment penalty of an Islamic facility: paid to the lender with the installment, or booked as payable to charity (not paid through the bank)."
+msgstr "غرامة التأخير في التسهيل الإسلامي: تُدفع للممول مع القسط، أو تُقيَّد مستحقة للأعمال الخيرية (لا تُدفع من البنك)."
+
+msgid "Expense account (company currency) of the late payment penalties; the default Penalty Account of the repayments."
+msgstr "حساب مصروف (بعملة الشركة) لغرامات التأخير؛ وهو حساب الغرامة الافتراضي للسدادات."
+
+msgid "Liability account (company currency, not Payable / Receivable) credited with the penalties payable to charity."
+msgstr "حساب التزام (بعملة الشركة، ليس دائنين / مدينين) يُقيَّد دائناً بالغرامات المستحقة للأعمال الخيرية."
+
+# Bank Facility Limit
+msgctxt "Bank Facility Limit"
+msgid "Default Tenor (Months)"
+msgstr "المدة الافتراضية (بالأشهر)"
+
+msgid "The tenor of a Trust Receipt created by the settlement of a Letter of Credit (may be changed at the settlement)."
+msgstr "مدة إيصال الأمانة الذي تُنشئه تسوية الاعتماد المستندي (يمكن تغييرها عند التسوية)."
+
+msgid "Liability account credited by drawdowns under this limit, in the facility currency. Required for loans, Murabaha, Tawarruq, Ijarah, Istisna'a, Trust Receipt and Other; an Overdraft is used through the facility's bank account."
+msgstr "حساب الالتزام الذي يُقيَّد دائناً بالمسحوبات تحت هذا الحد بعملة التسهيل. مطلوب للقروض والمرابحة والتورق والإجارة والاستصناع وإيصالات الأمانة والأنواع الأخرى، أما السحب على المكشوف فيُستخدم من خلال الحساب البنكي للتسهيل."
+
+# Facility Drawdown fields and options
+msgctxt "Facility Drawdown"
+msgid "Lender Type"
+msgstr "نوع الممول"
+
+msgctxt "Facility Drawdown"
+msgid "Lender Name"
+msgstr "اسم الممول"
+
+msgctxt "Facility Drawdown"
+msgid "Islamic Facility"
+msgstr "تسهيل إسلامي"
+
+msgctxt "Facility Drawdown"
+msgid "Repayment Mode"
+msgstr "طريقة السداد"
+
+msgctxt "Facility Drawdown"
+msgid "Manual"
+msgstr "يدوي"
+
+msgctxt "Facility Drawdown"
+msgid "Auto Debit"
+msgstr "خصم تلقائي"
+
+msgctxt "Facility Drawdown"
+msgid "PDC to Lender"
+msgstr "شيكات آجلة للممول"
+
+msgctxt "Facility Drawdown"
+msgid "Disburse To"
+msgstr "الصرف إلى"
+
+msgctxt "Facility Drawdown"
+msgid "Other Account"
+msgstr "حساب آخر"
+
+msgctxt "Facility Drawdown"
+msgid "Disbursement Account"
+msgstr "حساب الصرف"
+
+msgctxt "Facility Drawdown"
+msgid "Letter of Credit"
+msgstr "الاعتماد المستندي"
+
+msgctxt "Facility Drawdown"
+msgid "Leased Asset"
+msgstr "الأصل المؤجر"
+
+msgctxt "Facility Drawdown"
+msgid "Ownership Transfers at the End (Ijarah Muntahia Bittamleek)"
+msgstr "تنتقل الملكية في النهاية (إجارة منتهية بالتمليك)"
+
+msgctxt "Facility Drawdown"
+msgid "Disbursement Stages"
+msgstr "مراحل الصرف"
+
+msgctxt "Facility Drawdown"
+msgid "Disbursed Amount"
+msgstr "المبلغ المصروف"
+
+msgctxt "Facility Drawdown"
+msgid "Drawdown Payment Entry"
+msgstr "سند الدفع للسحب"
+
+msgctxt "Facility Drawdown"
+msgid "Ijarah"
+msgstr "إجارة"
+
+msgctxt "Facility Drawdown"
+msgid "Istisna'a"
+msgstr "استصناع"
+
+msgctxt "Facility Drawdown"
+msgid "Trust Receipt"
+msgstr "إيصال أمانة"
+
+msgid "A drawing under a Bank Facility (loan, Murabaha, Tawarruq, Ijarah, Istisna'a, Trust Receipt ...): the principal credited to the bank account, its repayment schedule and fees."
+msgstr "سحب بموجب تسهيل بنكي (قرض، مرابحة، تورق، إجارة، استصناع، إيصال أمانة ...): أصل المبلغ المضاف إلى الحساب البنكي وجدول سداده ورسومه."
+
+msgid "Auto Debit: the bank debits each installment (Treasury Company Settings: Auto Debit Posting). PDC to Lender: one post-dated cheque per installment (Generate Installment Cheques)."
+msgstr "خصم تلقائي: يخصم البنك كل قسط (إعدادات الخزينة للشركة: ترحيل الخصم التلقائي). شيكات آجلة للممول: شيك آجل لكل قسط (إنشاء شيكات الأقساط)."
+
+msgid "E.g. Capital Work in Progress: the financier pays the supplier / contractor directly."
+msgstr "مثل المشروعات تحت التنفيذ: يدفع الممول للمورد / المقاول مباشرة."
+
+msgid "The financier pays the Istisna'a in stages (Disburse Stage); the stages add up to the amount."
+msgstr "يدفع الممول الاستصناع على مراحل (صرف مرحلة)؛ ومجموع المراحل يساوي المبلغ."
+
+msgid "Trust Receipt created by the settlement of this Letter of Credit."
+msgstr "إيصال أمانة أنشأته تسوية هذا الاعتماد المستندي."
+
+# Facility Disbursement Stage fields and options
+msgctxt "Facility Disbursement Stage"
+msgid "Stage Date"
+msgstr "تاريخ المرحلة"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Description"
+msgstr "الوصف"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Disbursed On"
+msgstr "تاريخ الصرف"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Voucher Type"
+msgstr "نوع القيد"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Voucher"
+msgstr "القيد"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Pending"
+msgstr "معلقة"
+
+msgctxt "Facility Disbursement Stage"
+msgid "Disbursed"
+msgstr "مصروفة"
+
+# Facility Repayment fields and options
+msgctxt "Facility Repayment"
+msgid "Settled By"
+msgstr "طريقة التسوية"
+
+msgctxt "Facility Repayment"
+msgid "Auto Debit"
+msgstr "خصم تلقائي"
+
+msgctxt "Facility Repayment"
+msgid "PDC Cheque"
+msgstr "شيك آجل"
+
+msgctxt "Facility Repayment"
+msgid "Installment Cheque"
+msgstr "شيك القسط"
+
+msgctxt "Facility Repayment"
+msgid "Cheque Cycle"
+msgstr "دورة الشيك"
+
+msgctxt "Facility Repayment"
+msgid "Bank Transaction"
+msgstr "حركة البنك"
+
+msgctxt "Facility Repayment"
+msgid "Penalty Treatment"
+msgstr "معالجة الغرامة"
+
+msgctxt "Facility Repayment"
+msgid "Paid to Lender"
+msgstr "تُدفع للممول"
+
+msgctxt "Facility Repayment"
+msgid "Payable to Charity"
+msgstr "مستحقة للأعمال الخيرية"
+
+msgctxt "Facility Repayment"
+msgid "Payment Entry"
+msgstr "سند الدفع"
+
+msgctxt "Facility Repayment"
+msgid "Charity Journal Entry"
+msgstr "قيد الأعمال الخيرية"
+
+msgid "Bank: entered by a user. Auto Debit: debited by the bank (daily job or bank statement). PDC Cheque: the party posting of an installment cheque to the lender."
+msgstr "البنك: أدخله مستخدم. خصم تلقائي: خصمه البنك (المهمة اليومية أو كشف البنك). شيك آجل: قيد الطرف لشيك قسط للممول."
+
+msgid "From the facility's Late Payment Penalty setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank)."
+msgstr "من إعداد غرامة التأخير في التسهيل (التسهيلات الإسلامية): تُدفع للممول مع القسط، أو تُستحق للأعمال الخيرية (لا تُدفع من البنك)."
+
+# Facility Repayment Schedule fields
+msgctxt "Facility Repayment Schedule"
+msgid "Payment Voucher Type"
+msgstr "نوع سند الدفع"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Payment Voucher"
+msgstr "سند الدفع"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Installment Cheque"
+msgstr "شيك القسط"
+
+# PDC Cheque, Cheque Batch, Cheque Batch Item, PDC Clearing Match, Letter of Credit
+msgctxt "PDC Cheque"
+msgid "Bank Facility"
+msgstr "التسهيل البنكي"
+
+msgctxt "PDC Cheque"
+msgid "Facility Drawdown"
+msgstr "السحب من التسهيل"
+
+msgctxt "PDC Cheque"
+msgid "Facility Schedule Row"
+msgstr "صف جدول التسهيل"
+
+msgctxt "PDC Cheque"
+msgid "Facility Repayment"
+msgstr "سداد التسهيل"
+
+msgid "An installment cheque to the lender of this drawdown (PDC to Lender): its party posting is the repayment of the installment."
+msgstr "شيك قسط لممول هذا السحب (شيكات آجلة للممول): قيد الطرف الخاص به هو سداد القسط."
+
+msgctxt "Cheque Batch"
+msgid "Facility Drawdown"
+msgstr "السحب من التسهيل"
+
+msgid "Installment cheques to the lender of this drawdown (Generate Installment Cheques): each cheque pays its installment on its due date."
+msgstr "شيكات أقساط لممول هذا السحب (إنشاء شيكات الأقساط): كل شيك يسدد قسطه في تاريخ استحقاقه."
+
+msgctxt "Cheque Batch Item"
+msgid "Installment No"
+msgstr "رقم القسط"
+
+msgctxt "Cheque Batch Item"
+msgid "Facility Schedule Row"
+msgstr "صف جدول التسهيل"
+
+msgctxt "PDC Clearing Match"
+msgid "Facility Drawdown"
+msgstr "السحب من التسهيل"
+
+msgctxt "PDC Clearing Match"
+msgid "Facility Repayment"
+msgstr "سداد التسهيل"
+
+msgctxt "PDC Clearing Match"
+msgid "Installment No"
+msgstr "رقم القسط"
+
+msgid "An auto-debited installment of this drawdown (Repayment Mode Auto Debit)."
+msgstr "قسط مخصوم تلقائياً من هذا السحب (طريقة السداد: خصم تلقائي)."
+
+msgid "The repayment already posted for the installment (reconciled only)."
+msgstr "السداد المرحّل بالفعل للقسط (تتم المطابقة فقط)."
+
+msgctxt "Letter of Credit"
+msgid "Trust Receipt Drawdown"
+msgstr "سحب إيصال الأمانة"
+
+msgid "The bank financed the settlement (less the margin held) by this Trust Receipt."
+msgstr "موّل البنك التسوية (بعد خصم التأمين المحتجز) بإيصال الأمانة هذا."
+
+# Treasury Company Settings
+msgctxt "Treasury Company Settings"
+msgid "Facility Voucher"
+msgstr "قيد التسهيلات"
+
+msgctxt "Treasury Company Settings"
+msgid "Auto Debit Posting"
+msgstr "ترحيل الخصم التلقائي"
+
+msgctxt "Treasury Company Settings"
+msgid "On Due Date"
+msgstr "في تاريخ الاستحقاق"
+
+msgctxt "Treasury Company Settings"
+msgid "On Bank Statement Match"
+msgstr "عند المطابقة مع كشف البنك"
+
+msgid "Payment Entry: drawdowns and repayments in the company currency are Payment Entries with the lender as Supplier (the whole amount in deductions, the supplier balance is not affected). Foreign currency facilities always use Journal Entries."
+msgstr "سند دفع: المسحوبات والسدادات بعملة الشركة تكون سندات دفع والممول هو المورد (المبلغ كله في الخصومات، ولا يتأثر رصيد المورد). التسهيلات بالعملة الأجنبية تستخدم دائماً قيود اليومية."
+
+msgid "Auto Debit drawdowns: the daily job posts each installment on its due date, or the installment is posted when matched with the bank statement line in PDC Bank Clearing."
+msgstr "المسحوبات بالخصم التلقائي: المهمة اليومية ترحّل كل قسط في تاريخ استحقاقه، أو يُرحَّل القسط عند مطابقته مع سطر كشف البنك في تسوية الشيكات البنكية."
+
+# Messages (Bank Facility, lenders)
+msgid "A Finance Company facility needs a Lender (Supplier)."
+msgstr "تسهيل شركة التمويل يحتاج إلى ممول (مورد)."
+
+msgid "Row #{0}: A finance company facility cannot have a {1} sub-limit."
+msgstr "الصف #{0}: لا يمكن أن يكون لتسهيل شركة تمويل حد فرعي من نوع {1}."
+
+msgid "Bank is required when the Lender Type is Bank."
+msgstr "البنك مطلوب عندما يكون نوع الممول بنكاً."
+
+msgid "Set the Late Payment (Charity) Account and the Charity Payable Account."
+msgstr "حدد حساب غرامة التأخير (تبرع خيري) وحساب الأعمال الخيرية المستحقة."
+
+# Messages (drawdowns, stages, repayment modes)
+msgid "Drawdown {0} has installment cheques in use ({1}); cancel or replace them first."
+msgstr "السحب {0} له شيكات أقساط مستخدمة ({1})؛ ألغها أو استبدلها أولاً."
+
+msgid "Disbursement stages can only change through Disburse Stage."
+msgstr "لا يمكن تغيير مراحل الصرف إلا من خلال صرف مرحلة."
+
+msgid "Disbursement Account is required when disbursing to another account."
+msgstr "حساب الصرف مطلوب عند الصرف إلى حساب آخر."
+
+msgid "Disbursement Account {0} must be a ledger account of {1} in {2}, not a party account."
+msgstr "يجب أن يكون حساب الصرف {0} حساب أستاذ للشركة {1} بعملة {2}، وليس حساب طرف."
+
+msgid "Repayment Mode must be one of: {0}."
+msgstr "يجب أن تكون طريقة السداد إحدى: {0}."
+
+msgid "Installment cheques to the lender are only supported in the company currency {0}."
+msgstr "شيكات الأقساط للممول مدعومة بعملة الشركة {0} فقط."
+
+msgid "Add the disbursement stages of the Istisna'a."
+msgstr "أضف مراحل صرف الاستصناع."
+
+msgid "Row #{0}: the Stage Date cannot be before the Drawdown Date."
+msgstr "الصف #{0}: لا يمكن أن يكون تاريخ المرحلة قبل تاريخ السحب."
+
+msgid "The disbursement stages ({0}) must add up to the drawdown amount ({1})."
+msgstr "يجب أن يساوي مجموع مراحل الصرف ({0}) مبلغ السحب ({1})."
+
+msgid "Only a submitted Istisna'a drawdown is disbursed in stages."
+msgstr "لا يُصرف على مراحل إلا سحب استصناع معتمد."
+
+msgid "Stage {0} does not exist on drawdown {1}."
+msgstr "المرحلة {0} غير موجودة في السحب {1}."
+
+msgid "Stage {0} is already disbursed."
+msgstr "المرحلة {0} مصروفة بالفعل."
+
+msgid "Stage {0} disbursed: {1}"
+msgstr "صُرفت المرحلة {0}: {1}"
+
+msgid "Stage {0} of drawdown {1}"
+msgstr "المرحلة {0} من السحب {1}"
+
+msgid "Disbursement of drawdown {0} to {1}"
+msgstr "صرف السحب {0} إلى {1}"
+
+msgid "Profit accrual of drawdown {0} for {1}"
+msgstr "استحقاق ربح السحب {0} عن {1}"
+
+msgid "Late payment of repayment {0}, payable to charity"
+msgstr "غرامة تأخير السداد {0}، مستحقة للأعمال الخيرية"
+
+msgid "Payment Entry deductions must be in the company currency {0}; use a Journal Entry."
+msgstr "يجب أن تكون خصومات سند الدفع بعملة الشركة {0}؛ استخدم قيد يومية."
+
+# Messages (repayments, installment cheques)
+msgid "Repayment {0} is settled by cheque {1}: bounce, replace or cancel the cheque instead."
+msgstr "السداد {0} مسدد بالشيك {1}: اعمل ارتداد للشيك أو استبدله أو ألغه بدلاً من ذلك."
+
+msgid "Installment Cheque is required for a repayment settled by cheque."
+msgstr "شيك القسط مطلوب لسداد يُسوّى بشيك."
+
+msgid "Installment {0} is settled by cheque {1}."
+msgstr "القسط {0} يُسدَّد بالشيك {1}."
+
+msgid "Installments {0} are settled by cheques: cancel or replace those cheques before a prepayment."
+msgstr "الأقساط {0} تُسدَّد بشيكات: ألغِ هذه الشيكات أو استبدلها قبل السداد المبكر."
+
+msgid "The principal paid {0} exceeds the disbursed principal outstanding {1}."
+msgstr "أصل المبلغ المدفوع {0} يتجاوز رصيد الأصل المصروف {1}."
+
+msgid "Drawdown {0} is not repaid by cheques to the lender (Repayment Mode {1})."
+msgstr "السحب {0} لا يُسدَّد بشيكات للممول (طريقة السداد {1})."
+
+msgid "Drawdown {0} has no installment left without a cheque."
+msgstr "لم يتبق في السحب {0} أي قسط بدون شيك."
+
+msgid "Installment cheques of drawdown {0}"
+msgstr "شيكات أقساط السحب {0}"
+
+msgid "Installment {0} of drawdown {1}"
+msgstr "القسط {0} من السحب {1}"
+
+msgid "The installment cheques must be made out to the lender {0}."
+msgstr "يجب أن تكون شيكات الأقساط باسم الممول {0}."
+
+msgid "The installment cheques must be outgoing cheques from Bank Account {0}."
+msgstr "يجب أن تكون شيكات الأقساط شيكات صادرة من الحساب البنكي {0}."
+
+msgid "Generate Cheques is not available for installment cheques; use Generate Installment Cheques on the drawdown."
+msgstr "إنشاء الشيكات غير متاح لشيكات الأقساط؛ استخدم إنشاء شيكات الأقساط من السحب."
+
+msgid "An installment cheque to the lender cannot allocate invoices."
+msgstr "لا يمكن لشيك قسط للممول أن يخصص فواتير."
+
+msgid "Row #{0}: the installment is not an installment of drawdown {1}."
+msgstr "الصف #{0}: هذا القسط ليس من أقساط السحب {1}."
+
+msgid "Row #{0}: installment {1} already has cheque {2}."
+msgstr "الصف #{0}: القسط {1} له الشيك {2} بالفعل."
+
+msgid "Row #{0}: the cheque must be {1} dated {2} (installment {3})."
+msgstr "الصف #{0}: يجب أن يكون الشيك بمبلغ {1} وبتاريخ {2} (القسط {3})."
+
+msgid "Cheque {0} is no longer the cheque of installment {1}."
+msgstr "الشيك {0} لم يعد شيك القسط {1}."
+
+msgid "Cheque {0} ({1}) no longer matches the unpaid installment {2} ({3})."
+msgstr "الشيك {0} ({1}) لم يعد يطابق القسط غير المدفوع {2} ({3})."
+
+msgid "Installment cheque {0} ({1})"
+msgstr "شيك القسط {0} ({1})"
+
+# Messages (auto debit, PDC Bank Clearing)
+msgid "Auto debit of installment {0}"
+msgstr "خصم تلقائي للقسط {0}"
+
+msgid "Facility auto debit failed for drawdown {0}"
+msgstr "فشل الخصم التلقائي للتسهيل للسحب {0}"
+
+msgid "Repayment {0} posted and reconciled"
+msgstr "تم ترحيل السداد {0} ومطابقته"
+
+msgid "You are not permitted to submit Facility Repayments."
+msgstr "غير مسموح لك باعتماد سدادات التسهيلات."
+
+msgid "Facility Drawdown {0} is not repaid by auto debit from Bank Account {1}."
+msgstr "السحب من التسهيل {0} لا يُسدَّد بالخصم التلقائي من الحساب البنكي {1}."
+
+msgid "Repayment {0} is already reconciled or no longer open."
+msgstr "السداد {0} تمت مطابقته بالفعل أو لم يعد مفتوحاً."
+
+msgid "The open amount of Bank Transaction {0} does not match repayment {1}."
+msgstr "المبلغ المفتوح لحركة البنك {0} لا يطابق السداد {1}."
+
+msgid "{0} installment(s) posted."
+msgstr "تم ترحيل {0} قسط."
+
+# Messages (Trust Receipt, Invoice Discounting, security cheque to the lender)
+msgid "The cash margin covers the settlement: nothing to finance by Trust Receipt."
+msgstr "التأمين النقدي يغطي التسوية: لا يوجد ما يُموَّل بإيصال أمانة."
+
+msgid "Bank Facility {0} has no Trust Receipt sub-limit."
+msgstr "التسهيل البنكي {0} ليس له حد فرعي لإيصالات الأمانة."
+
+msgid "Enter the Trust Receipt tenor."
+msgstr "أدخل مدة إيصال الأمانة."
+
+msgid "Trust Receipt of {0} {1}"
+msgstr "إيصال أمانة لـ {0} {1}"
+
+msgid "Cancel the repayments of Trust Receipt {0} first."
+msgstr "ألغِ سدادات إيصال الأمانة {0} أولاً."
+
+msgid "Bank Facility {0} does not belong to company {1}."
+msgstr "التسهيل البنكي {0} لا يتبع الشركة {1}."
+
+msgid "Bank Facility {0} must be in the company currency {1}."
+msgstr "يجب أن يكون التسهيل البنكي {0} بعملة الشركة {1}."
+
+msgid "Bank Facility {0} has no Invoice Discounting sub-limit."
+msgstr "التسهيل البنكي {0} ليس له حد فرعي لخصم الفواتير."
+
+msgid "Security cheque for Bank Facility {0}"
+msgstr "شيك ضمان للتسهيل البنكي {0}"
+
+# Form buttons and dialogs (7g-1 minimal JS)
+msgid "Generate Installment Cheques"
+msgstr "إنشاء شيكات الأقساط"
+
+msgid "Disburse Stage"
+msgstr "صرف مرحلة"
+
+msgid "Settled By: {0}"
+msgstr "طريقة التسوية: {0}"
+
+msgid "Finance by Trust Receipt"
+msgstr "التمويل بإيصال أمانة"
+
+msgid "Default: the rate of the Trust Receipt sub-limit."
+msgstr "الافتراضي: سعر الحد الفرعي لإيصالات الأمانة."

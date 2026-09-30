@@ -19,8 +19,9 @@ Actions (whitelisted methods of the controller; Treasury Manager, write permissi
   references an invoice is forced to the invoice's rate). Both vouchers are cleared on the settlement date
   (the bank statement shows one net debit, amount less margin: see the README). The credit closes: the
   amount not drawn (credit amount less settled amount) is recorded as the Unused Amount and no longer counts
-  against the facility; the margin held was already returned in full. Financing the settlement by the bank
-  (an import loan) is out of scope: settle, then record a Facility Drawdown for the loan.
+  against the facility; the margin held was already returned in full. With "Finance by Trust Receipt" the
+  bank lends the settlement less the margin held: a Trust Receipt drawdown is created and submitted in the same
+  transaction (treasury.bank_facilities.trust_receipt, spec 7g §3.9).
 - Release Margin (Expired): the margin of an expired, unused credit returns to the bank.
 - Expiry (daily job): Opened / Amended credits past their effective expiry date become Expired (no
   accounting). Credits with documents received never expire: they are settled.
@@ -62,6 +63,7 @@ EVENT_MARGIN_RELEASE = "lc_margin_release"
 EVENT_AMENDMENT_CHARGES = "lc_amendment_charges"
 EVENT_DOCUMENT_CHARGES = "lc_document_charges"
 EVENT_SETTLEMENT = "lc_settlement"
+TR_SAVEPOINT = "treasury_lc_trust_receipt"
 
 
 # ---------------------------------------------------------------------------
@@ -102,9 +104,28 @@ def open_credit(doc):
 
 
 def cancel(doc):
+	cancel_trust_receipt(doc)
 	accounting.cancel_vouchers(DOCTYPE, doc.name)
 	doc.open_amount = 0
 	instruments.log_now(doc, "Cancelled", CANCELLED, values={"open_amount": 0})
+
+
+def cancel_trust_receipt(doc):
+	"""The Trust Receipt drawdown of the credit is cancelled first (it has no repayments yet); the credit's
+	cancellation (a Treasury Manager's) authorises it."""
+	name = doc.get("trust_receipt_drawdown")
+	if not name or frappe.db.get_value("Facility Drawdown", name, "docstatus") != 1:
+		return
+	if frappe.db.exists("Facility Repayment", {"drawdown": name, "docstatus": 1}):
+		frappe.throw(
+			_("Cancel the repayments of Trust Receipt {0} first.").format(frappe.bold(name)),
+			title=_("Not Allowed"),
+		)
+	drawdown = frappe.get_doc("Facility Drawdown", name)
+	drawdown.flags.ignore_permissions = True
+	# the credit linking it (`trust_receipt_drawdown`) is the document being cancelled
+	drawdown.flags.ignore_links = True
+	drawdown.cancel()
 
 
 # ---------------------------------------------------------------------------
@@ -272,8 +293,14 @@ def settle(
 	exchange_rate=None,
 	purchase_invoice: str | None = None,
 	remarks=None,
+	finance_by_trust_receipt=0,
+	tr_tenor_months=None,
+	tr_first_repayment_date=None,
+	tr_interest_rate=None,
 ) -> dict:
 	"""Pay the supplier: see the module docstring."""
+	from treasury.bank_facilities import trust_receipt
+
 	doc = instruments.begin(DOCTYPE, name)
 	allowed = (ACCEPTED,) if doc.lc_type == USANCE else (DOCUMENTS_RECEIVED,)
 	instruments.require_status(doc, allowed, SETTLED)
@@ -288,6 +315,38 @@ def settle(
 			)
 		)
 	rate = instruments.event_rate(doc, date, exchange_rate)
+	if not cint(finance_by_trust_receipt):
+		return _settle(doc, date, amount, rate, purchase_invoice, remarks)
+	tr_amount, tr_tenor = trust_receipt.validate_financing(doc, amount, tr_tenor_months)
+	# atomic: a Trust Receipt refused (e.g. above the available limit) undoes the whole settlement
+	frappe.db.savepoint(TR_SAVEPOINT)
+	try:
+		# the credit is closed (open amount 0) before the Trust Receipt is checked against the facility
+		_settle(doc, date, amount, rate, purchase_invoice, remarks)
+		drawdown = trust_receipt.create_from_lc(
+			doc, date, tr_amount, rate, tr_tenor, tr_first_repayment_date or None, tr_interest_rate
+		)
+		vouchers = frappe.db.get_value(
+			"Facility Drawdown", drawdown, ["payment_entry", "journal_entry"], as_dict=True
+		)
+		if vouchers.payment_entry:
+			voucher = ("Payment Entry", vouchers.payment_entry)
+		else:
+			voucher = ("Journal Entry", vouchers.journal_entry)
+		doc.reload()
+		doc.trust_receipt_drawdown = drawdown
+		instruments.log(doc, "Trust Receipt Drawdown", None, date, voucher, drawdown)
+		result = instruments.save(doc)
+	except Exception:
+		frappe.db.rollback(save_point=TR_SAVEPOINT)
+		raise
+	frappe.db.release_savepoint(TR_SAVEPOINT)
+	return {**result, "trust_receipt_drawdown": drawdown}
+
+
+def _settle(doc, date, amount: float, rate: float, purchase_invoice: str | None, remarks) -> dict:
+	"""The margin release, the supplier's Payment Entry and the credit's closing (see `settle`)."""
+	precision = doc.precision("amount")
 	references = _invoice_reference(doc, purchase_invoice, amount, rate)
 
 	margin_journal = None

@@ -126,6 +126,7 @@ frappe.ui.form.on("Letter of Credit", {
 						},
 					}),
 				},
+				...lc_trust_receipt_fields(frm),
 				remarks,
 			]);
 		}
@@ -138,6 +139,38 @@ frappe.ui.form.on("Letter of Credit", {
 		}
 	},
 });
+
+function lc_trust_receipt_fields(frm) {
+	// spec 7g §3.9: the bank finances the settlement less the margin held by a Trust Receipt drawdown
+	const onload = frm.doc.__onload || {};
+	if (!onload.has_trust_receipt_limit) {
+		return [];
+	}
+	const financed = "eval:doc.finance_by_trust_receipt";
+	return [
+		{ fieldname: "finance_by_trust_receipt", label: __("Finance by Trust Receipt"), fieldtype: "Check" },
+		{
+			fieldname: "tr_tenor_months",
+			label: __("Tenor (Months)"),
+			fieldtype: "Int",
+			default: onload.trust_receipt_tenor || 0,
+			depends_on: financed,
+		},
+		{
+			fieldname: "tr_first_repayment_date",
+			label: __("First Repayment Date"),
+			fieldtype: "Date",
+			depends_on: financed,
+		},
+		{
+			fieldname: "tr_interest_rate",
+			label: __("Interest / Profit Rate (% p.a.)"),
+			fieldtype: "Percent",
+			depends_on: financed,
+			description: __("Default: the rate of the Trust Receipt sub-limit."),
+		},
+	];
+}
 
 function lc_setup_queries(frm) {
 	frm.set_query("facility", () => ({ filters: { status: "Active" } }));

@@ -18,6 +18,8 @@ class ChequeBatchItem(Document):
 		cheque_no: DF.Data | None
 		drawer_bank: DF.Data | None
 		due_date: DF.Date
+		facility_schedule_row: DF.Data | None
+		installment_no: DF.Int
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data

@@ -3,15 +3,19 @@
  "allow_rename": 0,
  "autoname": "naming_series:",
  "creation": "2026-09-29 18:00:00.000000",
- "description": "A credit facility agreement with a bank: total limit, sub-limits per type (overdraft, loans, LG, LC, discounting, Murabaha / Tawarruq), rates, dates and collateral.",
+ "description": "A credit facility agreement with a bank or a finance company: total limit, sub-limits per type (overdraft, loans, LG, LC, trust receipts, discounting, Murabaha / Tawarruq / Ijarah / Istisna'a), rates, dates and collateral.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
   "facility_name",
+  "lender_type",
+  "lender",
+  "lender_name",
   "company",
   "bank",
   "contract_no",
+  "is_islamic",
   "column_break_main",
   "status",
   "currency",
@@ -32,6 +36,9 @@
   "column_break_accounts",
   "commission_expense_account",
   "accrued_interest_account",
+  "late_payment_mode",
+  "late_payment_charity_account",
+  "charity_payable_account",
   "collateral_section",
   "collateral_notes",
   "security_cheques",
@@ -58,6 +65,30 @@
    "reqd": 1
   },
   {
+   "default": "Bank",
+   "fieldname": "lender_type",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Lender Type",
+   "options": "Bank\nFinance Company",
+   "reqd": 1
+  },
+  {
+   "description": "The financier as a Supplier (e.g. Al Jazeera Finance). For a bank, created from the Bank on first use.",
+   "fieldname": "lender",
+   "fieldtype": "Link",
+   "label": "Lender",
+   "mandatory_depends_on": "eval:doc.lender_type=='Finance Company'",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "lender_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Lender Name",
+   "read_only": 1
+  },
+  {
    "fieldname": "company",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -69,17 +100,23 @@
   {
    "fieldname": "bank",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Bank",
-   "options": "Bank",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.lender_type=='Bank'",
+   "options": "Bank"
   },
   {
    "fieldname": "contract_no",
    "fieldtype": "Data",
    "in_global_search": 1,
    "label": "Contract No"
+  },
+  {
+   "default": "0",
+   "description": "Islamic terms: Profit instead of Interest. Set automatically for Murabaha, Tawarruq, Ijarah and Istisna'a sub-limits.",
+   "fieldname": "is_islamic",
+   "fieldtype": "Check",
+   "label": "Islamic Facility"
   },
   {
    "fieldname": "column_break_main",
@@ -218,6 +255,32 @@
    "options": "Account"
   },
   {
+   "default": "Paid to Lender",
+   "depends_on": "eval:doc.is_islamic",
+   "description": "A late payment penalty of an Islamic facility: paid to the lender with the installment, or booked as payable to charity (not paid through the bank).",
+   "fieldname": "late_payment_mode",
+   "fieldtype": "Select",
+   "label": "Late Payment Penalty",
+   "options": "Paid to Lender\nPayable to Charity"
+  },
+  {
+   "depends_on": "eval:doc.is_islamic",
+   "description": "Expense account (company currency) of the late payment penalties; the default Penalty Account of the repayments.",
+   "fieldname": "late_payment_charity_account",
+   "fieldtype": "Link",
+   "label": "Late Payment (Charity) Account",
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval:doc.late_payment_mode=='Payable to Charity'",
+   "description": "Liability account (company currency, not Payable / Receivable) credited with the penalties payable to charity.",
+   "fieldname": "charity_payable_account",
+   "fieldtype": "Link",
+   "label": "Charity Payable Account",
+   "mandatory_depends_on": "eval:doc.late_payment_mode=='Payable to Charity'",
+   "options": "Account"
+  },
+  {
    "collapsible": 1,
    "fieldname": "collateral_section",
    "fieldtype": "Section Break",
@@ -304,7 +367,7 @@
    "role": "Accounts User"
   }
  ],
- "search_fields": "facility_name,bank,contract_no",
+ "search_fields": "facility_name,lender_name,contract_no",
  "show_title_field_in_link": 0,
  "sort_field": "creation",
  "sort_order": "DESC",

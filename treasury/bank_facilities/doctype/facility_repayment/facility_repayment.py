@@ -6,11 +6,11 @@ import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, formatdate, getdate
+from frappe.utils import cint, flt, formatdate, getdate
 
 from treasury.accounting import posting
 from treasury.balance_alerts import guard
-from treasury.bank_facilities import accounting, repayment
+from treasury.bank_facilities import accounting, lenders, repayment
 from treasury.bank_facilities.interest import accrued_balance
 from treasury.bank_facilities.utilisation import refresh_utilisation
 from treasury.utils import voucher_summary
@@ -19,12 +19,18 @@ DRAWDOWN = "Facility Drawdown"
 # Computed by the controller / posting service; never taken from the client.
 SYSTEM_FIELDS = (
 	"journal_entry",
+	"payment_entry",
+	"charity_journal_entry",
+	"penalty_treatment",
 	"schedule_snapshot",
 	"prepayment_amount",
 	"accrued_interest_cleared",
 	"interest_expensed",
 	"submission_seq",
 )
+# Set only by the facility services (auto debit, installment cheques: flag `treasury_facility_service`); a
+# repayment entered by a user is always settled by the bank.
+SERVICE_FIELDS = ("settlement", "pdc_cheque", "cheque_cycle", "bank_transaction")
 
 
 class FacilityRepayment(Document):
@@ -47,6 +53,9 @@ class FacilityRepayment(Document):
 		amended_from: DF.Link | None
 		bank: DF.Link | None
 		bank_account: DF.Link
+		bank_transaction: DF.Link | None
+		charity_journal_entry: DF.Link | None
+		cheque_cycle: DF.Int
 		company: DF.Link | None
 		currency: DF.Link | None
 		drawdown: DF.Link
@@ -57,14 +66,18 @@ class FacilityRepayment(Document):
 		interest_paid: DF.Currency
 		journal_entry: DF.Link | None
 		naming_series: DF.Literal["FRP-.YYYY.-.#####"]
+		payment_entry: DF.Link | None
+		pdc_cheque: DF.Link | None
 		penalty: DF.Currency
 		penalty_account: DF.Link | None
+		penalty_treatment: DF.Literal["", "Paid to Lender", "Payable to Charity"]
 		prepayment: DF.Check
 		prepayment_amount: DF.Currency
 		principal_paid: DF.Currency
 		remarks: DF.SmallText | None
 		repayment_date: DF.Date
 		schedule_snapshot: DF.LongText | None
+		settlement: DF.Literal["Bank", "Auto Debit", "PDC Cheque"]
 		submission_seq: DF.Int
 		total_paid: DF.Currency
 		vouchers_html: DF.HTML | None
@@ -77,6 +90,9 @@ class FacilityRepayment(Document):
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 			# design 7e P17: "Submitted with a low-balance override by ..." on the form
 			self.set_onload("low_balance_override", guard.latest_override(self.doctype, self.name))
+		if self.facility:
+			is_islamic = cint(frappe.db.get_value("Bank Facility", self.facility, "is_islamic"))
+			self.set_onload("terms", lenders.terms(is_islamic))
 
 	def validate(self):
 		# on submit too: the submitted document comes from the client (it is recomputed in before_submit)
@@ -84,9 +100,17 @@ class FacilityRepayment(Document):
 			for fieldname in SYSTEM_FIELDS:
 				self.set(fieldname, None)
 			self.submission_seq = 0
+			if not self.flags.treasury_facility_service:
+				self.settlement = accounting.SETTLED_BY_BANK
+				self.pdc_cheque = self.bank_transaction = None
+				self.cheque_cycle = 0
+		self.settlement = self.settlement or accounting.SETTLED_BY_BANK
 		guard.reset_override_flag(self)
 		drawdown = self.get_drawdown()
+		facility = frappe.get_doc("Bank Facility", drawdown.facility)
 		self.set_drawdown_details(drawdown)
+		self.set_penalty_treatment(facility)
+		self.validate_cheque_settlement()
 		self.validate_date(drawdown)
 		self.validate_bank_account()
 		self.set_exchange_rate()
@@ -99,8 +123,10 @@ class FacilityRepayment(Document):
 		guard.check_override_flag(self.allow_low_balance)
 		# serialise the repayments of one drawdown: allocate on the schedule as it is now, under the lock
 		repayment.lock_drawdown(self.drawdown)
-		# low balance guard (pre-state; the drawdown row is locked first); finished in on_submit
-		self.flags.balance_snapshot = guard.begin(self.company, [self.bank_account])
+		# low balance guard (pre-state; the drawdown row is locked first); finished in on_submit. A debit the
+		# bank already made (scheduler, statement) or a cheque's party posting is never blocked.
+		system = bool(self.flags.treasury_system_repayment) or self.is_cheque_settlement()
+		self.flags.balance_snapshot = guard.begin(self.company, [self.bank_account], system=system)
 		drawdown = self.get_drawdown()
 		self.validate_date(drawdown)
 		self.allocate(drawdown)
@@ -110,9 +136,13 @@ class FacilityRepayment(Document):
 	def on_submit(self):
 		drawdown = self.get_drawdown()
 		facility = frappe.get_doc("Bank Facility", drawdown.facility)
-		journal = accounting.post_repayment(self, drawdown, facility)
-		self.db_set("journal_entry", journal)
-		repayment.apply_repayment(drawdown, self, journal)
+		voucher = self.post_voucher(drawdown, facility)
+		values = {"payment_entry" if voucher[0] == "Payment Entry" else "journal_entry": voucher[1]}
+		charity = accounting.post_charity(self, facility)
+		if charity:
+			values["charity_journal_entry"] = charity
+		self.db_set(values)
+		repayment.apply_repayment(drawdown, self, voucher)
 		refresh_utilisation(drawdown.facility)
 		text = guard.finish(
 			self.flags.pop("balance_snapshot", None),
@@ -123,19 +153,50 @@ class FacilityRepayment(Document):
 		if text:
 			self.add_comment("Info", text)
 
+	def post_voucher(self, drawdown, facility) -> tuple[str, str]:
+		"""The repayment's own voucher, or for an installment cheque the cheque's party posting: one Payment
+		Entry from the PDC Payable account, sourced to the cheque (spec 7g §3.4, no double posting)."""
+		if not self.is_cheque_settlement():
+			return accounting.post_repayment(self, drawdown, facility)
+		from treasury.pdc import lifecycle
+
+		cheque = frappe.get_doc("PDC Cheque", self.pdc_cheque)
+		mapping = posting.get_account_mapping(cheque.company, cheque.bank_account)
+		return accounting.post_repayment(
+			self,
+			drawdown,
+			facility,
+			paid_from=mapping.pdc_payable_account,
+			source=("PDC Cheque", cheque.name, lifecycle.EVENT_PARTY, cint(self.cheque_cycle) or 1),
+			details=lifecycle.cheque_details(cheque),
+			reference_no=cheque.cheque_no,
+		)
+
 	def before_cancel(self):
-		# only the last submitted repayment of a drawdown may be cancelled (its schedule snapshot is the current one)
+		if self.is_cheque_settlement() and not self.flags.treasury_facility_service:
+			frappe.throw(
+				_("Repayment {0} is settled by cheque {1}: bounce, replace or cancel the cheque instead.").format(
+					frappe.bold(self.name), frappe.bold(self.pdc_cheque)
+				),
+				frappe.ValidationError,
+				title=_("Not Allowed"),
+			)
+		# the last submitted repayment of a drawdown (its schedule snapshot is the current one), or a cheque's
 		repayment.lock_drawdown(self.drawdown)
-		repayment.check_no_later_repayment(self.drawdown, self)
+		repayment.check_can_cancel(frappe.get_doc(DRAWDOWN, self.drawdown), self)
 
 	def on_cancel(self):
 		drawdown = self.get_drawdown()
-		# restore the schedule first: its rows link to this repayment and to its Journal Entry
+		# restore the schedule first: its rows link to this repayment and to its voucher
 		repayment.undo_repayment(drawdown, self)
+		# its voucher and charity Journal Entry (a cheque repayment has none: the cheque's are undone by the cheque)
 		accounting.cancel_vouchers(self.doctype, self.name)
 		refresh_utilisation(drawdown.facility)
 
 	# ------------------------------------------------------------------ validation
+
+	def is_cheque_settlement(self) -> bool:
+		return self.settlement == accounting.SETTLED_BY_CHEQUE
 
 	def get_drawdown(self):
 		drawdown = frappe.get_doc(DRAWDOWN, self.drawdown)
@@ -149,6 +210,27 @@ class FacilityRepayment(Document):
 		if not self.bank_account:
 			self.bank_account = drawdown.bank_account
 
+	def set_penalty_treatment(self, facility):
+		"""An Islamic facility's late payment penalty goes to the lender or to charity (its setting); the charity
+		account is the default penalty account there."""
+		if cint(facility.is_islamic):
+			self.penalty_treatment = facility.late_payment_mode or accounting.PAID_TO_LENDER
+			if flt(self.penalty) and not self.penalty_account and facility.late_payment_charity_account:
+				self.penalty_account = facility.late_payment_charity_account
+		else:
+			self.penalty_treatment = accounting.PAID_TO_LENDER
+
+	def validate_cheque_settlement(self):
+		"""I2: an installment cheque pays exactly one installment, no prepayment, no penalty."""
+		if not self.is_cheque_settlement():
+			return
+		if not self.pdc_cheque:
+			frappe.throw(_("Installment Cheque is required for a repayment settled by cheque."))
+		self.allocation_mode = repayment.SELECTED_ROW
+		self.prepayment = 0
+		self.penalty = 0
+		self.penalty_account = None
+
 	def validate_date(self, drawdown):
 		date = getdate(self.repayment_date)
 		if date < getdate(drawdown.drawdown_date):
@@ -157,10 +239,18 @@ class FacilityRepayment(Document):
 					formatdate(drawdown.drawdown_date)
 				)
 			)
+		if self.is_cheque_settlement():
+			# dated by its cheque (the cheque date or a represented cheque's), undone by delta (§3.5)
+			return
 		# the schedule is changed in date order, so a repayment cannot be back-dated before a submitted one
 		latest = frappe.get_all(
 			self.doctype,
-			filters={"drawdown": self.drawdown, "docstatus": 1, "name": ["!=", self.name or ""]},
+			filters={
+				"drawdown": self.drawdown,
+				"docstatus": 1,
+				"name": ["!=", self.name or ""],
+				"settlement": ["!=", accounting.SETTLED_BY_CHEQUE],
+			},
 			order_by="repayment_date desc",
 			limit=1,
 			pluck="repayment_date",
@@ -201,14 +291,18 @@ class FacilityRepayment(Document):
 			)
 
 	def set_default_amounts(self, drawdown):
-		"""Nothing entered: pay the unpaid principal and interest of the next installment (or the selected one)."""
+		"""Nothing entered: pay the unpaid principal and interest of the next installment (or the selected one);
+		an installment with a live cheque is left to its cheque."""
 		if self.docstatus != 0 or flt(self.principal_paid) or flt(self.interest_paid):
 			return
+		live = {} if self.allocation_mode == repayment.SELECTED_ROW else repayment._live_cheques(drawdown.name)
 		rows = sorted(
 			(
 				r
 				for r in drawdown.repayment_schedule
-				if not r.is_prepayment and (repayment.unpaid_principal(r) or repayment.unpaid_interest(r))
+				if not r.is_prepayment
+				and r.name not in live
+				and (repayment.unpaid_principal(r) or repayment.unpaid_interest(r))
 			),
 			key=lambda r: getdate(r.due_date),
 		)
@@ -223,10 +317,12 @@ class FacilityRepayment(Document):
 			self.set(fieldname, flt(self.get(fieldname), self.precision(fieldname)))
 			if self.get(fieldname) < 0:
 				frappe.throw(_("{0} cannot be negative.").format(_(self.meta.get_label(fieldname))))
+		# a penalty payable to charity is not paid through the bank (spec 7g §4.3 R6)
+		penalty = self.penalty if accounting.penalty_paid_to_lender(self) else 0
 		self.total_paid = flt(
-			self.principal_paid + self.interest_paid + self.penalty, self.precision("total_paid")
+			self.principal_paid + self.interest_paid + penalty, self.precision("total_paid")
 		)
-		if self.total_paid <= 0:
+		if self.total_paid <= 0 and not self.penalty:
 			frappe.throw(_("Enter the principal, interest or penalty paid."))
 
 	def validate_penalty_account(self):

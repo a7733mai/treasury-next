@@ -59,6 +59,7 @@ class TreasuryCompanySettings(Document):
 		)
 
 		accrue_facility_interest: DF.Check
+		auto_debit_posting: DF.Literal["On Due Date", "On Bank Statement Match"]
 		auto_select_cheque_book: DF.Check
 		balance_alerts_help: DF.HTML | None
 		balance_thresholds: DF.Table[TreasuryBalanceThreshold]
@@ -79,6 +80,7 @@ class TreasuryCompanySettings(Document):
 		default_outgoing_cheque_bank_account: DF.Link | None
 		default_swift_bank_account: DF.Link | None
 		default_transfer_method: DF.Literal["Normal", "Fawran", "SWIFT"]
+		facility_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		incoming_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
 		incoming_party_posting: DF.Literal["On Receipt", "On Cheque Date", "Manual"]
 		incoming_under_collection: DF.Literal["On Deposit", "Disabled"]

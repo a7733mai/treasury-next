@@ -22,7 +22,7 @@ from frappe.utils import date_diff, flt, getdate, today
 
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting
-from treasury.bank_facilities.utilisation import DRAWDOWN, REPAYMENT, get_source_balances
+from treasury.bank_facilities.utilisation import DRAWDOWN, REPAYMENT, drawdown_sources, get_source_balances
 from treasury.utils.dates import month_ends_between
 
 SAVEPOINT = "treasury_facility_accrual"
@@ -97,16 +97,12 @@ def expensed_by_repayments(drawdown_name: str, upto) -> float:
 
 
 def accrued_balance(drawdown, upto) -> float:
-	"""Accrued interest of the drawdown not yet cleared by its repayments, up to `upto` (facility currency)."""
+	"""Accrued interest of the drawdown not yet cleared by its repayments (and installment cheques: their
+	party posting is the repayment, spec 7g §3.4), up to `upto` (facility currency)."""
 	accounts = accrual_accounts(drawdown)
 	if not accounts:
 		return 0.0
-	sources = [(DRAWDOWN, drawdown.name)] + [
-		(REPAYMENT, name)
-		for name in frappe.get_all(
-			REPAYMENT, filters={"drawdown": drawdown.name, "docstatus": 1}, pluck="name"
-		)
-	]
+	sources = list(drawdown_sources([drawdown.name]))
 	balances = get_source_balances(sources, accounts, upto, credit_minus_debit=True)
 	return max(flt(sum(balances.values()), drawdown.precision("amount")), 0.0)
 

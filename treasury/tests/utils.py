@@ -728,6 +728,108 @@ def make_repayment(drawdown, repayment_date, submit: bool = True, **values):
 	return doc
 
 
+# ---------------------------------------------------------------------------
+# Phase 7g: lenders, Islamic products, installment cheques
+# ---------------------------------------------------------------------------
+
+LENDER = "_Test Treasury Lender"
+# Treasury Company Settings `facility_voucher`: the 1.0 test classes pin the Journal Entries.
+FACILITY_PE = {"facility_voucher": "Payment Entry"}
+FACILITY_JE = {"facility_voucher": "Journal Entry"}
+
+
+def ensure_lender(name: str = LENDER) -> str:
+	"""A finance company (EGP Supplier with the default payable account)."""
+	return ensure_supplier(name)
+
+
+def ensure_islamic_accounts() -> frappe._dict:
+	"""Liability accounts of the Islamic / trust receipt sub-limits, CWIP, and the late payment accounts."""
+	return frappe._dict(
+		murabaha=ensure_account("Treasury Murabaha Liability EGP", "Current Liabilities"),
+		ijarah=ensure_account("Treasury Ijarah Liability EGP", "Current Liabilities"),
+		istisna=ensure_account("Treasury Istisna Liability EGP", "Current Liabilities"),
+		trust_receipt=ensure_account("Treasury Trust Receipts EGP", "Current Liabilities"),
+		cwip=ensure_account("Treasury CWIP", "Current Assets"),
+		charity=ensure_account("Treasury Late Payment Charity", "Indirect Expenses"),
+		charity_payable=ensure_account("Treasury Charity Payable", "Current Liabilities"),
+		profit=ensure_account("Treasury Profit Expense", "Indirect Expenses"),
+	)
+
+
+def make_finance_facility(limits: list[dict] | None = None, lender: str | None = None, **values):
+	"""A Finance Company facility (lender `_Test Treasury Lender`, no bank) with a Murabaha sub-limit."""
+	accounts = ensure_islamic_accounts()
+	if limits is None:
+		limits = [
+			{
+				"limit_type": "Murabaha",
+				"limit_amount": values.get("total_limit", 1_000_000),
+				"interest_rate": 12,
+				"liability_account": accounts.murabaha,
+			}
+		]
+	values.setdefault("interest_expense_account", accounts.profit)
+	return make_bank_facility(
+		limits=limits, lender_type="Finance Company", lender=lender or ensure_lender(), bank=None, **values
+	)
+
+
+def make_installment_batch(drawdown, submit: bool = True, handover: bool = True, **values):
+	"""The Cheque Batch of a PDC to Lender drawdown's open installments (its own cheque numbers, no book)."""
+	from treasury.bank_facilities import facility_cheques
+
+	name = drawdown if isinstance(drawdown, str) else drawdown.name
+	data = facility_cheques.make_installment_batch(name)
+	data.pop("name", None)
+	data.pop("__islocal", None)
+	data["cheque_book"] = None
+	if not handover:
+		data["handover_date"] = None
+	for row in data["cheques"]:
+		row.pop("name", None)
+		row.pop("parent", None)
+		row["cheque_no"] = unique_cheque_no()
+	data.update(values)
+	batch = frappe.get_doc(data).insert()
+	if submit:
+		batch.submit()
+		batch.reload()
+	return batch
+
+
+def liability_voucher_count(account: str, drawdown: str) -> int:
+	"""Distinct non-cancelled vouchers with GL on `account` settling the drawdown's installments: those of its
+	repayments and of its installment cheques (the drawdown's own vouchers are not counted)."""
+	from treasury.bank_facilities.utilisation import DRAWDOWN, drawdown_sources
+
+	sources = drawdown_sources([drawdown])
+	sources.pop((DRAWDOWN, drawdown), None)
+	if not sources:
+		return 0
+	gle = frappe.qb.DocType("GL Entry")
+	vouchers = set()
+	for doctype in ("Payment Entry", "Journal Entry"):
+		voucher = frappe.qb.DocType(doctype)
+		rows = (
+			frappe.qb.from_(gle)
+			.join(voucher)
+			.on(voucher.name == gle.voucher_no)
+			.select(gle.voucher_no, voucher.treasury_source_doctype, voucher.treasury_source_name)
+			.distinct()
+			.where(
+				(gle.account == account)
+				& (gle.voucher_type == doctype)
+				& (gle.is_cancelled == 0)
+				& (voucher.treasury_source_name.isin(sorted({s[1] for s in sources})))
+			)
+		).run(as_dict=True)
+		for row in rows:
+			if (row.treasury_source_doctype, row.treasury_source_name) in sources:
+				vouchers.add((doctype, row.voucher_no))
+	return len(vouchers)
+
+
 def ensure_instrument_accounts() -> frappe._dict:
 	"""Accounts of the Letters of Guarantee / Credit and Cheque Discounting tests (Phase 5b)."""
 	return frappe._dict(
@@ -1872,7 +1974,9 @@ class BalanceAlertTestMixin(TreasuryTestMixin):
 		from unittest.mock import patch
 
 		super().setUp()
-		self.use_company_settings(**DEFAULT_PDC_SETTINGS, **TRANSFER_SETTINGS, on_low_balance="Warn")
+		self.use_company_settings(
+			**DEFAULT_PDC_SETTINGS, **TRANSFER_SETTINGS, **FACILITY_JE, on_low_balance="Warn"
+		)
 		set_alert_settings(self)
 		set_thresholds(self, [])
 		set_recipients(self, [])

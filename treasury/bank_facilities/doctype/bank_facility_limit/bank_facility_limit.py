@@ -17,6 +17,7 @@ class BankFacilityLimit(Document):
 		cash_margin_percent: DF.Percent
 		commission_rate: DF.Percent
 		day_count: DF.Literal["Actual/365", "Actual/360"]
+		default_tenor_months: DF.Int
 		interest_rate: DF.Percent
 		liability_account: DF.Link | None
 		limit_amount: DF.Currency
@@ -26,9 +27,13 @@ class BankFacilityLimit(Document):
 			"Long Term Loan",
 			"Letter of Guarantee",
 			"Letter of Credit",
+			"Trust Receipt",
 			"Cheque Discounting",
+			"Invoice Discounting",
 			"Murabaha",
 			"Tawarruq",
+			"Ijarah",
+			"Istisna'a",
 			"Other",
 		]
 		margin_rate: DF.Percent

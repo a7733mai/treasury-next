@@ -39,6 +39,78 @@ frappe.ui.form.on("Facility Drawdown", {
 			frm.add_custom_button(__("Refresh Status"), () => {
 				frm.call({ doc: frm.doc, method: "refresh_status", freeze: true }).then(() => frm.reload_doc());
 			});
+			frm.events.add_facility_actions(frm);
+		}
+		frm.events.set_islamic_labels(frm);
+	},
+
+	set_islamic_labels(frm) {
+		// "Profit" / "Rental" wording of an Islamic facility (server terms, treasury.bank_facilities.lenders)
+		const terms = (frm.doc.__onload || {}).terms;
+		if (!terms || !frm.doc.is_islamic) {
+			return;
+		}
+		frm.set_df_property("interest_rate", "label", terms.interest_rate);
+		frm.set_df_property("total_interest", "label", terms.interest);
+		const grid = frm.get_field("repayment_schedule").grid;
+		const interest = frm.doc.limit_type === "Ijarah" ? __("Rental") : terms.interest;
+		grid.update_docfield_property("interest", "label", interest);
+	},
+
+	add_facility_actions(frm) {
+		if (frm.is_dirty()) {
+			return;
+		}
+		if (
+			frm.doc.repayment_mode === "PDC to Lender" &&
+			frm.doc.repayment_status === "Open" &&
+			frappe.model.can_create("Cheque Batch")
+		) {
+			frm.add_custom_button(
+				__("Generate Installment Cheques"),
+				() =>
+					frm.call({ doc: frm.doc, method: "make_installment_cheques", freeze: true }).then((r) => {
+						if (r.message) {
+							const synced = frappe.model.sync(r.message)[0];
+							frappe.set_route("Form", synced.doctype, synced.name);
+						}
+					}),
+				__("Create")
+			);
+		}
+		const pending = (frm.doc.disbursement_stages || []).filter((row) => row.status !== "Disbursed");
+		if (frm.doc.limit_type === "Istisna'a" && pending.length && frappe.user.has_role("Treasury Manager")) {
+			frm.add_custom_button(__("Disburse Stage"), () => {
+				frappe.prompt(
+					[
+						{
+							fieldname: "stage",
+							label: __("Stage"),
+							fieldtype: "Select",
+							reqd: 1,
+							options: pending.map((row) => ({
+								value: row.name,
+								label: `${row.idx}: ${format_currency(row.amount, frm.doc.currency)}`,
+							})),
+							default: pending[0].name,
+						},
+						{
+							fieldname: "disbursement_date",
+							label: __("Date", null, "Treasury"),
+							fieldtype: "Date",
+							reqd: 1,
+							default: frappe.datetime.get_today(),
+						},
+						{ fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" },
+					],
+					(values) =>
+						frm
+							.call({ doc: frm.doc, method: "disburse_stage", args: values, freeze: true })
+							.then(() => frm.reload_doc()),
+					__("Disburse Stage"),
+					__("Disburse Stage")
+				);
+			});
 		}
 	},
 

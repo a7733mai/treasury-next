@@ -167,6 +167,11 @@ class ProjectedPartyStatement:
 	def party_filters(self) -> dict:
 		return {"company": self.company, "party_type": self.party_type, "party": self.party}
 
+	def cheque_filters(self) -> dict:
+		"""The party's cheques, installment cheques to a lender excluded: they settle a facility, never the
+		party's ledger (spec 7g §3.12)."""
+		return {**self.party_filters(), "facility_drawdown": ["is", "not set"]}
+
 	def get_unposted_cheques(self) -> list[frappe._dict]:
 		"""All cheques of the party not posted to it yet, whatever their due date: the exposure summary is a
 		snapshot; only the projected rows stop at To Date."""
@@ -175,7 +180,7 @@ class ProjectedPartyStatement:
 			statuses.append("Created")
 		cheques = get_cheques(
 			{
-				**self.party_filters(),
+				**self.cheque_filters(),
 				"accounting_status": NOT_POSTED,
 				"operational_status": ["in", statuses],
 			}
@@ -186,7 +191,7 @@ class ProjectedPartyStatement:
 	def get_posted_not_cleared(self) -> list[frappe._dict]:
 		return get_cheques(
 			{
-				**self.party_filters(),
+				**self.cheque_filters(),
 				"accounting_status": ["in", list(POSTED_NOT_CLEARED_ACCOUNTING)],
 				"operational_status": ["in", list(POSTED_NOT_CLEARED_STATUSES)],
 			}

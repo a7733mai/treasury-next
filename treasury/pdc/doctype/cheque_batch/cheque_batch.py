@@ -39,6 +39,7 @@ class ChequeBatch(Document):
 		cost_center: DF.Link | None
 		currency: DF.Link | None
 		direction: DF.Literal["Outgoing", "Incoming"]
+		facility_drawdown: DF.Link | None
 		gen_amount: DF.Currency
 		gen_amount_mode: DF.Literal["Per Cheque", "Split Total"]
 		gen_count: DF.Int

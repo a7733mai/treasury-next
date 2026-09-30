@@ -57,6 +57,24 @@ frappe.query_reports["Facility Repayment Schedule Report"] = {
 			})),
 		},
 		{
+			fieldname: "repayment_mode",
+			label: __("Repayment Mode"),
+			fieldtype: "Select",
+			options: ["", "Manual", "Auto Debit", "PDC to Lender"].map((value) => ({
+				value,
+				label: value ? __(value, null, "Facility Drawdown") : "",
+			})),
+		},
+		{
+			fieldname: "lender_type",
+			label: __("Lender Type"),
+			fieldtype: "Select",
+			options: ["", "Bank", "Finance Company"].map((value) => ({
+				value,
+				label: value ? __(value, null, "Bank Facility") : "",
+			})),
+		},
+		{
 			fieldname: "include_overdue",
 			label: __("Include Overdue"),
 			fieldtype: "Check",

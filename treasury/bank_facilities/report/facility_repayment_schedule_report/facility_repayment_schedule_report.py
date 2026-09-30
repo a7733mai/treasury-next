@@ -13,6 +13,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate
 
+from treasury.bank_facilities import lenders
 from treasury.bank_facilities.repayment import OVERDUE, PAID
 from treasury.bank_facilities.report_utils import (
 	DRAWDOWN,
@@ -44,6 +45,8 @@ def execute(filters=None):
 		bank=filters.bank,
 		drawdown=filters.drawdown,
 		unpaid_only=not include_paid,
+		repayment_mode=filters.repayment_mode,
+		lender_type=filters.lender_type,
 	)
 	converter = CompanyConverter(company)
 	data = []
@@ -58,8 +61,11 @@ def execute(filters=None):
 		row.company_currency = converter.company_currency
 		row.unpaid_company = converter.convert(row.unpaid, row.currency)
 		row.limit_type_label = _(row.limit_type, context=FACILITY)
+		row.repayment_mode_label = _(row.repayment_mode or "Manual", context=DRAWDOWN)
+		row.cheque_status_label = _(row.cheque_status, context="PDC Cheque") if row.cheque_status else None
 		data.append(row)
-	return get_columns(), data, None, None, get_summary(data, converter.company_currency)
+	terms = lenders.terms_for(row.is_islamic for row in data)
+	return get_columns(terms), data, None, None, get_summary(data, converter.company_currency)
 
 
 def get_summary(rows: list, currency: str) -> list[dict]:
@@ -91,7 +97,10 @@ def get_summary(rows: list, currency: str) -> list[dict]:
 	]
 
 
-def get_columns() -> list[dict]:
+def get_columns(terms=None) -> list[dict]:
+	"""`terms`: the Interest / Profit wording of the rows shown (treasury.bank_facilities.lenders.terms_for)."""
+	terms = terms or lenders.mixed_terms()
+
 	def money(fieldname, label, options="currency", width=120):
 		return column(fieldname, label, "Currency", width, options=options)
 
@@ -100,18 +109,24 @@ def get_columns() -> list[dict]:
 		column("drawdown", _("Facility Drawdown"), "Link", 150, options=DRAWDOWN),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
 		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank"),
+		column("lender_name", _("Lender"), width=140),
 		column("limit_type_label", _("Limit Type"), width=120),
 		column("installment_no", _("Installment No"), "Int", 80),
 		money("principal", _("Principal")),
-		money("interest", _("Interest / Profit")),
+		money("interest", terms.interest),
 		money("total", _("Total", context=CTX)),
 		money("paid_principal", _("Paid Principal")),
-		money("paid_interest", _("Paid Interest / Profit")),
+		money("paid_interest", terms.interest_paid),
 		money("unpaid_principal", _("Unpaid Principal")),
-		money("unpaid_interest", _("Unpaid Interest / Profit")),
+		money("unpaid_interest", _("Unpaid {0}").format(terms.interest)),
 		money("unpaid", _("Unpaid")),
 		column("status_label", _("Status", context="Treasury"), width=100),
 		column("status", _("Status", context="Treasury"), width=90, hidden=1),
+		column("repayment_mode_label", _("Repayment Mode"), width=110),
+		column("pdc_cheque", _("Installment Cheque"), "Link", 150, options="PDC Cheque"),
+		column("cheque_status_label", _("Cheque Status"), width=100),
+		column("payment_voucher_type", _("Voucher Type"), "Link", 110, options="DocType", hidden=1),
+		column("payment_journal", _("Payment Voucher"), "Dynamic Link", 160, options="payment_voucher_type"),
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 		money("unpaid_company", _("Unpaid (Company Currency)"), "company_currency", 150),
 		column("bank_account", _("Bank Account", context="Treasury"), "Link", 160, options="Bank Account"),

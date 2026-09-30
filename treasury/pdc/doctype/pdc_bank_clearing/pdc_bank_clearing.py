@@ -18,6 +18,12 @@ Bank Charges (spec 7d §3.5): a Posted charge is matched like a transfer (its ba
 date) and reconciled against its voucher. A withdrawal left unmatched whose description / reference contains a
 keyword of a Bank Charge Category is proposed as a new charge of that category ("Keyword"): clearing it creates,
 submits and reconciles the charge in one step.
+
+Auto-debited facility installments (spec 7g §3.7, treasury.bank_facilities.auto_debit): a statement debit of
+an installment's amount is matched with the Auto Debit repayment already posted (reconciled only) or, with
+"On Bank Statement Match", with the open installment (the repayment is recorded on the statement date, cleared
+and reconciled). Strong: the drawdown or the facility's contract number in the reference / description; Weak:
+within the tolerance of the due / repayment date. Posting needs the submit permission on Facility Repayment.
 """
 
 import re
@@ -41,7 +47,11 @@ CHEQUE = "PDC Cheque"
 TRANSFER = "Bank Transfer"
 BANK_CHARGE = "Bank Charge"
 BANK_TRANSACTION = "Bank Transaction"
-CHEQUE_ROW, TRANSFER_ROW, CHARGE_ROW = "cheque", "transfer", "charge"
+FACILITY_REPAYMENT = "Facility Repayment"
+FACILITY_DRAWDOWN = "Facility Drawdown"
+INSTALLMENT_DOCTYPES = (FACILITY_REPAYMENT, FACILITY_DRAWDOWN)
+INSTALLMENT = "Installment"
+CHEQUE_ROW, TRANSFER_ROW, CHARGE_ROW, INSTALLMENT_ROW = "cheque", "transfer", "charge", "installment"
 CHARGE_FIELDS = ["name", "entry_type", "amount", "currency", "posting_date", "bank_reference", "category"]
 SOURCE_SIDE = "source"
 TARGET_SIDE = "target"
@@ -110,11 +120,13 @@ class PDCBankClearing(Document):
 		documents = [(CHEQUE, c) for c in self.get_open_cheques()]
 		documents += [(TRANSFER, t) for t in self.get_open_transfers()]
 		documents += [(BANK_CHARGE, c) for c in self.get_open_bank_charges()]
+		documents += [(INSTALLMENT, i) for i in self.get_open_installments()]
 		tolerance = cint(self.date_tolerance)
 		quality_of = {
 			CHEQUE: match_quality,
 			TRANSFER: transfer_match_quality,
 			BANK_CHARGE: charge_match_quality,
+			INSTALLMENT: installment_match_quality,
 		}
 
 		candidates = []
@@ -156,6 +168,17 @@ class PDCBankClearing(Document):
 					direction=doc.direction,
 					party=doc.counterparty,
 					due_date=doc.execution_date,
+				)
+			elif doctype == INSTALLMENT:
+				row.update(
+					reference_doctype=FACILITY_REPAYMENT if doc.repayment else FACILITY_DRAWDOWN,
+					facility_drawdown=doc.drawdown,
+					facility_repayment=doc.repayment,
+					installment_no=doc.installment_no,
+					cheque_no=f"#{doc.installment_no}",
+					direction=lifecycle.OUTGOING,
+					party=doc.lender_name,
+					due_date=doc.date,
 				)
 			else:
 				row.update(
@@ -333,6 +356,16 @@ class PDCBankClearing(Document):
 		transfers += [transfer_side(row, TARGET_SIDE) for row in targets if row.name not in confirmed]
 		return transfers
 
+	def get_open_installments(self) -> list[frappe._dict]:
+		"""Auto-debited facility installments of the bank account (treasury.bank_facilities.auto_debit); each
+		gets a `name` unique among them (the repayment, or drawdown #installment)."""
+		from treasury.bank_facilities import auto_debit
+
+		rows = auto_debit.get_open_installments(self.company, self.bank_account, self.from_date, self.to_date)
+		for row in rows:
+			row.name = row.repayment or f"{row.drawdown}#{row.installment_no}"
+		return rows
+
 	def get_open_bank_charges(self) -> list[frappe._dict]:
 		"""Posted (not yet reconciled) charges and refunds of the bank account that the user may read, with the
 		statement `direction` (a charge is a withdrawal, a refund a deposit)."""
@@ -373,14 +406,17 @@ class PDCBankClearing(Document):
 			)
 		self.validate_filters()
 
-		result = {"cleared": [], "created": [], "skipped": []}
+		result = {"cleared": [], "created": [], "skipped": [], "installments": []}
 		for row in selected:
 			kind = row_kind(row)
 			creates = kind == CHARGE_ROW and not row.get("bank_charge")
+			posts = kind == INSTALLMENT_ROW and not row.get("facility_repayment")
 			reason = self.clear_row(row)
-			document = {CHEQUE_ROW: row.cheque, TRANSFER_ROW: row.get("bank_transfer")}.get(
-				kind, row.get("bank_charge")
-			)
+			document = {
+				CHEQUE_ROW: row.cheque,
+				TRANSFER_ROW: row.get("bank_transfer"),
+				INSTALLMENT_ROW: row.get("facility_repayment") or row.get("facility_drawdown"),
+			}.get(kind, row.get("bank_charge"))
 			if reason:
 				row.result = reason
 				result["skipped"].append(
@@ -396,6 +432,10 @@ class PDCBankClearing(Document):
 				row.result = _("Bank Charge {0} created and reconciled").format(row.bank_charge)
 				row.selected = 0
 				result["created"].append(row.bank_charge)
+			elif posts:
+				row.result = _("Repayment {0} posted and reconciled").format(row.facility_repayment)
+				row.selected = 0
+				result["installments"].append(row.facility_repayment)
 			else:
 				row.result = _("Cleared and reconciled")
 				row.selected = 0
@@ -420,11 +460,14 @@ class PDCBankClearing(Document):
 		kind = row_kind(row)
 		bank_charge = row.get("bank_charge")
 		frappe.db.savepoint(SAVEPOINT)
+		facility_repayment = row.get("facility_repayment")
 		try:
 			if kind == TRANSFER_ROW:
 				self.clear_transfer(row)
 			elif kind == CHARGE_ROW:
 				self.clear_charge(row)
+			elif kind == INSTALLMENT_ROW:
+				self.clear_installment(row)
 			else:
 				self.validate_row(row)
 				self.clear_cheque(row)
@@ -432,10 +475,15 @@ class PDCBankClearing(Document):
 		except Exception as e:
 			frappe.db.rollback(save_point=SAVEPOINT)
 			row.bank_charge = bank_charge  # a charge created in the rolled back savepoint no longer exists
+			row.facility_repayment = facility_repayment  # likewise a repayment
 			# expected: business rules and the user's permission on the document; anything else is logged
 			if not isinstance(e, frappe.ValidationError | frappe.PermissionError):
 				if kind == TRANSFER_ROW:
 					title = _("PDC Bank Clearing failed for Bank Transfer {0}").format(row.bank_transfer)
+				elif kind == INSTALLMENT_ROW:
+					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(
+						row.bank_transaction
+					)
 				elif kind == CHARGE_ROW:
 					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(
 						row.bank_transaction
@@ -446,6 +494,74 @@ class PDCBankClearing(Document):
 			return strip_html(str(e)) or _("Could not be cleared.")
 		frappe.db.release_savepoint(SAVEPOINT)
 		return None
+
+	def clear_installment(self, row):
+		"""An auto-debited installment: the posted repayment is reconciled with the statement line; an open one
+		is recorded on the statement date (auto_debit.repay_installment: cleared and reconciled). The user's own
+		Facility Repayment submit permission applies."""
+		from treasury.bank_facilities import auto_debit
+
+		if not frappe.has_permission(FACILITY_REPAYMENT, "submit"):
+			frappe.throw(_("You are not permitted to submit Facility Repayments."), frappe.PermissionError)
+		bt = row.bank_transaction and frappe.db.get_value(
+			BANK_TRANSACTION,
+			row.bank_transaction,
+			["docstatus", "bank_account", "currency", "unallocated_amount", "withdrawal", "date"],
+			as_dict=True,
+		)
+		if not bt or bt.docstatus != 1 or bt.bank_account != self.bank_account or flt(bt.unallocated_amount) <= 0:
+			frappe.throw(
+				_("Bank Transaction {0} is not an open transaction of this bank account.").format(
+					row.bank_transaction
+				)
+			)
+		drawdown = frappe.db.get_value(
+			FACILITY_DRAWDOWN,
+			row.facility_drawdown,
+			["company", "bank_account", "repayment_mode", "docstatus"],
+			as_dict=True,
+		)
+		if (
+			not drawdown
+			or drawdown.docstatus != 1
+			or (drawdown.company, drawdown.bank_account) != (self.company, self.bank_account)
+			or drawdown.repayment_mode != auto_debit.AUTO_DEBIT
+		):
+			frappe.throw(
+				_("Facility Drawdown {0} is not repaid by auto debit from Bank Account {1}.").format(
+					row.facility_drawdown, self.bank_account
+				)
+			)
+		if row.get("facility_repayment"):
+			rep = frappe.db.get_value(
+				FACILITY_REPAYMENT,
+				row.facility_repayment,
+				["drawdown", "docstatus", "bank_transaction", "payment_entry", "journal_entry", "total_paid"],
+				as_dict=True,
+			)
+			if not rep or rep.docstatus != 1 or rep.drawdown != row.facility_drawdown or rep.bank_transaction:
+				frappe.throw(
+					_("Repayment {0} is already reconciled or no longer open.").format(row.facility_repayment)
+				)
+			if flt(bt.unallocated_amount, 2) != flt(rep.total_paid, 2):
+				frappe.throw(
+					_("The open amount of Bank Transaction {0} does not match repayment {1}.").format(
+						row.bank_transaction, row.facility_repayment
+					)
+				)
+			if rep.payment_entry:
+				voucher = ("Payment Entry", rep.payment_entry)
+			else:
+				voucher = ("Journal Entry", rep.journal_entry)
+			reconcile_voucher(row.bank_transaction, *voucher)
+			frappe.db.set_value(
+				FACILITY_REPAYMENT, row.facility_repayment, "bank_transaction", row.bank_transaction
+			)
+		else:
+			row.facility_repayment = auto_debit.repay_installment(
+				row.facility_drawdown, cint(row.installment_no), bt.date, bank_transaction=row.bank_transaction
+			)
+		row.transaction_date = bt.date
 
 	def clear_charge(self, row):
 		"""An existing (Posted) charge is reconciled with the statement line; a keyword proposal creates,
@@ -660,6 +776,8 @@ class PDCBankClearing(Document):
 		lines = [_("{0} document(s) cleared and reconciled.").format(len(result["cleared"]))]
 		if result.get("created"):
 			lines.append(_("{0} bank charge(s) created.").format(len(result["created"])))
+		if result.get("installments"):
+			lines.append(_("{0} installment(s) posted.").format(len(result["installments"])))
 		if result["skipped"]:
 			lines.append(_("{0} row(s) skipped:").format(len(result["skipped"])))
 			lines += [
@@ -676,8 +794,11 @@ class PDCBankClearing(Document):
 
 
 def row_kind(row) -> str:
-	""" "cheque", "transfer" or "charge" from the row's document type (rows without one: by their links)."""
+	""" "cheque", "transfer", "charge" or "installment" from the row's document type (rows without one: by
+	their links)."""
 	doctype = row.get("reference_doctype")
+	if doctype in INSTALLMENT_DOCTYPES:
+		return INSTALLMENT_ROW
 	if doctype == TRANSFER or (doctype != BANK_CHARGE and row.get("bank_transfer") and not row.get("cheque")):
 		return TRANSFER_ROW
 	if doctype == BANK_CHARGE or (row.get("bank_charge") and not row.get("cheque")):
@@ -699,6 +820,23 @@ def charge_match_quality(bt, charge, tolerance_days: int) -> str | None:
 	if cheque_no_in(reference, bt.reference_number) or cheque_no_in(reference, bt.description):
 		return STRONG
 	if abs(date_diff(bt.date, charge.posting_date)) <= tolerance_days:
+		return WEAK
+	return None
+
+
+def installment_match_quality(bt, item, tolerance_days: int) -> str | None:
+	"""An auto-debited installment: a withdrawal in its currency whose open amount is the installment's
+	(the repayment's total paid, or the row's unpaid total). Strong: the drawdown or the facility's contract
+	number in the reference / description; Weak: within `tolerance_days` of the due / repayment date."""
+	if flt(bt.withdrawal) <= 0 or (bt.currency and item.currency and bt.currency != item.currency):
+		return None
+	precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount")
+	if flt(bt.unallocated_amount, precision) != flt(item.amount, precision):
+		return None
+	for reference in (item.drawdown, item.contract_no):
+		if cheque_no_in(reference, bt.reference_number) or cheque_no_in(reference, bt.description):
+			return STRONG
+	if abs(date_diff(bt.date, item.date)) <= tolerance_days:
 		return WEAK
 	return None
 

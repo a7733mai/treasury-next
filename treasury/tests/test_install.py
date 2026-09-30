@@ -171,8 +171,12 @@ class TestInstall(IntegrationTestCase):
 
 		self.assertEqual(len(to_delete), len(set(to_delete)))
 		self.assertEqual(set(to_delete), created)
-		# only the two voucher doctypes are touched
-		self.assertEqual({doctype for doctype, _fieldname in to_delete}, {"Payment Entry", "Journal Entry"})
+		# only the two voucher doctypes and Invoice Discounting (spec 7g §2.8) are touched
+		self.assertEqual(
+			{doctype for doctype, _fieldname in to_delete},
+			{"Payment Entry", "Journal Entry", "Invoice Discounting"},
+		)
+		self.assertIn(("Invoice Discounting", "treasury_facility"), to_delete)
 
 	def test_every_custom_field_of_the_app_is_deleted_on_uninstall(self):
 		modules = frappe.get_all("Module Def", filters={"app_name": "treasury"}, pluck="name")

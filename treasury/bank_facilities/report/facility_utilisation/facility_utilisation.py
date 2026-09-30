@@ -3,7 +3,7 @@
 
 """Facility Utilisation (PLAN.md §8): limit, utilised, available and % used per facility and sub-limit.
 
-Tree: Bank (company currency totals) → Facility (its totals) → one row per sub-limit. Figures come from
+Tree: Bank or finance company lender (company currency totals) → Facility (its totals) → one row per sub-limit. Figures come from
 treasury.bank_facilities.utilisation.get_utilisation (the ledger up to As On), never from the stored display
 fields. Facility figures are in the facility currency, with company currency columns converted at the
 reports' today rate; the bank rows and the summary add the company currency columns.
@@ -32,7 +32,7 @@ def execute(filters=None):
 	conditions = {"company": company}
 	excluded = [DRAFT] if cint(filters.include_closed) else [DRAFT, CLOSED]
 	conditions["status"] = ["not in", excluded]
-	for fieldname in ("bank", "name"):
+	for fieldname in ("bank", "name", "lender_type"):
 		value = filters.get("facility" if fieldname == "name" else fieldname)
 		if value:
 			conditions[fieldname] = value
@@ -40,13 +40,17 @@ def execute(filters=None):
 	data, banks = [], {}
 	for facility in get_facilities(conditions):
 		utilisation = get_utilisation(facility.name, filters.limit_type or None, as_on)
-		bank = banks.get(facility.bank)
+		# top level: the bank, or the lender of a finance company facility
+		lender = facility.bank or facility.lender_name
+		bank = banks.get(lender)
 		if not bank:
-			bank = banks[facility.bank] = frappe._dict(
-				row_id=f"bank-{facility.bank}",
+			bank = banks[lender] = frappe._dict(
+				row_id=f"bank-{lender}",
 				indent=0,
-				label=facility.bank,
+				label=lender,
 				bank=facility.bank,
+				lender_type=_(facility.lender_type or "Bank", context=FACILITY),
+				lender_name=lender,
 				company_currency=converter.company_currency,
 				limit_company=0.0,
 				utilised_company=0.0,
@@ -62,6 +66,8 @@ def execute(filters=None):
 			label=facility.facility_name,
 			facility=facility.name,
 			bank=facility.bank,
+			lender_type=_(facility.lender_type or "Bank", context=FACILITY),
+			lender_name=facility.lender_name or facility.bank,
 			status=_(facility.status, context=FACILITY),
 			limit_amount=utilisation.total_limit,
 			utilised=utilisation.utilised,
@@ -136,6 +142,8 @@ def get_columns() -> list[dict]:
 		column("label", _("Bank / Facility / Limit Type"), width=240),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
 		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank", hidden=1),
+		column("lender_type", _("Lender Type"), width=110),
+		column("lender_name", _("Lender"), width=150),
 		column("limit_type", _("Limit Type"), width=130, hidden=1),
 		column("status", _("Status", context="Treasury"), width=90),
 		money("limit_amount", _("Limit", context="Treasury")),

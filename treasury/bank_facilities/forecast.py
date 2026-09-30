@@ -3,7 +3,8 @@
 - `get_flows` (hook `treasury_forecast_sources`): the unpaid part (principal + interest / profit) of every
   installment of the submitted drawdowns, as an outflow on its due date from the drawdown's bank account.
   Paid installments and prepayment rows never appear; a partly paid one shows its unpaid rest. Drawdowns are
-  submitted on their own date, so they are actual movements, never expected ones.
+  submitted on their own date, so they are actual movements, never expected ones. An installment with a live
+  installment cheque (PDC to Lender) is left out: the cheque itself is the expected outflow (spec 7g §3.12).
 - `get_summary` (hook `treasury_forecast_summary_sources`): "Available Overdraft", the available amount of
   the Overdraft sub-limits of the Active facilities whose Default Bank Account is in the report's scope
   (treasury.bank_facilities.utilisation).
@@ -56,9 +57,12 @@ def get_flows(filters) -> list[dict]:
 			drawdown.company,
 			drawdown.facility,
 			drawdown.bank,
+			drawdown.lender_name,
+			drawdown.limit_type,
 			drawdown.currency,
 			drawdown.bank_account,
 			row.installment_no,
+			row.pdc_cheque,
 			row.due_date,
 			row.principal,
 			row.interest,
@@ -81,8 +85,19 @@ def get_flows(filters) -> list[dict]:
 	)
 	rates: dict[str, float] = {}
 	flows = []
-	for r in query.run(as_dict=True):
-		if r.name not in readable:
+	rows = query.run(as_dict=True)
+	live = set(
+		frappe.get_all(
+			"PDC Cheque",
+			filters={
+				"name": ["in", sorted({r.pdc_cheque for r in rows if r.pdc_cheque}) or [""]],
+				"operational_status": ["in", ["Created", "Delivered"]],
+			},
+			pluck="name",
+		)
+	)
+	for r in rows:
+		if r.name not in readable or r.pdc_cheque in live:
 			continue
 		unpaid = flt(
 			max(flt(r.principal) - flt(r.paid_principal), 0) + max(flt(r.interest) - flt(r.paid_interest), 0),
@@ -99,8 +114,10 @@ def get_flows(filters) -> list[dict]:
 				"amount_in_account_currency": unpaid,
 				"reference_doctype": DRAWDOWN,
 				"reference_name": r.name,
-				"party": r.bank,
-				"description": _("Installment {0}").format(r.installment_no),
+				"party": r.lender_name or r.bank,
+				"description": (_("Rental {0}") if r.limit_type == "Ijarah" else _("Installment {0}")).format(
+					r.installment_no
+				),
 			}
 		)
 	return flows

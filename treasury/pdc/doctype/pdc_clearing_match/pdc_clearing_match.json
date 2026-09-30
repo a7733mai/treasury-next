@@ -17,6 +17,9 @@
   "bank_transfer",
   "bank_charge",
   "bank_charge_category",
+  "facility_drawdown",
+  "facility_repayment",
+  "installment_no",
   "direction",
   "party",
   "due_date",
@@ -55,7 +58,7 @@
    "fieldname": "reference_doctype",
    "fieldtype": "Select",
    "label": "Document Type",
-   "options": "PDC Cheque\nBank Transfer\nBank Charge",
+   "options": "PDC Cheque\nBank Transfer\nBank Charge\nFacility Repayment\nFacility Drawdown",
    "read_only": 1
   },
   {
@@ -122,6 +125,28 @@
    "label": "Charge Category",
    "options": "Bank Charge Category",
    "read_only_depends_on": "eval:doc.match_quality!=='Keyword' || doc.bank_charge"
+  },
+  {
+   "description": "An auto-debited installment of this drawdown (Repayment Mode Auto Debit).",
+   "fieldname": "facility_drawdown",
+   "fieldtype": "Link",
+   "label": "Facility Drawdown",
+   "options": "Facility Drawdown",
+   "read_only": 1
+  },
+  {
+   "description": "The repayment already posted for the installment (reconciled only).",
+   "fieldname": "facility_repayment",
+   "fieldtype": "Link",
+   "label": "Facility Repayment",
+   "options": "Facility Repayment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "installment_no",
+   "fieldtype": "Int",
+   "label": "Installment No",
+   "read_only": 1
   },
   {
    "fieldname": "direction",

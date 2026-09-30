@@ -1,0 +1,62 @@
+"""Phase 7g: the defaults of the new Bank Facilities fields on the documents saved before them.
+
+Idempotent: only empty values are set.
+- Bank Facility: lender type Bank, late payment penalties paid to the lender, the lender's name (the Bank's
+  name), Islamic when a Murabaha / Tawarruq sub-limit exists;
+- Facility Drawdown: repayment mode Manual, disbursed to the bank account;
+- Facility Repayment: settled by the bank;
+- Facility Repayment Schedule: the payment voucher is a Journal Entry (`payment_journal` became a Dynamic
+  Link on `payment_voucher_type`; the column keeps its values);
+- Treasury Company Settings: facility vouchers are Payment Entries, auto debits posted on the due date.
+"""
+
+import frappe
+from frappe.query_builder.functions import IfNull
+
+
+def _fill(doctype: str, values: dict):
+	table = frappe.qb.DocType(doctype)
+	for fieldname, value in values.items():
+		field = getattr(table, fieldname)
+		frappe.qb.update(table).set(field, value).where(IfNull(field, "") == "").run()
+
+
+def execute():
+	_fill("Bank Facility", {"lender_type": "Bank", "late_payment_mode": "Paid to Lender"})
+
+	facility = frappe.qb.DocType("Bank Facility")
+	limit = frappe.qb.DocType("Bank Facility Limit")
+	islamic = (
+		frappe.qb.from_(limit)
+		.select(limit.parent)
+		.where((limit.parenttype == "Bank Facility") & (limit.limit_type.isin(["Murabaha", "Tawarruq"])))
+	)
+	frappe.qb.update(facility).set(facility.is_islamic, 1).where(facility.name.isin(islamic)).run()
+
+	bank = frappe.qb.DocType("Bank")
+	for row in (
+		frappe.qb.from_(facility)
+		.join(bank)
+		.on(bank.name == facility.bank)
+		.select(facility.name, bank.bank_name)
+		.where(IfNull(facility.lender_name, "") == "")
+	).run(as_dict=True):
+		frappe.db.set_value(
+			"Bank Facility", row.name, "lender_name", row.bank_name or row.name, update_modified=False
+		)
+
+	_fill("Facility Drawdown", {"repayment_mode": "Manual", "disburse_to": "Bank Account"})
+	_fill("Facility Repayment", {"settlement": "Bank"})
+
+	schedule = frappe.qb.DocType("Facility Repayment Schedule")
+	(
+		frappe.qb.update(schedule)
+		.set(schedule.payment_voucher_type, "Journal Entry")
+		.where((IfNull(schedule.payment_journal, "") != "") & (IfNull(schedule.payment_voucher_type, "") == ""))
+		.run()
+	)
+
+	_fill(
+		"Treasury Company Settings",
+		{"facility_voucher": "Payment Entry", "auto_debit_posting": "On Due Date"},
+	)

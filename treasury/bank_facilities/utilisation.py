@@ -2,10 +2,12 @@
 
 Per limit type:
 
-- Loans (Short / Long Term Loan, Murabaha, Tawarruq, Other): the principal outstanding of the facility's
-  submitted drawdowns of that type = the balance (credit - debit, facility currency) of each drawdown's
-  liability account in the GL rows of the Journal Entries linked to the drawdown or to its repayments
-  (`treasury_source_*`). Other postings on the same liability account never count.
+- Loans (Short / Long Term Loan, Murabaha, Tawarruq, Ijarah, Istisna'a, Trust Receipt, Other): the principal
+  outstanding of the facility's submitted drawdowns of that type = the balance (credit - debit, facility
+  currency) of each drawdown's liability account in the GL rows of the Payment Entries and Journal Entries
+  linked to the drawdown, to its repayments or to its installment cheques (`treasury_source_*`; a cheque's
+  party posting is the repayment of its installment, spec 7g §3.4). Other postings on the same liability
+  account never count.
 - Overdraft: max(0, - GL balance of the GL account of the facility's Default Bank Account), in its currency.
 - Anything else: the functions listed in the `treasury_facility_utilisation_sources` hook of any app. Each
   receives (facility doc, as_on date or None) and returns a list of {"limit_type": ..., "amount": ...} in the
@@ -30,9 +32,20 @@ HOOK = "treasury_facility_utilisation_sources"
 FACILITY = "Bank Facility"
 DRAWDOWN = "Facility Drawdown"
 REPAYMENT = "Facility Repayment"
+CHEQUE = "PDC Cheque"
 OVERDRAFT = "Overdraft"
 # Limit types drawn through a Facility Drawdown (a liability account per sub-limit).
-LOAN_TYPES = ("Short Term Loan", "Long Term Loan", "Murabaha", "Tawarruq", "Other")
+LOAN_TYPES = (
+	"Short Term Loan",
+	"Long Term Loan",
+	"Murabaha",
+	"Tawarruq",
+	"Ijarah",
+	"Istisna'a",
+	"Trust Receipt",
+	"Other",
+)
+VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
 
 
 def get_utilisation(facility, limit_type: str | None = None, as_on=None) -> frappe._dict:
@@ -125,11 +138,7 @@ def get_drawdown_outstanding(drawdowns: list[dict], as_on=None) -> dict[str, flo
 	if not drawdowns:
 		return {}
 	accounts = {d["name"]: d["liability_account"] for d in drawdowns}
-	sources = {(DRAWDOWN, name): name for name in accounts}
-	for row in frappe.get_all(
-		REPAYMENT, filters={"drawdown": ["in", list(accounts)]}, fields=["name", "drawdown"]
-	):
-		sources[(REPAYMENT, row.name)] = row.drawdown
+	sources = drawdown_sources(list(accounts))
 
 	balances = get_source_balances(
 		list(sources), sorted({a for a in accounts.values() if a}), as_on, credit_minus_debit=True
@@ -142,6 +151,22 @@ def get_drawdown_outstanding(drawdowns: list[dict], as_on=None) -> dict[str, flo
 	return outstanding
 
 
+def drawdown_sources(drawdowns: list[str]) -> dict[tuple[str, str], str]:
+	"""{(source doctype, source name): drawdown} of every Treasury source whose vouchers may move a drawdown's
+	liability or accrued interest: the drawdowns, their repayments and their installment cheques (every cycle
+	and replacement: a cheque's party posting pays its installment, its reversal reopens it)."""
+	sources = {(DRAWDOWN, name): name for name in drawdowns}
+	if not drawdowns:
+		return sources
+	for row in frappe.get_all(REPAYMENT, filters={"drawdown": ["in", drawdowns]}, fields=["name", "drawdown"]):
+		sources[(REPAYMENT, row.name)] = row.drawdown
+	for row in frappe.get_all(
+		CHEQUE, filters={"facility_drawdown": ["in", drawdowns]}, fields=["name", "facility_drawdown"]
+	):
+		sources[(CHEQUE, row.name)] = row.facility_drawdown
+	return sources
+
+
 def get_source_balances(
 	sources: list[tuple[str, str]],
 	accounts: list[str],
@@ -150,42 +175,50 @@ def get_source_balances(
 	event_prefix: str | None = None,
 ) -> dict[tuple[str, str, str], float]:
 	"""{(source doctype, source name, account): balance in the account currency} of the non-cancelled GL rows
-	of the Journal Entries linked to `sources` (Treasury source links), on `accounts`, up to `as_on`.
+	of the Payment Entries and Journal Entries linked to `sources` (Treasury source links), on `accounts`, up
+	to `as_on` (one query per voucher doctype, summed).
 
-	`event_prefix`: only the Journal Entries whose `treasury_event` starts with it."""
+	`event_prefix`: only the vouchers whose `treasury_event` starts with it."""
 	if not sources or not accounts:
 		return {}
+	wanted = set(sources)
 	gle = frappe.qb.DocType("GL Entry")
-	je = frappe.qb.DocType("Journal Entry")
 	amount = (
 		gle.credit_in_account_currency - gle.debit_in_account_currency
 		if credit_minus_debit
 		else gle.debit_in_account_currency - gle.credit_in_account_currency
 	)
-	query = (
-		frappe.qb.from_(gle)
-		.join(je)
-		.on(je.name == gle.voucher_no)
-		.select(je.treasury_source_doctype, je.treasury_source_name, gle.account, Sum(amount).as_("balance"))
-		.where(
-			(gle.voucher_type == "Journal Entry")
-			& (gle.is_cancelled == 0)
-			& (gle.account.isin(accounts))
-			& (je.treasury_source_doctype.isin(sorted({s[0] for s in sources})))
-			& (je.treasury_source_name.isin(sorted({s[1] for s in sources})))
+	balances: dict[tuple[str, str, str], float] = {}
+	for voucher_type in VOUCHER_DOCTYPES:
+		voucher = frappe.qb.DocType(voucher_type)
+		query = (
+			frappe.qb.from_(gle)
+			.join(voucher)
+			.on(voucher.name == gle.voucher_no)
+			.select(
+				voucher.treasury_source_doctype,
+				voucher.treasury_source_name,
+				gle.account,
+				Sum(amount).as_("balance"),
+			)
+			.where(
+				(gle.voucher_type == voucher_type)
+				& (gle.is_cancelled == 0)
+				& (gle.account.isin(accounts))
+				& (voucher.treasury_source_doctype.isin(sorted({s[0] for s in sources})))
+				& (voucher.treasury_source_name.isin(sorted({s[1] for s in sources})))
+			)
+			.groupby(voucher.treasury_source_doctype, voucher.treasury_source_name, gle.account)
 		)
-		.groupby(je.treasury_source_doctype, je.treasury_source_name, gle.account)
-	)
-	if as_on:
-		query = query.where(gle.posting_date <= getdate(as_on))
-	if event_prefix:
-		query = query.where(je.treasury_event.like(f"{event_prefix}%"))
-	wanted = set(sources)
-	return {
-		(r.treasury_source_doctype, r.treasury_source_name, r.account): flt(r.balance)
-		for r in query.run(as_dict=True)
-		if (r.treasury_source_doctype, r.treasury_source_name) in wanted
-	}
+		if as_on:
+			query = query.where(gle.posting_date <= getdate(as_on))
+		if event_prefix:
+			query = query.where(voucher.treasury_event.like(f"{event_prefix}%"))
+		for r in query.run(as_dict=True):
+			key = (r.treasury_source_doctype, r.treasury_source_name)
+			if key in wanted:
+				balances[(*key, r.account)] = balances.get((*key, r.account), 0) + flt(r.balance)
+	return balances
 
 
 def refresh_utilisation(facility: str) -> frappe._dict:

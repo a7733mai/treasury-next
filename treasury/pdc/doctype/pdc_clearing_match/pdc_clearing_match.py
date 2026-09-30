@@ -24,12 +24,17 @@ class PDCClearingMatch(Document):
 		description: DF.SmallText | None
 		direction: DF.Data | None
 		due_date: DF.Date | None
+		facility_drawdown: DF.Link | None
+		facility_repayment: DF.Link | None
+		installment_no: DF.Int
 		match_quality: DF.Literal["Strong", "Weak", "Keyword"]
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data
 		party: DF.Data | None
-		reference_doctype: DF.Literal["PDC Cheque", "Bank Transfer", "Bank Charge"]
+		reference_doctype: DF.Literal[
+			"PDC Cheque", "Bank Transfer", "Bank Charge", "Facility Repayment", "Facility Drawdown"
+		]
 		result: DF.SmallText | None
 		selected: DF.Check
 		transaction_date: DF.Date | None

@@ -41,6 +41,10 @@ BATCH_FIELDS = ("cheque_batch", "cheque_batch_row")
 # treasury.security_cheques.lifecycle (flag `treasury_security_cheque`) or carried to a replacement by the
 # lifecycle, never changed afterwards.
 SECURITY_FIELDS = ("security_cheque",)
+# The installment of a Facility Drawdown an installment cheque to the lender pays (PDC to Lender, spec 7g §3.4):
+# set only on insert by treasury.pdc.batch (flag `treasury_cheque_batch`) or carried to a replacement, never
+# changed afterwards. `facility_repayment` (the repayment of the current cycle) is written by the lifecycle.
+FACILITY_FIELDS = ("facility_drawdown", "facility_schedule_row")
 # What a submitted Cheque Batch voucher states about each of its cheques: frozen outside the cheque actions
 # while the batch is submitted (replace or cancel the cheque instead), together with the references.
 BATCH_LOCKED_FIELDS = (*LOCKED_FIELDS, "cheque_book", "drawer_bank")
@@ -76,6 +80,8 @@ PROTECTED_FIELDS = (
 	"replaces",
 	*BATCH_FIELDS,
 	*SECURITY_FIELDS,
+	*FACILITY_FIELDS,
+	"facility_repayment",
 	# written by lifecycle.record_print; a new cheque (a replacement too) starts unprinted
 	"print_count",
 	"last_printed_on",
@@ -136,6 +142,9 @@ class PDCCheque(Document):
 		drawer_bank: DF.Data | None
 		effective_due_date: DF.Date | None
 		exchange_rate: DF.Float
+		facility_drawdown: DF.Link | None
+		facility_repayment: DF.Link | None
+		facility_schedule_row: DF.Data | None
 		handover_date: DF.Date | None
 		is_postponed: DF.Check
 		issue_date: DF.Date
@@ -247,6 +256,7 @@ class PDCCheque(Document):
 		self.validate_cheque_no()
 		self.validate_dates()
 		self.validate_references()
+		self.validate_facility_cheque()
 		self.validate_locked_fields()
 		self.amount_in_words = money_in_words(self.amount, self.currency)
 
@@ -267,7 +277,7 @@ class PDCCheque(Document):
 
 		Only a cheque inserted by a Cheque Batch keeps its batch link, and only one inserted by a security
 		cheque encashment its security cheque link (flags, which a client cannot send)."""
-		keep = BATCH_FIELDS if self.flags.treasury_cheque_batch else ()
+		keep = (*BATCH_FIELDS, *FACILITY_FIELDS) if self.flags.treasury_cheque_batch else ()
 		if self.flags.treasury_security_cheque:
 			keep += SECURITY_FIELDS
 		for fieldname in PROTECTED_FIELDS:
@@ -591,6 +601,23 @@ class PDCCheque(Document):
 			self.direction,
 			_("The total allocated amount cannot be greater than the cheque amount."),
 		)
+
+	def validate_facility_cheque(self):
+		"""An installment cheque to the lender (spec 7g §2.6): outgoing, in the company currency, allocating no
+		invoice (its party posting books no party row: it is the repayment of the installment)."""
+		if not self.facility_drawdown:
+			return
+		if self.direction != lifecycle.OUTGOING:
+			frappe.throw(_("This action is only available for {0} cheques.").format(_(lifecycle.OUTGOING)))
+		if self.references:
+			frappe.throw(_("An installment cheque to the lender cannot allocate invoices."))
+		company_currency = erpnext.get_company_currency(self.company)
+		if self.currency != company_currency:
+			frappe.throw(
+				_("Installment cheques to the lender are only supported in the company currency {0}.").format(
+					company_currency
+				)
+			)
 
 	def validate_locked_fields(self):
 		if self.is_new():

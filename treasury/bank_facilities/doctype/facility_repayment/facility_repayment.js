@@ -35,6 +35,18 @@ frappe.ui.form.on("Facility Repayment", {
 				"blue"
 			);
 		}
+		// who settled it: the bank (a user), the bank's auto debit, or an installment cheque to the lender
+		if (!frm.is_new() && frm.doc.settlement && frm.doc.settlement !== "Bank") {
+			frm.dashboard.add_indicator(
+				__("Settled By: {0}", [__(frm.doc.settlement, null, "Facility Repayment")]),
+				frm.doc.settlement === "PDC Cheque" ? "purple" : "blue"
+			);
+		}
+		// "Profit" wording of an Islamic facility (server terms, treasury.bank_facilities.lenders)
+		const terms = (frm.doc.__onload || {}).terms;
+		if (terms) {
+			frm.set_df_property("interest_paid", "label", terms.interest_paid);
+		}
 	},
 });
 

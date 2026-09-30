@@ -27,6 +27,7 @@ from treasury.bank_facilities.utilisation import get_utilisation
 from treasury.pdc.report.bank_position_forecast.bank_position_forecast import BankPositionForecast
 from treasury.tests.utils import (
 	COMPANY,
+	FACILITY_JE,
 	OTHER_ABBR,
 	OTHER_COMPANY,
 	TreasuryTestMixin,
@@ -76,7 +77,8 @@ class FacilityReportTestCase(TreasuryTestMixin, IntegrationTestCase):
 
 	def setUp(self):
 		super().setUp()
-		self.use_company_settings(accrue_facility_interest=0)
+		# the 1.0 Journal Entry vouchers (the Payment Entry mode: test_facility_reports_7g)
+		self.use_company_settings(accrue_facility_interest=0, **FACILITY_JE)
 		patcher = patch("treasury.pdc.report_utils.today", return_value=str(T))
 		patcher.start()
 		self.addCleanup(patcher.stop)

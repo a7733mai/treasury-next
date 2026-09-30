@@ -45,7 +45,19 @@ def get_facilities(filters: dict, fields: list[str] | None = None) -> list[frapp
 		FACILITY,
 		filters=filters,
 		fields=fields
-		or ["name", "facility_name", "company", "bank", "currency", "total_limit", "expiry_date", "status"],
+		or [
+			"name",
+			"facility_name",
+			"company",
+			"bank",
+			"lender_type",
+			"lender_name",
+			"is_islamic",
+			"currency",
+			"total_limit",
+			"expiry_date",
+			"status",
+		],
 		order_by="bank asc, name asc",
 	)
 
@@ -63,11 +75,20 @@ def get_installments(
 	drawdown: str | None = None,
 	unpaid_only: bool = True,
 	as_of=None,
+	repayment_mode: str | None = None,
+	lender_type: str | None = None,
 ) -> list[frappe._dict]:
 	"""Schedule rows (prepayment rows excluded) of the submitted drawdowns the user may read, with their unpaid
-	amounts and their status on `as_of` (default the reports' today)."""
+	amounts, their status on `as_of` (default the reports' today), the repayment mode, the installment cheque
+	and its status, and the payment voucher."""
 	filters = {"company": company}
-	for fieldname, value in (("facility", facility), ("bank", bank), ("name", drawdown)):
+	for fieldname, value in (
+		("facility", facility),
+		("bank", bank),
+		("name", drawdown),
+		("repayment_mode", repayment_mode),
+		("lender_type", lender_type),
+	):
 		if value:
 			filters[fieldname] = value
 	readable = get_readable_drawdowns(filters)
@@ -86,6 +107,9 @@ def get_installments(
 			dd.bank_account,
 			dd.limit_type,
 			dd.currency,
+			dd.repayment_mode,
+			dd.is_islamic,
+			dd.lender_name,
 			row.installment_no,
 			row.due_date,
 			row.principal,
@@ -93,6 +117,9 @@ def get_installments(
 			row.total,
 			row.paid_principal,
 			row.paid_interest,
+			row.pdc_cheque,
+			row.payment_voucher_type,
+			row.payment_journal,
 		)
 		.where((dd.docstatus == 1) & (dd.name.isin(sorted(readable))) & (row.is_prepayment == 0))
 		.orderby(row.due_date)
@@ -106,7 +133,17 @@ def get_installments(
 	precision = get_precision()
 	as_of = getdate(as_of or report_today())
 	rows = []
-	for r in query.run(as_dict=True):
+	result = query.run(as_dict=True)
+	cheque_status = {
+		c.name: c.operational_status
+		for c in frappe.get_all(
+			"PDC Cheque",
+			filters={"name": ["in", sorted({r.pdc_cheque for r in result if r.pdc_cheque}) or [""]]},
+			fields=["name", "operational_status"],
+		)
+	}
+	for r in result:
+		r.cheque_status = cheque_status.get(r.pdc_cheque) if r.pdc_cheque else None
 		r.unpaid_principal = flt(max(flt(r.principal) - flt(r.paid_principal), 0), precision)
 		r.unpaid_interest = flt(max(flt(r.interest) - flt(r.paid_interest), 0), precision)
 		r.unpaid = flt(r.unpaid_principal + r.unpaid_interest, precision)

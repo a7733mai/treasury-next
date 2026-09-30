@@ -37,6 +37,8 @@ EVENT_LABELS = {
 	"facility_drawdown": "Drawdown",
 	"facility_upfront_fees": "Upfront Fees",
 	"facility_repayment": "Repayment",
+	"facility_stage_disbursement": "Stage Disbursement",
+	"facility_late_payment_charity": "Late Payment (Charity)",
 	"cheque_discounting": "Discounting",
 	"lg_margin": "Cash Margin",
 	"lg_commission": "Commission",

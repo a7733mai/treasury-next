@@ -427,6 +427,117 @@ def create_bank_charge_payment(
 	return pe.name
 
 
+@_system_context
+def create_deductions_payment(
+	*,
+	source_doctype: str,
+	source_name: str,
+	event: str,
+	payment_type: str,
+	company: str,
+	posting_date,
+	party_type: str,
+	party: str,
+	bank_account_head: str,
+	deductions: list[dict],
+	reference_no: str,
+	reference_date,
+	remarks: str | None = None,
+	details: dict | None = None,
+	cycle: int = 1,
+	clearance_date=None,
+) -> str:
+	"""Create (or return the existing) Pay / Receive Payment Entry whose whole amount is in deduction rows
+	(spec 7g §3.2): e.g. a facility repayment (Pay: principal on the liability account, interest on the
+	expense or accrued interest account) or a drawdown (Receive: the liability as a negative row, the upfront
+	fees as a positive one). `deductions`: [{account, amount, cost_center?}], company currency.
+
+	Why it balances (payment_entry.py:1103-1142, 1192-1213, 1699-1721; spec 7g F1-F4):
+	- F1: several unflagged deductions summing to the paid amount leave unallocated = base received -
+	  deductions - allocated = 0 and difference = base paid - party (0) - deductions = 0;
+	- F2: deduction rows are booked in the company currency: every account (the bank side too) must be in it,
+	  a foreign currency facility keeps its Journal Entries;
+	- F3: no references and nothing unallocated: no party GL row and no Payment Ledger Entry, the party's
+	  balance is untouched;
+	- F4: Receive takes rows signed by the caller; a negative row is booked as a credit
+	  (`toggle_debit_credit_if_negative`), so Receive [-Liability A, +Fees F] with paid = received = A - F
+	  books Dr Bank A - F, Dr Fees F, Cr Liability A.
+	"""
+	cycle = _validate_cycle(cycle)
+	_lock_source(source_doctype, source_name)
+	if existing := find_voucher("Payment Entry", source_doctype, source_name, event, cycle):
+		_return_existing("Payment Entry", existing, True)
+		if clearance_date and not frappe.db.get_value("Payment Entry", existing, "clearance_date"):
+			_set_clearance_date(existing, clearance_date, "Payment Entry")
+		return existing
+
+	if payment_type not in ("Pay", "Receive"):
+		frappe.throw(_("Payment Type must be Pay or Receive."))
+	company_currency = erpnext.get_company_currency(company)
+	precision = frappe.get_precision("Payment Entry Deduction", "amount") or 2
+	for account in (bank_account_head, *(d.get("account") for d in deductions or [])):
+		details_ = _transfer_account(account, company) if account else None
+		if not details_ or details_.account_currency != company_currency:
+			frappe.throw(
+				_("Payment Entry deductions must be in the company currency {0}; use a Journal Entry.").format(
+					company_currency
+				)
+			)
+	rows = [d for d in deductions or [] if flt(d.get("amount"), precision)]
+	amount = flt(sum(flt(d.get("amount"), precision) for d in rows), precision)
+	if (payment_type == "Pay" and amount <= 0) or (payment_type == "Receive" and -amount <= 0):
+		frappe.throw(_("Amount must be greater than zero."))
+
+	amounts = _get_payment_amounts(
+		company=company,
+		posting_date=posting_date,
+		party_type=party_type,
+		party=party,
+		amount=abs(amount),
+		bank_account_head=bank_account_head,
+		currency=company_currency,
+		exchange_rate=1.0,
+	)
+	pe = _new_payment_entry(
+		payment_type=payment_type,
+		company=company,
+		posting_date=posting_date,
+		party_type=party_type,
+		party=party,
+		reference_no=reference_no,
+		reference_date=reference_date,
+		bank_account_head=bank_account_head,
+		amounts=amounts,
+		remarks=remarks,
+	)
+	details = frappe._dict(details or {})
+	for row in rows:
+		pe.append(
+			"deductions",
+			_charges_row(
+				company,
+				row["account"],
+				row["amount"],
+				{**details, "cost_center": row.get("cost_center") or details.cost_center},
+			),
+		)
+	_apply_details(pe, details)
+	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
+	pe.flags.ignore_permissions = True  # see module docstring
+	pe.insert()
+	if flt(pe.difference_amount) or flt(pe.unallocated_amount):
+		frappe.throw(
+			_("The Payment Entry {0} is not balanced (difference {1}).").format(
+				pe.name, flt(pe.difference_amount) or flt(pe.unallocated_amount)
+			)
+		)
+	pe.submit()
+	if clearance_date:
+		_set_clearance_date(pe.name, clearance_date, "Payment Entry")
+	_stamp_user("Payment Entry", pe.name, owner=True)
+	return pe.name
+
+
 def _new_payment_entry(
 	*,
 	payment_type: str,

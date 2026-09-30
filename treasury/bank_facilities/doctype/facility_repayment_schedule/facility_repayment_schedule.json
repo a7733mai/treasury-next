@@ -16,8 +16,10 @@
   "paid_principal",
   "paid_interest",
   "is_prepayment",
+  "payment_voucher_type",
   "payment_journal",
-  "repayment"
+  "repayment",
+  "pdc_cheque"
  ],
  "fields": [
   {
@@ -107,11 +109,20 @@
    "read_only": 1
   },
   {
-   "fieldname": "payment_journal",
+   "fieldname": "payment_voucher_type",
    "fieldtype": "Link",
-   "label": "Payment Journal",
+   "hidden": 1,
+   "label": "Payment Voucher Type",
    "no_copy": 1,
-   "options": "Journal Entry",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_journal",
+   "fieldtype": "Dynamic Link",
+   "label": "Payment Voucher",
+   "no_copy": 1,
+   "options": "payment_voucher_type",
    "read_only": 1
   },
   {
@@ -120,6 +131,14 @@
    "label": "Last Repayment",
    "no_copy": 1,
    "options": "Facility Repayment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pdc_cheque",
+   "fieldtype": "Link",
+   "label": "Installment Cheque",
+   "no_copy": 1,
+   "options": "PDC Cheque",
    "read_only": 1
   }
  ],

@@ -10,6 +10,8 @@
   "amount",
   "drawer_bank",
   "column_break_cheque",
+  "installment_no",
+  "facility_schedule_row",
   "pdc_cheque",
   "remarks",
   "allocation_section",
@@ -55,6 +57,22 @@
    "fieldtype": "Column Break"
   },
   {
+   "columns": 1,
+   "depends_on": "eval:doc.installment_no",
+   "fieldname": "installment_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Installment No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "facility_schedule_row",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Facility Schedule Row",
+   "read_only": 1
+  },
+  {
    "columns": 2,
    "fieldname": "pdc_cheque",
    "fieldtype": "Link",
@@ -82,7 +100,7 @@
    "options": "DocType"
   },
   {
-   "columns": 2,
+   "columns": 1,
    "fieldname": "reference_name",
    "fieldtype": "Dynamic Link",
    "in_list_view": 1,

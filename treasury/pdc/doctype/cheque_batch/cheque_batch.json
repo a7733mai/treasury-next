@@ -15,6 +15,7 @@
   "purpose",
   "source_doctype",
   "source_name",
+  "facility_drawdown",
   "column_break_main",
   "bank_account",
   "cheque_book",
@@ -135,6 +136,16 @@
    "label": "Created From",
    "options": "source_doctype",
    "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.facility_drawdown",
+   "description": "Installment cheques to the lender of this drawdown (Generate Installment Cheques): each cheque pays its installment on its due date.",
+   "fieldname": "facility_drawdown",
+   "fieldtype": "Link",
+   "label": "Facility Drawdown",
+   "options": "Facility Drawdown",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_main",

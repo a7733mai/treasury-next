@@ -50,6 +50,15 @@ frappe.query_reports["Cost of Financing"] = {
 			options: "Bank Facility",
 			get_query: () => ({ filters: { company: frappe.query_report.get_filter_value("company") } }),
 		},
+		{
+			fieldname: "lender_type",
+			label: __("Lender Type"),
+			fieldtype: "Select",
+			options: ["", "Bank", "Finance Company"].map((value) => ({
+				value,
+				label: value ? __(value, null, "Bank Facility") : "",
+			})),
+		},
 	],
 
 	tree: true,

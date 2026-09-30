@@ -15,6 +15,7 @@ from treasury.tests.utils import (
 	BANK_CHARGE_SETTINGS,
 	COMPANY,
 	CUSTOMER,
+	FACILITY_JE,
 	PE_SETTINGS,
 	SUPPLIER,
 	TreasuryTestMixin,
@@ -61,7 +62,14 @@ TREASURY_ITEMS = {
 		"Facility Repayment",
 	],
 	"Customer": ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Security Cheque"],
-	"Supplier": ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Security Cheque", "Letter of Credit"],
+	"Supplier": [
+		"PDC Cheque",
+		"Cheque Batch",
+		"Bank Transfer",
+		"Security Cheque",
+		"Letter of Credit",
+		"Bank Facility",
+	],
 	"Employee": ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Security Cheque"],
 	"Bank Account": [
 		"PDC Cheque",
@@ -114,7 +122,7 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 
 	def setUp(self):
 		super().setUp()
-		self.use_company_settings(**PE_SETTINGS)
+		self.use_company_settings(**PE_SETTINGS, **FACILITY_JE)
 		# get_open_count sets a statement timeout on the connection
 		self.addCleanup(frappe.db.set_execution_timeout, 0)
 
