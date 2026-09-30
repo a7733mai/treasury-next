@@ -1,5 +1,5 @@
 """Phase 7e: levels, the hourly digest / alerts, dedupe and escalation, channels, language and recipients
-(spec 7e §3.2–3.4, §7 C).
+(spec 7e §3.2-3.4, §7 C).
 
 The E1 fixture (treasury.tests.utils.make_alert_fixture_e1) is built on a bank of its own with dates relative
 to the real today. `evaluate_company` is called directly with a `now` of the day under test; e-mail is mocked

@@ -47,7 +47,7 @@ class TreasurySettings(Document):
 		self.validate_balance_alerts()
 
 	def validate_balance_alerts(self):
-		"""Horizon 1–7 days, digest hour 0–23, one row per role / user, enabled users only (spec 7e §2.1)."""
+		"""Horizon 1-7 days, digest hour 0-23, one row per role / user, enabled users only (spec 7e §2.1)."""
 		if not 1 <= cint(self.balance_alert_horizon) <= MAX_HORIZON:
 			frappe.throw(_("Horizon must be between 1 and 7 days."))
 		if not 0 <= cint(self.balance_digest_hour) <= 23:
