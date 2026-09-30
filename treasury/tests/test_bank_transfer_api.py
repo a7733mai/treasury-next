@@ -149,9 +149,11 @@ class TestBankTransferAPI(TreasuryTestMixin, IntegrationTestCase):
 			[("Journal Entry", supplier_je.name)],
 		)
 		customer_je = make_party_journal_entry("Customer", CUSTOMER, 700, acc("Sales"))
-		# no default Fawran bank: the company currency, not the site's global default currency
+		# no default Fawran bank and no cheque bank either: no bank, and the company currency (never the
+		# site's global default currency)
 		self.use_company_settings(default_fawran_bank_account=None)
-		values = build_transfer("Journal Entry", customer_je.name, "Fawran")
+		with patch("treasury.bank_transfers.api._fallback_bank", return_value=None):
+			values = build_transfer("Journal Entry", customer_je.name, "Fawran")
 		self.assertEqual(
 			(values["transfer_type"], values["party"], values["amount"], values["method"]),
 			("Party Receipt", CUSTOMER, 700, "Fawran"),
