@@ -107,15 +107,15 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertFalse(alert_logs(alert_type="Override", bank_account=self.bank))
 
 	def test_message_html(self):
-		"""Design 7e §4.1: names and amounts in <bdi>, at most 3 lines per bank then "+n more day(s)", and a
+		"""Design 7e §4.1: names and amounts bidi-isolated (FSI / PDI), at most 3 lines per bank then "+n more day(s)", and a
 		link to the bank's forecast."""
 		self.mode("Warn")
 		# T+1 .. T+6 all fall below the minimum and are all lowered: 6 days
 		cheque = self.cheque(100000, 1)
 		cheque.deliver(handover_date=self.today)
 		(message,) = self.warnings()
-		self.assertIn(f"<bdi>{self.bank}</bdi>", message)
-		self.assertIn(f"<bdi>{cheque.name}</bdi>", message)
+		self.assertIn(f"{guard.FSI}{self.bank}{guard.PDI}", message)
+		self.assertIn(f"{guard.FSI}{cheque.name}{guard.PDI}", message)
 		self.assertEqual(message.count("<li>"), 3)
 		self.assertIn(f'<li class="text-muted">{_("+{0} more day(s)").format(3)}</li>', message)
 		route = notify.forecast_route(COMPANY, self.today, 7, self.bank)
@@ -564,7 +564,7 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		cheque.deliver(handover_date=self.today)
 		(message,) = self.warnings()
 		self.assertIn(f"<b>{escape_html(_('PDC Cheque'))}</b>", message)
-		self.assertIn(f"<b><bdi>{cheque.name}</bdi></b>", message)
+		self.assertIn(f"<b>{guard.FSI}{cheque.name}{guard.PDI}</b>", message)
 
 	# ------------------------------------------------------------------ Security Cheque
 

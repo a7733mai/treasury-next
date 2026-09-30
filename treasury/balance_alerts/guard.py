@@ -155,18 +155,27 @@ def message_lines(doctype: str, name: str, found: list) -> list[str]:
 	return lines
 
 
+FSI, PDI = chr(0x2068), chr(0x2069)  # first strong isolate / pop directional isolate
+
+
+def isolate(text: str) -> str:
+	"""Bidi-isolate a name or amount (the <bdi> of plain text)."""
+	return f"{FSI}{text}{PDI}"
+
+
 def message_html(doctype: str, name: str, found: list, snapshot) -> str:
-	"""The message shown to the user (design 7e §4.1): escaped, every name and amount in <bdi>, and a link to
-	the forecast of the first breached bank."""
+	"""The message shown to the user (design 7e §4.1): escaped, every name and amount isolated for RTL, and a
+	link to the forecast of the first breached bank. Frappe's message sanitizer drops <bdi>, so the isolation uses
+	the Unicode FSI / PDI characters instead (same effect, survives `clean_html`)."""
 	esc = frappe.utils.escape_html
 
 	def wrap(value, bold=False):
-		text = f"<bdi>{esc(value)}</bdi>"
+		text = isolate(esc(value))
 		return f"<b>{text}</b>" if bold else text
 
 	# each argument is a closed tag of its own: a translation may reorder the placeholders
 	head = _("Low projected balance after {0} {1}:").format(
-		f"<b>{esc(_(doctype))}</b>", f"<b><bdi>{esc(name)}</bdi></b>"
+		f"<b>{esc(_(doctype))}</b>", f"<b>{isolate(esc(name))}</b>"
 	)
 	items = []
 	for shown, more in _grouped(found):
