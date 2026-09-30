@@ -4,10 +4,19 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, getdate, today
+from frappe.utils import cint, getdate, now_datetime, today
+
+from treasury.utils.context import real_user
+from treasury.utils.protected_fields import changed_tables
 
 # Leaves are scanned in chunks so a (mis)configured huge range never loads everything at once.
 SCAN_CHUNK = 500
+# `kind` of a cancelled leaves row: a cheque (or a spoilt leaf) cancelled, or a leaf voided (Void Leaf).
+KIND_CANCELLED = "Cancelled"
+KIND_VOID = "Void"
+VOID_REASON_TYPES = ("Damaged", "Misprinted", "Lost", "Stolen", "Other")
+# Leaves voided in one action at most (one row each).
+MAX_VOID_RANGE = 100
 
 
 class ChequeBook(Document):
@@ -35,7 +44,15 @@ class ChequeBook(Document):
 		status: DF.Literal["Active", "Exhausted", "Closed"]
 	# end: auto-generated types
 
+	def onload(self):
+		if not self.is_new():
+			from treasury.pdc import cheque_leaves
+
+			self.set_onload("leaf_summary", cheque_leaves.book_summary(self))
+
 	def validate(self):
+		# first: the cancelled / void leaves are an audit trail, written only by the leaf actions
+		self.validate_leaf_log()
 		self.validate_bank_account()
 		self.validate_range()
 		self.validate_overlap()
@@ -87,7 +104,22 @@ class ChequeBook(Document):
 				)
 			)
 
+	def validate_leaf_log(self):
+		"""`read_only` only protects the form: a REST save could edit or delete a row and free its leaf.
+		Only the leaf actions (Cancel Leaf, Void Leaf, a cancelled cheque) change the table; a new book may be
+		inserted with rows."""
+		if self.is_new() or self.flags.treasury_leaf_action:
+			return
+		before = self.get_doc_before_save()
+		if before and changed_tables(self, before, ("cancelled_leaves",), lifecycle_save=False):
+			frappe.throw(
+				_("Cancelled and void leaves can only be recorded by the Cancel Leaf and Void Leaf actions."),
+				title=_("Not Allowed"),
+			)
+
 	def validate_cancelled_leaves(self):
+		before = None if self.is_new() else self.get_doc_before_save()
+		saved = {row.name for row in before.cancelled_leaves} if before else set()
 		seen = set()
 		for row in self.cancelled_leaves:
 			number = self.parse_leaf(row.cheque_no)
@@ -96,8 +128,13 @@ class ChequeBook(Document):
 					_("Row #{0}: Cheque No {1} is cancelled more than once.").format(row.idx, row.cheque_no)
 				)
 			seen.add(number)
+			if row.name and row.name in saved:
+				continue  # recorded before: kept exactly as it is
 			row.cheque_no = self.format_leaf(number)
 			row.date = row.date or today()
+			row.kind = row.kind or KIND_CANCELLED
+			row.user = real_user()
+			row.datetime = now_datetime()
 
 	def update_status(self):
 		if self.status == "Closed":
@@ -164,12 +201,30 @@ class ChequeBook(Document):
 			number = chunk[-1] + 1
 		return None
 
-	def add_cancelled_leaf(self, number: int, reason: str | None = None, date=None):
+	def add_cancelled_leaf(
+		self,
+		number: int,
+		reason: str | None = None,
+		date=None,
+		kind: str = KIND_CANCELLED,
+		reason_type: str | None = None,
+		source: tuple[str, str] | None = None,
+	):
+		"""Append a cancelled / void leaf row; `source`: (doctype, name) of the cheque whose cancellation
+		recorded it. The row's user and time are set on save (`validate_cancelled_leaves`)."""
 		if number in self.cancelled_numbers():
 			return
 		self.append(
 			"cancelled_leaves",
-			{"cheque_no": self.format_leaf(number), "reason": reason, "date": getdate(date or today())},
+			{
+				"cheque_no": self.format_leaf(number),
+				"kind": kind,
+				"reason_type": reason_type,
+				"reason": reason,
+				"date": getdate(date or today()),
+				"source_doctype": source[0] if source else None,
+				"source_name": source[1] if source else None,
+			},
 		)
 
 	@frappe.whitelist(methods=["POST"])
@@ -210,14 +265,22 @@ def allocate_next_cheque_no(cheque_book: str) -> str:
 	return book.format_leaf(number)
 
 
-def record_cancelled_leaf(cheque_book: str, cheque_no: str, reason: str | None = None, date=None):
-	"""Record a leaf as cancelled (used when its PDC Cheque is cancelled; permission checked by the caller)."""
+def record_cancelled_leaf(
+	cheque_book: str,
+	cheque_no: str,
+	reason: str | None = None,
+	date=None,
+	source: tuple[str, str] | None = None,
+):
+	"""Record a leaf as cancelled (used when its PDC Cheque is cancelled; permission checked by the caller).
+	`source`: (doctype, name) of that cheque."""
 	book = _lock_book(cheque_book)
 	value = str(cheque_no or "").strip()
 	if not value.isdigit() or not cint(book.start_no) <= int(value) <= cint(book.end_no):
 		return
-	book.add_cancelled_leaf(int(value), reason, date)
+	book.add_cancelled_leaf(int(value), reason, date, reason_type="Cheque Cancelled", source=source)
 	book.flags.ignore_permissions = True  # the caller checked permission on the PDC Cheque
+	book.flags.treasury_leaf_action = True
 	book.save()
 
 
@@ -237,6 +300,55 @@ def cancel_leaf(cheque_book: str, cheque_no: str, reason: str | None = None):
 				"Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead."
 			).format(frappe.bold(cheque_no))
 		)
-	book.add_cancelled_leaf(number, reason)
+	book.add_cancelled_leaf(number, reason, reason_type="Spoilt")
+	book.flags.treasury_leaf_action = True
 	book.save()
 	return book.format_leaf(number)
+
+
+@frappe.whitelist(methods=["POST"])
+def void_leaf(
+	cheque_book: str,
+	from_cheque_no: str,
+	to_cheque_no: str | None = None,
+	reason_type: str | None = None,
+	reason: str | None = None,
+) -> list[str]:
+	"""Void one unused leaf or a range of them (damaged, misprinted, lost, stolen ...): each gets a `Void` row
+	with the reason and the user, so it is never allocated. The book may be in any status (record keeping)."""
+	book = _lock_book(cheque_book)
+	book.check_permission("write")
+	if reason_type not in VOID_REASON_TYPES:
+		frappe.throw(_("Select the reason type of the void leaf."))
+	reason = (reason or "").strip()
+	if not reason:
+		frappe.throw(_("A reason is required to void a leaf."))
+	first = book.parse_leaf(from_cheque_no)
+	last = book.parse_leaf(to_cheque_no or from_cheque_no)
+	if last < first:
+		frappe.throw(_("To Cheque No cannot be before From Cheque No."))
+	if last - first + 1 > MAX_VOID_RANGE:
+		frappe.throw(_("At most {0} leaves can be voided at once.").format(MAX_VOID_RANGE))
+
+	numbers = list(range(first, last + 1))
+	cancelled = book.cancelled_numbers()
+	if already := next((n for n in numbers if n in cancelled), None):
+		frappe.throw(
+			_("Cheque No {0} is already cancelled or void.").format(frappe.bold(book.format_leaf(already)))
+		)
+	if used := book.used_numbers(numbers, exclude_cancelled_cheques=True):
+		frappe.throw(
+			_(
+				"Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel or replace that cheque instead."
+			).format(frappe.bold(book.format_leaf(min(used))))
+		)
+
+	for number in numbers:
+		book.add_cancelled_leaf(number, reason, today(), kind=KIND_VOID, reason_type=reason_type)
+	book.flags.treasury_leaf_action = True
+	book.save()  # Exhausted if no free leaf remains
+
+	leaves = [book.format_leaf(n) for n in numbers]
+	range_text = leaves[0] if len(leaves) == 1 else f"{leaves[0]} - {leaves[-1]}"
+	book.add_comment("Info", _("Leaves {0} voided ({1}): {2}").format(range_text, _(reason_type), reason))
+	return leaves

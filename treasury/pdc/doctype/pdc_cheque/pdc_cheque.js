@@ -82,13 +82,23 @@ frappe.ui.form.on("PDC Cheque", {
 			() => open_print(frm.doctype, frm.doc.name, "PDC Cheque Receipt"),
 			__("Print", null, "PDC Cheque")
 		);
-		// the PDC Account Mapping of the bank may name its own cheque layout
-		const cheque_format = (frm.doc.__onload && frm.doc.__onload.cheque_print_format) || "PDC Cheque Print";
-		frm.add_custom_button(
-			__("Print Cheque"),
-			() => open_print(frm.doctype, frm.doc.name, cheque_format),
-			__("Print", null, "PDC Cheque")
-		);
+		const layout = frm.doc.__onload && frm.doc.__onload.cheque_layout;
+		if (frm.doc.direction === "Outgoing" && layout) {
+			// the bank's Cheque Layout: the print is registered (counter, status log) before it opens
+			frm.add_custom_button(
+				__("Print Cheque"),
+				() => pdc_print_cheque(frm, layout, frm.doc.print_count > 0),
+				__("Print", null, "PDC Cheque")
+			);
+		} else {
+			// the PDC Account Mapping of the bank may name its own cheque layout
+			const cheque_format = (frm.doc.__onload && frm.doc.__onload.cheque_print_format) || "PDC Cheque Print";
+			frm.add_custom_button(
+				__("Print Cheque"),
+				() => open_print(frm.doctype, frm.doc.name, cheque_format),
+				__("Print", null, "PDC Cheque")
+			);
+		}
 		frm.events.add_cheque_template_button(frm, open_print);
 	},
 
@@ -704,6 +714,69 @@ function pdc_low_balance_log(frm) {
 			"orange"
 		);
 	}
+}
+
+// ------------------------------------------------------------------------------------ cheque printing
+// lifecycle.record_print registers the print; a printed cheque is printed again only with a reason (and, when the
+// company says so, by a Treasury Manager). The server is authoritative; `reprint` only opens the reason field.
+function pdc_print_cheque(frm, layout, reprint) {
+	const esc = frappe.utils.escape_html;
+	const fields = [
+		{
+			fieldname: "language",
+			fieldtype: "Select",
+			label: __("Language", null, "Cheque Layout"),
+			options: [
+				{ value: "Arabic", label: __("Arabic", null, "Cheque Layout") },
+				{ value: "English", label: __("English", null, "Cheque Layout") },
+			],
+			default: layout.default_language || "Arabic",
+			reqd: 1,
+		},
+	];
+	if (reprint) {
+		fields.push(
+			{
+				fieldname: "warning",
+				fieldtype: "HTML",
+				options: `<div class="alert alert-warning">${esc(
+					__("Printed {0} times, last by {1} on {2}.", [
+						frm.doc.print_count || 1,
+						frappe.user.full_name(frm.doc.last_printed_by) || frm.doc.last_printed_by || "",
+						frappe.datetime.str_to_user(frm.doc.last_printed_on) || "",
+					])
+				)}</div>`,
+			},
+			{ fieldname: "reason", fieldtype: "Small Text", label: __("Reason"), reqd: 1 }
+		);
+	}
+	frappe.prompt(
+		fields,
+		(values) => {
+			frm.call({
+				doc: frm.doc,
+				method: "print_cheque",
+				args: { language: values.language, reprint: reprint ? 1 : 0, reason: values.reason },
+				freeze: true,
+				error_handlers: {
+					// printed meanwhile by someone else: ask again as a reprint
+					ChequeAlreadyPrintedError: () => frm.reload_doc().then(() => pdc_print_cheque(frm, layout, true)),
+				},
+			}).then((r) => {
+				const result = r.message || {};
+				const params = new URLSearchParams({
+					doctype: frm.doctype,
+					name: frm.doc.name,
+					format: result.print_format || "Treasury Cheque",
+					_lang: result.language || "",
+				});
+				window.open(`/printview?${params.toString()}`);
+				frm.reload_doc();
+			});
+		},
+		reprint ? __("Reprint Cheque") : __("Print Cheque"),
+		__("Print", null, "PDC Cheque")
+	);
 }
 
 function pdc_replace(frm) {

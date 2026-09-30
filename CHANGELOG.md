@@ -2,6 +2,22 @@
 
 ## Unreleased (1.1)
 
+### Cheque Leaves, Cheque Printing and Security Reports (Phase 7f)
+- **Cheque Leaf Register** (every leaf of the outgoing books with its status, usage, party, dates, Payment
+  Entries; view Leaves / Books) on a read-only leaf engine (`treasury.pdc.cheque_leaves`); print format
+  **Cheque Book Leaves**; Cheque Book Usage gets a Void Leaves column.
+- **Void Leaf** on Cheque Book (one leaf or a range, reason type and reason, also on a Closed book); cancelled /
+  void leaves rows keep kind, reason type, user, time and the cancelled cheque, and can only be written by the
+  leaf actions.
+- **Cheque Layout** per bank account (positions in mm, calibration, fonts, date formats, Arabic-Indic digits,
+  "only" / currency / fraction wording, A4 carrier) with a live preview and a test print; print formats
+  **Treasury Cheque**, **Cheque Batch Leaves**, **Cheque Layout Test Print**. *Print Cheque* registers each
+  print (counter, last printed on / by, status log Printed / Reprinted, reprint reason; Treasury Manager only by
+  default: `cheque_reprint_requires_manager`); *Payee Name on Cheque*.
+- `treasury_amount_in_words`: optional "only", currency name and fraction name overrides, fraction in figures.
+- Reports **Security Cheques Summary** (ageing buckets, chart, cards) and **Security Cheque Movements**.
+- Patch `set_cheque_leaf_defaults`. No accounting in this phase.
+
 ### Bank Position Alerts (Phase 7e)
 - Per-bank daily projected positions from the Bank Position Forecast engine (`treasury.pdc.bank_positions`,
   one engine call per company; banks sharing a GL account are merged), evaluated against new **Balance

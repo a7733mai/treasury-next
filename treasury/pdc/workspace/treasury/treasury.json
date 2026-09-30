@@ -73,7 +73,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "PDC Reports",
-   "link_count": 7,
+   "link_count": 8,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -156,10 +156,21 @@
    "type": "Link"
   },
   {
+   "dependencies": "Cheque Book",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cheque Leaf Register",
+   "link_count": 0,
+   "link_to": "Cheque Leaf Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
    "hidden": 0,
    "is_query_report": 0,
    "label": "Treasury Masters",
-   "link_count": 4,
+   "link_count": 5,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -173,6 +184,17 @@
    "link_to": "Cheque Book",
    "link_type": "DocType",
    "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cheque Layout",
+   "link_count": 0,
+   "link_to": "Cheque Layout",
+   "link_type": "DocType",
+   "onboard": 0,
    "type": "Link"
   },
   {
@@ -212,7 +234,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Security Cheques",
-   "link_count": 6,
+   "link_count": 8,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -246,6 +268,28 @@
    "label": "Security Cheque Register",
    "link_count": 0,
    "link_to": "Security Cheque Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Security Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Security Cheques Summary",
+   "link_count": 0,
+   "link_to": "Security Cheques Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Security Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Security Cheque Movements",
+   "link_count": 0,
+   "link_to": "Security Cheque Movements",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
@@ -500,7 +544,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-12 12:00:00.000000",
+ "modified": "2026-10-14 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",

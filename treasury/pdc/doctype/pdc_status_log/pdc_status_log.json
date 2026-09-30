@@ -49,7 +49,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Event",
-   "options": "Created\nDelivered\nReceived\nParty Posted\nDeposited\nUnder Collection Posted\nCleared\nBank Posted\nBank Charges Posted\nPostponed\nBounced\nBounce Charges Posted\nVoucher Cancelled\nVoucher Reversed\nReversed\nRe-presented\nReplaced\nReplacement Created\nCancelled\nReturned\nDiscounted\nDiscount Cancelled\nDiscount Settled\nDiscount Recourse Posted\nLow Balance Override",
+   "options": "Created\nDelivered\nReceived\nParty Posted\nDeposited\nUnder Collection Posted\nCleared\nBank Posted\nBank Charges Posted\nPostponed\nBounced\nBounce Charges Posted\nVoucher Cancelled\nVoucher Reversed\nReversed\nRe-presented\nReplaced\nReplacement Created\nCancelled\nReturned\nDiscounted\nDiscount Cancelled\nDiscount Settled\nDiscount Recourse Posted\nLow Balance Override\nPrinted\nReprinted",
    "read_only": 1,
    "search_index": 1
   },

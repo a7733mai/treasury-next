@@ -51,6 +51,7 @@
    "options": "Account"
   },
   {
+   "description": "Legacy: used only when the bank account has no Cheque Layout.",
    "fieldname": "cheque_print_format",
    "fieldtype": "Link",
    "label": "Cheque Print Format",

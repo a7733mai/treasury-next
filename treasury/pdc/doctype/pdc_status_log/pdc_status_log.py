@@ -40,6 +40,8 @@ class PDCStatusLog(Document):
 			"Discount Settled",
 			"Discount Recourse Posted",
 			"Low Balance Override",
+			"Printed",
+			"Reprinted",
 		]
 		event_date: DF.Date | None
 		from_accounting: DF.Data | None

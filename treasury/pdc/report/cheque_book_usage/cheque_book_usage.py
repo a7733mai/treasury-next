@@ -6,13 +6,15 @@
 A leaf is used when an outgoing PDC Cheque of the book's bank account carries its number (the same rule the
 cheque book applies when it allocates numbers) and that cheque is not cancelled; a cancelled cheque's leaf
 is recorded in the book's cancelled leaves. An outgoing Security Cheque uses its leaf whatever its status
-(cancelling or returning it frees nothing). A leaf is counted once: cancelled wins over used.
+(cancelling or returning it frees nothing). A leaf is counted once: cancelled / void wins over used. Void
+leaves (Void Leaf) are counted apart from the cancelled ones. The leaf-by-leaf view is Cheque Leaf Register.
 """
 
 import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
+from treasury.pdc.cheque_leaves import get_cancelled_rows
 from treasury.pdc.report_utils import (
 	CTX,
 	OUTGOING,
@@ -46,9 +48,15 @@ def execute(filters=None):
 
 	used_by_bank = {bank: get_used_leaves(bank) for bank in {b.bank_account for b in books}}
 	cancelled_by_book = get_cancelled_leaves([b.name for b in books])
+	void_by_book = get_cancelled_leaves([b.name for b in books], kind="Void")
 	payment_entries = get_book_payment_entries([b.name for b in books])
 	data = [
-		make_row(book, used_by_bank[book.bank_account], cancelled_by_book.get(book.name, set()))
+		make_row(
+			book,
+			used_by_bank[book.bank_account],
+			cancelled_by_book.get(book.name, set()),
+			void_by_book.get(book.name, set()),
+		)
 		for book in books
 	]
 	for row in data:
@@ -95,30 +103,27 @@ def get_used_leaves(bank_account: str) -> set[int]:
 	return {int(n) for n in numbers if str(n or "").strip().isdigit()}
 
 
-def get_cancelled_leaves(books: list[str]) -> dict[str, set[int]]:
-	if not books:
-		return {}
-	result: dict[str, set[int]] = {}
-	for row in frappe.get_all(
-		"Cheque Book Cancelled Leaf",
-		filters={"parenttype": BOOK_DOCTYPE, "parent": ["in", books]},
-		fields=["parent", "cheque_no"],
-	):
-		if str(row.cheque_no or "").strip().isdigit():
-			result.setdefault(row.parent, set()).add(int(row.cheque_no))
-	return result
+def get_cancelled_leaves(books: list[str], kind: str = "Cancelled") -> dict[str, set[int]]:
+	"""{book: leaf numbers of its cancelled leaves rows of `kind` (Cancelled / Void)}."""
+	return {
+		book: {number for number, row in rows.items() if row.kind == kind}
+		for book, rows in get_cancelled_rows(books).items()
+	}
 
 
 def format_leaf(number: int, digits: int) -> str:
 	return str(number).zfill(digits) if digits else str(number)
 
 
-def make_row(book, used_leaves: set[int], cancelled_leaves: set[int]) -> frappe._dict:
+def make_row(
+	book, used_leaves: set[int], cancelled_leaves: set[int], void_leaves: set[int] | None = None
+) -> frappe._dict:
 	start, end, digits = cint(book.start_no), cint(book.end_no), cint(book.leaf_digits)
 	total = max(end - start + 1, 0)
 	cancelled = {n for n in cancelled_leaves if start <= n <= end}
-	used = {n for n in used_leaves if start <= n <= end} - cancelled
-	remaining = 0 if book.status == "Closed" else total - len(used) - len(cancelled)
+	void = {n for n in void_leaves or () if start <= n <= end}
+	used = {n for n in used_leaves if start <= n <= end} - cancelled - void
+	remaining = 0 if book.status == "Closed" else total - len(used) - len(cancelled) - len(void)
 	return frappe._dict(
 		cheque_book=book.name,
 		bank_account=book.bank_account,
@@ -127,10 +132,11 @@ def make_row(book, used_leaves: set[int], cancelled_leaves: set[int]) -> frappe.
 		total_leaves=total,
 		used_leaves=len(used),
 		cancelled_leaves=len(cancelled),
+		void_leaves=len(void),
 		remaining_leaves=remaining,
 		next_no=format_leaf(cint(book.next_no), digits) if book.status == "Active" else None,
 		status=book.status,
-		used_percent=flt((len(used) + len(cancelled)) * 100.0 / total, 2) if total else 0,
+		used_percent=flt((len(used) + len(cancelled) + len(void)) * 100.0 / total, 2) if total else 0,
 	)
 
 
@@ -143,6 +149,7 @@ def get_columns() -> list[dict]:
 		column("total_leaves", _("Total Leaves"), "Int", 90),
 		column("used_leaves", _("Used", context=CTX), "Int", 80),
 		column("cancelled_leaves", _("Cancelled Leaves"), "Int", 110),
+		column("void_leaves", _("Void Leaves"), "Int", 90),
 		column("remaining_leaves", _("Remaining", context=CTX), "Int", 90),
 		column("next_no", _("Next No"), width=100),
 		column("status", _("Status", context="Treasury"), width=90),

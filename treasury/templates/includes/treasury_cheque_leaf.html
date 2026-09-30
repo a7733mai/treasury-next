@@ -1,0 +1,59 @@
+{#- One cheque leaf (treasury.pdc.cheque_printing.render_leaf). Every position is in mm from the top-left corner
+    of the physical leaf (A4 Carrier: of the sheet, the leaf offset included), whatever the language: the language
+    only sets the text direction inside a box. Texts come escaped from here; `leaf` is built by build_leaf.
+    wkhtmltopdf takes the page size from the `.print-format` rule, the browser from `@page`. -#}
+{%- set rtl = leaf.dir == "rtl" -%}
+{%- set start = "right" if rtl else "left" -%}
+{%- set b = leaf.boxes -%}
+<style>
+.print-format{padding:0;margin:0;page-width:{{ leaf.page_width }};page-height:{{ leaf.page_height }};margin-top:0mm;margin-bottom:0mm;margin-left:0mm;margin-right:0mm}
+@page{size:{{ leaf.page_width }} {{ leaf.page_height }};margin:0}
+.treasury-cheque-page{page-break-after:always}
+.treasury-cheque-page:last-child{page-break-after:auto}
+.treasury-cheque-leaf .tcl-box{position:absolute;white-space:nowrap;line-height:1.2;box-sizing:border-box}
+.treasury-cheque-leaf .tcl-crossing{border-top:1px solid #000;border-bottom:1px solid #000;text-align:center;-webkit-transform-origin:center;transform-origin:center}
+.treasury-cheque-leaf .tcl-signature-text{position:absolute;bottom:0;left:0;right:0;text-align:center}
+.treasury-cheque-leaf.tcl-grid{background-color:#fff;background-image:repeating-linear-gradient(0deg,rgba(0,120,215,.35) 0,rgba(0,120,215,.35) .2mm,transparent .2mm,transparent 10mm),repeating-linear-gradient(90deg,rgba(0,120,215,.35) 0,rgba(0,120,215,.35) .2mm,transparent .2mm,transparent 10mm),repeating-linear-gradient(0deg,rgba(0,120,215,.12) 0,rgba(0,120,215,.12) .1mm,transparent .1mm,transparent 1mm),repeating-linear-gradient(90deg,rgba(0,120,215,.12) 0,rgba(0,120,215,.12) .1mm,transparent .1mm,transparent 1mm)}
+.treasury-cheque-leaf .tcl-leaf-outline{position:absolute;border:.3mm solid #333;box-sizing:border-box}
+.treasury-cheque-leaf .tcl-outline{outline:.2mm dashed #d9480f}
+.treasury-cheque-leaf .tcl-label{position:absolute;top:-3mm;{{ start }}:0;font-size:6pt;color:#d9480f;font-family:Arial,Tahoma,sans-serif;white-space:nowrap}
+</style>
+<div class="treasury-cheque-leaf{{ ' tcl-grid' if test_grid else '' }}" dir="{{ leaf.dir }}" lang="{{ leaf.lang }}" style="position:relative;width:{{ leaf.page_width }};height:{{ leaf.page_height }};overflow:hidden;font-family:{{ leaf.font_family | e }};font-size:{{ leaf.font_size }};">
+	{%- if test_grid %}
+	<div class="tcl-leaf-outline" style="top:{{ leaf.leaf_top }};left:{{ leaf.leaf_left }};width:{{ leaf.leaf_width }};height:{{ leaf.leaf_height }};"></div>
+	{%- endif %}
+	<div class="tcl-box tcl-date{{ ' tcl-outline' if test_grid else '' }}" dir="ltr" style="top:{{ b.date.top }};left:{{ b.date.left }};width:{{ b.date.width }};font-size:{{ b.date.font_size }};text-align:center;">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Date", context="Cheque Layout") }}</span>{% endif -%}
+		{%- if leaf.date_chars -%}
+			{%- for char in leaf.date_chars -%}<span style="display:inline-block;width:{{ leaf.date_char_spacing }};text-align:center">{{ char | e }}</span>{%- endfor -%}
+		{%- else -%}{{ leaf.date | e }}{%- endif -%}
+	</div>
+	<div class="tcl-box tcl-payee{{ ' tcl-outline' if test_grid else '' }}" style="top:{{ b.payee.top }};left:{{ b.payee.left }};width:{{ b.payee.width }};font-size:{{ b.payee.font_size }};text-align:{{ start }};">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Payee", context="Cheque Layout") }}</span>{% endif -%}
+		{{ leaf.payee | e }}
+	</div>
+	<div class="tcl-box tcl-figures{{ ' tcl-outline' if test_grid else '' }}" dir="ltr" style="top:{{ b.figures.top }};left:{{ b.figures.left }};width:{{ b.figures.width }};font-size:{{ b.figures.font_size }};text-align:center;font-weight:bold;">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Amount in Figures", context="Cheque Layout") }}</span>{% endif -%}
+		{{ leaf.figures | e }}
+	</div>
+	<div class="tcl-box tcl-words-1{{ ' tcl-outline' if test_grid else '' }}" style="top:{{ b.words1.top }};left:{{ b.words1.left }};width:{{ b.words1.width }};font-size:{{ b.words1.font_size }};text-align:{{ start }};">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Amount in Words", context="Cheque Layout") }} 1</span>{% endif -%}
+		{{ leaf.words1 | e }}
+	</div>
+	<div class="tcl-box tcl-words-2{{ ' tcl-outline' if test_grid else '' }}" style="top:{{ b.words2.top }};left:{{ b.words2.left }};width:{{ b.words2.width }};font-size:{{ b.words2.font_size }};text-align:{{ start }};">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Amount in Words", context="Cheque Layout") }} 2</span>{% endif -%}
+		{{ leaf.words2 | e }}
+	</div>
+	{%- if leaf.print_crossing or test_grid %}
+	<div class="tcl-box tcl-crossing{{ ' tcl-outline' if test_grid else '' }}" style="top:{{ b.crossing.top }};left:{{ b.crossing.left }};width:{{ b.crossing.width }};font-size:{{ b.crossing.font_size }};-webkit-transform:rotate({{ b.crossing.rotation }}deg);transform:rotate({{ b.crossing.rotation }}deg);">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Crossing", context="Cheque Layout") }}</span>{% endif -%}
+		{{ leaf.crossing | e }}
+	</div>
+	{%- endif %}
+	{%- if leaf.signature or test_grid %}
+	<div class="tcl-box tcl-signature{{ ' tcl-outline' if test_grid else '' }}" style="top:{{ b.signature.top }};left:{{ b.signature.left }};width:{{ b.signature.width }};height:{{ b.signature.height }};">
+		{%- if test_grid %}<span class="tcl-label">{{ _("Signature", context="Cheque Layout") }}</span>{% endif -%}
+		<div class="tcl-signature-text">{{ leaf.signature | e }}</div>
+	</div>
+	{%- endif %}
+</div>

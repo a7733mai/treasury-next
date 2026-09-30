@@ -1,0 +1,86 @@
+{#- Every leaf of a cheque book with its status (treasury.pdc.cheque_leaves). The details of a cheque the user
+    may not read are left blank. -#}
+{%- set direction = treasury_print_direction() -%}
+{%- set register = treasury_cheque_book_leaves(doc) -%}
+{%- set summary = register.summary -%}
+<div class="cheque-book-leaves" dir="{{ direction }}" style="text-align: {{ 'right' if direction == 'rtl' else 'left' }};">
+	<style>
+		.cheque-book-leaves table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 0.9em; }
+		.cheque-book-leaves th, .cheque-book-leaves td { border: 1px solid #999; padding: 3px 5px; vertical-align: top; }
+		.cheque-book-leaves th { background: #f5f5f5; }
+		.cheque-book-leaves .cbl-label { width: 20%; font-weight: bold; background: #f5f5f5; }
+		.cheque-book-leaves .cbl-number { text-align: {{ 'left' if direction == 'rtl' else 'right' }}; white-space: nowrap; }
+		.cheque-book-leaves .cbl-muted { color: #888; }
+		.cheque-book-leaves .cbl-bounced { color: #c0392b; }
+	</style>
+
+	<h3 style="text-align: center;">{{ doc.company | e }}</h3>
+	<h2 style="text-align: center;">{{ _("Cheque Book Leaves") }}<br><small>{{ doc.name | e }}</small></h2>
+
+	<table class="cbl-header">
+		<tr>
+			<td class="cbl-label">{{ _("Bank Account", context="Treasury") }}</td>
+			<td>{{ doc.bank_account | e }}</td>
+			<td class="cbl-label">{{ _("Book No") }}</td>
+			<td>{{ (doc.book_no or "") | e }}</td>
+		</tr>
+		<tr>
+			<td class="cbl-label">{{ _("Range", context="Treasury Report") }}</td>
+			<td><bdi>{{ doc.start_no }} - {{ doc.end_no }}</bdi></td>
+			<td class="cbl-label">{{ _("Status", context="Treasury") }}</td>
+			<td>{{ _(doc.status, context="Cheque Book") }}</td>
+		</tr>
+	</table>
+
+	<table class="cbl-summary">
+		<tr>
+			<th>{{ _("Total Leaves") }}</th>
+			<th>{{ _("Used", context="Treasury Report") }}</th>
+			<th>{{ _("Cancelled Leaves") }}</th>
+			<th>{{ _("Void Leaves") }}</th>
+			<th>{{ _("Remaining", context="Treasury Report") }}</th>
+		</tr>
+		<tr>
+			<td class="cbl-total">{{ summary.total or 0 }}</td>
+			<td class="cbl-used">{{ summary.used or 0 }}</td>
+			<td class="cbl-cancelled">{{ summary.cancelled or 0 }}</td>
+			<td class="cbl-void">{{ summary.void or 0 }}</td>
+			<td class="cbl-remaining">{{ summary.remaining or 0 }}</td>
+		</tr>
+	</table>
+
+	{% if register.too_many %}
+	<p class="cbl-too-many">{{ _("Too many leaves to list.") }}</p>
+	{% else %}
+	<table class="cbl-leaves">
+		<thead>
+			<tr>
+				<th>{{ _("Leaf No") }}</th>
+				<th>{{ _("Status", context="Treasury") }}</th>
+				<th>{{ _("Party", context="Treasury Report") }}</th>
+				<th>{{ _("Amount", context="Treasury") }}</th>
+				<th>{{ _("Issue Date", context="Treasury") }}</th>
+				<th>{{ _("Due Date", context="Treasury") }}</th>
+				<th>{{ _("Clearance Date", context="Cheque Leaf") }}</th>
+				<th>{{ _("Payment Entry", context="Treasury Report") }}</th>
+				<th>{{ _("Document", context="Cheque Leaf") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for leaf in register.leaves %}
+			<tr class="{{ 'cbl-muted' if leaf.status in ('Void', 'Cancelled Leaf') else ('cbl-bounced' if leaf.status == 'Bounced' else '') }}">
+				<td class="cbl-leaf-no"><bdi>{{ leaf.leaf_no }}</bdi></td>
+				<td>{{ _(leaf.status, context="Cheque Leaf") }}{% if leaf.cancel_reason %}<br><small>{{ leaf.cancel_reason | e }}</small>{% endif %}</td>
+				<td>{{ (leaf.party_name or leaf.party or "") | e }}</td>
+				<td class="cbl-number">{% if leaf.amount %}{{ frappe.utils.fmt_money(leaf.amount, currency=leaf.currency) }}{% endif %}</td>
+				<td>{{ frappe.utils.formatdate(leaf.issue_date) if leaf.issue_date else "" }}</td>
+				<td>{{ frappe.utils.formatdate(leaf.due_date or leaf.expiry_date) if (leaf.due_date or leaf.expiry_date) else "" }}</td>
+				<td>{{ frappe.utils.formatdate(leaf.clearance_date) if leaf.clearance_date else "" }}</td>
+				<td><bdi>{{ (leaf.payment_entry or "") | e }}</bdi></td>
+				<td><bdi>{{ (leaf.document or "") | e }}</bdi></td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% endif %}
+</div>

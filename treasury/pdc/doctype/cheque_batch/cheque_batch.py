@@ -7,7 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import cint
 
 from treasury.balance_alerts import guard
-from treasury.pdc import batch, lifecycle
+from treasury.pdc import batch, cheque_printing, lifecycle
 
 # "CHQB" (cheque batch), distinct from the "CHB-" series of Cheque Book
 NAMING_SERIES = {"Outgoing": "CHQB-OUT-.YYYY.-.####", "Incoming": "CHQB-IN-.YYYY.-.####"}
@@ -149,6 +149,37 @@ class ChequeBatch(Document):
 	def print_all(self):
 		self.check_permission("print")
 		return batch.get_print_info(self)
+
+	@frappe.whitelist(methods=["POST"])
+	def print_cheques(self, language=None, reprint=0, reason=None, only_unprinted=0):
+		"""Register the print of the batch's printable cheques (all or nothing), then the form opens the
+		"Cheque Batch Leaves" print; without a Cheque Layout, the legacy multi-PDF of the cheques."""
+		self.check_permission("print")
+		if self.docstatus != 1:
+			frappe.throw(_("Submit the Cheque Batch first."))
+		if self.direction != lifecycle.OUTGOING:
+			frappe.throw(_("This action is only available for {0} cheques.").format(_(lifecycle.OUTGOING)))
+		names = [
+			c.name
+			for c in batch.get_batch_cheques(self.name, as_user=True)
+			if c.operational_status in cheque_printing.PRINTABLE_STATUSES
+		]
+		if not names:
+			frappe.throw(_("No cheques to print."))
+		layout = cheque_printing.get_layout(self.bank_account)
+		if not layout:
+			# legacy: no counter without a layout (lifecycle.record_print needs one), the cheques' own format
+			return batch.get_print_info(self)
+		result = cheque_printing.register_prints(
+			names, language, cint(reprint), reason, cint(only_unprinted)
+		)
+		return {
+			"doctype": self.doctype,
+			"name": self.name,
+			"print_format": cheque_printing.FORMAT_BATCH,
+			"language": cheque_printing.lang_code(language, layout),
+			**result,
+		}
 
 
 @frappe.whitelist()

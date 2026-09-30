@@ -11,7 +11,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt, getdate, money_in_words
 
 from treasury.accounting import dimensions, payment_modes, posting
-from treasury.pdc import lifecycle
+from treasury.pdc import cheque_printing, lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
 from treasury.utils import references, voucher_summary
 from treasury.utils.party import get_party_name, validate_party_type
@@ -76,6 +76,10 @@ PROTECTED_FIELDS = (
 	"replaces",
 	*BATCH_FIELDS,
 	*SECURITY_FIELDS,
+	# written by lifecycle.record_print; a new cheque (a replacement too) starts unprinted
+	"print_count",
+	"last_printed_on",
+	"last_printed_by",
 )
 # Append-only history tables, appended to only by the lifecycle.
 PROTECTED_TABLES = ("status_log", "postponements")
@@ -130,6 +134,8 @@ class PDCCheque(Document):
 		handover_date: DF.Date | None
 		is_postponed: DF.Check
 		issue_date: DF.Date
+		last_printed_by: DF.Link | None
+		last_printed_on: DF.Datetime | None
 		mode_of_payment: DF.Link | None
 		naming_series: DF.Literal["PDC-OUT-.YYYY.-.#####", "PDC-IN-.YYYY.-.#####"]
 		operational_status: DF.Literal[
@@ -152,8 +158,10 @@ class PDCCheque(Document):
 		party_payment_entry: DF.Link | None
 		party_posting_date: DF.Date | None
 		party_type: DF.Link
+		payee_on_cheque: DF.Data | None
 		postponement_count: DF.Int
 		postponements: DF.Table[PDCPostponement]
+		print_count: DF.Int
 		project: DF.Link | None
 		references: DF.Table[PDCChequeReference]
 		remarks: DF.SmallText | None
@@ -179,22 +187,25 @@ class PDCCheque(Document):
 			)
 			self.set_onload("cheque_print_format", self.get_cheque_print_format())
 			self.set_onload("batch_locked", self.is_batch_locked())
+			layout = (
+				cheque_printing.get_layout(self.bank_account) if self.direction == lifecycle.OUTGOING else None
+			)
+			self.set_onload(
+				"cheque_layout",
+				{"name": layout.name, "default_language": layout.default_language} if layout else None,
+			)
 
 	def get_cheque_print_format(self) -> str | None:
-		"""The Cheque Print Format hinted by the PDC Account Mapping row of the bank account, if any."""
+		"""The print format of the cheque leaf: an outgoing cheque's bank Cheque Layout ("Treasury Cheque"),
+		else the Cheque Print Format of the bank's PDC Account Mapping row, else "PDC Cheque Print"."""
 		if not self.bank_account:
 			return None
-		formats = frappe.get_all(
-			"PDC Account Mapping",
-			filters={
-				"parenttype": "Treasury Company Settings",
-				"parent": self.company,
-				"bank_account": self.bank_account,
-			},
-			pluck="cheque_print_format",
-			limit=1,
+		if self.direction == lifecycle.OUTGOING:
+			return cheque_printing.resolve_print_format(self.company, self.bank_account)
+		return (
+			cheque_printing.mapping_print_format(self.company, self.bank_account)
+			or cheque_printing.LEGACY_FORMAT
 		)
-		return formats[0] if formats else None
 
 	def insert(self, *args, **kwargs):
 		# Frappe validates links before `before_insert`, so a client-sent voucher link would fail link
@@ -714,6 +725,11 @@ class PDCCheque(Document):
 	@frappe.whitelist(methods=["POST"])
 	def settle_discounted(self, settlement_date=None, remarks=None):
 		return lifecycle.settle_discounted(self.name, settlement_date, remarks)
+
+	@frappe.whitelist(methods=["POST"])
+	def print_cheque(self, language=None, reprint=0, reason=None):
+		"""Register the print of the cheque leaf (Cheque Layout of its bank); the form then opens the print."""
+		return lifecycle.record_print(self.name, language, cint(reprint), reason)
 
 
 def on_doctype_update():

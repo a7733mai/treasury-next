@@ -1,0 +1,665 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:CHL-{#####}",
+ "creation": "2026-10-14 12:00:00.000000",
+ "description": "Where each item is printed on the cheque leaves of a bank account, in mm from the top-left corner of the leaf.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "layout_name",
+  "bank_account",
+  "company",
+  "column_break_main",
+  "is_default",
+  "disabled",
+  "default_language",
+  "wording_section",
+  "date_format",
+  "digits",
+  "add_only_suffix",
+  "show_currency_name",
+  "fraction_style",
+  "figures_guard",
+  "column_break_wording",
+  "currency_name_en",
+  "currency_name_ar",
+  "fraction_name_en",
+  "fraction_name_ar",
+  "paper_section",
+  "leaf_width_mm",
+  "leaf_height_mm",
+  "paper",
+  "offset_top_mm",
+  "offset_left_mm",
+  "column_break_paper",
+  "nudge_x_mm",
+  "nudge_y_mm",
+  "font_family",
+  "base_font_size_pt",
+  "date_section",
+  "date_top_mm",
+  "date_left_mm",
+  "column_break_date",
+  "date_width_mm",
+  "date_font_size_pt",
+  "date_char_spacing_mm",
+  "payee_section",
+  "payee_top_mm",
+  "payee_left_mm",
+  "column_break_payee",
+  "payee_width_mm",
+  "payee_font_size_pt",
+  "figures_section",
+  "figures_top_mm",
+  "figures_left_mm",
+  "column_break_figures",
+  "figures_width_mm",
+  "figures_font_size_pt",
+  "words_section",
+  "words1_top_mm",
+  "words1_left_mm",
+  "words1_width_mm",
+  "words1_max_chars",
+  "column_break_words",
+  "words2_top_mm",
+  "words2_left_mm",
+  "words2_width_mm",
+  "words_font_size_pt",
+  "crossing_section",
+  "print_crossing",
+  "crossing_top_mm",
+  "crossing_left_mm",
+  "crossing_width_mm",
+  "column_break_crossing",
+  "crossing_rotation_deg",
+  "crossing_font_size_pt",
+  "crossing_text_en",
+  "crossing_text_ar",
+  "signature_section",
+  "signature_top_mm",
+  "signature_left_mm",
+  "signature_width_mm",
+  "signature_height_mm",
+  "column_break_signature",
+  "signature_label",
+  "signature_text",
+  "preview_section",
+  "test_amount",
+  "preview_html"
+ ],
+ "fields": [
+  {
+   "fieldname": "layout_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Layout Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "bank_account.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "Default for this Bank Account"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "default": "Arabic",
+   "fieldname": "default_language",
+   "fieldtype": "Select",
+   "label": "Default Language",
+   "options": "Arabic\nEnglish",
+   "reqd": 1
+  },
+  {
+   "fieldname": "wording_section",
+   "fieldtype": "Section Break",
+   "label": "Wording"
+  },
+  {
+   "default": "dd/mm/yyyy",
+   "fieldname": "date_format",
+   "fieldtype": "Select",
+   "label": "Date Format",
+   "options": "dd/mm/yyyy\ndd-mm-yyyy\ndd.mm.yyyy\nddmmyyyy\nyyyy/mm/dd\nmm/dd/yyyy"
+  },
+  {
+   "default": "Western",
+   "description": "Arabic-Indic applies to Arabic prints only.",
+   "fieldname": "digits",
+   "fieldtype": "Select",
+   "label": "Digits",
+   "options": "Western\nArabic-Indic"
+  },
+  {
+   "default": "1",
+   "fieldname": "add_only_suffix",
+   "fieldtype": "Check",
+   "label": "Add \"only\" (فقط … لا غير)"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_currency_name",
+   "fieldtype": "Check",
+   "label": "Show Currency Name"
+  },
+  {
+   "default": "Words",
+   "description": "Figures: … and 50/100",
+   "fieldname": "fraction_style",
+   "fieldtype": "Select",
+   "label": "Fraction Style",
+   "options": "Words\nFigures"
+  },
+  {
+   "default": "#",
+   "description": "Printed before and after the amount in figures (#1,250.50#). Empty for none.",
+   "fieldname": "figures_guard",
+   "fieldtype": "Data",
+   "label": "Figures Guard"
+  },
+  {
+   "fieldname": "column_break_wording",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Optional, e.g. \"Qatari Riyals\".",
+   "fieldname": "currency_name_en",
+   "fieldtype": "Data",
+   "label": "Currency Name (English)"
+  },
+  {
+   "description": "Optional, e.g. \"ريال قطري\".",
+   "fieldname": "currency_name_ar",
+   "fieldtype": "Data",
+   "label": "Currency Name (Arabic)"
+  },
+  {
+   "description": "Optional, e.g. \"Fils\".",
+   "fieldname": "fraction_name_en",
+   "fieldtype": "Data",
+   "label": "Fraction Name (English)"
+  },
+  {
+   "description": "Optional, e.g. \"فلس\".",
+   "fieldname": "fraction_name_ar",
+   "fieldtype": "Data",
+   "label": "Fraction Name (Arabic)"
+  },
+  {
+   "fieldname": "paper_section",
+   "fieldtype": "Section Break",
+   "label": "Paper"
+  },
+  {
+   "default": "175",
+   "fieldname": "leaf_width_mm",
+   "fieldtype": "Float",
+   "label": "Leaf Width (mm)",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "80",
+   "fieldname": "leaf_height_mm",
+   "fieldtype": "Float",
+   "label": "Leaf Height (mm)",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "Cheque Leaf",
+   "fieldname": "paper",
+   "fieldtype": "Select",
+   "label": "Paper",
+   "options": "Cheque Leaf\nA4 Carrier"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.paper==='A4 Carrier'",
+   "description": "Position of the leaf on the A4 sheet.",
+   "fieldname": "offset_top_mm",
+   "fieldtype": "Float",
+   "label": "Offset Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.paper==='A4 Carrier'",
+   "fieldname": "offset_left_mm",
+   "fieldtype": "Float",
+   "label": "Offset Left (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "column_break_paper",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Moves every field; may be negative.",
+   "fieldname": "nudge_x_mm",
+   "fieldtype": "Float",
+   "label": "Printer Calibration X (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "Moves every field; may be negative.",
+   "fieldname": "nudge_y_mm",
+   "fieldtype": "Float",
+   "label": "Printer Calibration Y (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "Arial, Tahoma, sans-serif",
+   "fieldname": "font_family",
+   "fieldtype": "Data",
+   "label": "Font Family"
+  },
+  {
+   "default": "11",
+   "fieldname": "base_font_size_pt",
+   "fieldtype": "Float",
+   "label": "Base Font Size (pt)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "date_section",
+   "fieldtype": "Section Break",
+   "label": "Date"
+  },
+  {
+   "default": "8",
+   "fieldname": "date_top_mm",
+   "fieldtype": "Float",
+   "label": "Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "130",
+   "fieldname": "date_left_mm",
+   "fieldtype": "Float",
+   "label": "Left (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "column_break_date",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "40",
+   "fieldname": "date_width_mm",
+   "fieldtype": "Float",
+   "label": "Width (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "0 = base size.",
+   "fieldname": "date_font_size_pt",
+   "fieldtype": "Float",
+   "label": "Font Size (pt)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "For box dates: distance between character centres. 0 = normal text.",
+   "fieldname": "date_char_spacing_mm",
+   "fieldtype": "Float",
+   "label": "Character Spacing (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "payee_section",
+   "fieldtype": "Section Break",
+   "label": "Payee"
+  },
+  {
+   "default": "22",
+   "fieldname": "payee_top_mm",
+   "fieldtype": "Float",
+   "label": "Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "25",
+   "fieldname": "payee_left_mm",
+   "fieldtype": "Float",
+   "label": "Left (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "column_break_payee",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "120",
+   "fieldname": "payee_width_mm",
+   "fieldtype": "Float",
+   "label": "Width (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "0 = base size.",
+   "fieldname": "payee_font_size_pt",
+   "fieldtype": "Float",
+   "label": "Font Size (pt)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "figures_section",
+   "fieldtype": "Section Break",
+   "label": "Amount in Figures"
+  },
+  {
+   "default": "35",
+   "fieldname": "figures_top_mm",
+   "fieldtype": "Float",
+   "label": "Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "130",
+   "fieldname": "figures_left_mm",
+   "fieldtype": "Float",
+   "label": "Left (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "column_break_figures",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "40",
+   "fieldname": "figures_width_mm",
+   "fieldtype": "Float",
+   "label": "Width (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "0 = base size.",
+   "fieldname": "figures_font_size_pt",
+   "fieldtype": "Float",
+   "label": "Font Size (pt)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "words_section",
+   "fieldtype": "Section Break",
+   "label": "Amount in Words"
+  },
+  {
+   "default": "32",
+   "fieldname": "words1_top_mm",
+   "fieldtype": "Float",
+   "label": "Line 1 Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "25",
+   "fieldname": "words1_left_mm",
+   "fieldtype": "Float",
+   "label": "Line 1 Left (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "100",
+   "fieldname": "words1_width_mm",
+   "fieldtype": "Float",
+   "label": "Line 1 Width (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "60",
+   "description": "The rest of the words goes to line 2.",
+   "fieldname": "words1_max_chars",
+   "fieldtype": "Int",
+   "label": "Line 1 Max Characters"
+  },
+  {
+   "fieldname": "column_break_words",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "40",
+   "fieldname": "words2_top_mm",
+   "fieldtype": "Float",
+   "label": "Line 2 Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "10",
+   "fieldname": "words2_left_mm",
+   "fieldtype": "Float",
+   "label": "Line 2 Left (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "115",
+   "fieldname": "words2_width_mm",
+   "fieldtype": "Float",
+   "label": "Line 2 Width (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "0 = base size.",
+   "fieldname": "words_font_size_pt",
+   "fieldtype": "Float",
+   "label": "Font Size (pt)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "crossing_section",
+   "fieldtype": "Section Break",
+   "label": "Crossing"
+  },
+  {
+   "default": "1",
+   "fieldname": "print_crossing",
+   "fieldtype": "Check",
+   "label": "Print Crossing"
+  },
+  {
+   "default": "3",
+   "fieldname": "crossing_top_mm",
+   "fieldtype": "Float",
+   "label": "Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "5",
+   "fieldname": "crossing_left_mm",
+   "fieldtype": "Float",
+   "label": "Left (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "35",
+   "fieldname": "crossing_width_mm",
+   "fieldtype": "Float",
+   "label": "Width (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "column_break_crossing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "crossing_rotation_deg",
+   "fieldtype": "Float",
+   "label": "Rotation (Degrees)",
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "description": "0 = base size.",
+   "fieldname": "crossing_font_size_pt",
+   "fieldtype": "Float",
+   "label": "Font Size (pt)",
+   "precision": "1"
+  },
+  {
+   "description": "Optional. Default: A/C Payee Only.",
+   "fieldname": "crossing_text_en",
+   "fieldtype": "Data",
+   "label": "Crossing Text (English)"
+  },
+  {
+   "description": "Optional. Default: لحساب المستفيد الأول.",
+   "fieldname": "crossing_text_ar",
+   "fieldtype": "Data",
+   "label": "Crossing Text (Arabic)"
+  },
+  {
+   "fieldname": "signature_section",
+   "fieldtype": "Section Break",
+   "label": "Signature"
+  },
+  {
+   "default": "55",
+   "fieldname": "signature_top_mm",
+   "fieldtype": "Float",
+   "label": "Top (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "115",
+   "fieldname": "signature_left_mm",
+   "fieldtype": "Float",
+   "label": "Left (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "50",
+   "fieldname": "signature_width_mm",
+   "fieldtype": "Float",
+   "label": "Width (mm)",
+   "precision": "1"
+  },
+  {
+   "default": "15",
+   "fieldname": "signature_height_mm",
+   "fieldtype": "Float",
+   "label": "Height (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "column_break_signature",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Company Name",
+   "description": "Printed under the signature area.",
+   "fieldname": "signature_label",
+   "fieldtype": "Select",
+   "label": "Signature Label",
+   "options": "None\nCompany Name\nCustom Text"
+  },
+  {
+   "depends_on": "eval:doc.signature_label==='Custom Text'",
+   "fieldname": "signature_text",
+   "fieldtype": "Data",
+   "label": "Signature Text",
+   "mandatory_depends_on": "eval:doc.signature_label==='Custom Text'"
+  },
+  {
+   "fieldname": "preview_section",
+   "fieldtype": "Section Break",
+   "label": "Preview"
+  },
+  {
+   "default": "123456.78",
+   "fieldname": "test_amount",
+   "fieldtype": "Currency",
+   "label": "Sample Amount"
+  },
+  {
+   "fieldname": "preview_html",
+   "fieldtype": "HTML",
+   "label": "Preview"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-14 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Cheque Layout",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User"
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "role": "Accounts Manager"
+  }
+ ],
+ "search_fields": "layout_name,bank_account",
+ "show_title_field_in_link": 0,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "layout_name",
+ "track_changes": 1
+}

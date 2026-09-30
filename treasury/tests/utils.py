@@ -1874,6 +1874,50 @@ class BalanceAlertTestMixin(TreasuryTestMixin):
 
 
 # ---------------------------------------------------------------------------
+# Phase 7f: cheque leaves, cheque layouts
+# ---------------------------------------------------------------------------
+
+
+def make_cheque_layout(bank_account: str | None = None, **values):
+	"""A Cheque Layout (default of its bank account unless `values` say otherwise) with the DocType defaults."""
+	doc = frappe.get_doc(
+		{
+			"doctype": "Cheque Layout",
+			"layout_name": f"Layout {frappe.generate_hash(length=6)}",
+			"bank_account": bank_account or bank_account_name("EGP"),
+			"is_default": 1,
+			**values,
+		}
+	)
+	doc.insert()
+	return doc
+
+
+def ensure_currency(code: str, fraction: str, units: int) -> str:
+	"""A Currency master (created only if missing, e.g. QAR Dirham/100, KWD Fils/1000)."""
+	if not frappe.db.exists("Currency", code):
+		frappe.get_doc(
+			{
+				"doctype": "Currency",
+				"currency_name": code,
+				"fraction": fraction,
+				"fraction_units": units,
+				"smallest_currency_fraction_value": 1 / units,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True)
+	return code
+
+
+def leaf_rows(filters: dict) -> dict[int, frappe._dict]:
+	"""The leaf rows of the Cheque Leaf Register (view Leaves), keyed by leaf number."""
+	from treasury.pdc.report.cheque_leaf_register.cheque_leaf_register import execute
+
+	result = execute({"company": COMPANY, **filters})
+	return {row.leaf_number: row for row in result[1] if not row.get("is_group")}
+
+
+# ---------------------------------------------------------------------------
 # Assertions / queries
 # ---------------------------------------------------------------------------
 

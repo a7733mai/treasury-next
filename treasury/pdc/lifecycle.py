@@ -30,6 +30,7 @@ from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.balance_alerts import guard
+from treasury.pdc import cheque_printing
 from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
@@ -560,7 +561,7 @@ def cancel_cheque(name: str, reason: str | None = None) -> dict:
 
 	_log(doc, "Cancelled", operational="Cancelled", remarks=reason)
 	if doc.direction == OUTGOING and doc.cheque_book:
-		record_cancelled_leaf(doc.cheque_book, doc.cheque_no, reason)
+		record_cancelled_leaf(doc.cheque_book, doc.cheque_no, reason, source=(DOCTYPE, doc.name))
 	return _save(doc)
 
 
@@ -577,6 +578,82 @@ def return_to_party(name: str, return_date=None, reason: str | None = None) -> d
 	_log(doc, "Returned", operational="Returned", remarks=reason, event_date=date)
 	_undo_postings(doc, date, reason)
 	return _save(doc)
+
+
+# ---------------------------------------------------------------------------
+# Printing (treasury.pdc.cheque_printing): no status change, no accounting
+# ---------------------------------------------------------------------------
+
+
+def begin_print(name: str):
+	"""Lock the cheque (and its batch) and check the print permission and a Treasury role."""
+	return _begin(name, roles=cheque_printing.PRINT_ROLES, ptype="print")
+
+
+def check_printable(doc):
+	"""The Cheque Layout an outgoing Created / Delivered cheque is printed on (throws otherwise)."""
+	if error := cheque_printing.printable_error(doc):
+		frappe.throw(error)
+	layout = cheque_printing.get_layout(doc.bank_account)
+	if not layout:
+		frappe.throw(
+			_("Bank Account {0} has no Cheque Layout. Create one first.").format(frappe.bold(doc.bank_account))
+		)
+	return layout
+
+
+def check_reprint(doc, reason: str | None):
+	"""A reprint needs a reason and, when the company says so, a Treasury Manager."""
+	if not (reason or "").strip():
+		frappe.throw(_("A reason is required to reprint a cheque."))
+	manager_only = frappe.db.get_value(
+		"Treasury Company Settings", doc.company, "cheque_reprint_requires_manager"
+	)
+	if cint(manager_only) and MANAGER not in frappe.get_roles():
+		frappe.throw(
+			_("Only a {0} may reprint a cheque.").format(_(MANAGER)),
+			frappe.PermissionError,
+			title=_("Not Permitted"),
+		)
+
+
+def record_print(name: str, language: str | None, reprint=0, reason: str | None = None) -> dict:
+	"""Register the print of an outgoing cheque on its bank's Cheque Layout: the counter, the last printed on /
+	by and a "Printed" / "Reprinted" status log row. A printed cheque is printed again only with `reprint`
+	and a reason (ChequeAlreadyPrintedError otherwise). Returns what the form needs to open the print."""
+	doc = begin_print(name)
+	layout = check_printable(doc)
+	code = cheque_printing.lang_code(language, layout)
+	count = cint(doc.print_count)
+	if count:
+		if not cint(reprint):
+			frappe.throw(
+				_("Cheque {0} was already printed {1} time(s), last by {2} on {3}.").format(
+					frappe.bold(doc.name),
+					count,
+					doc.last_printed_by or "-",
+					frappe.format(doc.last_printed_on, {"fieldtype": "Datetime"}),
+				),
+				cheque_printing.ChequeAlreadyPrintedError,
+			)
+		check_reprint(doc, reason)
+
+	remarks = _(cheque_printing.language_label(code))
+	if (reason or "").strip():
+		remarks += ": " + reason.strip()
+	_log(doc, "Reprinted" if count else "Printed", remarks=remarks)
+	# the status log is append-only and nothing else changes: the row is inserted in place (like the low
+	# balance override), the counter written directly
+	doc.status_log[-1].db_insert()
+	doc.db_set(
+		{"print_count": count + 1, "last_printed_on": now_datetime(), "last_printed_by": real_user()}
+	)
+	return {
+		"name": doc.name,
+		"print_count": count + 1,
+		"print_format": cheque_printing.FORMAT_CHEQUE,
+		"language": code,
+	}
 
 
 # ---------------------------------------------------------------------------

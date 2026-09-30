@@ -105,6 +105,11 @@ jinja = {
 		"treasury.utils.print_helpers.treasury_batch_receipt",
 		"treasury.utils.print_helpers.treasury_payment_entries",
 		"treasury.utils.print_helpers.treasury_party_account_no",
+		# Phase 7f: cheque leaves on bank Cheque Layouts, cheque book leaves
+		"treasury.pdc.cheque_printing.treasury_cheque_leaf",
+		"treasury.pdc.cheque_printing.treasury_batch_cheque_leaves",
+		"treasury.pdc.cheque_printing.treasury_cheque_layout_test",
+		"treasury.pdc.cheque_leaves.treasury_cheque_book_leaves",
 	],
 }
 

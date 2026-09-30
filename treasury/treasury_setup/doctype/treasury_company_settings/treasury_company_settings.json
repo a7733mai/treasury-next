@@ -58,6 +58,7 @@
   "default_outgoing_cheque_bank_account",
   "default_incoming_cheque_bank_account",
   "auto_select_cheque_book",
+  "cheque_reprint_requires_manager",
   "column_break_documents",
   "default_installment_count",
   "default_installment_frequency",
@@ -411,6 +412,12 @@
    "fieldname": "auto_select_cheque_book",
    "fieldtype": "Check",
    "label": "Use the Bank's Active Cheque Book"
+  },
+  {
+   "default": "1",
+   "fieldname": "cheque_reprint_requires_manager",
+   "fieldtype": "Check",
+   "label": "Only a Treasury Manager may reprint a cheque"
   },
   {
    "fieldname": "column_break_documents",

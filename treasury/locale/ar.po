@@ -10573,3 +10573,757 @@ msgstr "{0}: الرصيد المتوقع {1} في {2}، حد التنبيه {3}.
 
 msgid "Override by {0} on {1}."
 msgstr "تجاوز بواسطة {0} على {1}."
+
+# Phase 7f — cheque leaf register, Void Leaf, cheque printing (Cheque Layout), security cheque reports
+msgid "Cheque Layout"
+msgstr "تخطيط طباعة الشيك"
+
+msgid "Cheque Leaf Register"
+msgstr "سجل أوراق الشيكات"
+
+msgid "Security Cheques Summary"
+msgstr "ملخص شيكات الضمان"
+
+msgid "Security Cheque Movements"
+msgstr "حركات شيكات الضمان"
+
+msgid "Treasury Cheque"
+msgstr "شيك الخزينة"
+
+msgid "Cheque Batch Leaves"
+msgstr "أوراق شيكات الدفعة"
+
+msgid "Cheque Layout Test Print"
+msgstr "طباعة تجريبية لتخطيط الشيك"
+
+msgid "Cheque Book Leaves"
+msgstr "أوراق دفتر الشيكات"
+
+# Leaf statuses and usage (context "Cheque Leaf", treasury.pdc.cheque_leaves)
+msgctxt "Cheque Leaf"
+msgid "Unused"
+msgstr "غير مستخدمة"
+
+msgctxt "Cheque Leaf"
+msgid "Written"
+msgstr "محررة"
+
+msgctxt "Cheque Leaf"
+msgid "Issued (PDC)"
+msgstr "مسلمة – شيك آجل"
+
+msgctxt "Cheque Leaf"
+msgid "Cleared"
+msgstr "مصروفة"
+
+msgctxt "Cheque Leaf"
+msgid "Bounced"
+msgstr "مرتدة"
+
+msgctxt "Cheque Leaf"
+msgid "Replaced"
+msgstr "مستبدلة"
+
+msgctxt "Cheque Leaf"
+msgid "Cancelled Leaf"
+msgstr "ورقة ملغاة"
+
+msgctxt "Cheque Leaf"
+msgid "Void"
+msgstr "تالفة"
+
+msgctxt "Cheque Leaf"
+msgid "Security Created"
+msgstr "ضمان – محرر"
+
+msgctxt "Cheque Leaf"
+msgid "Security Issued"
+msgstr "ضمان – مسلم"
+
+msgctxt "Cheque Leaf"
+msgid "Security Returned"
+msgstr "ضمان – مرتجع"
+
+msgctxt "Cheque Leaf"
+msgid "Security Encashed"
+msgstr "ضمان – محصّل"
+
+msgctxt "Cheque Leaf"
+msgid "Security Lost"
+msgstr "ضمان – مفقود"
+
+msgctxt "Cheque Leaf"
+msgid "Security Cancelled"
+msgstr "ضمان – ملغى"
+
+msgctxt "Cheque Leaf"
+msgid "Payment"
+msgstr "سداد"
+
+msgctxt "Cheque Leaf"
+msgid "Security"
+msgstr "ضمان"
+
+msgctxt "Cheque Leaf"
+msgid "Usage"
+msgstr "الاستخدام"
+
+msgctxt "Cheque Leaf"
+msgid "Document"
+msgstr "المستند"
+
+msgctxt "Cheque Leaf"
+msgid "Document Type"
+msgstr "نوع المستند"
+
+msgctxt "Cheque Leaf"
+msgid "Clearance Date"
+msgstr "تاريخ الصرف"
+
+msgctxt "Cheque Leaf"
+msgid "Reason Type"
+msgstr "نوع السبب"
+
+msgctxt "Cheque Leaf"
+msgid "View"
+msgstr "العرض"
+
+msgctxt "Cheque Leaf"
+msgid "Leaves"
+msgstr "الأوراق"
+
+msgctxt "Cheque Leaf"
+msgid "Books"
+msgstr "الدفاتر"
+
+# Cheque Book Cancelled Leaf: fields and options
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Kind"
+msgstr "النوع"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Reason Type"
+msgstr "نوع السبب"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Source Type"
+msgstr "نوع المصدر"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Source"
+msgstr "المصدر"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Cancelled"
+msgstr "ملغاة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Void"
+msgstr "تالفة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Spoilt"
+msgstr "أُفسدت عند الكتابة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Damaged"
+msgstr "ممزقة / تالفة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Misprinted"
+msgstr "خطأ في الطباعة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Lost"
+msgstr "مفقودة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Stolen"
+msgstr "مسروقة"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Cheque Cancelled"
+msgstr "إلغاء الشيك"
+
+msgctxt "Cheque Book Cancelled Leaf"
+msgid "Other"
+msgstr "أخرى"
+
+msgid "The cheque whose cancellation recorded the leaf."
+msgstr "الشيك الذي سُجلت الورقة ملغاة بإلغائه."
+
+# Cheque Book: Void Leaf, audit trail, form
+msgid "Cancelled and void leaves can only be recorded by the Cancel Leaf and Void Leaf actions."
+msgstr "لا تُسجل الأوراق الملغاة والتالفة إلا من خلال إجراءي \"إلغاء ورقة\" و\"إتلاف ورقة\"."
+
+msgid "Select the reason type of the void leaf."
+msgstr "اختر نوع سبب إتلاف الورقة."
+
+msgid "A reason is required to void a leaf."
+msgstr "يجب ذكر سبب لإتلاف الورقة."
+
+msgid "To Cheque No cannot be before From Cheque No."
+msgstr "لا يمكن أن يسبق رقم الشيك \"إلى\" رقم الشيك \"من\"."
+
+msgid "At most {0} leaves can be voided at once."
+msgstr "يمكن إتلاف {0} ورقة كحد أقصى في المرة الواحدة."
+
+msgid "Cheque No {0} is already cancelled or void."
+msgstr "الشيك رقم {0} ملغى أو تالف بالفعل."
+
+msgid "Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel or replace that cheque instead."
+msgstr "الشيك رقم {0} مستخدم في شيك آجل أو شيك ضمان. ألغِ ذلك الشيك أو استبدله بدلاً من ذلك."
+
+msgid "Leaves {0} voided ({1}): {2}"
+msgstr "تم إتلاف الأوراق {0} ({1}): {2}"
+
+msgid "Void Leaf"
+msgstr "إتلاف ورقة"
+
+msgid "Void Leaves"
+msgstr "الأوراق التالفة"
+
+msgid "Leaf Register"
+msgstr "سجل الأوراق"
+
+msgid "Print Leaves"
+msgstr "طباعة الأوراق"
+
+msgid "Used: {0}"
+msgstr "مستخدمة: {0}"
+
+msgid "Cancelled: {0}"
+msgstr "ملغاة: {0}"
+
+msgid "Void: {0}"
+msgstr "تالفة: {0}"
+
+msgid "Remaining: {0} of {1}"
+msgstr "المتبقي: {0} من {1}"
+
+msgid "From Cheque No"
+msgstr "من رقم الشيك"
+
+msgid "To Cheque No"
+msgstr "إلى رقم الشيك"
+
+msgid "Empty: only the From leaf."
+msgstr "فارغ: ورقة \"من\" فقط."
+
+msgid "Leaves voided: {0}"
+msgstr "الأوراق التي تم إتلافها: {0}"
+
+# Cheque Leaf Register and the Cheque Book Leaves print
+msgid "Invalid Usage: {0}"
+msgstr "استخدام غير صالح: {0}"
+
+msgid "Invalid View: {0}"
+msgstr "طريقة عرض غير صالحة: {0}"
+
+msgid "The selection has {0} leaves (maximum {1}). Select a Cheque Book or a Bank Account."
+msgstr "الاختيار يشمل {0} ورقة (الحد الأقصى {1}). اختر دفتر شيكات أو حساباً بنكياً."
+
+msgid "Leaf No"
+msgstr "رقم الورقة"
+
+msgid "PDC Status"
+msgstr "حالة الشيك الآجل"
+
+msgid "Times Printed"
+msgstr "مرات الطباعة"
+
+msgid "Cancel / Void Reason"
+msgstr "سبب الإلغاء / الإتلاف"
+
+msgid "Cancelled / Voided On"
+msgstr "تاريخ الإلغاء / الإتلاف"
+
+msgid "Cancelled / Voided By"
+msgstr "ألغاها / أتلفها"
+
+msgid "Book Status"
+msgstr "حالة الدفتر"
+
+msgid "Print Book"
+msgstr "طباعة الدفتر"
+
+msgid "Select a Cheque Book first."
+msgstr "اختر دفتر شيكات أولاً."
+
+msgid "Too many leaves to list."
+msgstr "عدد الأوراق أكبر من أن يُعرض."
+
+# PDC Cheque: printing fields, status log events, settings
+msgctxt "PDC Cheque"
+msgid "Cheque Printing"
+msgstr "طباعة الشيك"
+
+msgctxt "PDC Cheque"
+msgid "Payee Name on Cheque"
+msgstr "اسم المستفيد على الشيك"
+
+msgctxt "PDC Cheque"
+msgid "Times Printed"
+msgstr "مرات الطباعة"
+
+msgctxt "PDC Cheque"
+msgid "Last Printed On"
+msgstr "آخر طباعة في"
+
+msgctxt "PDC Cheque"
+msgid "Last Printed By"
+msgstr "آخر طباعة بواسطة"
+
+msgid "Printed instead of the party name, e.g. the name as the bank requires it."
+msgstr "يُطبع بدلاً من اسم الطرف، مثل الاسم كما يطلبه البنك."
+
+msgctxt "PDC Status Log"
+msgid "Printed"
+msgstr "طُبع"
+
+msgctxt "PDC Status Log"
+msgid "Reprinted"
+msgstr "أُعيدت طباعته"
+
+msgctxt "Treasury Company Settings"
+msgid "Only a Treasury Manager may reprint a cheque"
+msgstr "إعادة طباعة الشيك لمدير الخزينة فقط"
+
+msgid "Legacy: used only when the bank account has no Cheque Layout."
+msgstr "قديم: يُستخدم فقط إذا لم يكن للحساب البنكي تخطيط طباعة شيك."
+
+# Cheque Layout: fields, sections and options
+msgctxt "Cheque Layout"
+msgid "Layout Name"
+msgstr "اسم التخطيط"
+
+msgctxt "Cheque Layout"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Cheque Layout"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Cheque Layout"
+msgid "Default for this Bank Account"
+msgstr "الافتراضي لهذا الحساب البنكي"
+
+msgctxt "Cheque Layout"
+msgid "Disabled"
+msgstr "معطّل"
+
+msgctxt "Cheque Layout"
+msgid "Default Language"
+msgstr "اللغة الافتراضية"
+
+msgctxt "Cheque Layout"
+msgid "Language"
+msgstr "اللغة"
+
+msgctxt "Cheque Layout"
+msgid "Arabic"
+msgstr "العربية"
+
+msgctxt "Cheque Layout"
+msgid "English"
+msgstr "الإنجليزية"
+
+msgctxt "Cheque Layout"
+msgid "Wording"
+msgstr "الصياغة"
+
+msgctxt "Cheque Layout"
+msgid "Date Format"
+msgstr "تنسيق التاريخ"
+
+msgctxt "Cheque Layout"
+msgid "Digits"
+msgstr "الأرقام"
+
+msgctxt "Cheque Layout"
+msgid "Western"
+msgstr "غربية (0-9)"
+
+msgctxt "Cheque Layout"
+msgid "Arabic-Indic"
+msgstr "هندية (٠-٩)"
+
+msgctxt "Cheque Layout"
+msgid "Add \"only\" (فقط … لا غير)"
+msgstr "إضافة \"فقط … لا غير\""
+
+msgctxt "Cheque Layout"
+msgid "Show Currency Name"
+msgstr "إظهار اسم العملة"
+
+msgctxt "Cheque Layout"
+msgid "Fraction Style"
+msgstr "طريقة كتابة الكسر"
+
+msgctxt "Cheque Layout"
+msgid "Words"
+msgstr "بالحروف"
+
+msgctxt "Cheque Layout"
+msgid "Figures"
+msgstr "بالأرقام"
+
+msgctxt "Cheque Layout"
+msgid "Figures Guard"
+msgstr "رمز حماية المبلغ بالأرقام"
+
+msgctxt "Cheque Layout"
+msgid "Currency Name (English)"
+msgstr "اسم العملة (بالإنجليزية)"
+
+msgctxt "Cheque Layout"
+msgid "Currency Name (Arabic)"
+msgstr "اسم العملة (بالعربية)"
+
+msgctxt "Cheque Layout"
+msgid "Fraction Name (English)"
+msgstr "اسم الكسر (بالإنجليزية)"
+
+msgctxt "Cheque Layout"
+msgid "Fraction Name (Arabic)"
+msgstr "اسم الكسر (بالعربية)"
+
+msgctxt "Cheque Layout"
+msgid "Paper"
+msgstr "الورق"
+
+msgctxt "Cheque Layout"
+msgid "Leaf Width (mm)"
+msgstr "عرض الورقة (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Leaf Height (mm)"
+msgstr "ارتفاع الورقة (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Cheque Leaf"
+msgstr "ورقة الشيك"
+
+msgctxt "Cheque Layout"
+msgid "A4 Carrier"
+msgstr "حامل على ورقة A4"
+
+msgctxt "Cheque Layout"
+msgid "Offset Top (mm)"
+msgstr "الإزاحة من الأعلى (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Offset Left (mm)"
+msgstr "الإزاحة من اليسار (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Printer Calibration X (mm)"
+msgstr "معايرة الطابعة أفقياً (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Printer Calibration Y (mm)"
+msgstr "معايرة الطابعة رأسياً (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Font Family"
+msgstr "نوع الخط"
+
+msgctxt "Cheque Layout"
+msgid "Base Font Size (pt)"
+msgstr "حجم الخط الأساسي (نقطة)"
+
+msgctxt "Cheque Layout"
+msgid "Date"
+msgstr "التاريخ"
+
+msgctxt "Cheque Layout"
+msgid "Top (mm)"
+msgstr "من الأعلى (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Left (mm)"
+msgstr "من اليسار (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Width (mm)"
+msgstr "العرض (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Height (mm)"
+msgstr "الارتفاع (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Font Size (pt)"
+msgstr "حجم الخط (نقطة)"
+
+msgctxt "Cheque Layout"
+msgid "Character Spacing (mm)"
+msgstr "المسافة بين الخانات (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Payee"
+msgstr "المستفيد"
+
+msgctxt "Cheque Layout"
+msgid "Amount in Figures"
+msgstr "المبلغ بالأرقام"
+
+msgctxt "Cheque Layout"
+msgid "Amount in Words"
+msgstr "المبلغ بالحروف"
+
+msgctxt "Cheque Layout"
+msgid "Line 1 Top (mm)"
+msgstr "السطر 1 من الأعلى (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Line 1 Left (mm)"
+msgstr "السطر 1 من اليسار (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Line 1 Width (mm)"
+msgstr "عرض السطر 1 (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Line 1 Max Characters"
+msgstr "أقصى عدد أحرف في السطر 1"
+
+msgctxt "Cheque Layout"
+msgid "Line 2 Top (mm)"
+msgstr "السطر 2 من الأعلى (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Line 2 Left (mm)"
+msgstr "السطر 2 من اليسار (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Line 2 Width (mm)"
+msgstr "عرض السطر 2 (مم)"
+
+msgctxt "Cheque Layout"
+msgid "Crossing"
+msgstr "التسطير"
+
+msgctxt "Cheque Layout"
+msgid "Print Crossing"
+msgstr "طباعة التسطير"
+
+msgctxt "Cheque Layout"
+msgid "Rotation (Degrees)"
+msgstr "الدوران (درجات)"
+
+msgctxt "Cheque Layout"
+msgid "Crossing Text (English)"
+msgstr "نص التسطير (بالإنجليزية)"
+
+msgctxt "Cheque Layout"
+msgid "Crossing Text (Arabic)"
+msgstr "نص التسطير (بالعربية)"
+
+msgctxt "Cheque Layout"
+msgid "Signature"
+msgstr "التوقيع"
+
+msgctxt "Cheque Layout"
+msgid "Signature Label"
+msgstr "بيان التوقيع"
+
+msgctxt "Cheque Layout"
+msgid "None"
+msgstr "بدون"
+
+msgctxt "Cheque Layout"
+msgid "Company Name"
+msgstr "اسم الشركة"
+
+msgctxt "Cheque Layout"
+msgid "Custom Text"
+msgstr "نص مخصص"
+
+msgctxt "Cheque Layout"
+msgid "Signature Text"
+msgstr "نص التوقيع"
+
+msgctxt "Cheque Layout"
+msgid "Preview"
+msgstr "معاينة"
+
+msgctxt "Cheque Layout"
+msgid "Sample Amount"
+msgstr "مبلغ تجريبي"
+
+msgid "Where each item is printed on the cheque leaves of a bank account, in mm from the top-left corner of the leaf."
+msgstr "مواضع طباعة كل بيان على أوراق شيكات الحساب البنكي، بالمليمتر من الركن العلوي الأيسر للورقة."
+
+msgid "Arabic-Indic applies to Arabic prints only."
+msgstr "الأرقام الهندية تُطبق على الطباعة بالعربية فقط."
+
+msgid "Printed before and after the amount in figures (#1,250.50#). Empty for none."
+msgstr "يُطبع قبل المبلغ بالأرقام وبعده (#1,250.50#). اتركه فارغاً لعدم الطباعة."
+
+msgid "Moves every field; may be negative."
+msgstr "يحرك كل البيانات؛ يمكن أن تكون القيمة سالبة."
+
+msgid "Position of the leaf on the A4 sheet."
+msgstr "موضع ورقة الشيك على ورقة A4."
+
+msgid "For box dates: distance between character centres. 0 = normal text."
+msgstr "للتواريخ في خانات: المسافة بين مراكز الخانات. 0 = نص عادي."
+
+msgid "0 = base size."
+msgstr "0 = الحجم الأساسي."
+
+msgid "The rest of the words goes to line 2."
+msgstr "باقي الكلمات تُطبع في السطر 2."
+
+msgid "Printed under the signature area."
+msgstr "يُطبع أسفل مساحة التوقيع."
+
+# Cheque Layout: messages, test print, preview
+msgid "Bank Account {0} must be a company bank account with a GL account."
+msgstr "الحساب البنكي {0} يجب أن يكون حساباً بنكياً للشركة مرتبطاً بحساب في دليل الحسابات."
+
+msgid "The cheque leaf must be 50–300 mm wide and 30–150 mm high."
+msgstr "يجب أن يكون عرض ورقة الشيك بين 50 و300 مم وارتفاعها بين 30 و150 مم."
+
+msgid "{0} is outside the cheque leaf ({1} × {2} mm)."
+msgstr "{0} يقع خارج ورقة الشيك ({1} × {2} مم)."
+
+msgid "Font sizes must be between 5 and 30 pt (0 = base size)."
+msgstr "يجب أن تكون أحجام الخط بين 5 و30 نقطة (0 = الحجم الأساسي)."
+
+msgid "Line 1 Max Characters must be between {0} and {1}."
+msgstr "أقصى عدد أحرف في السطر 1 يجب أن يكون بين {0} و{1}."
+
+msgid "The crossing rotation must be between -90 and 90 degrees."
+msgstr "يجب أن يكون دوران التسطير بين -90 و90 درجة."
+
+msgid "Enter the Signature Text."
+msgstr "أدخل نص التوقيع."
+
+msgid "The cheque leaf does not fit on an A4 sheet at this offset."
+msgstr "ورقة الشيك لا تتسع على ورقة A4 بهذه الإزاحة."
+
+msgid "Test Print"
+msgstr "طباعة تجريبية"
+
+msgid "Show in {0}"
+msgstr "عرض بـ{0}"
+
+msgid "Sample Payee Name Trading Company"
+msgstr "شركة المستفيد التجريبي للتجارة"
+
+msgid "Invalid document."
+msgstr "مستند غير صالح."
+
+# Cheque printing and reprints
+msgid "A/C Payee Only"
+msgstr "لحساب المستفيد الأول"
+
+msgid "Language must be Arabic or English."
+msgstr "يجب أن تكون اللغة العربية أو الإنجليزية."
+
+msgid "Bank Account {0} has no Cheque Layout. Create one first."
+msgstr "الحساب البنكي {0} ليس له تخطيط طباعة شيك. أنشئ تخطيطاً أولاً."
+
+msgid "Use \"Print Cheque\" on the cheque to print it."
+msgstr "استخدم \"طباعة الشيك\" من نموذج الشيك لطباعته."
+
+msgid "Cheque {0} is {1}; it cannot be printed."
+msgstr "الشيك {0} حالته {1}؛ لا يمكن طباعته."
+
+msgid "Only outgoing cheques can be printed."
+msgstr "لا يمكن طباعة إلا الشيكات الصادرة."
+
+msgid "Cheque {0} is {1}; only Created or Delivered cheques can be printed."
+msgstr "الشيك {0} حالته {1}؛ لا تُطبع إلا الشيكات المنشأة أو المسلمة."
+
+msgid "These cheques were already printed: {0}."
+msgstr "هذه الشيكات طُبعت من قبل: {0}."
+
+msgid "A reason is required to reprint a cheque."
+msgstr "يجب ذكر سبب لإعادة طباعة الشيك."
+
+msgid "Only a {0} may reprint a cheque."
+msgstr "لا يعيد طباعة الشيك إلا {0}."
+
+msgid "Cheque {0} was already printed {1} time(s), last by {2} on {3}."
+msgstr "الشيك {0} طُبع {1} مرة، آخرها بواسطة {2} في {3}."
+
+msgid "Printed {0} times, last by {1} on {2}."
+msgstr "طُبع {0} مرة، آخرها بواسطة {1} في {2}."
+
+msgid "Reprint Cheque"
+msgstr "إعادة طباعة الشيك"
+
+msgid "Cheques Already Printed"
+msgstr "شيكات مطبوعة من قبل"
+
+msgid "Reason (to reprint all)"
+msgstr "السبب (لإعادة طباعة الكل)"
+
+msgid "Print Unprinted Only"
+msgstr "طباعة غير المطبوع فقط"
+
+msgid "Reprint All"
+msgstr "إعادة طباعة الكل"
+
+msgctxt "Amount in words"
+msgid "{0} and {1}/{2}"
+msgstr "{0} و{1}/{2}"
+
+# Security Cheques Summary and Security Cheque Movements
+msgid "Invalid Group By: {0}"
+msgstr "تجميع غير صالح: {0}"
+
+msgid "Ageing ranges must be increasing whole numbers of days, e.g. 30, 60, 90."
+msgstr "يجب أن تكون فترات التقادم أعداداً صحيحة متزايدة من الأيام، مثل 30، 60، 90."
+
+msgid "No Expiry"
+msgstr "بدون انتهاء"
+
+msgid "Expired Not Returned"
+msgstr "منتهية لم تُرد"
+
+msgid "Closed Amount"
+msgstr "المبلغ المغلق"
+
+msgid "None selected: the cheques held / given now."
+msgstr "بدون اختيار: الشيكات المحتفظ بها / المسلمة حالياً."
+
+msgid "Ageing Ranges (Days)"
+msgstr "فترات التقادم (بالأيام)"
+
+msgid "From Date and To Date are required."
+msgstr "من تاريخ وإلى تاريخ مطلوبان."
+
+msgid "Invalid Event: {0}"
+msgstr "حدث غير صالح: {0}"
+
+msgid "Invalid Movement: {0}"
+msgstr "حركة غير صالحة: {0}"
+
+msgctxt "Security Cheque"
+msgid "Custody Moved"
+msgstr "نقل عهدة"
+
+msgctxt "Security Cheque"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Security Cheque"
+msgid "Group By"
+msgstr "التجميع حسب"
+
+msgctxt "Security Cheque"
+msgid "Movement"
+msgstr "الحركة"

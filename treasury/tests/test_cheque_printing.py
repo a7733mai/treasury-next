@@ -1,0 +1,507 @@
+"""Phase 7f: cheque printing on bank Cheque Layouts, print registration and reprints (spec 7f §7.4)."""
+
+import re
+
+import frappe
+from frappe.tests import IntegrationTestCase
+from frappe.utils import add_days, fmt_money, getdate
+
+from treasury.pdc.cheque_printing import (
+	FORMAT_BATCH,
+	FORMAT_CHEQUE,
+	FORMAT_TEST,
+	LEGACY_FORMAT,
+	ChequeAlreadyPrintedError,
+	build_leaf,
+	currency_decimals,
+	format_cheque_date,
+	preview_layout,
+	render_leaf,
+	split_words,
+)
+from treasury.tests.utils import (
+	COMPANY,
+	CUSTOMER,
+	DEFAULT_PDC_SETTINGS,
+	SUPPLIER,
+	TreasuryTestMixin,
+	add_user_permission,
+	bank_account_name,
+	day,
+	ensure_currency,
+	ensure_user,
+	get_voucher_count,
+	make_cheque_layout,
+	make_pdc_cheque,
+	unique_cheque_no,
+)
+
+CHEQUE = "PDC Cheque"
+BATCH = "Cheque Batch"
+LAYOUT = "Cheque Layout"
+ARABIC = re.compile(r"[؀-ۿ]")
+ARABIC_INDIC = re.compile(r"[٠-٩]")
+WESTERN = re.compile(r"[0-9]")
+LAYOUT_VALUES = {
+	"nudge_x_mm": 1.5,
+	"date_top_mm": 10,
+	"date_left_mm": 130,
+	"words1_max_chars": 30,
+	"figures_guard": "#",
+	"default_language": "Arabic",
+}
+TREASURY_USER = "treasury-print-user@example.com"
+TREASURY_MANAGER = "treasury-print-manager@example.com"
+ACCOUNTS_USER = "treasury-print-accounts@example.com"
+NO_ACCESS_USER = "treasury-print-noaccess@example.com"
+# restricted by a User Permission to one cheque (test_batch_all_or_nothing only)
+BATCH_MANAGER = "treasury-print-batch-manager@example.com"
+BOXES = (
+	"tcl-date",
+	"tcl-payee",
+	"tcl-figures",
+	"tcl-words-1",
+	"tcl-words-2",
+	"tcl-crossing",
+	"tcl-signature",
+)
+
+
+class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		ensure_user(TREASURY_USER, ["Treasury User"])
+		ensure_user(TREASURY_MANAGER, ["Treasury Manager"])
+		ensure_user(ACCOUNTS_USER, ["Accounts User"])
+		ensure_user(NO_ACCESS_USER, [])
+
+	def setUp(self):
+		super().setUp()
+		self.use_company_settings(**DEFAULT_PDC_SETTINGS, cheque_reprint_requires_manager=1)
+		self.set_lang("en")
+		self.layout = make_cheque_layout(**LAYOUT_VALUES)
+		self.cheque = make_pdc_cheque(amount=1250.50, issue_date=day(-20), due_date=day(-5))
+
+	def set_lang(self, lang: str):
+		previous = frappe.local.lang
+		frappe.local.lang = lang
+		self.addCleanup(setattr, frappe.local, "lang", previous)
+
+	def leaf(self, lang: str, layout=None, amount=1250.50, currency="EGP"):
+		return build_leaf(
+			layout or self.layout,
+			payee=self.cheque.party_name,
+			amount=amount,
+			currency=currency,
+			date=self.cheque.effective_due_date,
+			company=COMPANY,
+			lang=lang,
+		)
+
+	def render(self, doctype: str, name: str, print_format: str) -> str:
+		return frappe.get_print(doctype, name, print_format=print_format)
+
+	@staticmethod
+	def words_line(html: str) -> str:
+		match = re.search(r'tcl-words-1[^>]*>\s*([^<]*)<', html)
+		return match.group(1).strip() if match else ""
+
+	def disable_layouts(self):
+		"""Every layout of the EGP bank disabled (the layouts are rolled back with the class; each test creates
+		its own default in setUp)."""
+		for name in frappe.get_all(LAYOUT, filters={"bank_account": bank_account_name("EGP")}, pluck="name"):
+			frappe.db.set_value(LAYOUT, name, "disabled", 1)
+
+	def state(self, cheque) -> tuple:
+		cheque.reload()
+		return cheque.operational_status, cheque.accounting_status, get_voucher_count(CHEQUE, cheque.name)
+
+	# ------------------------------------------------------------------ building the leaf
+
+	def test_build_leaf_positions(self):
+		leaf = self.leaf("en")
+		self.assertEqual((leaf.boxes.date.top, leaf.boxes.date.left), ("10.00mm", "131.50mm"))
+		self.assertEqual((leaf.page_width, leaf.page_height), ("175.00mm", "80.00mm"))
+
+		layout = frappe.copy_doc(self.layout)
+		layout.update({"paper": "A4 Carrier", "offset_left_mm": 20, "offset_top_mm": 15})
+		leaf = self.leaf("en", layout)
+		self.assertEqual((leaf.boxes.date.top, leaf.boxes.date.left), ("25.00mm", "151.50mm"))
+		self.assertEqual((leaf.page_width, leaf.page_height), ("210.00mm", "297.00mm"))
+		self.assertEqual((leaf.leaf_top, leaf.leaf_left), ("15.00mm", "20.00mm"))
+
+	def test_build_leaf_english(self):
+		leaf = self.leaf("en")
+		self.assertEqual(leaf.dir, "ltr")
+		self.assertEqual(leaf.figures, f"#{fmt_money(1250.50, precision=2)}#")
+		self.assertIn("One Thousand, Two Hundred And Fifty", leaf.words)
+		self.assertIn("Egyptian Pound", leaf.words)
+		self.assertIn("Fifty", leaf.words.split("Egyptian Pound")[1])
+		self.assertTrue(leaf.words.endswith("only"), leaf.words)
+		self.assertLessEqual(len(leaf.words1), 30)
+		self.assertTrue(leaf.words2)
+		self.assertEqual(f"{leaf.words1} {leaf.words2}", leaf.words)
+		self.assertEqual(leaf.crossing, "A/C Payee Only")
+		due = getdate(self.cheque.effective_due_date)
+		self.assertEqual(leaf.date, f"{due.day:02d}/{due.month:02d}/{due.year}")
+		self.assertEqual(leaf.payee, self.cheque.party_name)
+		self.assertEqual(leaf.signature, COMPANY)
+
+	def test_build_leaf_arabic(self):
+		leaf = self.leaf("ar")
+		self.assertEqual(leaf.dir, "rtl")
+		self.assertTrue(leaf.words.startswith("فقط"), leaf.words)
+		self.assertTrue(leaf.words.endswith("لا غير"), leaf.words)
+		self.assertIn("ألف", leaf.words)
+		self.assertIn("جنيه مصري", leaf.words)
+		self.assertEqual(leaf.crossing, "لحساب المستفيد الأول")
+
+	def test_arabic_indic_digits(self):
+		layout = frappe.copy_doc(self.layout)
+		layout.digits = "Arabic-Indic"
+		arabic = self.leaf("ar", layout)
+		for text in (arabic.figures, arabic.date):
+			self.assertTrue(ARABIC_INDIC.search(text), text)
+			self.assertFalse(WESTERN.search(text), text)
+		english = self.leaf("en", layout)
+		self.assertEqual((english.figures, english.date), (self.leaf("en").figures, self.leaf("en").date))
+
+	def test_wording_options(self):
+		layout = frappe.copy_doc(self.layout)
+		layout.add_only_suffix = 0
+		self.assertNotIn("only", self.leaf("en", layout).words)
+		self.assertNotIn("فقط", self.leaf("ar", layout).words)
+
+		layout = frappe.copy_doc(self.layout)
+		layout.show_currency_name = 0
+		self.assertNotIn("Egyptian Pound", self.leaf("en", layout).words)
+		self.assertNotIn("جنيه مصري", self.leaf("ar", layout).words)
+
+		layout = frappe.copy_doc(self.layout)
+		layout.fraction_style = "Figures"
+		self.assertIn("and 50/100", self.leaf("en", layout).words)
+		self.assertIn("و50/100", self.leaf("ar", layout).words)
+
+		layout = frappe.copy_doc(self.layout)
+		layout.update({"fraction_name_ar": "فلس", "currency_name_en": "Egyptian Pounds"})
+		self.assertIn("فلس", self.leaf("ar", layout).words)
+		self.assertIn("Egyptian Pounds", self.leaf("en", layout).words)
+
+	def test_qar_and_kwd(self):
+		ensure_currency("QAR", "Dirham", 100)
+		ensure_currency("KWD", "Fils", 1000)
+		fraction = frappe.db.get_value("Currency", "QAR", "fraction")
+
+		arabic = self.leaf("ar", amount=1000.50, currency="QAR").words
+		self.assertIn("ريال قطري", arabic)
+		self.assertIn("خمسون", arabic)
+		english = self.leaf("en", amount=1000.50, currency="QAR").words
+		self.assertIn("Qatari Riyal", english)
+		self.assertTrue(english.endswith(f"Fifty {fraction} only"), english)
+		if fraction == "Dirham":
+			self.assertIn("درهم", arabic)
+		layout = frappe.copy_doc(self.layout)
+		layout.update({"fraction_name_ar": "درهم", "fraction_name_en": "Dirhams"})
+		self.assertIn("درهم", self.leaf("ar", layout, amount=1000.50, currency="QAR").words)
+
+		units = frappe.db.get_value("Currency", "KWD", "fraction_units")
+		if units == 1000:
+			self.assertEqual(currency_decimals("KWD"), 3)
+			leaf = self.leaf("en", amount=1.250, currency="KWD")
+			self.assertEqual(leaf.figures, f"#{fmt_money(1.25, precision=3)}#")
+			self.assertIn("1.250", leaf.figures)
+			self.assertIn("Two Hundred And Fifty", leaf.words)
+		self.assertEqual(currency_decimals("EGP"), 2)
+
+	def test_date_formats(self):
+		date = getdate("2026-12-31")
+		expected = {
+			"dd/mm/yyyy": "31/12/2026",
+			"dd-mm-yyyy": "31-12-2026",
+			"dd.mm.yyyy": "31.12.2026",
+			"ddmmyyyy": "31122026",
+			"yyyy/mm/dd": "2026/12/31",
+			"mm/dd/yyyy": "12/31/2026",
+		}
+		for date_format, text in expected.items():
+			self.assertEqual(format_cheque_date(date, date_format), text)
+
+		layout = frappe.copy_doc(self.layout)
+		layout.update({"date_format": "ddmmyyyy", "date_char_spacing_mm": 5})
+		leaf = self.leaf("en", layout)
+		self.assertEqual(len(leaf.date_chars), 8)
+		html = str(render_leaf(layout, leaf))
+		self.assertEqual(html.count('<span style="display:inline-block;width:5.00mm'), 8)
+
+	def test_split_words(self):
+		self.assertEqual(split_words("One Thousand", 60), ("One Thousand", ""))
+		self.assertEqual(split_words("abcde fghij", 11), ("abcde fghij", ""))
+		self.assertEqual(split_words("abcdefghij", 4), ("abcd", "efghij"))
+		self.assertEqual(split_words("one two three four", 9), ("one two", "three four"))
+		self.assertEqual(split_words("one two three", 7), ("one two", "three"))
+
+	# ------------------------------------------------------------------ registration
+
+	def test_print_requires_registration(self):
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
+		self.assertIn("treasury-cheque-notice", html)
+		self.assertNotIn("tcl-figures", html)
+
+	def test_print_cheque_counter(self):
+		before = self.state(self.cheque)
+		result = self.cheque.print_cheque(language="ar")
+		self.assertEqual(
+			result,
+			{"name": self.cheque.name, "print_count": 1, "print_format": FORMAT_CHEQUE, "language": "ar"},
+		)
+		self.assertEqual(self.state(self.cheque), before)
+		self.assertEqual((self.cheque.print_count, self.cheque.last_printed_by), (1, "Administrator"))
+		self.assertTrue(self.cheque.last_printed_on)
+		log = self.cheque.status_log[-1]
+		self.assertEqual((log.event, log.remarks, log.user), ("Printed", "Arabic", "Administrator"))
+		self.assertEqual(
+			(log.from_operational, log.to_operational), ("Created", "Created")
+		)  # no status change
+
+		self.set_lang("ar")
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
+		self.assertIn("tcl-figures", html)
+		self.assertIn('dir="rtl"', html)
+		self.assertTrue(ARABIC.search(self.words_line(html)), self.words_line(html))
+		self.set_lang("en")
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
+		self.assertIn("One Thousand", self.words_line(html))
+		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 1)  # a view never counts
+
+	def test_reprint_flow(self):
+		self.cheque.print_cheque(language="ar")
+		self.assertRaises(ChequeAlreadyPrintedError, self.cheque.print_cheque, language="ar")
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			self.cheque.print_cheque(language="ar", reprint=1)
+		self.assertIn("A reason is required to reprint", str(ctx.exception))
+
+		with self.set_user(TREASURY_USER):
+			self.assertRaises(
+				frappe.PermissionError, self.cheque.print_cheque, language="en", reprint=1, reason="Jammed"
+			)
+		self.use_company_settings(cheque_reprint_requires_manager=0)
+		with self.set_user(TREASURY_USER):
+			result = self.cheque.print_cheque(language="en", reprint=1, reason="Jammed")
+		self.assertEqual((result["print_count"], result["language"]), (2, "en"))
+		self.cheque.reload()
+		self.assertEqual((self.cheque.print_count, self.cheque.last_printed_by), (2, TREASURY_USER))
+		log = self.cheque.status_log[-1]
+		self.assertEqual(log.event, "Reprinted")
+		self.assertIn("Jammed", log.remarks)
+		self.assertEqual(get_voucher_count(CHEQUE, self.cheque.name), 0)
+
+	def test_manager_reprints(self):
+		self.cheque.print_cheque(language="en")
+		with self.set_user(TREASURY_MANAGER):
+			self.cheque.print_cheque(language="English", reprint=1, reason="Spoilt in the printer")
+		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 2)
+		self.assertRaises(
+			frappe.ValidationError, self.cheque.print_cheque, language="French", reprint=1, reason="x"
+		)
+
+	def test_print_not_printable(self):
+		self.use_company_settings(outgoing_party_posting="Manual", outgoing_bank_posting="Manual")
+		cleared = make_pdc_cheque(issue_date=day(-20), due_date=day(-5))
+		cleared.deliver(handover_date=day(-19))
+		cleared.clear(clearance_date=day(-4))
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			cleared.print_cheque(language="en")
+		self.assertIn("only Created or Delivered cheques can be printed", str(ctx.exception))
+
+		cancelled = make_pdc_cheque()
+		cancelled.cancel_cheque(reason="Wrong payee")
+		self.assertRaises(frappe.ValidationError, cancelled.print_cheque, language="en")
+
+		incoming = make_pdc_cheque("Incoming")
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			incoming.print_cheque(language="en")
+		self.assertIn("Only outgoing cheques can be printed", str(ctx.exception))
+		incoming.run_method("onload")
+		self.assertEqual(incoming.get_onload().cheque_print_format, LEGACY_FORMAT)
+		self.assertIsNone(incoming.get_onload().cheque_layout)
+
+		# a delivered cheque prints; the leaf of a cheque that became unprintable is refused by the format
+		delivered = make_pdc_cheque(issue_date=day(-20), due_date=day(-5))
+		delivered.deliver(handover_date=day(-19))
+		delivered.print_cheque(language="en")
+		self.assertIn("tcl-figures", self.render(CHEQUE, delivered.name, FORMAT_CHEQUE))
+		delivered.clear(clearance_date=day(-4))
+		html = self.render(CHEQUE, delivered.name, FORMAT_CHEQUE)
+		self.assertNotIn("tcl-figures", html)
+		self.assertIn("treasury-cheque-notice", html)
+
+	def test_print_permissions(self):
+		with self.set_user(ACCOUNTS_USER):
+			self.assertRaises(frappe.PermissionError, self.cheque.print_cheque, language="en")
+		with self.set_user(NO_ACCESS_USER):
+			self.assertRaises(frappe.PermissionError, self.cheque.print_cheque, language="en")
+		with self.set_user(TREASURY_USER):
+			self.assertEqual(self.cheque.print_cheque(language="en")["print_count"], 1)
+
+	def test_no_layout_fallback(self):
+		cheque = make_pdc_cheque(currency="USD", amount=100, issue_date=day(-20), due_date=day(-5))
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			cheque.print_cheque(language="en")
+		self.assertIn("has no Cheque Layout", str(ctx.exception))
+		cheque.run_method("onload")
+		self.assertEqual(cheque.get_onload().cheque_print_format, LEGACY_FORMAT)
+		self.assertIsNone(cheque.get_onload().cheque_layout)
+
+		self.cheque.run_method("onload")
+		self.assertEqual(self.cheque.get_onload().cheque_print_format, FORMAT_CHEQUE)
+		self.assertEqual(
+			self.cheque.get_onload().cheque_layout,
+			{"name": self.layout.name, "default_language": "Arabic"},
+		)
+
+		# a disabled layout is no layout: back to the legacy format
+		self.disable_layouts()
+		self.cheque.run_method("onload")
+		self.assertEqual(self.cheque.get_onload().cheque_print_format, LEGACY_FORMAT)
+
+	def test_replacement_resets_counter(self):
+		self.cheque.print_cheque(language="ar")
+		result = self.cheque.replace(
+			{"cheque_no": unique_cheque_no(), "replacement_date": day(-10), "reason": "Printed wrongly"}
+		)
+		new = frappe.get_doc(CHEQUE, result["replaced_by"])
+		self.assertEqual((new.print_count, new.last_printed_by, new.last_printed_on), (0, None, None))
+		self.assertEqual([r.event for r in new.status_log], ["Created"])
+
+	def test_protected_counter(self):
+		"""The counter changes only through Print Cheque (a form / REST save is rejected)."""
+		doc = frappe.get_doc(CHEQUE, self.cheque.name)
+		doc.print_count = 5
+		self.assertRaises(frappe.ValidationError, doc.save)
+		doc = frappe.get_doc(CHEQUE, self.cheque.name)
+		doc.payee_on_cheque = "ACME Trading Co. W.L.L."
+		doc.save()
+		self.cheque.print_cheque(language="en")
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
+		self.assertIn("ACME Trading Co. W.L.L.", html)
+
+	# ------------------------------------------------------------------ batches
+
+	def make_batch(self, amounts, **values):
+		doc = frappe.get_doc(
+			{
+				"doctype": BATCH,
+				"direction": "Outgoing",
+				"company": COMPANY,
+				"party_type": "Supplier",
+				"party": SUPPLIER,
+				"bank_account": bank_account_name("EGP"),
+				"issue_date": day(-60),
+				"purpose": "Rent",
+				**values,
+			}
+		)
+		for i, amount in enumerate(amounts):
+			doc.append(
+				"cheques",
+				{"due_date": add_days(day(-30), 30 * i), "amount": amount, "cheque_no": unique_cheque_no()},
+			)
+		doc.insert()
+		doc.submit()
+		doc.reload()
+		return doc
+
+	def test_batch_print(self):
+		batch = self.make_batch([1000, 2000, 3000])
+		first, second, third = (row.pdc_cheque for row in batch.cheques)
+		frappe.get_doc(CHEQUE, first).cancel_cheque(reason="Not needed")
+
+		result = batch.print_cheques(language="en")
+		self.assertEqual(
+			(result["print_format"], result["printed"], result["skipped"], result["language"]),
+			(FORMAT_BATCH, [second, third], [], "en"),
+		)
+		html = self.render(BATCH, batch.name, FORMAT_BATCH)
+		self.assertEqual(html.count('class="treasury-cheque-page"'), 2)
+		figures = [fmt_money(amount, precision=2) for amount in (2000, 3000)]
+		self.assertLess(html.index(figures[0]), html.index(figures[1]))  # batch row order
+
+		self.assertRaises(ChequeAlreadyPrintedError, batch.print_cheques, language="en")
+		result = batch.print_cheques(language="en", only_unprinted=1)
+		self.assertEqual((result["printed"], sorted(result["skipped"])), ([], sorted([second, third])))
+
+		replaced = frappe.get_doc(CHEQUE, second).replace(
+			{"cheque_no": unique_cheque_no(), "replacement_date": day(-5), "reason": "Wrong date"}
+		)
+		result = batch.print_cheques(language="en", only_unprinted=1)
+		self.assertEqual((result["printed"], result["skipped"]), ([replaced["replaced_by"]], [third]))
+
+		result = batch.print_cheques(language="ar", reprint=1, reason="Printer jam")
+		self.assertEqual(sorted(result["printed"]), sorted([third, replaced["replaced_by"]]))
+		self.assertEqual(frappe.db.get_value(CHEQUE, third, "print_count"), 2)
+		for name in (first, second, third, replaced["replaced_by"]):
+			self.assertEqual(get_voucher_count(CHEQUE, name), 0)
+		self.assertEqual(get_voucher_count(BATCH, batch.name), 0)
+
+	def test_batch_all_or_nothing(self):
+		self.use_company_settings(outgoing_party_posting="Manual", outgoing_bank_posting="Manual")
+		batch = self.make_batch([1000, 2000, 3000])
+		first, second, third = (row.pdc_cheque for row in batch.cheques)
+		cleared = frappe.get_doc(CHEQUE, first)
+		cleared.deliver(handover_date=day(-25))
+		cleared.clear(clearance_date=day(-24))
+		ensure_user(BATCH_MANAGER, ["Treasury Manager"])
+		add_user_permission(BATCH_MANAGER, CHEQUE, third, applicable_for=CHEQUE)
+
+		with self.set_user(BATCH_MANAGER):
+			result = batch.print_cheques(language="en")
+		self.assertEqual(result["printed"], [third])  # the unreadable and the Cleared cheques are left out
+		self.assertEqual(frappe.db.get_value(CHEQUE, second, "print_count"), 0)
+
+		# all or nothing: one cheque that cannot be reprinted stops the whole batch
+		self.assertRaises(ChequeAlreadyPrintedError, batch.print_cheques, language="en")
+		self.assertEqual(frappe.db.get_value(CHEQUE, second, "print_count"), 0)
+
+		incoming = self.make_batch([500], direction="Incoming", party_type="Customer", party=CUSTOMER)
+		self.assertRaises(frappe.ValidationError, incoming.print_cheques, language="en")
+
+	def test_batch_without_layout(self):
+		self.disable_layouts()
+		batch = self.make_batch([1000, 2000])
+		result = batch.print_cheques(language="en")
+		self.assertEqual(result["doctype"], CHEQUE)
+		self.assertEqual(result["names"], [row.pdc_cheque for row in batch.cheques])
+		self.assertEqual(result["print_format"], LEGACY_FORMAT)
+
+	# ------------------------------------------------------------------ layout test print and preview
+
+	def test_layout_test_print(self):
+		self.layout.print_crossing = 0
+		self.layout.save()
+		for lang, payee in (("en", "Sample Payee Name Trading Company"), ("ar", None)):
+			self.set_lang(lang)
+			html = self.render(LAYOUT, self.layout.name, FORMAT_TEST)
+			self.assertIn("tcl-grid", html)
+			self.assertIn("tcl-leaf-outline", html)
+			for box in BOXES:
+				self.assertIn(box, html)
+			if payee:
+				self.assertIn(payee, html)
+			else:
+				self.assertIn('dir="rtl"', html)
+		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 0)
+
+	def test_preview_unsaved(self):
+		count = frappe.db.count(LAYOUT)
+		values = {**self.layout.as_dict(), "date_left_mm": 50, "nudge_x_mm": 0, "layout_name": "Unsaved"}
+		values.pop("name")
+		html = preview_layout(frappe.as_json(values), "en")
+		self.assertIn("left:50.00mm", html)
+		self.assertIn("Sample Payee Name Trading Company", html)
+		self.assertIn('dir="ltr"', preview_layout(values, "English"))
+		self.assertIn('dir="rtl"', preview_layout(values))  # the layout's default language
+		self.assertEqual(frappe.db.count(LAYOUT), count)
+		self.assertRaises(frappe.ValidationError, preview_layout, {"doctype": CHEQUE}, "en")
+		with self.set_user(NO_ACCESS_USER):
+			self.assertRaises(frappe.PermissionError, preview_layout, values, "en")

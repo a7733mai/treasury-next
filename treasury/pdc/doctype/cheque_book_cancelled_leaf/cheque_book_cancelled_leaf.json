@@ -6,8 +6,15 @@
  "engine": "InnoDB",
  "field_order": [
   "cheque_no",
+  "kind",
   "date",
-  "reason"
+  "reason_type",
+  "reason",
+  "column_break_audit",
+  "user",
+  "datetime",
+  "source_doctype",
+  "source_name"
  ],
  "fields": [
   {
@@ -15,25 +22,78 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Cheque No",
+   "read_only": 1,
    "reqd": 1
+  },
+  {
+   "columns": 1,
+   "default": "Cancelled",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kind",
+   "options": "Cancelled\nVoid",
+   "read_only": 1
   },
   {
    "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Date"
+   "label": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Reason Type",
+   "options": "\nSpoilt\nDamaged\nMisprinted\nLost\nStolen\nCheque Cancelled\nOther",
+   "read_only": 1
   },
   {
    "fieldname": "reason",
    "fieldtype": "Small Text",
    "in_list_view": 1,
-   "label": "Reason"
+   "label": "Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_audit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "datetime",
+   "fieldtype": "Datetime",
+   "label": "Date and Time",
+   "read_only": 1
+  },
+  {
+   "description": "The cheque whose cancellation recorded the leaf.",
+   "fieldname": "source_doctype",
+   "fieldtype": "Link",
+   "label": "Source Type",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Source",
+   "options": "source_doctype",
+   "read_only": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-09-29 18:00:00.000000",
+ "modified": "2026-10-14 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Cheque Book Cancelled Leaf",

@@ -78,6 +78,12 @@
   "postponements",
   "status_log_section",
   "status_log",
+  "printing_section",
+  "payee_on_cheque",
+  "column_break_printing",
+  "print_count",
+  "last_printed_on",
+  "last_printed_by",
   "more_info_section",
   "remarks",
   "column_break_more",
@@ -600,6 +606,46 @@
    "label": "Status Log",
    "no_copy": 1,
    "options": "PDC Status Log",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.direction==='Outgoing'",
+   "fieldname": "printing_section",
+   "fieldtype": "Section Break",
+   "label": "Cheque Printing"
+  },
+  {
+   "description": "Printed instead of the party name, e.g. the name as the bank requires it.",
+   "fieldname": "payee_on_cheque",
+   "fieldtype": "Data",
+   "label": "Payee Name on Cheque"
+  },
+  {
+   "fieldname": "column_break_printing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "print_count",
+   "fieldtype": "Int",
+   "label": "Times Printed",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_printed_on",
+   "fieldtype": "Datetime",
+   "label": "Last Printed On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_printed_by",
+   "fieldtype": "Link",
+   "label": "Last Printed By",
+   "no_copy": 1,
+   "options": "User",
    "read_only": 1
   },
   {

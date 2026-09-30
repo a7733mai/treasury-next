@@ -4,15 +4,24 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no, cancel_leaf
+from treasury.pdc.doctype.cheque_book.cheque_book import (
+	MAX_VOID_RANGE,
+	allocate_next_cheque_no,
+	cancel_leaf,
+	void_leaf,
+)
 from treasury.tests.utils import (
 	DEFAULT_PDC_SETTINGS,
 	TreasuryTestMixin,
+	ensure_user,
+	get_voucher_count,
 	make_cheque_book,
 	make_pdc_cheque,
+	make_security_cheque,
 )
 
 IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Account", "Bank Account", "Print Format"]
+BOOK_READER = "treasury-cheque-book-reader@example.com"
 
 
 class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
@@ -114,3 +123,156 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 			frappe.ValidationError, make_pdc_cheque, cheque_book=book.name, currency="USD", amount=10
 		)
 		self.assertRaises(frappe.ValidationError, make_pdc_cheque, "Incoming", cheque_book=book.name)
+
+	# ------------------------------------------------------------------ Phase 7f: void leaves, audit trail
+
+	def assert_error(self, message: str, fn, *args, **kwargs):
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			fn(*args, **kwargs)
+		self.assertIn(message, str(ctx.exception))
+
+	def test_void_single_leaf(self):
+		book = self.book(size=10)
+		result = void_leaf(book.name, self.leaf(book, 0), reason_type="Damaged", reason="Torn")
+		self.assertEqual(result, [self.leaf(book, 0)])
+
+		book.reload()
+		self.assertEqual(len(book.cancelled_leaves), 1)
+		row = book.cancelled_leaves[0]
+		self.assertEqual(
+			(row.cheque_no, row.kind, row.reason_type, row.reason, row.user),
+			(self.leaf(book, 0), "Void", "Damaged", "Torn", "Administrator"),
+		)
+		self.assertTrue(row.datetime)
+		self.assertEqual(make_pdc_cheque(cheque_book=book.name).cheque_no, self.leaf(book, 1))
+		comments = frappe.get_all(
+			"Comment",
+			filters={"reference_doctype": "Cheque Book", "reference_name": book.name, "comment_type": "Info"},
+			pluck="content",
+		)
+		self.assertEqual(len(comments), 1)
+		self.assertIn("Torn", comments[0])
+
+	def test_void_range(self):
+		book = self.book(size=10)
+		result = void_leaf(
+			book.name, self.leaf(book, 2), self.leaf(book, 4), reason_type="Misprinted", reason="Printer jam"
+		)
+		self.assertEqual(result, [self.leaf(book, i) for i in (2, 3, 4)])
+		book.reload()
+		self.assertEqual(
+			[(r.cheque_no, r.kind) for r in book.cancelled_leaves],
+			[(self.leaf(book, i), "Void") for i in (2, 3, 4)],
+		)
+		numbers = [make_pdc_cheque(cheque_book=book.name).cheque_no for _i in range(3)]
+		self.assertEqual(numbers, [self.leaf(book, i) for i in (0, 1, 5)])
+
+	def test_void_errors(self):
+		book = self.book(size=200)
+		make_pdc_cheque(cheque_book=book.name)  # leaf 0 is used
+		cancel_leaf(book.name, self.leaf(book, 1), "Spoilt")
+		args = {"reason_type": "Damaged", "reason": "Torn"}
+		self.assert_error("is used by a PDC Cheque", void_leaf, book.name, self.leaf(book, 0), **args)
+		self.assert_error("already cancelled or void", void_leaf, book.name, self.leaf(book, 1), **args)
+		self.assert_error(
+			"cannot be before", void_leaf, book.name, self.leaf(book, 5), self.leaf(book, 3), **args
+		)
+		self.assert_error(
+			f"At most {MAX_VOID_RANGE} leaves",
+			void_leaf,
+			book.name,
+			self.leaf(book, 2),
+			self.leaf(book, 2 + MAX_VOID_RANGE),
+			**args,
+		)
+		self.assert_error(
+			"A reason is required", void_leaf, book.name, self.leaf(book, 2), reason_type="Damaged", reason=" "
+		)
+		self.assert_error(
+			"Select the reason type", void_leaf, book.name, self.leaf(book, 2), reason_type="Spoilt", reason="x"
+		)
+		self.assert_error("is outside the range", void_leaf, book.name, str(book.end_no + 1), **args)
+		# a range reaching a used leaf (a security cheque's leaf included) is refused as a whole
+		make_security_cheque("Outgoing", cheque_no=self.leaf(book, 10))
+		self.assert_error(
+			"is used by a PDC Cheque", void_leaf, book.name, self.leaf(book, 8), self.leaf(book, 12), **args
+		)
+		book.reload()
+		self.assertEqual([r.cheque_no for r in book.cancelled_leaves], [self.leaf(book, 1)])
+
+	def test_void_exhausts_book(self):
+		book = self.book(size=2)
+		make_pdc_cheque(cheque_book=book.name)
+		void_leaf(book.name, self.leaf(book, 1), reason_type="Lost", reason="Lost in transit")
+		book.reload()
+		self.assertEqual(book.status, "Exhausted")
+
+	def test_void_on_closed_book(self):
+		book = self.book(size=3)
+		book.close()
+		void_leaf(book.name, self.leaf(book, 0), reason_type="Stolen", reason="Police report 12")
+		book.reload()
+		self.assertEqual((book.status, book.cancelled_leaves[0].kind), ("Closed", "Void"))
+
+	def test_void_requires_write(self):
+		book = self.book()
+		ensure_user(BOOK_READER, ["Treasury User"])
+		with self.set_user(BOOK_READER):
+			self.assertRaises(
+				frappe.PermissionError,
+				void_leaf,
+				book.name,
+				self.leaf(book, 0),
+				reason_type="Damaged",
+				reason="Torn",
+			)
+		book.reload()
+		self.assertEqual(book.cancelled_leaves, [])
+
+	def test_cancelled_leaves_protected(self):
+		book = self.book()
+		cancel_leaf(book.name, self.leaf(book, 0), "Spoilt")
+		message = "can only be recorded by the Cancel Leaf and Void Leaf actions"
+
+		doc = frappe.get_doc("Cheque Book", book.name)
+		doc.cancelled_leaves[0].reason = "Changed"
+		self.assert_error(message, doc.save)
+
+		doc = frappe.get_doc("Cheque Book", book.name)
+		doc.set("cancelled_leaves", [])
+		self.assert_error(message, doc.save)
+
+		doc = frappe.get_doc("Cheque Book", book.name)
+		doc.append("cancelled_leaves", {"cheque_no": self.leaf(book, 1), "reason": "Sneaky"})
+		self.assert_error(message, doc.save)
+
+		# other changes still save; the row is kept exactly as recorded
+		doc = frappe.get_doc("Cheque Book", book.name)
+		doc.book_no = "B-7F"
+		doc.save()
+		row = frappe.get_doc("Cheque Book", book.name).cancelled_leaves[0]
+		self.assertEqual((row.reason, row.kind, row.reason_type), ("Spoilt", "Cancelled", "Spoilt"))
+
+	def test_cancelled_pdc_records_source(self):
+		book = self.book()
+		cheque = make_pdc_cheque(cheque_book=book.name)
+		cheque.cancel_cheque(reason="Wrong amount")
+		book.reload()
+		row = book.cancelled_leaves[0]
+		self.assertEqual(
+			(row.cheque_no, row.kind, row.reason_type, row.source_doctype, row.source_name),
+			(cheque.cheque_no, "Cancelled", "Cheque Cancelled", "PDC Cheque", cheque.name),
+		)
+		self.assertEqual(row.user, "Administrator")
+
+	def test_no_vouchers(self):
+		book = self.book(size=10)
+		cheque = make_pdc_cheque(cheque_book=book.name)
+		before = get_voucher_count("PDC Cheque", cheque.name)
+		void_leaf(book.name, self.leaf(book, 3), reason_type="Other", reason="Test")
+		cancel_leaf(book.name, self.leaf(book, 4), "Spoilt")
+		for doctype in ("Payment Entry", "Journal Entry"):
+			self.assertEqual(frappe.db.count(doctype, {"treasury_source_doctype": "Cheque Book"}), 0)
+		self.assertEqual(get_voucher_count("PDC Cheque", cheque.name), before)
+		cheque.reload()
+		self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Created", "Not Posted"))

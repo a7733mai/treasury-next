@@ -226,7 +226,28 @@ any party can be encashed (not one of an *Other* party).
   (party, bank, amount, cheque no ...) lock once the cheque is handed over / received or posted.
 - **Cheque Book**: bank account, leaf range, next number, cancelled leaves (with reason); numbers are
   allocated under a lock, never reused, and the book becomes Exhausted on its last leaf. Cheque numbers are
-  unique per bank account across PDC and security cheques.
+  unique per bank account across PDC and security cheques. **Void Leaf** (one leaf or up to 100 at once,
+  reason type Damaged / Misprinted / Lost / Stolen / Other and a reason, also on a Closed book) records an
+  unused leaf as *Void*; a cancelled cheque records its leaf as *Cancelled* with the cheque as its source.
+  Every row keeps the user and the time, and the rows can only be written by these actions (not through the
+  form or the REST API). The form shows used / cancelled / void / remaining leaves, the *Leaf Register* and
+  the *Cheque Book Leaves* print (every leaf with its status).
+- **Cheque printing (Cheque Layout)**: one layout per bank account (the default one, else the newest enabled)
+  says where the date, payee, amount in figures, amount in words (two lines), crossing and signature label
+  are printed, in mm from the top-left corner of the physical leaf, with printer calibration, fonts, date
+  format (also box dates), Western or Arabic-Indic digits, "only" / currency name / fraction in words or
+  figures and the currency / fraction names (e.g. "Fils" for QAR), on a cheque leaf or on an A4 carrier.
+  *Test Print* prints a grid with every box outlined on blank paper; the form shows a live preview.
+  **Print Cheque** (outgoing Created / Delivered cheques) asks for Arabic or English, registers the print
+  (counter, last printed on / by, status log *Printed*) and opens the *Treasury Cheque* print; a printed
+  cheque is printed again only with a reason (status log *Reprinted*) and, by default, only by a Treasury
+  Manager (*Only a Treasury Manager may reprint a cheque* in Treasury Company Settings). *Payee Name on
+  Cheque* replaces the party name on the leaf. A Cheque Batch prints all its printable cheques at once
+  (*Cheque Batch Leaves*, all or nothing, *Print Unprinted Only* / *Reprint All*). Printing never posts
+  anything. Without a layout, the bank keeps the Cheque Print Format of its PDC Account Mapping row or
+  *PDC Cheque Print* (no counter). A printview URL opened again later is not counted (a page view cannot
+  write); the format renders only cheques registered at least once. Security cheques and incoming cheques
+  are not printed on layouts.
 - **PDC Bank Clearing** tool: suggests matches between open Bank Transactions and cheques (cheque no /
   amount, date tolerance), clears the selected cheques with the bank transaction date and reconciles the
   Bank Transaction against the bank Journal Entry — the engine of *On Bank Transaction Date*. It only
@@ -697,8 +718,8 @@ amounts of other currencies use today's rate.
 
 | Module | Reports | Number cards |
 |---|---|---|
-| PDC | Bank Position Forecast, Projected Party Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage | Outgoing / Incoming Cheques Due Today, Due in 7 Days, Overdue; Outstanding PDC Payable / Receivable |
-| Security Cheques | Security Cheque Register, Security Exposure, Security Cheques by Custody, Expired Security Cheques Not Returned | Security Held, Security Given, Security Cheques Expiring in 30 Days, Expired Security Cheques Not Returned |
+| PDC | Bank Position Forecast, Projected Party Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage, Cheque Leaf Register | Outgoing / Incoming Cheques Due Today, Due in 7 Days, Overdue; Outstanding PDC Payable / Receivable |
+| Security Cheques | Security Cheque Register, Security Cheques Summary, Security Cheque Movements, Security Exposure, Security Cheques by Custody, Expired Security Cheques Not Returned | Security Held, Security Given, Security Cheques Expiring in 30 Days, Expired Security Cheques Not Returned |
 | Bank Facilities | Facility Utilisation, Facility Repayment Schedule Report, Cost of Financing, LG Register, LC Register, Discounted Cheques | Total Facility Limits, Total Facility Utilised, Installments Due in 30 Days, Overdue Facility Installments, Open Letters of Guarantee, Open Letters of Credit, Discounted Cheques Outstanding |
 
 - **Bank Position Forecast**: opening and actual movements come from the bank GL only (it moves on the bank
@@ -721,6 +742,18 @@ amounts of other currencies use today's rate.
   Open / Blank cheques are counted, never summed — "Covered by Open / Blank").
 - **Cost of Financing**: interest, commission, fees and penalties per facility and month / quarter / year,
   from the GL (facility-linked vouchers only).
+- **Cheque Leaf Register**: every leaf of the outgoing cheque books (at most 10,000 per run; view *Books* for
+  the totals only): Unused, Written, Issued (PDC), Cleared, Bounced, Replaced, Cancelled Leaf, Void or the
+  status of the security cheque on it, with party, amount, dates, Payment Entries and the document. A number
+  typed by hand on a cheque without a book belongs to the book of the bank account whose range covers it (a
+  book that is not Closed first, then the newest). Leaf statuses are shown to whoever may read the books; the
+  details of a cheque the user may not read stay blank. *Cheque Book Usage* counts void leaves in their own
+  column.
+- **Security Cheques Summary**: held from others / given to others per party, purpose or status, with the
+  live cheques aged by expiry date (Expired, configurable ranges such as 0-30 / 31-60 / 61-90 / 91+, No
+  Expiry) and, when selected, the amounts of closed cheques. **Security Cheque Movements**: every status and
+  custody movement in a period (by event date, else by the date it was recorded), a custody change shown on
+  its status row.
 
 ### Roles and permissions
 

@@ -66,6 +66,7 @@ class TreasuryCompanySettings(Document):
 		bank_charge_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bank_settlement_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bounce_charges_account: DF.Link | None
+		cheque_reprint_requires_manager: DF.Check
 		company: DF.Link
 		default_charge_bearer: DF.Literal["OUR", "SHA", "BEN"]
 		default_fawran_bank_account: DF.Link | None

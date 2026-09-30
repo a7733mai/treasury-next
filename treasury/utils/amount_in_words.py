@@ -30,33 +30,52 @@ CURRENCY_NAMES = {
 }
 
 
-def treasury_amount_in_words(amount, currency: str | None = None, lang: str | None = None) -> str:
-	"""`amount` of `currency` in words, in `lang` (default: the current / print language)."""
+def treasury_amount_in_words(
+	amount,
+	currency: str | None = None,
+	lang: str | None = None,
+	*,
+	only: bool = True,
+	currency_name: str | None = None,
+	fraction_name: str | None = None,
+	fraction_style: str = "Words",
+) -> str:
+	"""`amount` of `currency` in words, in `lang` (default: the current / print language).
+
+	The defaults give the voucher wording ("... only"). A Cheque Layout may drop the "only" wrapper (`only`),
+	name the currency and its fraction itself (`currency_name` / `fraction_name`; `currency_name=""` leaves
+	the currency out, None means the translated default) and print the fraction in figures
+	(`fraction_style="Figures"`: "... and 50/100")."""
 	lang = lang or getattr(frappe.local, "lang", None) or "en"
 	amount = flt(amount)
 	if amount < 0:
 		return ""
 
-	fraction_name, fraction_units = None, 0
+	default_fraction, fraction_units = None, 0
 	if currency:
 		values = frappe.get_cached_value("Currency", currency, ["fraction", "fraction_units"], as_dict=True)
 		if values:
-			fraction_name, fraction_units = values.fraction, cint(values.fraction_units)
+			default_fraction, fraction_units = values.fraction, cint(values.fraction_units)
 
 	main = int(amount)
 	fraction = round((amount - main) * fraction_units) if fraction_units else 0
 	if fraction_units and fraction >= fraction_units:
 		main, fraction = main + 1, 0
 
-	currency_name = CURRENCY_NAMES.get(currency, currency or "")
-	currency_name = _(currency_name, lang=lang, context=CONTEXT) if currency_name else ""
+	if currency_name is None:
+		currency_name = CURRENCY_NAMES.get(currency, currency or "")
+		currency_name = _(currency_name, lang=lang, context=CONTEXT) if currency_name else ""
 	text = f"{number_in_words(main, lang)} {currency_name}".strip()
-	if fraction:
-		fraction_label = _(fraction_name, lang=lang, context=CONTEXT) if fraction_name else ""
+	if fraction and fraction_style == "Figures":
+		text = _("{0} and {1}/{2}", lang=lang, context=CONTEXT).format(text, fraction, fraction_units)
+	elif fraction:
+		if fraction_name is None:
+			fraction_name = _(default_fraction, lang=lang, context=CONTEXT) if default_fraction else ""
 		text = _("{0} and {1} {2}", lang=lang, context=CONTEXT).format(
-			text, number_in_words(fraction, lang), fraction_label
+			text, number_in_words(fraction, lang), fraction_name
 		)
-	return _("{0} only", lang=lang, context=CONTEXT).format(text.strip())
+	text = text.strip()
+	return _("{0} only", lang=lang, context=CONTEXT).format(text) if only else text
 
 
 def number_in_words(number: int, lang: str = "en") -> str:

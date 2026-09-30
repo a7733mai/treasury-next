@@ -15,10 +15,18 @@ class ChequeBookCancelledLeaf(Document):
 
 		cheque_no: DF.Data
 		date: DF.Date | None
+		datetime: DF.Datetime | None
+		kind: DF.Literal["Cancelled", "Void"]
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data
 		reason: DF.SmallText | None
+		reason_type: DF.Literal[
+			"", "Spoilt", "Damaged", "Misprinted", "Lost", "Stolen", "Cheque Cancelled", "Other"
+		]
+		source_doctype: DF.Link | None
+		source_name: DF.DynamicLink | None
+		user: DF.Link | None
 	# end: auto-generated types
 
 	pass
