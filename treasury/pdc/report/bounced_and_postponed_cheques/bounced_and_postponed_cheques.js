@@ -10,6 +10,19 @@ frappe.query_reports["Bounced and Postponed Cheques"] = {
 			options: "Company",
 			default: frappe.defaults.get_user_default("Company"),
 			reqd: 1,
+			on_change: function () {
+				// another company's bank account does not apply (design 7h §5)
+				frappe.query_report.set_filter_value("bank_account", "");
+			},
+		},
+		{
+			fieldname: "bank_account",
+			label: __("Bank Account", null, "Treasury"),
+			fieldtype: "Link",
+			options: "Bank Account",
+			get_query: () => ({
+				filters: { company: frappe.query_report.get_filter_value("company"), is_company_account: 1 },
+			}),
 		},
 		{
 			fieldname: "view",
@@ -53,15 +66,6 @@ frappe.query_reports["Bounced and Postponed Cheques"] = {
 				}
 				return party_type;
 			},
-		},
-		{
-			fieldname: "bank_account",
-			label: __("Bank Account", null, "Treasury"),
-			fieldtype: "Link",
-			options: "Bank Account",
-			get_query: () => ({
-				filters: { company: frappe.query_report.get_filter_value("company"), is_company_account: 1 },
-			}),
 		},
 		{
 			fieldname: "from_date",

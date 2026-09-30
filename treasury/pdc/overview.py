@@ -253,6 +253,9 @@ def positions_section(ctx) -> frappe._dict:
 	totals = frappe._dict(
 		current_company=flt(sum(r.current_company for r in rows), ctx.precision),
 		projected_7_company=flt(sum(r.projected_7_company for r in rows), ctx.precision),
+		# design 7h P5: the "Projected in {H} Days" card follows the chosen horizon
+		closing_horizon_company=flt(sum(r.closing_horizon_company for r in rows), ctx.precision),
+		horizon_route=frappe._dict(route=FORECAST, route_options={**forecast_options, **bank_list(ctx)}),
 		below_minimum=level_kpi(CRITICAL),
 		below_warning=level_kpi(WARNING),
 		cash_route=frappe._dict(route=OUTLOOK, route_options=outlook_options(PROJECTION_DAY)),
@@ -286,6 +289,7 @@ def position_row(ctx, p) -> frappe._dict:
 	shortfall = max(flt(minimum) - flt(lowest.closing), 0) if minimum is not None else 0
 	rate = ctx.rate(p.currency)
 	projected = p.days[min(PROJECTION_DAY, len(p.days)) - 1].closing
+	closing_horizon = p.days[-1].closing if p.days else p.current_balance
 	return frappe._dict(
 		bank_account=p.bank_account,
 		bank_accounts=p.bank_accounts,
@@ -293,8 +297,12 @@ def position_row(ctx, p) -> frappe._dict:
 		currency=p.currency,
 		current_balance=p.current_balance,
 		projected_7=projected,
-		closing_horizon=p.days[-1].closing if p.days else p.current_balance,
-		lowest=frappe._dict(date=iso(lowest.date), closing=lowest.closing),
+		closing_horizon=closing_horizon,
+		lowest=frappe._dict(
+			date=iso(lowest.date),
+			closing=lowest.closing,
+			closing_company=flt(flt(lowest.closing) * rate, ctx.precision),
+		),
 		level=p.level,
 		level_label=_(p.level, context=LEVEL_CTX),
 		minimum=minimum,
@@ -303,6 +311,7 @@ def position_row(ctx, p) -> frappe._dict:
 		shortfall=flt(shortfall, ctx.precision),
 		current_company=flt(flt(p.current_balance) * rate, ctx.precision),
 		projected_7_company=flt(flt(projected) * rate, ctx.precision),
+		closing_horizon_company=flt(flt(closing_horizon) * rate, ctx.precision),
 		route=FORECAST,
 		route_options={
 			"company": ctx.company,
@@ -388,13 +397,15 @@ def maturities(ctx, positions30, flows30) -> frappe._dict:
 		currency = flow.get("currency") or currency_of.get(flow.get("bank_account")) or ctx.company_currency
 		amount = flt(flow.amount) * ctx.rate(currency)
 		values[maturity_category(flow)][index] += amount if flow.direction == IN else -amount
+	categories = [category for category in MATURITY_CATEGORIES if any(values[category])]
 	datasets = [
 		{"name": _(category, context=CTX), "values": [flt(v, ctx.precision) for v in values[category]]}
-		for category in MATURITY_CATEGORIES
-		if any(values[category])
+		for category in categories
 	]
 	return frappe._dict(
 		data={"labels": labels, "datasets": datasets},
+		keys=categories,  # the untranslated category of each dataset: the page gives each a fixed colour
+		overdue=1 if overdue else 0,
 		type="bar",
 		barOptions={"stacked": 1},
 		currency=ctx.company_currency,

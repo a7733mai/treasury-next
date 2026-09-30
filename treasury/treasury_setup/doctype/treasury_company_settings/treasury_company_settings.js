@@ -776,80 +776,238 @@ function tcs_thresholds_headline(frm) {
 
 // ---------------------------------------------------------------- Setup Checklist (spec 7h §3.4)
 
+// Design 7h §3.1: one row per item in setup order (the list doubles as a guide). The checklist reflects the saved
+// document (__onload): it is evaluated again on save / reload.
 const TCS_MAX_MISSING = 5;
+const TCS_OK = "OK";
+const TCS_WARNING = "Warning";
+const TCS_MISSING = "Missing";
+const TCS_REQUIRED = "Required";
+
+function tcs_arrow() {
+	return frappe.utils.is_rtl() ? "←" : "→";
+}
+
+function tcs_can_write(frm) {
+	return !!(frm.perm[0] && frm.perm[0].write);
+}
+
+function tcs_checklist_items(frm) {
+	return (frm.doc.__onload && frm.doc.__onload.setup_checklist) || [];
+}
+
+function tcs_status_pill(item) {
+	// a status always has a colour and a word
+	const pills = {
+		[TCS_OK]: ["green", __("Done", null, TCS_CTX)],
+		[TCS_WARNING]: ["orange", __("Check", null, TCS_CTX)],
+	};
+	const [color, word] =
+		pills[item.status] || [item.level === TCS_REQUIRED ? "red" : "orange", __("Missing", null, TCS_CTX)];
+	return `<span class="indicator-pill ${color} no-indicator-dot" style="min-inline-size: 72px; justify-content: center;">${frappe.utils.escape_html(
+		word
+	)}</span>`;
+}
+
+function tcs_missing_text(item) {
+	const esc = frappe.utils.escape_html;
+	if (!(item.missing || []).length) {
+		return "";
+	}
+	let names = item.missing.slice(0, TCS_MAX_MISSING).join(", ");
+	if (item.missing.length > TCS_MAX_MISSING) {
+		names += " " + __("and {0} more", [item.missing.length - TCS_MAX_MISSING]);
+	}
+	// the default banks item lists field labels, the others list banks / categories / series
+	const text =
+		item.key === "default_banks"
+			? __("Missing: {0}", [names], TCS_CTX)
+			: __("Missing for: {0}", [names], TCS_CTX);
+	return `<div class="small">${esc(text)}</div>`;
+}
+
+function tcs_checklist_row(frm, item, index) {
+	const esc = frappe.utils.escape_html;
+	if (item.status === TCS_OK) {
+		// done rows are compact: one muted line
+		return `<div class="tcs-check-row" style="display: flex; gap: var(--margin-sm, 8px); align-items: center; padding-block: 4px;">
+			${tcs_status_pill(item)}<span class="text-muted">${esc(item.label)}</span></div>`;
+	}
+	const level =
+		item.level === TCS_REQUIRED
+			? `<span class="indicator-pill red no-indicator-dot" style="background: transparent; border: 1px solid var(--red-500);">${esc(
+					__("Required", null, TCS_CTX)
+			  )}</span>`
+			: `<span class="text-muted small">${esc(__("Recommended", null, TCS_CTX))}</span>`;
+	const actions = [];
+	if (item.quick_fill && tcs_can_write(frm)) {
+		actions.push(
+			`<button type="button" class="btn btn-xs btn-default tcs-quick-fill" data-index="${index}">${esc(
+				__("Use {0}", [item.quick_fill])
+			)}</button>`
+		);
+	}
+	if (item.key === "balance_thresholds" && tcs_can_write(frm)) {
+		actions.push(
+			`<button type="button" class="btn btn-xs btn-default tcs-add-thresholds">${esc(
+				__("Add All Bank Accounts")
+			)}</button>`
+		);
+	}
+	actions.push(
+		`<a href="#" class="tcs-fix" data-index="${index}">${esc(__("Fix", null, TCS_CTX))} ${tcs_arrow()}</a>`
+	);
+	return `<div class="tcs-check-row" style="display: flex; gap: var(--margin-sm, 8px); align-items: flex-start; padding-block: 8px; border-block-start: 1px solid var(--border-color);">
+		<div>${tcs_status_pill(item)}</div>
+		<div style="flex: 1; min-inline-size: 0;">
+			<div><b>${esc(item.label)}</b> ${level}</div>
+			${tcs_missing_text(item)}
+			${item.detail ? `<div class="text-muted small">${esc(item.detail)}</div>` : ""}
+		</div>
+		<div style="display: flex; gap: var(--margin-sm, 8px); align-items: center; flex-wrap: wrap; justify-content: flex-end;">${actions.join(
+			""
+		)}</div>
+	</div>`;
+}
+
+function tcs_checklist_progress(items) {
+	const esc = frappe.utils.escape_html;
+	const done = items.filter((i) => i.status === TCS_OK).length;
+	const required = items.filter((i) => i.level === TCS_REQUIRED && i.status === TCS_MISSING).length;
+	const color = required ? "red" : done < items.length ? "orange" : "green";
+	const percent = items.length ? Math.round((done * 100) / items.length) : 0;
+	const parts = [__("{0} of {1} done", [done, items.length], TCS_CTX)];
+	if (required) {
+		parts.push(__("{0} required step(s) missing", [required], TCS_CTX));
+	}
+	return `<div style="display: flex; gap: var(--margin-md, 12px); align-items: center; flex-wrap: wrap; margin-block-end: 8px;">
+		<b>${esc(__("Setup progress", null, TCS_CTX))}</b>
+		<div style="flex: 1; min-inline-size: 120px; max-inline-size: 320px; block-size: 8px; border-radius: 4px; background: var(--gray-200); overflow: hidden;">
+			<div style="inline-size: ${percent}%; block-size: 100%; background: var(--${color}-500);"></div>
+		</div>
+		<span class="small">${esc(parts.join(" · "))}</span>
+	</div>`;
+}
 
 function tcs_render_setup_checklist(frm) {
 	const field = frm.get_field("setup_checklist");
 	if (!field) {
 		return;
 	}
-	const items = (frm.doc.__onload && frm.doc.__onload.setup_checklist) || [];
+	const esc = frappe.utils.escape_html;
+	const items = tcs_checklist_items(frm);
+	tcs_checklist_chip(frm, items);
 	if (frm.is_new() || !items.length) {
 		field.$wrapper.html(
-			`<div class="text-muted small">${frappe.utils.escape_html(
-				__("Save the settings to see the Setup Checklist.")
-			)}</div>`
+			`<div class="text-muted small">${esc(__("Save the settings to see the Setup Checklist."))}</div>`
 		);
 		return;
 	}
-	const esc = frappe.utils.escape_html;
-	const colors = { OK: "green", Warning: "orange" };
-	const rows = items.map((item, index) => {
-		const color = colors[item.status] || (item.level === "Required" ? "red" : "orange");
-		const shown = item.missing.slice(0, TCS_MAX_MISSING).map(esc).join(", ");
-		const more =
-			item.missing.length > TCS_MAX_MISSING
-				? " " + esc(__("and {0} more", [item.missing.length - TCS_MAX_MISSING]))
-				: "";
-		const fix =
-			item.status === "OK" ? "" : `<a class="tcs-fix" data-index="${index}">${esc(__("Fix", null, TCS_CTX))}</a>`;
-		const quick =
-			item.quick_fill && frm.perm[0] && frm.perm[0].write
-				? ` <a class="tcs-quick-fill" data-index="${index}">${esc(__("Use {0}", [item.quick_fill]))}</a>`
-				: "";
-		return `<tr>
-			<td><span class="indicator-pill ${color}">${esc(__(item.status, null, TCS_CTX))}</span></td>
-			<td><b>${esc(item.label)}</b> <span class="text-muted small">${esc(__(item.level, null, TCS_CTX))}</span>
-				<div class="text-muted small">${esc(item.detail || "")}</div>
-				${shown ? `<div class="small">${shown}${more}</div>` : ""}</td>
-			<td>${fix}${quick}</td>
-		</tr>`;
-	});
-	field.$wrapper.html(`<table class="table table-sm"><tbody>${rows.join("")}</tbody></table>`);
+	// shown as soon as the form turns dirty (the checklist reflects the saved document)
+	const stale = `<div class="tcs-stale text-muted small ${frm.is_dirty() ? "" : "hidden"}" style="margin-block-end: 8px;">${esc(
+		__("Save to refresh the checklist.")
+	)}</div>`;
+	if (!frm._tcs_dirty_bound) {
+		frm._tcs_dirty_bound = true;
+		$(frm.wrapper).on("dirty", () => $(frm.wrapper).find(".tcs-stale").removeClass("hidden"));
+	}
+	const complete = items.every((i) => i.status === TCS_OK)
+		? `<div style="color: var(--green-600); margin-block-end: 8px;"><a href="#" class="tcs-open-dashboard" style="color: inherit;">${esc(
+				__("Setup complete. Open the Treasury Dashboard")
+		  )} ${tcs_arrow()}</a></div>`
+		: "";
+	field.$wrapper.html(`<div class="tcs-setup-checklist">
+		${tcs_checklist_progress(items)}${stale}${complete}
+		${items.map((item, index) => tcs_checklist_row(frm, item, index)).join("")}
+	</div>`);
+	const item_of = (e) => items[cint($(e.currentTarget).attr("data-index"))];
 	field.$wrapper.find(".tcs-fix").on("click", (e) => {
-		const item = items[cint($(e.currentTarget).attr("data-index"))];
-		const action = item.action || {};
-		if (action.route) {
-			frappe.set_route(...action.route, action.route_options || {});
-		} else if (action.field) {
-			frm.scroll_to_field(action.field);
-		}
+		e.preventDefault();
+		tcs_fix(frm, item_of(e));
 	});
 	field.$wrapper.find(".tcs-quick-fill").on("click", (e) => {
-		const item = items[cint($(e.currentTarget).attr("data-index"))];
+		const item = item_of(e);
 		(item.empty_fields || []).forEach((fieldname) => frm.set_value(fieldname, item.quick_fill));
+		frappe.show_alert({ message: esc(__("Defaults set: save to apply.")), indicator: "blue" });
 	});
+	field.$wrapper.find(".tcs-add-thresholds").on("click", () => {
+		// design 7h P21
+		frm.scroll_to_field("balance_thresholds");
+		tcs_add_all_banks(frm);
+	});
+	field.$wrapper.find(".tcs-open-dashboard").on("click", (e) => {
+		e.preventDefault();
+		frappe.set_route("treasury-dashboard", { company: frm.doc.company });
+	});
+}
+
+function tcs_fix(frm, item) {
+	const action = (item && item.action) || {};
+	if (!action.route) {
+		action.field && frm.scroll_to_field(action.field);
+		return;
+	}
+	const go = () => frappe.set_route(...action.route, action.route_options || {});
+	if (!frm.is_dirty()) {
+		go();
+		return;
+	}
+	// design 7h P20: no lost edits
+	const target = __(action.route[1] || "");
+	frappe.confirm(
+		frappe.utils.escape_html(__("Discard unsaved changes and open {0}?", [target], TCS_CTX)),
+		go
+	);
+}
+
+function tcs_checklist_chip(frm, items) {
+	// design 7h P18: the state stays visible when the section is collapsed
+	const section = frm.fields_dict.setup_checklist_section;
+	if (!section || !section.head) {
+		return;
+	}
+	section.head.find(".tcs-checklist-chip").remove();
+	if (frm.is_new() || !items.length) {
+		return;
+	}
+	const done = items.filter((i) => i.status === TCS_OK).length;
+	const color = done === items.length ? "green" : "orange";
+	$(
+		`<span class="tcs-checklist-chip indicator-pill ${color} no-indicator-dot" style="margin-inline-start: 8px;"></span>`
+	)
+		.text(`${done === items.length ? "✓ " : ""}${__("{0} of {1} done", [done, items.length], TCS_CTX)}`)
+		.insertBefore(section.head.find(".collapse-indicator"));
 }
 
 function tcs_checklist_headline(frm) {
 	if (frm.is_new() || frm.is_dirty()) {
 		return;
 	}
-	const items = (frm.doc.__onload && frm.doc.__onload.setup_checklist) || [];
-	const missing = items.filter((i) => i.level === "Required" && i.status === "Missing");
+	const missing = tcs_checklist_items(frm).filter((i) => i.level === TCS_REQUIRED && i.status === TCS_MISSING);
 	if (!missing.length) {
 		return;
 	}
 	const esc = frappe.utils.escape_html;
 	const $headline = frm.dashboard.set_headline(
-		`<div>${esc(__("Setup is incomplete: {0}.", [missing.map((i) => i.label).join(", ")]))}
-		<a class="tcs-open-checklist">${esc(__("Setup Checklist"))} →</a></div>`,
+		`<div>${esc(__("Setup incomplete: {0}.", [missing.map((i) => i.label).join(", ")]))}
+		<a class="tcs-open-checklist">${esc(__("Open the checklist"))} ↓</a></div>`,
 		"red"
 	);
 	$headline && $headline.find(".tcs-open-checklist").on("click", () => frm.scroll_to_field("setup_checklist"));
 }
 
 // ---------------------------------------------------------------- Naming Series (spec 7h §3.5)
+
+// the series field is visible and required on these forms: the user picks, the first option is the default
+const TCS_USER_SERIES = ["Bank Transfer", "Bank Charge"];
+// naming that no setting changes (spec 7h §2.4)
+const TCS_FIXED_NAMING = [
+	"Cheque Layout",
+	"Bank Charge Category",
+	"Custody Location",
+	"Treasury Company Settings",
+	"Treasury Alert Log",
+];
 
 function tcs_render_naming_series(frm) {
 	const field = frm.get_field("naming_series_help");
@@ -860,45 +1018,87 @@ function tcs_render_naming_series(frm) {
 	const esc = frappe.utils.escape_html;
 	const can_settings = frappe.model.can_write("Document Naming Settings");
 	const can_rule = frappe.model.can_create("Document Naming Rule");
-	const body = rows.map((row, index) => {
+	const code = (series) => `<code><bdi>${esc(series || "")}</bdi></code>`;
+	const series_cell = (row) => {
+		// the default in bold, the other options muted below it
 		const defaults =
 			typeof row.default === "object" && row.default
-				? Object.entries(row.default)
-						.map(([direction, series]) => `${esc(__(direction))}: <code>${esc(series)}</code>`)
-						.join("<br>")
-				: `<code>${esc(row.default || "")}</code>`;
-		const chosen = row.forced_by
-			? esc(__("By direction (fixed)", null, TCS_CTX))
-			: esc(__("First option (Document Naming Settings)", null, TCS_CTX));
-		const rules = (row.rules || [])
-			.map(
-				(r) =>
-					`<div class="small"><a href="/app/document-naming-rule/${encodeURIComponent(r.name)}">${esc(
-						r.prefix
-					)}</a> ${esc(r.conditions || "")}${r.disabled ? " (" + esc(__("Disabled")) + ")" : ""}</div>`
-			)
-			.join("");
+				? Object.entries(row.default).map(
+						([direction, series]) => `<b>${esc(__(direction))}: ${code(series)}</b>`
+				  )
+				: [`<b>${code(row.default)}</b>`];
+		const shown = typeof row.default === "object" && row.default ? Object.values(row.default) : [row.default];
+		const others = (row.options || [])
+			.filter((option) => !shown.includes(option))
+			.map((option) => `<div class="text-muted small">${code(option)}</div>`);
+		return defaults.join("<br>") + others.join("");
+	};
+	const chosen = (row) => {
+		if (row.forced_by) {
+			return __("By direction", null, TCS_CTX);
+		}
+		return TCS_USER_SERIES.includes(row.doctype)
+			? __("Chosen by the user (first option by default)", null, TCS_CTX)
+			: __("First option", null, TCS_CTX);
+	};
+	const rules_cell = (row) =>
+		(row.rules || [])
+			.map((r) => {
+				const style = r.disabled ? ' style="text-decoration: line-through;"' : "";
+				const disabled = r.disabled
+					? ` <span class="indicator-pill gray no-indicator-dot">${esc(__("Disabled", null, TCS_CTX))}</span>`
+					: "";
+				return `<div class="small"><a href="/app/document-naming-rule/${encodeURIComponent(
+					r.name
+				)}"${style}>${code(r.prefix)}</a> <span class="text-muted"${style}>${esc(r.conditions || "")} · #${esc(
+					r.counter || 0
+				)}</span>${disabled}</div>`;
+			})
+			.join("") || `<span class="text-muted small">—</span>`;
+	const body = rows.map((row, index) => {
 		const buttons = [
+			// design 7h P22: re-ordering the options has no effect on the direction-forced series
 			!row.forced_by && can_settings
-				? `<a class="tcs-naming-settings" data-index="${index}">${esc(__("Document Naming Settings", null, TCS_CTX))}</a>`
+				? `<button type="button" class="btn btn-xs btn-default tcs-naming-settings" data-index="${index}">${esc(
+						__("Document Naming Settings", null, TCS_CTX)
+				  )}</button>`
 				: "",
-			can_rule ? `<a class="tcs-naming-rule" data-index="${index}">${esc(__("Add Rule per Bank"))}</a>` : "",
+			can_rule
+				? `<button type="button" class="btn btn-xs btn-default tcs-naming-rule" data-index="${index}">${esc(
+						__("Add Rule per Bank")
+				  )}</button>`
+				: "",
 		]
 			.filter(Boolean)
-			.join(" · ");
-		return `<tr><td>${esc(__(row.doctype))}</td><td>${row.options.map((o) => `<code>${esc(o)}</code>`).join("<br>")}</td>
-			<td>${defaults}</td><td>${chosen}</td><td><code>${esc(row.bank_field)}</code>${rules}</td><td>${buttons}</td></tr>`;
+			.join(" ");
+		return `<tr><td>${esc(__(row.doctype))}</td><td>${series_cell(row)}</td><td>${esc(chosen(row))}</td>
+			<td>${rules_cell(row)}</td><td style="white-space: nowrap;">${buttons}</td></tr>`;
 	});
-	field.$wrapper.html(`<div class="text-muted small">${esc(
-		__(
-			"A Document Naming Rule overrides the series. Rules are matched highest priority first, and the counter of a rule does not restart each year. Payment Entry series are set per bank and method in Modes of Payment."
-		)
-	)}</div>
-		<table class="table table-sm"><thead><tr>
-			<th>${esc(__("Document Type", null, TCS_CTX))}</th><th>${esc(__("Options", null, TCS_CTX))}</th>
-			<th>${esc(__("Default Series", null, TCS_CTX))}</th><th>${esc(__("How the series is chosen", null, TCS_CTX))}</th>
-			<th>${esc(__("Rule condition field", null, TCS_CTX))}</th><th></th>
-		</tr></thead><tbody>${body.join("")}</tbody></table>`);
+	body.push(`<tr><td>${esc(__("Payment Entry", null, TCS_CTX))}</td>
+		<td colspan="3">${esc(__("Per bank and method in Modes of Payment", null, TCS_CTX))}</td>
+		<td><a href="#" class="tcs-naming-modes">${esc(__("Fix", null, TCS_CTX))} ${tcs_arrow()}</a></td></tr>`);
+	const bold = (label) => `<b>${esc(label)}</b>`;
+	const fixed = TCS_FIXED_NAMING.map((doctype) => __(doctype)).join(", ");
+	// the labels are escaped; the sentence is our own translation
+	field.$wrapper.html(`<p class="text-muted small">${__(
+		"Treasury documents are numbered by their naming series. To change a series, use {0}. To number differently per bank (or per direction), add a {1}: a rule overrides the series, rules are matched highest priority first, and a rule's counter does not restart each year. Payment Entry series are set per bank and method in {2} above.",
+		[
+			bold(__("Document Naming Settings", null, TCS_CTX)),
+			bold(__("Document Naming Rule", null, TCS_CTX)),
+			bold(__("Modes of Payment", null, TCS_CTX)),
+		]
+	)}</p>
+		<div style="overflow-x: auto;"><table class="table table-sm"><thead><tr>
+			<th>${esc(__("Document", null, TCS_CTX))}</th>
+			<th>${esc(__("Current series", null, TCS_CTX))}</th>
+			<th>${esc(__("How it's chosen", null, TCS_CTX))}</th>
+			<th>${esc(__("Per-bank rules", null, TCS_CTX))}</th><th></th>
+		</tr></thead><tbody>${body.join("")}</tbody></table></div>
+		<p class="text-muted small">${esc(__("These names cannot be changed: {0}", [fixed], TCS_CTX))}</p>`);
+	field.$wrapper.find(".tcs-naming-modes").on("click", (e) => {
+		e.preventDefault();
+		frm.scroll_to_field("payment_modes");
+	});
 	field.$wrapper.find(".tcs-naming-settings").on("click", (e) => {
 		const row = rows[cint($(e.currentTarget).attr("data-index"))];
 		frappe.route_options = { transaction_type: row.doctype };

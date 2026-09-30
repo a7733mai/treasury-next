@@ -1,137 +1,575 @@
-.treasury-dashboard {
+/* Treasury Dashboard (design 7h §1). Every rule is scoped to .treasury-dashboard (the page wrapper, so the filter
+   bar is covered too) and uses logical properties only: the page mirrors itself in RTL. */
+
+/* ------------------------------------------------------------------ filter bar (design §1.2) */
+
+.treasury-dashboard .page-form .trd-filter-company {
+	flex: 0 1 200px;
+	min-inline-size: 160px;
+}
+
+.treasury-dashboard .page-form .trd-filter-banks {
+	flex: 0 1 280px;
+	min-inline-size: 200px;
+}
+
+.treasury-dashboard .page-form .trd-filter-horizon {
+	flex: 0 1 120px;
+}
+
+.treasury-dashboard .trd-root {
 	padding-block: var(--padding-md, 16px);
 }
 
-.treasury-dashboard.td-loading .td-content {
-	opacity: 0.5;
+.treasury-dashboard .trd-effective {
+	margin-block-end: var(--margin-sm, 8px);
+}
+
+.treasury-dashboard .trd-title-sub .trd-stale,
+.treasury-dashboard .trd-loading {
+	color: var(--orange-600, var(--orange-500));
+}
+
+/* ------------------------------------------------------------------ loading / states (design §1.11) */
+
+.treasury-dashboard .trd-root.trd-busy .trd-body {
+	opacity: 0.55;
 	pointer-events: none;
+	transition: opacity 0.15s;
 }
 
-.treasury-dashboard .td-updated {
-	text-align: end;
-	margin-block-end: 8px;
+.treasury-dashboard .trd-skel {
+	block-size: 12px;
+	margin-block: 8px;
+	border-radius: var(--border-radius-sm, 4px);
+	background: var(--skeleton-bg, var(--gray-200));
+	animation: trd-pulse 1.2s ease-in-out infinite alternate;
 }
 
-.treasury-dashboard .td-section {
-	margin-block-end: 24px;
-	padding: 12px 16px;
+.treasury-dashboard .trd-skel-lg {
+	block-size: 22px;
+	inline-size: 60%;
+}
+
+.treasury-dashboard .trd-skel-chart {
+	block-size: 240px;
+}
+
+.treasury-dashboard .trd-skel-card {
+	cursor: default;
+}
+
+@keyframes trd-pulse {
+	from {
+		opacity: 0.5;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.treasury-dashboard .trd-skel {
+		animation: none;
+	}
+
+	.treasury-dashboard .trd-root.trd-busy .trd-body {
+		transition: none;
+	}
+}
+
+.treasury-dashboard .trd-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--margin-sm, 8px);
+	padding-block: 64px;
+	text-align: center;
+}
+
+.treasury-dashboard .trd-state-icon {
+	color: var(--text-muted);
+}
+
+.treasury-dashboard .trd-state-message {
+	font-size: var(--text-lg, 16px);
+	font-weight: 600;
+}
+
+.treasury-dashboard .trd-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--margin-sm, 8px);
+	min-block-size: 80px;
+	text-align: center;
+}
+
+.treasury-dashboard .trd-alert {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--margin-md, 12px);
+	margin-block-end: var(--margin-md, 12px);
+	padding-block: 10px;
+	padding-inline: 16px;
+	border-radius: var(--border-radius-md, 8px);
+	border-inline-start: 4px solid var(--red-500);
+	background: var(--red-50, var(--control-bg));
+	color: var(--red-700, var(--text-color));
+}
+
+.treasury-dashboard .trd-footer {
+	padding-block: var(--padding-sm, 8px);
+	text-align: center;
+}
+
+/* ------------------------------------------------------------------ setup banner (design §1.8) */
+
+.treasury-dashboard .trd-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--margin-md, 12px);
+	margin-block-end: var(--margin-md, 12px);
+	padding-block: 10px;
+	padding-inline: 16px;
+	border-radius: var(--border-radius-md, 8px);
+	border-inline-start: 4px solid var(--orange-500);
+	background: var(--card-bg, var(--fg-color));
+	border-block: 1px solid var(--border-color);
+	border-inline-end: 1px solid var(--border-color);
+}
+
+.treasury-dashboard .trd-banner-red {
+	border-inline-start-color: var(--red-500);
+}
+
+.treasury-dashboard .trd-banner-text {
+	flex: 1 1 240px;
+}
+
+.treasury-dashboard .trd-dismiss {
+	margin-inline-start: auto;
+	font-size: var(--text-lg, 16px);
+	line-height: 1;
+	color: var(--text-muted);
+	text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ grid and sections (design §1.3) */
+
+.treasury-dashboard .trd-group-title {
+	margin-block: var(--margin-lg, 20px) var(--margin-sm, 8px);
+	font-size: var(--text-xs, 11px);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	text-align: start;
+}
+
+.treasury-dashboard .trd-grid {
+	display: grid;
+	grid-template-columns: repeat(12, minmax(0, 1fr));
+	gap: var(--margin-md, 12px);
+}
+
+.treasury-dashboard .trd-span-4 {
+	grid-column: span 4;
+}
+
+.treasury-dashboard .trd-span-5 {
+	grid-column: span 5;
+}
+
+.treasury-dashboard .trd-span-6 {
+	grid-column: span 6;
+}
+
+.treasury-dashboard .trd-span-7 {
+	grid-column: span 7;
+}
+
+.treasury-dashboard .trd-span-8 {
+	grid-column: span 8;
+}
+
+.treasury-dashboard .trd-span-12 {
+	grid-column: span 12;
+}
+
+.treasury-dashboard .trd-section {
+	min-inline-size: 0;
+	padding: var(--padding-md, 16px);
 	border: 1px solid var(--border-color);
 	border-radius: var(--border-radius-md, 8px);
 	background: var(--card-bg, var(--fg-color));
 }
 
-.treasury-dashboard .td-section-title {
+.treasury-dashboard .trd-section-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--margin-sm, 8px);
+	margin-block-end: var(--margin-sm, 8px);
+}
+
+.treasury-dashboard .trd-title {
+	margin: 0;
+	font-size: var(--text-base, 14px);
 	font-weight: 600;
-	font-size: var(--text-lg, 16px);
-	margin-block-end: 8px;
 	text-align: start;
 }
 
-.treasury-dashboard .td-subtitle {
-	font-weight: 600;
-	margin-block: 12px 4px;
+.treasury-dashboard .trd-title-link {
+	color: inherit;
 }
 
-.treasury-dashboard .td-note {
-	margin-block-end: 8px;
-}
-
-.treasury-dashboard .td-cards {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-	gap: 12px;
-	margin-block-end: 12px;
-}
-
-.treasury-dashboard .td-card {
-	text-align: start;
-	padding: 12px;
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius, 6px);
-	background: var(--control-bg, var(--fg-color));
-	cursor: pointer;
-}
-
-.treasury-dashboard .td-card:hover,
-.treasury-dashboard .td-clickable:hover {
-	background: var(--fg-hover-color, var(--control-bg));
-	cursor: pointer;
-}
-
-.treasury-dashboard .td-card-label {
-	color: var(--text-muted);
+.treasury-dashboard .trd-head-end {
+	margin-inline-start: auto;
 	font-size: var(--text-sm, 13px);
 }
 
-.treasury-dashboard .td-card-value {
-	font-size: var(--text-xl, 18px);
-	font-weight: 600;
-}
-
-.treasury-dashboard .td-num {
-	text-align: end;
-}
-
-.treasury-dashboard .td-pill {
-	display: inline-block;
+.treasury-dashboard .trd-scope {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding-block: 1px;
 	padding-inline: 8px;
-	border-radius: 10px;
-	color: #fff;
+	border-radius: 999px;
 	font-size: var(--text-xs, 11px);
-	background: var(--gray-500);
-}
-
-.treasury-dashboard .td-level-critical {
-	background: var(--red-500);
-}
-
-.treasury-dashboard .td-level-warning {
-	background: var(--orange-500);
-}
-
-.treasury-dashboard .td-level-ok {
-	background: var(--green-500);
-}
-
-.treasury-dashboard .td-banner {
-	padding: 10px 16px;
-	margin-block-end: 16px;
-	border-radius: var(--border-radius, 6px);
-	border-inline-start: 4px solid var(--orange-500);
+	color: var(--text-muted);
 	background: var(--control-bg);
 }
 
-.treasury-dashboard .td-banner a {
-	margin-inline-start: 8px;
+.treasury-dashboard .trd-note {
+	margin-block: var(--margin-sm, 8px) 0;
 }
 
-.treasury-dashboard .td-banner-red {
+/* ------------------------------------------------------------------ KPI cards (design §1.5) */
+
+.treasury-dashboard .trd-kpis {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--margin-md, 12px);
+	margin-block-end: var(--margin-sm, 8px);
+}
+
+.treasury-dashboard .trd-kpi {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-inline-size: 0;
+	padding-block: 12px;
+	padding-inline: 14px 24px;
+	border: 1px solid var(--border-color);
+	border-inline-start-width: 3px;
+	border-radius: var(--border-radius-md, 8px);
+	background: var(--card-bg, var(--fg-color));
+	color: var(--text-color);
+	text-align: start;
+	text-decoration: none;
+	transition: box-shadow 0.15s;
+}
+
+.treasury-dashboard a.trd-kpi:hover,
+.treasury-dashboard a.trd-kpi:focus-visible {
+	box-shadow: var(--shadow-sm);
+	text-decoration: none;
+	color: var(--text-color);
+}
+
+.treasury-dashboard .trd-kpi-critical {
 	border-inline-start-color: var(--red-500);
 }
 
-.treasury-dashboard .td-charts {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-	gap: 12px;
+.treasury-dashboard .trd-kpi-warning {
+	border-inline-start-color: var(--orange-500);
 }
 
-.treasury-dashboard .td-facility {
+.treasury-dashboard .trd-kpi-good {
+	border-inline-start-color: var(--green-500);
+}
+
+.treasury-dashboard .trd-kpi-label,
+.treasury-dashboard .trd-kpi-sub {
+	font-size: var(--text-xs, 12px);
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.treasury-dashboard .trd-kpi-value {
+	font-size: 22px;
+	font-weight: 600;
+	line-height: 1.3;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.treasury-dashboard .trd-kpi-value .trd-short {
+	display: none;
+}
+
+.treasury-dashboard .trd-kpi-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--margin-sm, 8px);
+	margin-block-start: 4px;
+	font-size: var(--text-xs, 12px);
+}
+
+.treasury-dashboard .trd-chevron {
+	position: absolute;
+	inset-block-start: 10px;
+	inset-inline-end: 10px;
+	color: var(--text-muted);
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.treasury-dashboard a.trd-kpi:hover .trd-chevron,
+.treasury-dashboard a.trd-kpi:focus-visible .trd-chevron {
+	opacity: 1;
+}
+
+.treasury-dashboard .trd-text-red {
+	color: var(--red-600, var(--red-500));
+}
+
+.treasury-dashboard .trd-text-orange {
+	color: var(--orange-600, var(--orange-500));
+}
+
+.treasury-dashboard .trd-text-green {
+	color: var(--green-600, var(--green-500));
+}
+
+/* ------------------------------------------------------------------ tables (design §1.6, §1.9) */
+
+.treasury-dashboard .trd-table-wrap {
+	overflow-x: auto;
+}
+
+.treasury-dashboard .trd-table {
+	margin-block-end: var(--margin-sm, 8px);
+}
+
+.treasury-dashboard .trd-table th,
+.treasury-dashboard .trd-table td {
+	text-align: start;
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+.treasury-dashboard .trd-table th.trd-num,
+.treasury-dashboard .trd-table td.trd-num {
+	text-align: end;
+}
+
+.treasury-dashboard .trd-table .trd-total td {
+	font-weight: 600;
+	border-block-start: 2px solid var(--border-color);
+}
+
+.treasury-dashboard .trd-clickable {
+	cursor: pointer;
+}
+
+.treasury-dashboard .trd-clickable:hover {
+	background: var(--fg-hover-color, var(--control-bg));
+}
+
+.treasury-dashboard .trd-bank-name {
+	color: inherit;
+}
+
+.treasury-dashboard .trd-extra {
+	display: none;
+}
+
+.treasury-dashboard .trd-bank-cards {
+	display: none;
+	flex-direction: column;
+	gap: var(--margin-sm, 8px);
+}
+
+.treasury-dashboard .trd-bank-card {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md, 8px);
+	color: var(--text-color);
+	text-decoration: none;
+}
+
+.treasury-dashboard .trd-bank-card.trd-extra {
+	display: none;
+}
+
+.treasury-dashboard .trd-bank-card-head {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--margin-sm, 8px);
+}
+
+/* ------------------------------------------------------------------ charts and bars (design §1.7) */
+
+.treasury-dashboard .trd-chart {
+	min-block-size: 200px;
+}
+
+.treasury-dashboard .trd-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px var(--margin-md, 12px);
+	color: var(--text-muted);
+}
+
+.treasury-dashboard .trd-facility {
 	padding-block: 6px;
 }
 
-.treasury-dashboard .td-bar {
+.treasury-dashboard .trd-facility-total {
+	padding-block-end: 10px;
+	margin-block-end: 4px;
+	border-block-end: 1px solid var(--border-color);
+}
+
+.treasury-dashboard .trd-facility-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--margin-sm, 8px);
+	margin-block-end: 4px;
+}
+
+.treasury-dashboard .trd-facility-amount {
+	margin-inline-start: auto;
+}
+
+.treasury-dashboard .trd-bar {
+	position: relative;
+	display: block;
 	block-size: 8px;
 	border-radius: 4px;
-	background: var(--gray-200);
+	background: var(--gray-200, var(--control-bg));
 	overflow: hidden;
 }
 
-.treasury-dashboard .td-bar-fill {
-	block-size: 100%;
-	background: var(--blue-500);
+.treasury-dashboard .trd-bar-fill {
+	position: absolute;
+	inset-block: 0;
+	inset-inline-start: 0;
+	border-radius: 4px;
 }
 
-.treasury-dashboard .td-empty {
-	padding-block: 12px;
-	text-align: start;
+.treasury-dashboard .trd-bg-green {
+	background: var(--green-500);
+}
+
+.treasury-dashboard .trd-bg-orange {
+	background: var(--orange-500);
+}
+
+.treasury-dashboard .trd-bg-red {
+	background: var(--red-500);
+}
+
+/* ------------------------------------------------------------------ breakpoints */
+
+/* tablet: every half section becomes full width */
+@media (max-width: 1199px) {
+	.treasury-dashboard .trd-span-4,
+	.treasury-dashboard .trd-span-5,
+	.treasury-dashboard .trd-span-6,
+	.treasury-dashboard .trd-span-7,
+	.treasury-dashboard .trd-span-8 {
+		grid-column: span 12;
+	}
+}
+
+/* phone (design P4): two compact KPI cards per row, shortened amounts, the banks as cards */
+@media (max-width: 767px) {
+	.treasury-dashboard .page-form .trd-filter-company {
+		flex: 1 1 55%;
+	}
+
+	.treasury-dashboard .page-form .trd-filter-horizon {
+		flex: 1 1 35%;
+	}
+
+	.treasury-dashboard .page-form .trd-filter-banks {
+		flex: 1 1 100%;
+		order: 3;
+	}
+
+	.treasury-dashboard .trd-kpis {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--margin-sm, 8px);
+	}
+
+	.treasury-dashboard .trd-kpi {
+		padding-block: 10px;
+		padding-inline: 10px 18px;
+	}
+
+	.treasury-dashboard .trd-kpi-value {
+		font-size: 18px;
+	}
+
+	.treasury-dashboard .trd-kpi-value .trd-full {
+		display: none;
+	}
+
+	.treasury-dashboard .trd-kpi-value .trd-short {
+		display: inline;
+	}
+
+	.treasury-dashboard .trd-section {
+		padding: var(--padding-sm, 10px);
+	}
+
+	.treasury-dashboard .trd-section[data-section="banks"] .trd-table-wrap {
+		display: none;
+	}
+
+	.treasury-dashboard .trd-bank-cards {
+		display: flex;
+	}
+
+	.treasury-dashboard .trd-bank-cards .trd-extra {
+		display: none;
+	}
+
+	.treasury-dashboard .trd-skel-chart {
+		block-size: 200px;
+	}
+}
+
+/* design P23: a clean browser print */
+@media print {
+	.treasury-dashboard .page-form,
+	.treasury-dashboard .page-actions,
+	.treasury-dashboard .trd-dismiss,
+	.treasury-dashboard .trd-show-all,
+	.treasury-dashboard .trd-alert-area,
+	.treasury-dashboard .trd-chevron {
+		display: none !important;
+	}
+
+	.treasury-dashboard .trd-root.trd-busy .trd-body {
+		opacity: 1;
+	}
+
+	.treasury-dashboard .trd-section,
+	.treasury-dashboard .trd-kpi {
+		break-inside: avoid;
+	}
 }

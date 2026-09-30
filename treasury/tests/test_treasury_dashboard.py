@@ -160,6 +160,25 @@ class TestTreasuryDashboard(BalanceAlertTestMixin, IntegrationTestCase):
 		)
 		self.assertTrue(all(not any(v[1:]) for v in values.values()))
 		self.assertEqual(maturities.barOptions, {"stacked": 1})
+		# 7h-2: the untranslated category of each dataset (fixed colours on the page), legend order kept
+		self.assertEqual(maturities.keys, ["Cheques In", "Cheques Out", "Installments", "Transfers"])
+		self.assertEqual(maturities.keys, [d["name"] for d in maturities.data["datasets"]])
+		self.assertEqual(maturities.overdue, 0)
+
+	def test_horizon_totals(self):
+		"""Design 7h P5: "Projected in {H} Days" = the closing at the horizon, company currency; the worst
+		bank's lowest in company currency for the card subtitle."""
+		for horizon in HORIZONS:
+			with self.subTest(horizon=horizon):
+				positions = self.overview(horizon).sections.positions
+				(row,) = positions.banks
+				self.assertEqual(row.closing_horizon_company, -10020)
+				self.assertEqual(row.lowest.closing_company, -10020)
+				self.assertEqual(positions.totals.closing_horizon_company, -10020)
+				route = positions.totals.horizon_route
+				self.assertEqual(route.route, ["query-report", "Bank Position Forecast"])
+				self.assertEqual(route.route_options["to_date"], str(self.day(horizon - 1)))
+				self.assertEqual(route.route_options["bank_account"], [self.bank])
 
 	# ------------------------------------------------------------------ cheques
 
