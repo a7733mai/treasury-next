@@ -95,9 +95,10 @@ function ts_alert_hints(frm) {
 	const doc = frm.doc;
 	// design 7e P5: when the next digest goes out (system time zone)
 	const hour = cint(doc.balance_digest_hour);
+	// system_datetime(true) is a plain JS Date (frappe.datetime.moment_to_date_obj), not a moment
 	const now = frappe.datetime.system_datetime(true);
 	const time = `${String(hour).padStart(2, "0")}:00`;
-	const next = now.hours() < hour ? __("today {0}", [time]) : __("tomorrow {0}", [time]);
+	const next = now.getHours() < hour ? __("today {0}", [time]) : __("tomorrow {0}", [time]);
 	frm.set_df_property(
 		"balance_digest_hour",
 		"description",
@@ -161,7 +162,7 @@ function ts_preview_recipients(frm) {
 			return;
 		}
 		const esc = frappe.utils.escape_html;
-		let names = r.names.map((name) => `<bdi>${esc(name)}</bdi>`).join(", ");
+		let names = (r.names || []).map((name) => `<bdi>${esc(name)}</bdi>`).join(", ");
 		if (r.more) {
 			names += ` ${esc(__("+{0} more", [r.more]))}`;
 		}
@@ -260,8 +261,8 @@ function ts_preview_digest_dialog() {
 function ts_show_digest(company, user) {
 	const esc = frappe.utils.escape_html;
 	frappe.xcall(TS_ALERTS_METHOD + "preview_digest", { company, user }).then((r) => {
-		if (!r.html) {
-			frappe.msgprint({ message: esc(r.message || ""), indicator: "orange" });
+		if (!r || !r.html) {
+			frappe.msgprint({ message: esc((r && r.message) || ""), indicator: "orange" });
 			return;
 		}
 		const dialog = new frappe.ui.Dialog({
@@ -285,16 +286,16 @@ function ts_show_digest(company, user) {
 
 function ts_send_test(company) {
 	frappe.xcall(TS_ALERTS_METHOD + "send_test_digest", { company }).then((r) => {
-		if (r.sent) {
-			frappe.show_alert({ message: frappe.utils.escape_html(r.message), indicator: "green" });
+		if (r && r.sent) {
+			frappe.show_alert({ message: frappe.utils.escape_html(r.message || ""), indicator: "green" });
 		} else {
-			frappe.msgprint({ message: frappe.utils.escape_html(r.message || ""), indicator: "orange" });
+			frappe.msgprint({ message: frappe.utils.escape_html((r && r.message) || ""), indicator: "orange" });
 		}
 	});
 }
 
 function ts_run_alerts(company) {
 	frappe.xcall(TS_ALERTS_METHOD + "run_alerts_now", { company }).then((r) => {
-		frappe.show_alert({ message: frappe.utils.escape_html(r.message), indicator: "blue" });
+		frappe.show_alert({ message: frappe.utils.escape_html((r && r.message) || ""), indicator: "blue" });
 	});
 }
