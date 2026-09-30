@@ -1,0 +1,224 @@
+"""Entry-time low balance guard (spec 7e §3.5).
+
+A guarded action (cheque delivery, transfer submit / Send Now / Reschedule, facility repayment, bank charge)
+calls `begin` before it changes anything and `finish` after it wrote its changes, in the same transaction:
+
+- `begin` locks the involved Bank Accounts in name order (the 7b row lock, taken after the document's own row)
+  and evaluates their projected positions (pre-state);
+- `finish` evaluates them again (post-state). A breach is a day whose projected closing is below the minimum
+  balance *and* lower than before the action: an action that does not lower a day never blocks. Then, per
+  the company's On Low Projected Balance setting: Warn shows a message; Block raises LowBalanceError, unless a
+  Treasury Manager confirmed the override (`allow_low_balance`), which is recorded in a Treasury Alert Log of
+  type Override and returned for the document's own log. Ignore checks nothing.
+
+After every guarded action on a company with thresholds, whatever the mode, the company is evaluated again
+after the commit (alerts only, treasury.balance_alerts.scheduler.evaluate_company). Evaluations run elevated:
+the user must not be blocked by, nor miss, flows they cannot read.
+
+Batch operations use `batch_guard`: one check around the whole operation (the per-cheque guards are skipped).
+"""
+
+from contextlib import contextmanager
+
+import frappe
+from frappe import _
+from frappe.utils import cint, fmt_money, formatdate, getdate, strip_html, today
+
+from treasury.balance_alerts.positions import epsilon, evaluate, get_thresholds
+from treasury.bank_transfers import fees
+from treasury.pdc.report_utils import get_precision, report_today
+from treasury.utils.context import elevated, real_user
+
+OVERRIDE_ROLES = ("Treasury Manager", "System Manager")
+SETTINGS = "Treasury Company Settings"
+IGNORE, WARN, BLOCK = "Ignore", "Warn", "Block"
+# Set while a batch-level guard is active: the guards of the single actions inside it are skipped.
+FLAG = "treasury_balance_guard"
+SAVEPOINT = "treasury_balance_guard"
+LINES_PER_BANK = 3
+
+
+class LowBalanceError(frappe.ValidationError):
+	pass
+
+
+def has_override_role(user: str | None = None) -> bool:
+	return bool(set(OVERRIDE_ROLES) & set(frappe.get_roles(user or real_user())))
+
+
+def check_override_flag(allow_override):
+	"""Only a Treasury Manager (or System Manager) may ask for the override."""
+	if cint(allow_override) and not has_override_role():
+		frappe.throw(
+			_("Only a Treasury Manager can override the low balance block."),
+			frappe.PermissionError,
+			title=_("Not Permitted"),
+		)
+
+
+def _scheduler():
+	# imported late: the scheduler reaches the PDC modules, which import this guard
+	from treasury.balance_alerts import scheduler
+
+	return scheduler
+
+
+def _with_siblings(company: str, banks: list[str]) -> list[str]:
+	"""`banks` and the company bank accounts sharing their GL accounts (one merged position)."""
+	accounts = frappe.get_all("Bank Account", filters={"name": ["in", banks]}, pluck="account")
+	accounts = [a for a in accounts if a]
+	siblings = (
+		frappe.get_all(
+			"Bank Account",
+			filters={"company": company, "is_company_account": 1, "account": ["in", accounts]},
+			pluck="name",
+		)
+		if accounts
+		else []
+	)
+	return sorted(set(banks) | set(siblings))
+
+
+def begin(company: str, bank_accounts: list[str], *, system: bool = False) -> frappe._dict | None:
+	"""Lock the banks and take the pre-state; None when nothing is to be checked (see the module)."""
+	if system or frappe.flags.get(FLAG):
+		return None
+	banks = sorted({b for b in bank_accounts or () if b})
+	if not company or not banks:
+		return None
+	mode = frappe.db.get_value(SETTINGS, company, "on_low_balance")
+	thresholds = get_thresholds(company) if mode else {}
+	if not thresholds:
+		return None
+	if mode == IGNORE:
+		_scheduler().enqueue_evaluation(company)
+		return None
+	banks = _with_siblings(company, banks)
+	if not any(b in thresholds for b in banks):
+		_scheduler().enqueue_evaluation(company)
+		return None
+	for bank in banks:  # name order, after the document's own row
+		fees.lock_bank_account(bank)
+	day = getdate(report_today())
+	with elevated():
+		pre = evaluate(company, banks, today=day)
+	return frappe._dict(company=company, banks=banks, mode=mode, pre=pre, today=day)
+
+
+def breaches(pre: list, post: list) -> list[frappe._dict]:
+	"""Days below the minimum that the action lowered: [{position, day, pre_closing}] in bank, date order."""
+	eps = epsilon(get_precision())
+	before = {p.account: {d.date: d.closing for d in p.days} for p in pre}
+	found = []
+	for position in post:
+		if position.minimum is None:
+			continue
+		previous = before.get(position.account, {})
+		for day in position.days:
+			pre_closing = previous.get(day.date)
+			if day.closing < position.minimum and (pre_closing is None or day.closing < pre_closing - eps):
+				found.append(frappe._dict(position=position, day=day, pre_closing=pre_closing))
+	return found
+
+
+def message_lines(doctype: str, name: str, found: list) -> list[str]:
+	lines = [_("Low projected balance after {0} {1}:").format(_(doctype), name)]
+	per_bank: dict[str, int] = {}
+	for item in found:
+		position, day = item.position, item.day
+		count = per_bank.get(position.bank_account, 0)
+		per_bank[position.bank_account] = count + 1
+		if count >= LINES_PER_BANK:
+			continue
+		currency = position.currency
+		lines.append(
+			_("{0}: {1} projected {2} (before: {3}), minimum {4}.").format(
+				position.bank_account,
+				formatdate(day.date),
+				fmt_money(day.closing, currency=currency),
+				fmt_money(item.pre_closing, currency=currency) if item.pre_closing is not None else "-",
+				fmt_money(position.minimum, currency=currency),
+			)
+		)
+	return lines
+
+
+def finish(
+	snapshot, *, doctype: str, name: str, allow_override=False, block_as_warn: bool = False
+) -> str | None:
+	"""Check the post-state against the pre-state (see the module). Returns the override text (plain) when a
+	Treasury Manager overrode a Block, else None."""
+	if not snapshot:
+		return None
+	with elevated():
+		post = evaluate(snapshot.company, snapshot.banks, today=snapshot.today)
+	found = breaches(snapshot.pre, post)
+	text = None
+	if found:
+		lines = message_lines(doctype, name, found)
+		message = "<br>".join(lines)
+		title = _("Low Projected Balance")
+		if snapshot.mode != BLOCK or block_as_warn:
+			frappe.msgprint(message, title=title, indicator="orange")
+		elif cint(allow_override) and has_override_role():
+			text = strip_html("\n".join(lines))
+			_record_override(snapshot, doctype, name, found[0], text)
+			frappe.msgprint(
+				_("Low balance override recorded.") + "<br>" + message, title=title, indicator="orange"
+			)
+		else:
+			hint = (
+				_("Confirm the override to continue.")
+				if has_override_role()
+				else _("A Treasury Manager can override this block.")
+			)
+			frappe.throw(message + "<br><br>" + hint, LowBalanceError, title=title)
+	_scheduler().enqueue_evaluation(snapshot.company)
+	return text
+
+
+def _record_override(snapshot, doctype: str, name: str, first, text: str):
+	position, day = first.position, first.day
+	_scheduler().insert_log(
+		alert_type=_scheduler().OVERRIDE,
+		level="Critical",
+		company=snapshot.company,
+		bank_account=position.bank_account,
+		alert_date=getdate(today()),
+		projected_date=day.date,
+		balance=day.closing,
+		threshold=position.minimum,
+		currency=position.currency,
+		user=real_user(),
+		reference_doctype=doctype,
+		reference_name=name,
+		subject=_("Low balance override: {0} {1}").format(_(doctype), name),
+		message=text,
+	)
+
+
+@contextmanager
+def batch_guard(company: str, banks: list[str], allow_override, doctype: str, name: str):
+	"""One guard around a batch operation; yields a holder whose `text` is the override text afterwards.
+	A Block (or any error) rolls back everything the operation did."""
+	snapshot = begin(company, banks)
+	holder = frappe._dict(text=None)
+	if snapshot:
+		frappe.db.savepoint(SAVEPOINT)
+	previous = frappe.flags.get(FLAG)
+	frappe.flags[FLAG] = True
+	try:
+		yield holder
+	except Exception:
+		frappe.flags[FLAG] = previous
+		if snapshot:
+			frappe.db.rollback(save_point=SAVEPOINT)
+		raise
+	frappe.flags[FLAG] = previous
+	try:
+		holder.text = finish(snapshot, doctype=doctype, name=name, allow_override=allow_override)
+	except Exception:
+		frappe.db.rollback(save_point=SAVEPOINT)
+		raise
+	if snapshot:
+		frappe.db.release_savepoint(SAVEPOINT)

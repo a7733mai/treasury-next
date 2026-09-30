@@ -7,6 +7,7 @@ list of fields it deletes with the fields install creates and with the fields pr
 import io
 import json
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 import frappe
@@ -197,3 +198,60 @@ class TestInstall(IntegrationTestCase):
 	def test_hooks(self):
 		for hook in ("after_install", "after_migrate", "before_uninstall"):
 			self.assertEqual(frappe.get_hooks(hook, app_name="treasury"), [f"treasury.install.{hook}"])
+
+	def test_bank_position_alerts(self):
+		"""Phase 7e: the hourly job, the log retention, the Treasury Settings defaults, the default recipient
+		and the On Low Projected Balance patch."""
+		from treasury.balance_alerts import recipients
+		from treasury.patches.v1_1 import set_balance_alert_defaults
+		from treasury.utils.settings import stored_single_value
+
+		self.assertIn(
+			"treasury.balance_alerts.scheduler.run_hourly",
+			frappe.get_hooks("scheduler_events", app_name="treasury").get("hourly", []),
+		)
+		from frappe.core.doctype.log_settings.log_settings import _supports_log_clearing
+
+		hook = frappe.get_hooks("default_log_clearing_doctypes", app_name="treasury")
+		retention = hook["Treasury Alert Log"]
+		self.assertEqual(retention[-1] if isinstance(retention, list) else retention, 180)
+		self.assertTrue(_supports_log_clearing("Treasury Alert Log"))
+
+		# the defaults of the new Single fields are stored by setup (set_missing_single_defaults)
+		fields = (
+			"balance_alert_horizon",
+			"balance_digest_hour",
+			"send_balance_digest",
+			"send_balance_alerts",
+			"balance_alert_notification",
+			"balance_alert_email",
+			"digest_zero_days",
+		)
+		for fieldname in fields:
+			frappe.db.delete("Singles", {"doctype": "Treasury Settings", "field": fieldname})
+		stored = install.set_default_settings()
+		self.assertLessEqual(set(fields), set(stored))
+		self.assertEqual(
+			[stored_single_value("Treasury Settings", f) for f in fields], ["7", "7", "1", "1", "1", "1", "1"]
+		)
+
+		# setup adds the Treasury Manager recipient once
+		with (
+			patch.object(install, "create_custom_fields"),
+			patch.object(install.dimensions, "create_dimension_fields"),
+			patch.object(install.recipients, "ensure_default_recipients") as ensure_recipients,
+		):
+			install.setup()
+		ensure_recipients.assert_called_once_with()
+		self.assertTrue(recipients.DEFAULT_RECIPIENTS_KEY)
+
+		setup_treasury_test_data()
+		previous = frappe.db.get_value("Treasury Company Settings", COMPANY, "on_low_balance")
+		self.addCleanup(frappe.db.set_value, "Treasury Company Settings", COMPANY, "on_low_balance", previous)
+		frappe.db.set_value("Treasury Company Settings", COMPANY, "on_low_balance", "")
+		set_balance_alert_defaults.execute()
+		self.assertEqual(frappe.db.get_value("Treasury Company Settings", COMPANY, "on_low_balance"), "Warn")
+		self.assertIn(
+			"treasury.patches.v1_1.set_balance_alert_defaults",
+			(Path(frappe.get_app_path("treasury")) / "patches.txt").read_text(encoding="utf-8"),
+		)

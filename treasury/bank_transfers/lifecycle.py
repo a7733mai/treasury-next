@@ -27,6 +27,7 @@ from frappe import _
 from frappe.utils import flt, fmt_money, formatdate, getdate, now_datetime, today
 
 from treasury.accounting import dimensions, payment_modes, posting
+from treasury.balance_alerts import guard
 from treasury.bank_facilities import instruments
 from treasury.bank_transfers import fees
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
@@ -264,17 +265,45 @@ def enforce_limits(doc, execution_date=None, warn: bool = True):
 		frappe.msgprint("<br>".join(messages), title=_("Transfer Limit Exceeded"), indicator="orange")
 
 
+def balance_banks(doc) -> list[str]:
+	"""The bank accounts whose projected balance a transfer changes (the target of an Internal Transfer too)."""
+	banks = [doc.bank_account]
+	if doc.transfer_type == INTERNAL and doc.get("to_bank_account"):
+		banks.append(doc.to_bank_account)
+	return banks
+
+
+def begin_balance_guard(doc, system: bool = False):
+	"""Low balance guard, pre-state (treasury.balance_alerts.guard): before the limits (lock order)."""
+	return guard.begin(doc.company, balance_banks(doc), system=system)
+
+
+def finish_balance_guard(doc, snapshot, allow_low_balance=0):
+	"""Low balance guard, post-state: a Treasury Manager's override adds a "Low Balance Override" log row
+	(returned; the caller writes it)."""
+	text = guard.finish(snapshot, doctype=DOCTYPE, name=doc.name, allow_override=allow_low_balance)
+	if text:
+		return log(doc, "Low Balance Override", remarks=text, event_date=today())
+	return None
+
+
 def on_submit(doc):
-	"""A future execution date schedules the transfer; otherwise it is sent now (see the module docstring)."""
+	"""A future execution date schedules the transfer; otherwise it is sent now (see the module docstring).
+	The low balance guard started in `before_submit` is finished once the transfer's state is written."""
 	first_new_row = len(doc.status_log)
 	if getdate(doc.execution_date) > getdate(today()):
 		log(doc, "Scheduled", SCHEDULED, event_date=today(), remarks=formatdate(doc.execution_date))
 		_write_in_place(doc, first_new_row)
-		return
-	_send(doc, doc.execution_date)
-	_write_in_place(
-		doc, first_new_row, ("payment_entry", "base_fee_amount", "completion_date", "bank_transaction_date")
-	)
+	else:
+		_send(doc, doc.execution_date)
+		_write_in_place(
+			doc,
+			first_new_row,
+			("payment_entry", "base_fee_amount", "completion_date", "bank_transaction_date"),
+		)
+	first_new_row = len(doc.status_log)
+	if finish_balance_guard(doc, doc.flags.pop("balance_snapshot", None), doc.get("allow_low_balance")):
+		_write_in_place(doc, first_new_row)
 
 
 def before_cancel(doc):
@@ -332,39 +361,61 @@ def send(name: str, system: bool = False) -> dict:
 def _send_scheduled(name: str, system: bool = False) -> dict:
 	doc = _begin(name, None if system else USER_ROLES, system=system)
 	instruments.require_status(doc, (SCHEDULED,))
+	# the daily job is not guarded: sending on the execution date changes no projected day
+	snapshot = begin_balance_guard(doc, system=system)
 	# the limits of the day again (e.g. lowered since the submit): Block leaves the transfer Scheduled
 	enforce_limits(doc, warn=False)
 	_send(doc, doc.execution_date)
-	return _save(doc)
+	result = _save(doc)
+	_finish_action_guard(doc, snapshot)
+	return result
 
 
-def send_now(name: str, execution_date=None, remarks=None) -> dict:
+def _finish_action_guard(doc, snapshot, allow_low_balance=0):
+	"""Post-state of the guard of an action on a saved transfer: an override row is inserted in place."""
+	row = finish_balance_guard(doc, snapshot, allow_low_balance)
+	if row:
+		row.db_insert()
+
+
+def send_now(name: str, execution_date=None, remarks=None, allow_low_balance=0) -> dict:
 	"""Send a Scheduled transfer today (or on a past `execution_date`), which becomes its execution date; the
-	limits of that day apply as on submit."""
+	limits of that day apply as on submit, and the low balance guard (`allow_low_balance`: a Treasury
+	Manager's override)."""
+	guard.check_override_flag(allow_low_balance)
 	doc = _begin(name, USER_ROLES)
 	instruments.require_status(doc, (SCHEDULED,))
 	date = _date(execution_date)
 	if date > getdate(today()):
 		frappe.throw(_("Use Reschedule for a future date."))
+	snapshot = begin_balance_guard(doc)
 	enforce_limits(doc, date)
 	doc.execution_date = date
 	_send(doc, date, remarks)
-	return _save(doc)
+	result = _save(doc)
+	_finish_action_guard(doc, snapshot, allow_low_balance)
+	return result
 
 
-def reschedule(name: str, execution_date, remarks=None) -> dict:
+def reschedule(name: str, execution_date, remarks=None, allow_low_balance=0) -> dict:
+	"""Move a Scheduled transfer to a later date (limits and low balance guard of the new date apply; an
+	incoming transfer moved later lowers the days in between)."""
+	guard.check_override_flag(allow_low_balance)
 	doc = _begin(name, USER_ROLES)
 	instruments.require_status(doc, (SCHEDULED,))
 	if not execution_date or getdate(execution_date) <= getdate(today()):
 		frappe.throw(_("The new execution date must be in the future; use Send Now to send it today."))
 	new_date = getdate(execution_date)
+	snapshot = begin_balance_guard(doc)
 	enforce_limits(doc, new_date)
 	note = f"{formatdate(doc.execution_date)} → {formatdate(new_date)}"
 	if remarks:
 		note += f": {remarks}"
 	doc.execution_date = new_date
 	log(doc, "Rescheduled", remarks=note, event_date=today())
-	return _save(doc)
+	result = _save(doc)
+	_finish_action_guard(doc, snapshot, allow_low_balance)
+	return result
 
 
 def _send(doc, date, remarks=None):

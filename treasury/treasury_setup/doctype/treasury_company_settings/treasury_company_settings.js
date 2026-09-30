@@ -72,6 +72,8 @@ frappe.ui.form.on("Treasury Company Settings", {
 		);
 		frm.set_query("bank_account", "transfer_fee_rules", company_bank);
 		frm.set_query("bank_account", "transfer_limits", company_bank);
+		// Bank Balance Alerts: any company bank account, with or without a PDC Accounts row
+		frm.set_query("bank_account", "balance_thresholds", company_bank);
 		frm.set_query("expense_account", "transfer_fee_rules", () => ({
 			filters: { company: frm.doc.company, root_type: "Expense", is_group: 0 },
 		}));
@@ -85,6 +87,19 @@ frappe.ui.form.on("Treasury Company Settings", {
 		frm.events.render_transfer_fees_help(frm);
 		frm.events.format_transfer_grids(frm);
 		frm.events.add_transfer_buttons(frm);
+		frm.events.render_balance_alerts_help(frm);
+	},
+
+	render_balance_alerts_help(frm) {
+		const field = frm.get_field("balance_alerts_help");
+		if (!field) {
+			return;
+		}
+		field.$wrapper.html(`<div class="text-muted small">${frappe.utils.escape_html(
+			__(
+				"Each day of the horizon (Treasury Settings) is projected per bank: below the Warning Balance the day is Warning, below the Minimum Balance it is Critical and alerted; entries that lower a day below the minimum are checked."
+			)
+		)}</div>`);
 	},
 
 	auto_select_cheque_book(frm) {

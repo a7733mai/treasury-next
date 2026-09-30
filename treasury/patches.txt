@@ -8,3 +8,4 @@ treasury.patches.v1_1.set_bank_settlement_voucher
 treasury.patches.v1_1.set_bank_transfer_defaults
 treasury.patches.v1_1.set_document_payment_defaults
 treasury.patches.v1_1.set_bank_charge_defaults
+treasury.patches.v1_1.set_balance_alert_defaults

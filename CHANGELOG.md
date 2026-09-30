@@ -2,6 +2,23 @@
 
 ## Unreleased (1.1)
 
+### Bank Position Alerts (Phase 7e)
+- Per-bank daily projected positions from the Bank Position Forecast engine (`treasury.pdc.bank_positions`,
+  one engine call per company; banks sharing a GL account are merged), evaluated against new **Balance
+  Thresholds** (Treasury Company Settings: warning / minimum balance per company bank account).
+- Hourly job: a **daily digest** per recipient, company and day from the digest hour on, and **critical /
+  warning alerts** with dedupe and escalation ("Worse:"), as in-system notifications and / or e-mails in each
+  recipient's language, limited to the banks the recipient may see. Settings and **Recipients** in Treasury
+  Settings (install adds Treasury Manager once).
+- **Entry-time low balance guard** (On Low Projected Balance: Ignore / Warn / Block) on cheque delivery
+  (single, Cheque Batch submit / Deliver All, security cheque encashment), Bank Transfer submit / Send Now /
+  Reschedule, Facility Repayment and Bank Charge submit; a Treasury Manager may override a Block (field
+  *Override Low Balance* or the action's confirmation), which is logged. Every guarded entry triggers an
+  evaluation after the commit.
+- New **Treasury Alert Log** (digests, alerts, overrides; Log Settings clears it after 180 days), report
+  **Bank Balance Outlook**, number card *Banks Below Minimum (7 days)*, chart *Lowest Projected Balance per
+  Bank*. Patch `set_balance_alert_defaults`. No accounting is posted.
+
 ### Bank Charges (Phase 7d)
 - New submittable **Bank Charge** (Charge / Refund) in Bank Transfers and the master **Bank Charge
   Category** (expense account per company, statement keywords) in Treasury Setup; six default categories

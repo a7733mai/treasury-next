@@ -332,10 +332,34 @@ frappe.ui.form.on("Cheque Batch", {
 							{ fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" },
 						],
 						(values) => {
-							frm.call({ doc: frm.doc, method, args: values, freeze: true }).then((r) => {
-								frm.events.show_bulk_result(r.message);
-								frm.reload_doc();
-							});
+							// Deliver All: a low balance Block may be overridden by a Treasury Manager
+							const run = (override) =>
+								frm
+									.call({
+										doc: frm.doc,
+										method,
+										args: Object.assign({}, values, override ? { allow_low_balance: 1 } : {}),
+										freeze: true,
+										error: (r) => {
+											if (
+												outgoing &&
+												!override &&
+												r &&
+												r.exc_type === "LowBalanceError" &&
+												frappe.user.has_role(["Treasury Manager", "System Manager"])
+											) {
+												frappe.confirm(
+													__("Override the low balance block and continue?"),
+													() => run(true)
+												);
+											}
+										},
+									})
+									.then((r) => {
+										frm.events.show_bulk_result(r.message);
+										frm.reload_doc();
+									});
+							run(false);
 						},
 						label,
 						label
@@ -610,3 +634,16 @@ function cheque_batch_new_payee(frm) {
 	});
 	dialog.show();
 }
+
+// Low balance guard: the override (outgoing batches handed over on submit) is offered to Treasury Managers
+// only (the server checks the role)
+frappe.ui.form.on("Cheque Batch", {
+	refresh(frm) {
+		frm.toggle_display(
+			"allow_low_balance",
+			frm.doc.docstatus === 0 &&
+				frm.doc.direction === "Outgoing" &&
+				frappe.user.has_role(["Treasury Manager", "System Manager"])
+		);
+	},
+});

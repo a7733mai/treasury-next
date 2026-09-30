@@ -9,6 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import flt, formatdate, getdate
 
 from treasury.accounting import posting
+from treasury.balance_alerts import guard
 from treasury.bank_facilities import accounting, repayment
 from treasury.bank_facilities.interest import accrued_balance
 from treasury.bank_facilities.utilisation import refresh_utilisation
@@ -42,6 +43,7 @@ class FacilityRepayment(Document):
 		accrued_interest_cleared: DF.Currency
 		allocation_mode: DF.Literal["Oldest First", "Selected Row"]
 		allocations: DF.Table[FacilityRepaymentAllocation]
+		allow_low_balance: DF.Check
 		amended_from: DF.Link | None
 		bank: DF.Link | None
 		bank_account: DF.Link
@@ -91,8 +93,11 @@ class FacilityRepayment(Document):
 		self.allocate(drawdown)
 
 	def before_submit(self):
+		guard.check_override_flag(self.allow_low_balance)
 		# serialise the repayments of one drawdown: allocate on the schedule as it is now, under the lock
 		repayment.lock_drawdown(self.drawdown)
+		# low balance guard (pre-state; the drawdown row is locked first); finished in on_submit
+		self.flags.balance_snapshot = guard.begin(self.company, [self.bank_account])
 		drawdown = self.get_drawdown()
 		self.validate_date(drawdown)
 		self.allocate(drawdown)
@@ -106,6 +111,14 @@ class FacilityRepayment(Document):
 		self.db_set("journal_entry", journal)
 		repayment.apply_repayment(drawdown, self, journal)
 		refresh_utilisation(drawdown.facility)
+		text = guard.finish(
+			self.flags.pop("balance_snapshot", None),
+			doctype=self.doctype,
+			name=self.name,
+			allow_override=self.allow_low_balance,
+		)
+		if text:
+			self.add_comment("Info", text)
 
 	def before_cancel(self):
 		# only the last submitted repayment of a drawdown may be cancelled (its schedule snapshot is the current one)

@@ -153,11 +153,14 @@ def cheque_columns() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def is_permitted_value(doctype: str, value: str, applicable_for: str = DOCTYPE) -> bool:
-	"""False when the user's User Permissions on `doctype` (for `applicable_for`) exclude `value`."""
+def is_permitted_value(
+	doctype: str, value: str, applicable_for: str = DOCTYPE, user: str | None = None
+) -> bool:
+	"""False when the User Permissions of `user` (default: the session user) on `doctype` (for
+	`applicable_for`) exclude `value`."""
 	restrictions = [
 		p
-		for p in get_user_permissions().get(doctype, [])
+		for p in get_user_permissions(user).get(doctype, [])
 		if not p.get("applicable_for") or p.get("applicable_for") == applicable_for
 	]
 	return not restrictions or value in {p.get("doc") for p in restrictions}
@@ -335,6 +338,57 @@ def get_gl_movements(
 			& (gle.posting_date <= getdate(to_date))
 		)
 		.groupby(gle.posting_date)
+		.orderby(gle.posting_date)
+	).run(as_dict=True)
+
+
+def get_gl_balances_by_account(
+	company: str, accounts, upto_date, in_account_currency: bool = True
+) -> dict[str, float]:
+	"""{account: balance (debit - credit) up to and including `upto_date`} of `accounts`, in one query
+	(an account without GL rows is 0)."""
+	accounts = sorted(set(accounts or ()))
+	if not accounts:
+		return {}
+	gle = frappe.qb.DocType("GL Entry")
+	debit, credit = _gl_amount_fields(gle, in_account_currency)
+	rows = (
+		frappe.qb.from_(gle)
+		.select(gle.account, Sum(debit - credit))
+		.where(
+			(gle.company == company)
+			& (gle.account.isin(accounts))
+			& (gle.is_cancelled == 0)
+			& (gle.posting_date <= getdate(upto_date))
+		)
+		.groupby(gle.account)
+	).run()
+	balances = dict.fromkeys(accounts, 0.0)
+	balances.update({account: flt(balance) for account, balance in rows})
+	return balances
+
+
+def get_gl_movements_by_account(
+	company: str, accounts, from_date, to_date, in_account_currency: bool = True
+) -> list[frappe._dict]:
+	"""Rows {account, posting_date, debit, credit} of `accounts` within [from_date, to_date], in one query."""
+	accounts = sorted(set(accounts or ()))
+	if not accounts or getdate(from_date) > getdate(to_date):
+		return []
+	gle = frappe.qb.DocType("GL Entry")
+	debit, credit = _gl_amount_fields(gle, in_account_currency)
+	return (
+		frappe.qb.from_(gle)
+		.select(gle.account, gle.posting_date, Sum(debit).as_("debit"), Sum(credit).as_("credit"))
+		.where(
+			(gle.company == company)
+			& (gle.account.isin(accounts))
+			& (gle.is_cancelled == 0)
+			& (gle.posting_date >= getdate(from_date))
+			& (gle.posting_date <= getdate(to_date))
+		)
+		.groupby(gle.account, gle.posting_date)
+		.orderby(gle.account)
 		.orderby(gle.posting_date)
 	).run(as_dict=True)
 

@@ -48,6 +48,11 @@
   "bank_charge_voucher",
   "column_break_bank_charges",
   "bank_charge_clearance",
+  "balance_alerts_section",
+  "on_low_balance",
+  "column_break_balance_alerts",
+  "balance_alerts_help",
+  "balance_thresholds",
   "documents_section",
   "default_outgoing_cheque_bank_account",
   "default_incoming_cheque_bank_account",
@@ -344,6 +349,37 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:!(doc.balance_thresholds||[]).length",
+   "fieldname": "balance_alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Balance Alerts"
+  },
+  {
+   "default": "Warn",
+   "description": "When an entry would bring a bank's projected balance below its minimum within the horizon. Block: only a Treasury Manager can override.",
+   "fieldname": "on_low_balance",
+   "fieldtype": "Select",
+   "label": "On Low Projected Balance",
+   "options": "Ignore\nWarn\nBlock",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_balance_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "balance_alerts_help",
+   "fieldtype": "HTML"
+  },
+  {
+   "description": "Amounts in the bank account currency. Banks without a row are listed in the digest but raise no alert and are never checked.",
+   "fieldname": "balance_thresholds",
+   "fieldtype": "Table",
+   "label": "Balance Thresholds",
+   "options": "Treasury Balance Threshold"
+  },
+  {
+   "collapsible": 1,
    "collapsible_depends_on": "eval:!doc.default_outgoing_cheque_bank_account",
    "description": "Defaults for the Treasury buttons on invoices, orders, quotations, journal entries, expense claims and parties.",
    "fieldname": "documents_section",
@@ -418,7 +454,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-07 12:00:00.000000",
+ "modified": "2026-10-10 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

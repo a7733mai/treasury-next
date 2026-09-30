@@ -188,6 +188,14 @@ def _alert_cheques(company: str, until) -> list[frappe._dict]:
 
 def _alert_users() -> list[str]:
 	"""Enabled system users holding a Treasury role."""
+	return users_with_roles(ALERT_ROLES)
+
+
+def users_with_roles(roles) -> list[str]:
+	"""Enabled system users holding any of `roles`, sorted by name."""
+	roles = list(roles or ())
+	if not roles:
+		return []
 	has_role = frappe.qb.DocType("Has Role")
 	user = frappe.qb.DocType("User")
 	users = (
@@ -198,7 +206,7 @@ def _alert_users() -> list[str]:
 		.distinct()
 		.where(
 			(has_role.parenttype == "User")
-			& (has_role.role.isin(ALERT_ROLES))
+			& (has_role.role.isin(roles))
 			& (user.enabled == 1)
 			& (user.user_type == "System User")
 		)

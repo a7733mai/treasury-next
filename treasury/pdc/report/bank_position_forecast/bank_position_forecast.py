@@ -27,6 +27,10 @@ With no Bank Account selected, every cheque of the company is counted (cheques w
 
 `horizon_weeks` (not shown in the filter bar) replaces To Date by From Date + that many weeks; the
 "Expected Cash Flow" dashboard chart uses it for its 12-week horizon.
+
+`per_bank` and `today` (internal, never in the filter bar) are set only by treasury.pdc.bank_positions, which
+builds per-bank daily positions from `collect_flows`: every flow keeps its bank account currency amount (no
+single view currency, so banks in different currencies are allowed) and "today" may be given.
 """
 
 from bisect import bisect_right
@@ -89,7 +93,8 @@ class BankPositionForecast:
 	def __init__(self, filters=None):
 		filters = frappe._dict(filters or {})
 		self.company = validate_company(filters.company)
-		self.today = report_today()
+		self.per_bank = cint(filters.per_bank)
+		self.today = getdate(filters.today) if self.per_bank and filters.today else report_today()
 		self.from_date = getdate(filters.from_date or self.today)
 		self.to_date = getdate(filters.to_date or add_days(self.from_date, DEFAULT_DAYS))
 		if cint(filters.horizon_weeks) > 0:
@@ -106,13 +111,16 @@ class BankPositionForecast:
 		self.selected_banks = as_list(filters.bank_account)
 		self.banks = get_bank_accounts(self.company, self.selected_banks)
 		self.bank_names = {b.name for b in self.banks}
-		self.bank_view = filters.currency_view == BANK_CURRENCY
+		# per bank: every amount stays in its bank account currency
+		self.bank_view = self.per_bank or filters.currency_view == BANK_CURRENCY
 		self.converter = AmountConverter(self.company, self.today)
 		self.currency = self.get_view_currency()
 		self.precision = get_precision()
 		self.summary_values = frappe._dict()
 
-	def get_view_currency(self) -> str:
+	def get_view_currency(self) -> str | None:
+		if self.per_bank:
+			return None
 		if not self.bank_view:
 			return self.converter.company_currency
 		currencies = sorted({b.currency for b in self.banks if b.currency})
@@ -129,7 +137,7 @@ class BankPositionForecast:
 	def run(self):
 		self.periods = build_periods(self.from_date, self.to_date, self.periodicity)
 		self.overdue_index = self.get_overdue_index()
-		flows = self.get_cheque_flows() + self.get_hook_flows()
+		flows = self.collect_flows()
 		overdue, brought_forward, by_period = self.assign_flows(flows)
 		actual = self.get_actual_by_period()
 		summary_rows, data = self.build_rows(overdue, brought_forward, by_period, actual)
@@ -176,31 +184,39 @@ class BankPositionForecast:
 			{**base, "operational_status": ["in", open_statuses], "effective_due_date": due_filter}
 		) + get_cheques({**base, "operational_status": "Cleared"})
 
+	def collect_flows(self) -> list[frappe._dict]:
+		"""Every expected flow (cheques, then the hook sources), unfiltered by date."""
+		return self.get_cheque_flows() + self.get_hook_flows()
+
 	def get_cheque_flows(self) -> list[frappe._dict]:
 		flows = []
 		for direction in (OUTGOING, INCOMING):
 			for row in self.get_expected_cheques(direction):
 				if not self.accepts_bank(row.bank_account):
 					continue
-				if self.bank_view and row.currency != self.currency:
+				if self.bank_view and not self.per_bank and row.currency != self.currency:
 					continue
-				if self.bank_view:
-					amount = flt(row.amount, self.precision)
-				else:
-					amount = self.converter.company_amount(row)
-				flows.append(
-					frappe._dict(
-						date=forecast_date(row),
-						direction=IN if direction == INCOMING else OUT,
-						amount=amount,
-						bank_account=row.bank_account,
-						reference_doctype=DOCTYPE,
-						reference_name=row.name,
-						party=row.party_name or row.party,
-						description=row.cheque_no,
-					)
-				)
+				flow = self._cheque_flow(row, direction)
+				flow.amount = flow.amount_in_account_currency if self.bank_view else flow.amount_company
+				flows.append(flow)
 		return flows
+
+	def _cheque_flow(self, row, direction: str) -> frappe._dict:
+		"""A cheque as a flow, with its amount in the cheque (= bank account) currency and, outside the bank
+		currency views (which never convert), in the company currency."""
+		return frappe._dict(
+			date=forecast_date(row),
+			direction=IN if direction == INCOMING else OUT,
+			amount=None,
+			amount_company=None if self.bank_view else self.converter.company_amount(row),
+			amount_in_account_currency=flt(row.amount, self.precision),
+			currency=row.currency,
+			bank_account=row.bank_account,
+			reference_doctype=DOCTYPE,
+			reference_name=row.name,
+			party=row.party_name or row.party,
+			description=row.cheque_no,
+		)
 
 	def get_hook_filters(self) -> frappe._dict:
 		return frappe._dict(

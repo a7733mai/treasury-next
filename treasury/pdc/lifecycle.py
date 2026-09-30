@@ -29,6 +29,7 @@ from frappe import _
 from frappe.utils import cint, flt, formatdate, getdate, now_datetime, today
 
 from treasury.accounting import dimensions, payment_modes, posting
+from treasury.balance_alerts import guard
 from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
@@ -139,18 +140,28 @@ def after_insert(doc):
 # ---------------------------------------------------------------------------
 
 
-def deliver(name: str, handover_date=None, remarks: str | None = None) -> dict:
+def deliver(name: str, handover_date=None, remarks: str | None = None, allow_low_balance=0) -> dict:
+	"""Hand an outgoing cheque over. The low balance guard (treasury.balance_alerts.guard) checks the bank's
+	projected balance; `allow_low_balance`: a Treasury Manager overrides a Block (logged)."""
+	guard.check_override_flag(allow_low_balance)
 	doc = _begin(name)
 	_require_direction(doc, OUTGOING)
 	_require_status(doc, ("Created",), "Delivered")
 	date = _date(handover_date)
 	_not_before(doc, date, "handover_date", _latest_date(doc))
+	snapshot = guard.begin(doc.company, [doc.bank_account])
 
 	doc.handover_date = date
 	_log(doc, "Delivered", operational="Delivered", remarks=remarks, event_date=date)
 	if _party_mode(doc) == "On Handover":
 		_post_party(doc, date)
-	return _save(doc)
+	result = _save(doc)
+	text = guard.finish(snapshot, doctype=DOCTYPE, name=doc.name, allow_override=allow_low_balance)
+	if text:
+		# the cheque was just saved: the override row is inserted in place
+		_log(doc, "Low Balance Override", remarks=text)
+		doc.status_log[-1].db_insert()
+	return result
 
 
 def receive(name: str, receipt_date=None, remarks: str | None = None) -> dict:

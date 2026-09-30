@@ -597,6 +597,10 @@ function pdc_action(frm, method, label, fields) {
 			frappe.prompt(
 				fields,
 				(values) => {
+					if (method === "deliver") {
+						pdc_call_with_override(frm, method, values);
+						return;
+					}
 					frm.call({ doc: frm.doc, method, args: values, freeze: true }).then(() => frm.reload_doc());
 				},
 				label,
@@ -605,6 +609,26 @@ function pdc_action(frm, method, label, fields) {
 		},
 		__("Actions")
 	);
+}
+
+// Low balance guard (Block mode): a Treasury Manager may confirm the override and call again. The server is
+// authoritative: it checks the role and logs the override.
+const PDC_OVERRIDE_ROLES = ["Treasury Manager", "System Manager"];
+
+function pdc_call_with_override(frm, method, args, override) {
+	frm.call({
+		doc: frm.doc,
+		method,
+		args: Object.assign({}, args, override ? { allow_low_balance: 1 } : {}),
+		freeze: true,
+		error: (r) => {
+			if (!override && r && r.exc_type === "LowBalanceError" && frappe.user.has_role(PDC_OVERRIDE_ROLES)) {
+				frappe.confirm(__("Override the low balance block and continue?"), () =>
+					pdc_call_with_override(frm, method, args, true)
+				);
+			}
+		},
+	}).then(() => frm.reload_doc());
 }
 
 function pdc_replace(frm) {

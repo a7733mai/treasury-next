@@ -493,6 +493,35 @@ class TestTranslations(IntegrationTestCase):
 		missing = [m for m in METHODS if MAP_DOCTYPE not in self.contexts_by_msgid.get(m, ())]
 		self.assertEqual(missing, [])
 
+	def test_bank_position_alert_terms(self):
+		"""Phase 7e: the Select options, the levels (shown with the Treasury Alert Log context), the status log
+		event and the override field have Arabic entries."""
+		expected = {
+			"Treasury Company Settings": ("Ignore", "Warn", "Block"),
+			"Treasury Alert Log": (
+				"Digest",
+				"Balance Alert",
+				"Override",
+				"Warning",
+				"Critical",
+				"OK",
+				"No Threshold",
+				"Level",
+			),
+			"Treasury Alert Recipient": ("Role", "User"),
+			"Treasury Report": ("In", "Out"),
+		}
+		missing = [
+			f"{context}: {msgid}"
+			for context, msgids in expected.items()
+			for msgid in msgids
+			if context not in self.contexts_by_msgid.get(msgid, ())
+		]
+		for msgid in ("Low Balance Override", "Override Low Balance", "Bank Balance Outlook"):
+			if None not in self.contexts_by_msgid.get(msgid, ()):
+				missing.append(msgid)
+		self.assertEqual(missing, [])
+
 	def test_extraction_helpers(self):
 		"""The static extraction understands the call styles used in the app."""
 		py = APP_DIR / "utils" / "amount_in_words.py"

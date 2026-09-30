@@ -1233,6 +1233,9 @@ function bt_add_actions(frm) {
 	}
 }
 
+// actions guarded by the low balance check (treasury.balance_alerts.guard)
+const BT_LOW_BALANCE_METHODS = ["send_now", "reschedule"];
+
 function bt_action(frm, method, label, fields, args, options = {}) {
 	// the server checks the permission, the role, the status and the dates (lifecycle.py)
 	frm.add_custom_button(
@@ -1251,10 +1254,33 @@ function bt_action(frm, method, label, fields, args, options = {}) {
 					dialog.hide();
 					const call_args = {};
 					args.forEach((key) => (call_args[key] = values[key] || null));
-					frm.call({ doc: frm.doc, method, args: call_args, freeze: true }).then(() => {
-						options.after && options.after(values);
-						frm.reload_doc();
-					});
+					// Send Now / Reschedule: a Treasury Manager may override a low balance Block (server-checked)
+					const run = (override) =>
+						frm
+							.call({
+								doc: frm.doc,
+								method,
+								args: Object.assign({}, call_args, override ? { allow_low_balance: 1 } : {}),
+								freeze: true,
+								error: (r) => {
+									if (
+										!override &&
+										BT_LOW_BALANCE_METHODS.includes(method) &&
+										r &&
+										r.exc_type === "LowBalanceError" &&
+										frappe.user.has_role(["Treasury Manager", "System Manager"])
+									) {
+										frappe.confirm(__("Override the low balance block and continue?"), () =>
+											run(true)
+										);
+									}
+								},
+							})
+							.then(() => {
+								options.after && options.after(values);
+								frm.reload_doc();
+							});
+					run(false);
 				},
 			});
 			dialog.show();
@@ -1306,3 +1332,13 @@ function bt_add_view_buttons(frm) {
 		);
 	}
 }
+
+// Low balance guard: the override is offered to Treasury Managers only (the server checks the role)
+frappe.ui.form.on("Bank Transfer", {
+	refresh(frm) {
+		frm.toggle_display(
+			"allow_low_balance",
+			frm.doc.docstatus === 0 && frappe.user.has_role(["Treasury Manager", "System Manager"])
+		);
+	},
+});

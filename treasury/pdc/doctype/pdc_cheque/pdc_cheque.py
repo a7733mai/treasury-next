@@ -8,7 +8,7 @@ from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_ac
 from frappe import _
 from frappe.contacts.doctype.contact.contact import get_default_contact
 from frappe.model.document import Document
-from frappe.utils import flt, getdate, money_in_words
+from frappe.utils import cint, flt, getdate, money_in_words
 
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import lifecycle
@@ -643,8 +643,8 @@ class PDCCheque(Document):
 	# POST only: they change data, and Frappe checks the CSRF token only on POST requests.
 
 	@frappe.whitelist(methods=["POST"])
-	def deliver(self, handover_date=None, remarks=None):
-		return lifecycle.deliver(self.name, handover_date, remarks)
+	def deliver(self, handover_date=None, remarks=None, allow_low_balance=0):
+		return lifecycle.deliver(self.name, handover_date, remarks, cint(allow_low_balance))
 
 	@frappe.whitelist(methods=["POST"])
 	def receive(self, receipt_date=None, remarks=None):

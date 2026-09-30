@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import cint
 
 from treasury.pdc import batch, lifecycle
 
@@ -25,6 +26,7 @@ class ChequeBatch(Document):
 		from treasury.pdc.doctype.cheque_batch_item.cheque_batch_item import ChequeBatchItem
 
 		allocation_method: DF.Literal["Manual", "FIFO Invoices", "Advance (no allocation)"]
+		allow_low_balance: DF.Check
 		amended_from: DF.Link | None
 		bank_account: DF.Link | None
 		cheque_book: DF.Link | None
@@ -128,9 +130,11 @@ class ChequeBatch(Document):
 	# Each cheque is acted on through treasury.pdc.lifecycle, which checks the user's permission (and role).
 
 	@frappe.whitelist(methods=["POST"])
-	def deliver_all(self, handover_date=None, remarks=None):
+	def deliver_all(self, handover_date=None, remarks=None, allow_low_balance=0):
 		self.check_permission("read")
-		return batch.run_bulk_action(self, lifecycle.OUTGOING, handover_date, remarks)
+		return batch.run_bulk_action(
+			self, lifecycle.OUTGOING, handover_date, remarks, allow_low_balance=cint(allow_low_balance)
+		)
 
 	@frappe.whitelist(methods=["POST"])
 	def receive_all(self, receipt_date=None, remarks=None):

@@ -11,6 +11,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt, fmt_money
 
 from treasury.accounting import dimensions, posting
+from treasury.balance_alerts import guard
 from treasury.bank_facilities import instruments
 from treasury.bank_transfers import fees, lifecycle
 from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
@@ -60,6 +61,7 @@ class BankTransfer(Document):
 		from treasury.pdc.doctype.pdc_cheque_reference.pdc_cheque_reference import PDCChequeReference
 
 		accounting_status: DF.Literal["Not Posted", "Posted", "Reversed"]
+		allow_low_balance: DF.Check
 		amended_from: DF.Link | None
 		amount: DF.Currency
 		bank: DF.Link | None
@@ -156,7 +158,10 @@ class BankTransfer(Document):
 		self.title = self.party_name or f"{self.bank_account} → {self.to_bank_account}"
 
 	def before_submit(self):
+		guard.check_override_flag(self.allow_low_balance)
 		lifecycle.check_approval(self)
+		# low balance guard (pre-state, bank rows locked in name order) before the limits; finished in on_submit
+		self.flags.balance_snapshot = lifecycle.begin_balance_guard(self)
 		# Block rejects the transfer (validate already showed the Warn messages)
 		lifecycle.enforce_limits(self, warn=False)
 		if self.transfer_type == lifecycle.PARTY_PAYMENT:
@@ -492,12 +497,12 @@ class BankTransfer(Document):
 	# POST only: they change data, and Frappe checks the CSRF token only on POST requests.
 
 	@frappe.whitelist(methods=["POST"])
-	def send_now(self, execution_date=None, remarks=None):
-		return lifecycle.send_now(self.name, execution_date or None, remarks)
+	def send_now(self, execution_date=None, remarks=None, allow_low_balance=0):
+		return lifecycle.send_now(self.name, execution_date or None, remarks, cint(allow_low_balance))
 
 	@frappe.whitelist(methods=["POST"])
-	def reschedule(self, execution_date=None, remarks=None):
-		return lifecycle.reschedule(self.name, execution_date or None, remarks)
+	def reschedule(self, execution_date=None, remarks=None, allow_low_balance=0):
+		return lifecycle.reschedule(self.name, execution_date or None, remarks, cint(allow_low_balance))
 
 	@frappe.whitelist(methods=["POST"])
 	def mark_completed(self, completion_date=None, bank_transaction_date=None, remarks=None):

@@ -1,0 +1,59 @@
+{%- set num_align = "left" if dir == "rtl" else "right" -%}
+<div dir="{{ dir }}" style="font-family: sans-serif; font-size: 13px;">
+	<p>
+		<strong>{{ _("Projected balance of {0} ({1}) below its threshold").format(bank_account | e, company | e) }}</strong><br>
+		{{ _("Actual balance today (GL)") }}: <bdi>{{ current_balance }}</bdi> {{ currency | e }}
+	</p>
+	<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+		<thead>
+			<tr>
+				<th>{{ _("Date", context="Treasury") }}</th>
+				<th>{{ _("Level", context="Treasury Alert Log") }}</th>
+				<th>{{ _("Projected Closing Balance") }}</th>
+				<th>{{ _("Threshold", context="Treasury Alert Log") }}</th>
+				<th>{{ _("Shortfall") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in rows %}
+			<tr class="treasury-level-{{ row.level | lower }}"
+				{% if row.colours %}style="background: {{ row.colours[0] }}; color: {{ row.colours[1] }};"{% endif %}>
+				<td>{{ row.date }}{% if row.worse %} ({{ _("worse") }}){% endif %}</td>
+				<td>{{ row.level_label }}</td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ row.closing }}</bdi></td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ row.threshold }}</bdi></td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ row.shortfall }}</bdi></td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% if movements %}
+	<p><strong>{{ _("Largest expected payments up to the first breach") }}</strong></p>
+	<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+		<thead>
+			<tr>
+				<th>{{ _("Date", context="Treasury") }}</th>
+				<th>{{ _("Amount", context="Treasury") }}</th>
+				<th>{{ _("Document", context="Treasury Alert Log") }}</th>
+				<th>{{ _("Party", context="Treasury") }}</th>
+				<th>{{ _("Description") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for m in movements %}
+			<tr>
+				<td>{{ m.date }}</td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ m.amount }}</bdi></td>
+				<td>
+					{% if m.url %}<a href="{{ m.url | e }}">{{ m.label | e }} {{ m.reference_name | e }}</a>
+					{% else %}{{ m.label | e }} {{ (m.reference_name or "") | e }}{% endif %}
+				</td>
+				<td>{{ (m.party or "") | e }}</td>
+				<td>{{ (m.description or "") | e }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% endif %}
+	<p><a class="treasury-forecast-link" href="{{ link | e }}">{{ _("Open in Bank Position Forecast") }}</a></p>
+</div>

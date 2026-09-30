@@ -427,17 +427,35 @@ function sec_encash_prompt(frm, bank_accounts) {
 					},
 				];
 			}
-			frappe.confirm(__("Encash this security cheque? This cannot be undone."), () => {
-				frm.call({ doc: frm.doc, method: "encash", args, freeze: true }).then((r) => {
-					if (r.message && r.message.pdc_cheque) {
-						frappe.set_route("Form", "PDC Cheque", r.message.pdc_cheque);
-					} else {
-						frm.reload_doc();
-					}
-				});
-			});
+			frappe.confirm(__("Encash this security cheque? This cannot be undone."), () => sec_call_encash(frm, args));
 		},
 		__("Encash"),
 		__("Encash")
 	);
+}
+
+// Low balance guard (Block mode) of an outgoing encashment: a Treasury Manager may confirm the override and
+// call again; the server checks the role and logs it.
+const SEC_OVERRIDE_ROLES = ["Treasury Manager", "System Manager"];
+
+function sec_call_encash(frm, args, override) {
+	frm.call({
+		doc: frm.doc,
+		method: "encash",
+		args: Object.assign({}, args, override ? { allow_low_balance: 1 } : {}),
+		freeze: true,
+		error: (r) => {
+			if (!override && r && r.exc_type === "LowBalanceError" && frappe.user.has_role(SEC_OVERRIDE_ROLES)) {
+				frappe.confirm(__("Override the low balance block and continue?"), () =>
+					sec_call_encash(frm, args, true)
+				);
+			}
+		},
+	}).then((r) => {
+		if (r.message && r.message.pdc_cheque) {
+			frappe.set_route("Form", "PDC Cheque", r.message.pdc_cheque);
+		} else {
+			frm.reload_doc();
+		}
+	});
 }

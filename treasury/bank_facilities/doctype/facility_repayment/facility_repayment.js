@@ -37,3 +37,13 @@ frappe.ui.form.on("Facility Repayment", {
 		}
 	},
 });
+
+// Low balance guard: the override is offered to Treasury Managers only (the server checks the role)
+frappe.ui.form.on("Facility Repayment", {
+	refresh(frm) {
+		frm.toggle_display(
+			"allow_low_balance",
+			frm.doc.docstatus === 0 && frappe.user.has_role(["Treasury Manager", "System Manager"])
+		);
+	},
+});

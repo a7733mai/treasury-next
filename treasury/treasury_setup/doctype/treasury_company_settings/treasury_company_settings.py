@@ -3,6 +3,7 @@
 
 import erpnext
 import frappe
+from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.naming import NamingSeries
@@ -50,12 +51,17 @@ class TreasuryCompanySettings(Document):
 		)
 		from treasury.treasury_setup.doctype.bank_transfer_limit.bank_transfer_limit import BankTransferLimit
 		from treasury.treasury_setup.doctype.pdc_account_mapping.pdc_account_mapping import PDCAccountMapping
+		from treasury.treasury_setup.doctype.treasury_balance_threshold.treasury_balance_threshold import (
+			TreasuryBalanceThreshold,
+		)
 		from treasury.treasury_setup.doctype.treasury_payment_mode_map.treasury_payment_mode_map import (
 			TreasuryPaymentModeMap,
 		)
 
 		accrue_facility_interest: DF.Check
 		auto_select_cheque_book: DF.Check
+		balance_alerts_help: DF.HTML | None
+		balance_thresholds: DF.Table[TreasuryBalanceThreshold]
 		bank_charge_clearance: DF.Literal["On Posting", "On Bank Transaction"]
 		bank_charge_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bank_settlement_voucher: DF.Literal["Payment Entry", "Journal Entry"]
@@ -77,6 +83,7 @@ class TreasuryCompanySettings(Document):
 		incoming_under_collection: DF.Literal["On Deposit", "Disabled"]
 		mode_name_template: DF.Data
 		on_bounce: DF.Literal["Cancel Payment Entry", "Reverse by Journal Entry"]
+		on_low_balance: DF.Literal["Ignore", "Warn", "Block"]
 		outgoing_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
 		outgoing_party_posting: DF.Literal["On Handover", "On Cheque Date", "On Creation", "Manual"]
 		payment_modes: DF.Table[TreasuryPaymentModeMap]
@@ -127,6 +134,31 @@ class TreasuryCompanySettings(Document):
 		self.validate_payment_modes()
 		self.validate_transfer_settings()
 		self.validate_document_settings()
+		self.validate_balance_thresholds()
+
+	# ------------------------------------------------------------------ bank balance alerts
+
+	def validate_balance_thresholds(self):
+		"""One row per company bank account (with or without PDC Accounts), its currency from the GL account,
+		warning not below minimum; negative amounts are allowed (overdraft accounts). Spec 7e §2.3."""
+		seen = set()
+		for row in self.get("balance_thresholds"):
+			if row.bank_account in seen:
+				frappe.throw(
+					_("Row #{0}: Bank Account {1} already has thresholds.").format(
+						row.idx, frappe.bold(row.bank_account)
+					)
+				)
+			seen.add(row.bank_account)
+			gl_account = self.validate_bank_account(row)
+			row.currency = get_account_currency(gl_account)
+			precision = row.precision("minimum_balance")
+			row.minimum_balance = flt(row.minimum_balance, precision)
+			row.warning_balance = flt(row.warning_balance, precision)
+			if row.warning_balance < row.minimum_balance:
+				frappe.throw(
+					_("Row #{0}: Warning Balance cannot be lower than Minimum Balance.").format(row.idx)
+				)
 
 	# ------------------------------------------------------------------ pay / receive from documents
 

@@ -7,6 +7,7 @@ from frappe.permissions import reset_perms
 from frappe.utils import cint
 
 from treasury.accounting import dimensions, payment_modes
+from treasury.balance_alerts import recipients
 from treasury.bank_transfers import charge_defaults
 from treasury.utils.party import ensure_payee_supplier_group
 from treasury.utils.settings import set_missing_single_defaults
@@ -95,6 +96,8 @@ def before_uninstall():
 	report_kept_series()
 	# the categories are deleted with the app's doctypes: a reinstall creates the defaults again
 	frappe.db.set_global(charge_defaults.DEFAULTS_CREATED_KEY, None)
+	# likewise the alert recipients of Treasury Settings
+	frappe.db.set_global(recipients.DEFAULT_RECIPIENTS_KEY, None)
 
 
 def setup():
@@ -106,6 +109,7 @@ def setup():
 	set_default_settings()
 	dimensions.create_dimension_fields()
 	charge_defaults.ensure_default_categories()
+	recipients.ensure_default_recipients()
 
 
 def set_default_settings() -> list[str]:

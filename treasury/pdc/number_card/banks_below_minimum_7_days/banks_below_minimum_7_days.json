@@ -1,0 +1,23 @@
+{
+ "color": "#E24C4C",
+ "creation": "2026-10-10 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "PDC Cheque",
+ "dynamic_filters_json": "{\"company\":\"frappe.defaults.get_user_default(\\\"Company\\\")\"}",
+ "filters_json": "{\"horizon_days\":7}",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Banks Below Minimum (7 days)",
+ "method": "treasury.balance_alerts.dashboard.get_low_balance_card",
+ "modified": "2026-10-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Banks Below Minimum (7 days)",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Custom"
+}

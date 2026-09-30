@@ -657,3 +657,15 @@ function bch_translate_log(frm) {
 	});
 	frm.refresh_field("status_log");
 }
+
+// Low balance guard: the override is offered to Treasury Managers only (the server checks the role)
+frappe.ui.form.on("Bank Charge", {
+	refresh(frm) {
+		frm.toggle_display(
+			"allow_low_balance",
+			frm.doc.docstatus === 0 &&
+				frm.doc.entry_type === BCH_CHARGE &&
+				frappe.user.has_role(["Treasury Manager", "System Manager"])
+		);
+	},
+});

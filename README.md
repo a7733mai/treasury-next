@@ -589,6 +589,43 @@ fees, cheque clearance charges, bounce charges recovered, LG / LC commissions an
 month, bank, bank account, category or source, with a chart and a detail view linking each voucher. Cheque
 discounting charges and facility interest stay in Cost of Financing.
 
+#### Bank Position Alerts
+
+Treasury projects every bank's balance day by day over a short horizon (the Bank Position Forecast engine,
+per bank) and warns before a bank runs short. It posts nothing.
+
+- **Settings.** *Treasury Settings → Bank Position Alerts*: horizon (today and the next days, 1–7), digest
+  hour (system time zone), daily digest and critical alerts on / off, the channels (in-system notification,
+  e-mail — only with a default outgoing e-mail account), whether the digest lists days without movements,
+  and the **Recipients** (roles and / or users; install adds *Treasury Manager* once). *Treasury Company
+  Settings → Bank Balance Alerts*: **Balance Thresholds** per company bank account (Warning and Minimum
+  Balance in the bank account currency; negative values allowed for overdraft accounts) and **On Low
+  Projected Balance** (Ignore / Warn / Block, default Warn). Banks without a threshold row are listed in the
+  digest but never alerted or checked. Bank Accounts sharing one GL account are one position (their money
+  cannot be split) with the strictest thresholds.
+- **Levels.** A day whose projected closing is below the minimum is *Critical*, below the warning balance
+  *Warning*. The projection equals the report's Daily *Projected Closing Balance* (Bank Currency, Include
+  Overdue): today's closing includes the overdue expected flows.
+- **Daily digest** (hourly job, from the digest hour on, once per recipient, company and day): one table per
+  bank (Critical first) with today's actual GL balance, the thresholds and one row per day (in, out,
+  projected closing, status), plus a link to the bank's forecast. Each recipient only sees the companies and
+  bank accounts their permissions and User Permissions allow, in their own language.
+- **Critical / warning alerts** (hourly and right after every guarded entry): one alert per bank for its
+  breached days, with the largest expected payments; a breached day is alerted once per day and again only
+  when it gets worse ("Worse:"), or when a Warning day turns Critical.
+- **Entry-time check.** Delivering an outgoing cheque (single, Cheque Batch submit / Deliver All, security
+  cheque encashment), submitting / sending now / rescheduling a Bank Transfer, submitting a Facility
+  Repayment or a Bank Charge compares the bank's projection before and after the entry. A day that the entry
+  lowers below the minimum is reported: *Warn* shows a message, *Block* refuses the entry unless a Treasury
+  Manager confirms the override (the *Override Low Balance* box of the document, or the confirmation of the
+  action), which is logged. A batch is checked once and refused as a whole. Bank Charges created from a
+  statement line only warn (the bank already took the money); scheduled system postings and cancellations
+  are never checked.
+- **Treasury Alert Log** keeps the digests, alerts and overrides (the dedupe keys; cleared after 180 days by
+  Log Settings). Report **Bank Balance Outlook** lists every bank's current and lowest projected balance,
+  level, first breach and shortfall; number card *Banks Below Minimum (7 days)* and chart *Lowest Projected
+  Balance per Bank* are on the workspace.
+
 #### Pay or receive from any screen
 
 A **Treasury** button group on Sales / Purchase Invoice, Sales / Purchase Order, Journal Entry, Customer,
@@ -711,6 +748,7 @@ amounts of other currencies use today's rate.
 | daily_long | `treasury.bank_facilities.interest.post_interest_accruals` | month-end interest accruals (when enabled) |
 | daily_long | `treasury.bank_facilities.scheduler.send_facility_alerts` | installments due / overdue, facilities and guarantees expiring |
 | daily | `treasury.security_cheques.scheduler.send_security_expiry_alerts` | security cheques expiring or expired and not returned |
+| hourly | `treasury.balance_alerts.scheduler.run_hourly` | bank position digest (once a day from the digest hour) and critical / warning balance alerts |
 
 Scheduled postings run as Administrator; alerts go to Treasury Manager / User as notifications and, if outgoing email is
 set up, by email, listing only the documents each recipient may read.

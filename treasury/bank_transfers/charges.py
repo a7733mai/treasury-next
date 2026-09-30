@@ -19,9 +19,10 @@ are stored in English and translated when displayed.
 import erpnext
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, fmt_money, getdate
+from frappe.utils import cint, flt, fmt_money, getdate, today
 
 from treasury.accounting import dimensions, payment_modes, posting
+from treasury.balance_alerts import guard
 from treasury.bank_facilities import accounting as facility_accounting
 from treasury.bank_facilities import instruments
 from treasury.bank_transfers import bank_supplier
@@ -140,6 +141,18 @@ def on_submit(doc):
 		first_new_row,
 		("payment_entry", "journal_entry", "clearance_date", "bank_transaction_date"),
 	)
+	# low balance guard started in before_submit: a charge from a statement line records a fact the bank
+	# already executed, so a Block only warns
+	text = guard.finish(
+		doc.flags.pop("balance_snapshot", None),
+		doctype=DOCTYPE,
+		name=doc.name,
+		allow_override=doc.get("allow_low_balance"),
+		block_as_warn=bool(doc.bank_transaction),
+	)
+	if text:
+		log(doc, "Low Balance Override", remarks=text, event_date=today())
+		_write_in_place(doc, len(doc.status_log) - 1)
 
 
 def post(doc):

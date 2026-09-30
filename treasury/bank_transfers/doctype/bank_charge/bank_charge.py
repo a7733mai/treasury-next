@@ -9,6 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt, fmt_money, getdate, today
 
 from treasury.accounting import dimensions, payment_modes, posting
+from treasury.balance_alerts import guard
 from treasury.bank_facilities import instruments
 from treasury.bank_transfers import charges
 from treasury.treasury_setup.doctype.bank_charge_category.bank_charge_category import get_account_row
@@ -52,6 +53,7 @@ class BankCharge(Document):
 
 		accounting_status: DF.Literal["Not Posted", "Posted"]
 		against_bank_charge: DF.Link | None
+		allow_low_balance: DF.Check
 		amended_from: DF.Link | None
 		amount: DF.Currency
 		bank: DF.Link | None
@@ -117,6 +119,12 @@ class BankCharge(Document):
 			charges.validate_bank_transaction(self, self.bank_transaction)
 		self.validate_accounting_details(settings)
 		self.title = f"{_(self.category)} · {self.bank_account}"
+
+	def before_submit(self):
+		# low balance guard (a refund raises the balance: not guarded); finished in on_submit
+		guard.check_override_flag(self.allow_low_balance)
+		if self.entry_type == charges.CHARGE:
+			self.flags.balance_snapshot = guard.begin(self.company, [self.bank_account])
 
 	def on_submit(self):
 		charges.on_submit(self)

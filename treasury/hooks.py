@@ -189,6 +189,10 @@ doc_events = {
 # Bank facilities: expiry / schedule statuses / utilisation first, then the month-end interest accruals
 # (idempotent per drawdown and month, catches up missed months), then the alert digest.
 scheduler_events = {
+	# Bank position alerts: the daily digest (from the digest hour on) and the critical / warning alerts
+	"hourly": [
+		"treasury.balance_alerts.scheduler.run_hourly",
+	],
 	"daily": [
 		"treasury.security_cheques.scheduler.send_security_expiry_alerts",
 	],
@@ -340,9 +344,8 @@ override_doctype_dashboards = {
 # Automatically update python controller files with type annotations for this app.
 # export_python_type_annotations = True
 
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
+# days to retain the logs (Log Settings)
+default_log_clearing_doctypes = {"Treasury Alert Log": 180}
 
 # Translation
 # ------------

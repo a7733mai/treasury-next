@@ -35,6 +35,11 @@ class PDCStatusLog(Document):
 			"Replacement Created",
 			"Cancelled",
 			"Returned",
+			"Discounted",
+			"Discount Cancelled",
+			"Discount Settled",
+			"Discount Recourse Posted",
+			"Low Balance Override",
 		]
 		event_date: DF.Date | None
 		from_accounting: DF.Data | None

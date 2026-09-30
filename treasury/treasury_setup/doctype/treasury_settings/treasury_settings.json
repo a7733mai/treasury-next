@@ -10,6 +10,16 @@
   "facility_alert_days",
   "column_break_alerts",
   "allow_future_clearance_date",
+  "balance_alerts_section",
+  "balance_alert_horizon",
+  "balance_digest_hour",
+  "send_balance_digest",
+  "send_balance_alerts",
+  "column_break_balance_alerts",
+  "balance_alert_notification",
+  "balance_alert_email",
+  "digest_zero_days",
+  "balance_alert_recipients",
   "payees_section",
   "payee_supplier_group",
   "bank_charges_section",
@@ -57,6 +67,67 @@
    "label": "Allow Future Clearance Date"
   },
   {
+   "fieldname": "balance_alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Position Alerts"
+  },
+  {
+   "default": "7",
+   "description": "Today and the next days, 1–7.",
+   "fieldname": "balance_alert_horizon",
+   "fieldtype": "Int",
+   "label": "Horizon (Days)"
+  },
+  {
+   "default": "7",
+   "description": "Hour of day (0–23, system time zone) after which the daily digest is sent.",
+   "fieldname": "balance_digest_hour",
+   "fieldtype": "Int",
+   "label": "Digest Hour"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_balance_digest",
+   "fieldtype": "Check",
+   "label": "Send Daily Digest"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_balance_alerts",
+   "fieldtype": "Check",
+   "label": "Send Critical Alerts"
+  },
+  {
+   "fieldname": "column_break_balance_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "balance_alert_notification",
+   "fieldtype": "Check",
+   "label": "In-System Notification"
+  },
+  {
+   "default": "1",
+   "description": "Sent only when a default outgoing e-mail account exists.",
+   "fieldname": "balance_alert_email",
+   "fieldtype": "Check",
+   "label": "E-mail"
+  },
+  {
+   "default": "1",
+   "fieldname": "digest_zero_days",
+   "fieldtype": "Check",
+   "label": "Include Days Without Movements"
+  },
+  {
+   "description": "Roles and / or users. Each recipient only gets the companies and bank accounts they may see.",
+   "fieldname": "balance_alert_recipients",
+   "fieldtype": "Table",
+   "label": "Recipients",
+   "options": "Treasury Alert Recipient"
+  },
+  {
    "fieldname": "payees_section",
    "fieldtype": "Section Break",
    "label": "Payees"
@@ -90,7 +161,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-07 12:00:00.000000",
+ "modified": "2026-10-10 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Settings",

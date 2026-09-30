@@ -1,0 +1,214 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-10 12:00:00.000000",
+ "description": "Bank position digests and alerts sent, and the low balance overrides (written by the system only).",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "alert_type",
+  "level",
+  "company",
+  "bank_account",
+  "alert_date",
+  "projected_date",
+  "column_break_main",
+  "balance",
+  "threshold",
+  "currency",
+  "is_escalation",
+  "user",
+  "delivery_section",
+  "recipients",
+  "column_break_delivery",
+  "notified",
+  "emailed",
+  "reference_section",
+  "reference_doctype",
+  "column_break_reference",
+  "reference_name",
+  "message_section",
+  "subject",
+  "message"
+ ],
+ "fields": [
+  {
+   "fieldname": "alert_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Alert Type",
+   "options": "Digest\nBalance Alert\nOverride",
+   "reqd": 1
+  },
+  {
+   "fieldname": "level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Level",
+   "options": "\nWarning\nCritical"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "options": "Bank Account"
+  },
+  {
+   "description": "The calendar day it was sent (system time zone).",
+   "fieldname": "alert_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Alert Date",
+   "reqd": 1
+  },
+  {
+   "description": "The day whose projected balance is below the threshold.",
+   "fieldname": "projected_date",
+   "fieldtype": "Date",
+   "label": "Projected Date"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Projected closing balance of that day.",
+   "fieldname": "balance",
+   "fieldtype": "Currency",
+   "label": "Projected Balance",
+   "options": "currency"
+  },
+  {
+   "description": "Minimum or warning balance.",
+   "fieldname": "threshold",
+   "fieldtype": "Currency",
+   "label": "Threshold",
+   "options": "currency"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_escalation",
+   "fieldtype": "Check",
+   "label": "Escalation"
+  },
+  {
+   "description": "Digest: the recipient. Override: the acting user.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "fieldname": "delivery_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery"
+  },
+  {
+   "description": "The users notified, one per line.",
+   "fieldname": "recipients",
+   "fieldtype": "Small Text",
+   "label": "Recipients"
+  },
+  {
+   "fieldname": "column_break_delivery",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "notified",
+   "fieldtype": "Check",
+   "label": "In-System Notification"
+  },
+  {
+   "default": "0",
+   "fieldname": "emailed",
+   "fieldtype": "Check",
+   "label": "E-mailed"
+  },
+  {
+   "depends_on": "eval:doc.reference_doctype",
+   "fieldname": "reference_section",
+   "fieldtype": "Section Break",
+   "label": "Overridden Document"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "column_break_reference",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "message_section",
+   "fieldtype": "Section Break",
+   "label": "Message"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject",
+   "length": 500
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Text",
+   "label": "Message"
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-10-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Treasury Setup",
+ "name": "Treasury Alert Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager"
+  }
+ ],
+ "read_only": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "subject",
+ "track_changes": 0
+}

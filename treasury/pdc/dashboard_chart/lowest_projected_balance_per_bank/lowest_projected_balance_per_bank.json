@@ -1,0 +1,23 @@
+{
+ "chart_name": "Lowest Projected Balance per Bank",
+ "chart_type": "Report",
+ "creation": "2026-10-10 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart",
+ "dynamic_filters_json": "{\"company\":\"frappe.defaults.get_user_default(\\\"Company\\\")\"}",
+ "filters_json": "{\"horizon_days\":7}",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "modified": "2026-10-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PDC",
+ "name": "Lowest Projected Balance per Bank",
+ "number_of_groups": 0,
+ "owner": "Administrator",
+ "report_name": "Bank Balance Outlook",
+ "timeseries": 0,
+ "type": "Bar",
+ "use_report_chart": 1,
+ "y_axis": []
+}

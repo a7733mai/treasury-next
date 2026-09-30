@@ -134,6 +134,8 @@ class TestClientCalls(UnitTestCase):
 
 		methods += (BankCharge.reconcile_bank_transaction, PDCBankClearing.clear_selected)
 		previous = getattr(frappe.local, "request", None)
+		# Phase 7e: the actions guarded by the low balance check stay POST only
+		methods += self.low_balance_actions()
 		try:
 			for method in methods:
 				with self.subTest(method=method.__qualname__):
@@ -143,6 +145,46 @@ class TestClientCalls(UnitTestCase):
 					self.assertRaises(frappe.PermissionError, is_valid_http_method, method)
 					frappe.local.request = SimpleNamespace(method="POST")
 					is_valid_http_method(method)
+		finally:
+			frappe.local.request = previous
+
+	@staticmethod
+	def low_balance_actions() -> tuple:
+		from treasury.bank_transfers.doctype.bank_transfer.bank_transfer import BankTransfer
+		from treasury.pdc.doctype.cheque_batch.cheque_batch import ChequeBatch
+		from treasury.pdc.doctype.pdc_cheque.pdc_cheque import PDCCheque
+		from treasury.security_cheques.doctype.security_cheque.security_cheque import SecurityCheque
+
+		return (
+			PDCCheque.deliver,
+			ChequeBatch.deliver_all,
+			BankTransfer.send_now,
+			BankTransfer.reschedule,
+			SecurityCheque.encash,
+		)
+
+	def test_low_balance_actions_accept_the_override(self):
+		"""Phase 7e: the guarded actions take `allow_low_balance` (the override the form confirms)."""
+		import inspect
+
+		for method in self.low_balance_actions():
+			with self.subTest(method=method.__qualname__):
+				self.assertIn("allow_low_balance", inspect.signature(method).parameters)
+				self.assertIn(method, frappe.whitelisted)
+
+	def test_low_balance_card_accepts_get(self):
+		"""Phase 7e: the number card method only reads (GET is fine)."""
+		from types import SimpleNamespace
+
+		from frappe.handler import is_valid_http_method
+
+		from treasury.balance_alerts.dashboard import get_low_balance_card
+
+		previous = getattr(frappe.local, "request", None)
+		try:
+			self.assertIn(get_low_balance_card, frappe.whitelisted)
+			frappe.local.request = SimpleNamespace(method="GET")
+			is_valid_http_method(get_low_balance_card)
 		finally:
 			frappe.local.request = previous
 

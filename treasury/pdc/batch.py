@@ -39,6 +39,7 @@ from frappe.query_builder.functions import IfNull, Sum
 from frappe.utils import add_days, cint, flt, getdate
 
 from treasury.accounting import dimensions, posting
+from treasury.balance_alerts import guard
 from treasury.pdc import lifecycle
 from treasury.pdc.batch_status import (
 	RELEASED_STATUSES,
@@ -682,11 +683,31 @@ def batch_operation(batch_name: str):
 
 def create_cheques(batch):
 	"""One PDC Cheque per row, handed over / received on the batch's date if it has one. Idempotent: a row
-	that already has its cheque keeps it, and only Created cheques are handed over."""
+	that already has its cheque keeps it, and only Created cheques are handed over. Outgoing cheques handed
+	over on submit are checked once for the whole batch by the low balance guard (the batch's
+	`allow_low_balance`: a Treasury Manager's override)."""
 	with batch_operation(batch.name):
-		for row in batch.cheques:
-			for_row(row, lambda row=row: _submit_row(batch, row))
+		if batch.handover_date and batch.direction == lifecycle.OUTGOING:
+			with _balance_guard(batch, batch.get("allow_low_balance")):
+				for row in batch.cheques:
+					for_row(row, lambda row=row: _submit_row(batch, row))
+		else:
+			for row in batch.cheques:
+				for_row(row, lambda row=row: _submit_row(batch, row))
 	batch.status = update_batch_status(batch.name)
+
+
+@contextmanager
+def _balance_guard(batch, allow_low_balance):
+	"""One low balance check around a batch-wide hand-over (treasury.balance_alerts.guard.batch_guard); an
+	override is recorded as an Info comment on the batch."""
+	guard.check_override_flag(allow_low_balance)
+	with guard.batch_guard(
+		batch.company, [batch.bank_account], cint(allow_low_balance), BATCH, batch.name
+	) as holder:
+		yield
+	if holder.text:
+		batch.add_comment("Info", holder.text)
 
 
 def _submit_row(batch, row):
@@ -810,11 +831,16 @@ def clear_cancelled_leaves(batch):
 # ---------------------------------------------------------------------------
 
 
-def run_bulk_action(batch, direction: str, date=None, remarks: str | None = None) -> dict:
+def run_bulk_action(
+	batch, direction: str, date=None, remarks: str | None = None, allow_low_balance=0
+) -> dict:
 	"""Deliver (outgoing) / receive (incoming) every Created cheque of a submitted batch.
 
 	Each cheque runs in its own savepoint with the lifecycle's own permission and role checks: a failing
 	cheque is rolled back and reported, the others go on. Returns {"succeeded", "failed", "skipped"}.
+
+	Deliver All is checked once as a whole by the low balance guard: a Block rolls back every cheque (per-cheque
+	partial success would depend on the row order); `allow_low_balance` is a Treasury Manager's override.
 
 	Rolling back to the savepoint undoes the failed cheque's database writes and drops the messages it
 	queued (e.g. ERPNext's "Allocation Adjusted"). It cannot undo `frappe.db.after_commit` callbacks or jobs
@@ -829,25 +855,33 @@ def run_bulk_action(batch, direction: str, date=None, remarks: str | None = None
 	action = lifecycle.deliver if direction == lifecycle.OUTGOING else lifecycle.receive
 	result = {"succeeded": [], "failed": [], "skipped": []}
 	with batch_operation(batch.name):
-		for cheque in get_batch_cheques(batch.name):
-			if cheque.operational_status != "Created":
-				result["skipped"].append(cheque.name)
-				continue
-			messages = len(frappe.local.message_log)
-			frappe.db.savepoint(ACTION_SAVEPOINT)
-			try:
-				action(cheque.name, date, remarks)
-			except Exception as e:
-				frappe.db.rollback(save_point=ACTION_SAVEPOINT)
-				del frappe.local.message_log[messages:]
-				result["failed"].append(
-					{"cheque": cheque.name, "cheque_no": cheque.cheque_no, "error": _message(e)}
-				)
-			else:
-				frappe.db.release_savepoint(ACTION_SAVEPOINT)
-				result["succeeded"].append(cheque.name)
+		if direction == lifecycle.OUTGOING:
+			with _balance_guard(batch, allow_low_balance):
+				_run_each(batch, action, date, remarks, result)
+		else:
+			_run_each(batch, action, date, remarks, result)
 	update_batch_status(batch.name)
 	return result
+
+
+def _run_each(batch, action, date, remarks, result: dict):
+	for cheque in get_batch_cheques(batch.name):
+		if cheque.operational_status != "Created":
+			result["skipped"].append(cheque.name)
+			continue
+		messages = len(frappe.local.message_log)
+		frappe.db.savepoint(ACTION_SAVEPOINT)
+		try:
+			action(cheque.name, date, remarks)
+		except Exception as e:
+			frappe.db.rollback(save_point=ACTION_SAVEPOINT)
+			del frappe.local.message_log[messages:]
+			result["failed"].append(
+				{"cheque": cheque.name, "cheque_no": cheque.cheque_no, "error": _message(e)}
+			)
+		else:
+			frappe.db.release_savepoint(ACTION_SAVEPOINT)
+			result["succeeded"].append(cheque.name)
 
 
 def get_print_info(batch) -> dict:

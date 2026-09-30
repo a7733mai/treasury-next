@@ -1,0 +1,46 @@
+{%- set num_align = "left" if dir == "rtl" else "right" -%}
+<div dir="{{ dir }}" style="font-family: sans-serif; font-size: 13px;">
+	<p>
+		<strong>{{ _("Bank position for {0} on {1}").format(company | e, date) }}</strong><br>
+		{{ _("Horizon: {0} days · {1} critical · {2} warning").format(horizon, critical, warning) }}
+	</p>
+	{% for bank in banks %}
+	<table class="treasury-bank" border="1" cellpadding="4" cellspacing="0"
+		style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+		<thead>
+			<tr>
+				<th colspan="5" style="text-align: start; background: #F4F5F6;">
+					{{ bank.name | e }}{% if bank.merged %} ({{ bank.merged | e }}){% endif %} · {{ bank.currency | e }}
+					· {{ bank.level_label }}<br>
+					<span style="font-weight: normal;">
+						{{ _("Actual balance today (GL)") }}: <bdi>{{ bank.current_balance }}</bdi>
+						{% if bank.warning %} · {{ _("Warning Balance") }}: <bdi>{{ bank.warning }}</bdi>{% endif %}
+						{% if bank.minimum %} · {{ _("Minimum Balance") }}: <bdi>{{ bank.minimum }}</bdi>{% endif %}
+					</span>
+				</th>
+			</tr>
+			<tr>
+				<th>{{ _("Date", context="Treasury") }}</th>
+				<th>{{ _("In", context="Treasury Report") }}</th>
+				<th>{{ _("Out", context="Treasury Report") }}</th>
+				<th>{{ _("Projected Closing Balance") }}</th>
+				<th>{{ _("Status", context="Treasury") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in bank.rows %}
+			<tr class="treasury-day{% if row.level %} treasury-level-{{ row.level | lower | replace(' ', '-') }}{% endif %}"
+				{% if row.colours %}style="background: {{ row.colours[0] }}; color: {{ row.colours[1] }};"{% endif %}>
+				<td>{{ row.label }}</td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ row.inflow }}</bdi></td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ row.outflow }}</bdi></td>
+				<td style="text-align: {{ num_align }};"><bdi>{{ row.closing }}</bdi></td>
+				<td>{{ row.status }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	<p><a class="treasury-forecast-link" href="{{ bank.link | e }}">{{ _("Open in Bank Position Forecast") }}</a></p>
+	{% endfor %}
+	{% if unassigned %}<p style="color: #6C7680;">{{ unassigned }}</p>{% endif %}
+</div>

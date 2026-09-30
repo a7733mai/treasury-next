@@ -6,7 +6,7 @@ import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, getdate, today
+from frappe.utils import cint, flt, getdate, today
 
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
 from treasury.security_cheques import lifecycle
@@ -476,6 +476,7 @@ class SecurityCheque(Document):
 		bank_account=None,
 		references=None,
 		remarks=None,
+		allow_low_balance=0,
 	):
 		return lifecycle.encash(
 			self.name,
@@ -485,6 +486,7 @@ class SecurityCheque(Document):
 			bank_account or None,
 			references,
 			remarks,
+			cint(allow_low_balance),
 		)
 
 

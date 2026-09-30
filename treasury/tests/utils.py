@@ -1598,6 +1598,273 @@ def set_bank_suppliers(testcase, rows: list[dict]):
 
 
 # ---------------------------------------------------------------------------
+# Phase 7e: bank position alerts
+# ---------------------------------------------------------------------------
+
+THRESHOLD_DOCTYPE = "Treasury Balance Threshold"
+RECIPIENT_DOCTYPE = "Treasury Alert Recipient"
+ALERT_LOG_DOCTYPE = "Treasury Alert Log"
+# The Treasury Settings every 7e test starts from (the shipped defaults).
+ALERT_SETTINGS = {
+	"balance_alert_horizon": 7,
+	"balance_digest_hour": 7,
+	"send_balance_digest": 1,
+	"send_balance_alerts": 1,
+	"balance_alert_notification": 1,
+	"balance_alert_email": 1,
+	"digest_zero_days": 1,
+}
+
+
+def ensure_alert_bank(currency: str = "EGP", name: str | None = None) -> frappe._dict:
+	"""A company bank account with a GL account (account type Bank) and PDC accounts of its own, plus its PDC
+	Accounts row (so cheques can be drawn on it): its balances belong to one test only. A random name unless
+	`name` is given. Returns {bank_account, account, currency, pdc_payable, pdc_receivable, under_collection}."""
+	name = name or f"Treasury Alert {currency} {frappe.generate_hash(length=6)}"
+	cur = None if currency == "EGP" else currency
+	account = ensure_account(f"{name} GL", "Bank Accounts", "Bank", cur)
+	bank = frappe._dict(
+		currency=currency,
+		account=account,
+		bank_gl=account,
+		bank_account=ensure_bank_account(name, account),
+		pdc_payable=ensure_account(f"{name} PDC Payable", "Current Liabilities", "Bank", cur),
+		pdc_receivable=ensure_account(f"{name} PDC Receivable", "Current Assets", "Bank", cur),
+		under_collection=ensure_account(f"{name} Under Collection", "Current Assets", "Bank", cur),
+		bank_charges=ensure_account("Treasury Bank Charges", "Indirect Expenses"),
+	)
+	if not frappe.db.exists(
+		"PDC Account Mapping", {"parenttype": "Treasury Company Settings", "bank_account": bank.bank_account}
+	):
+		# written directly: saving the settings would validate every other row (the thresholds included)
+		idx = frappe.db.count(
+			"PDC Account Mapping", {"parenttype": "Treasury Company Settings", "parent": COMPANY}
+		)
+		frappe.get_doc(
+			{
+				"doctype": "PDC Account Mapping",
+				"name": frappe.generate_hash(length=10),
+				"parenttype": "Treasury Company Settings",
+				"parentfield": "pdc_accounts",
+				"parent": COMPANY,
+				"idx": idx + 1,
+				**mapping_row(bank),
+			}
+		).db_insert()
+	return bank
+
+
+def fund_bank(bank: frappe._dict, amount: float, date, rate: float = 1.0) -> str:
+	"""Money on the bank GL on `date` (amount in the bank currency), against Sales: a submitted Journal Entry."""
+	je = frappe.get_doc(
+		{
+			"doctype": "Journal Entry",
+			"company": COMPANY,
+			"posting_date": getdate(date),
+			"multi_currency": 1 if bank.currency != "EGP" else 0,
+			"accounts": [
+				{"account": bank.account, "debit_in_account_currency": amount, "exchange_rate": rate},
+				{
+					"account": acc("Sales"),
+					"cost_center": acc("Main"),
+					"credit_in_account_currency": flt(amount * rate, 2),
+					"exchange_rate": 1,
+				},
+			],
+		}
+	)
+	je.insert(ignore_permissions=True)
+	je.submit()
+	return je.name
+
+
+def set_thresholds(testcase, rows: list[dict]):
+	"""Replace the Balance Thresholds of the test company for the current test (restored by a cleanup).
+	Rows: {bank_account, warning_balance, minimum_balance}; the currency is taken from the GL account.
+	Written straight to the table (the validation has tests of its own)."""
+	previous = [dict(row) for row in _child_rows(THRESHOLD_DOCTYPE, "balance_thresholds")]
+	values = []
+	for row in rows:
+		gl_account = frappe.db.get_value("Bank Account", row["bank_account"], "account")
+		values.append({"currency": frappe.get_cached_value("Account", gl_account, "account_currency"), **row})
+	_write_child_rows(THRESHOLD_DOCTYPE, "balance_thresholds", values)
+	testcase.addCleanup(_write_child_rows, THRESHOLD_DOCTYPE, "balance_thresholds", previous)
+
+
+def set_alert_settings(testcase, **values):
+	"""Treasury Settings values for the current test (restored by a cleanup; a value never stored before is
+	removed again). Without values: ALERT_SETTINGS."""
+	from treasury.utils.settings import stored_single_value
+
+	values = values or ALERT_SETTINGS
+	for fieldname, value in values.items():
+		previous = stored_single_value("Treasury Settings", fieldname)
+		frappe.db.set_single_value("Treasury Settings", fieldname, value)
+		testcase.addCleanup(_restore_single, fieldname, previous)
+	frappe.clear_document_cache("Treasury Settings", "Treasury Settings")
+
+
+def _restore_single(fieldname: str, value):
+	if value is None:
+		frappe.db.delete("Singles", {"doctype": "Treasury Settings", "field": fieldname})
+	else:
+		frappe.db.set_single_value("Treasury Settings", fieldname, value)
+	frappe.clear_document_cache("Treasury Settings", "Treasury Settings")
+
+
+def _recipient_rows() -> list[dict]:
+	return frappe.get_all(
+		RECIPIENT_DOCTYPE,
+		filters={"parenttype": "Treasury Settings", "parent": "Treasury Settings"},
+		fields=["recipient_type", "role", "user"],
+		order_by="idx asc",
+	)
+
+
+def _write_recipient_rows(rows: list[dict]):
+	frappe.db.delete(RECIPIENT_DOCTYPE, {"parenttype": "Treasury Settings", "parent": "Treasury Settings"})
+	for idx, row in enumerate(rows, 1):
+		frappe.get_doc(
+			{
+				"doctype": RECIPIENT_DOCTYPE,
+				"name": frappe.generate_hash(length=10),
+				"parenttype": "Treasury Settings",
+				"parentfield": "balance_alert_recipients",
+				"parent": "Treasury Settings",
+				"idx": idx,
+				"recipient_type": "User" if row.get("user") else "Role",
+				**row,
+			}
+		).db_insert()
+
+
+def set_recipients(testcase, rows: list[dict]):
+	"""Replace Treasury Settings → Recipients for the current test (restored by a cleanup). Rows: {"user": u}
+	or {"role": r}."""
+	previous = [dict(row) for row in _recipient_rows()]
+	_write_recipient_rows(rows)
+	testcase.addCleanup(_write_recipient_rows, previous)
+
+
+def alert_logs(**filters) -> list[frappe._dict]:
+	"""Treasury Alert Logs matching `filters`, oldest first."""
+	return frappe.get_all(
+		ALERT_LOG_DOCTYPE,
+		filters=filters,
+		fields=[
+			"name",
+			"alert_type",
+			"level",
+			"company",
+			"bank_account",
+			"alert_date",
+			"projected_date",
+			"balance",
+			"threshold",
+			"is_escalation",
+			"user",
+			"recipients",
+			"notified",
+			"emailed",
+			"reference_doctype",
+			"reference_name",
+			"subject",
+		],
+		order_by="creation asc, projected_date asc",
+	)
+
+
+def make_alert_fixture_e1(testcase) -> frappe._dict:
+	"""Spec 7e §4, E1: an EGP bank of its own, days T .. T+6 (T = real today), warning 50,000 / minimum 20,000.
+
+	Opening (GL up to T-1) 100,000 = 60,000 funded on T-2 + a 40,000 drawdown on T-1; no GL movement today.
+	T+1 outgoing cheque C1 30,000 delivered; T+2 incoming cheque C2 10,000 received; T+3 Scheduled transfer TR1
+	50,000 + fee 20; T+5 the drawdown's single installment 40,000 (interest 0).
+	Closings: T 100,000 · T+1 70,000 · T+2 80,000 · T+3 29,980 (Warning) · T+4 29,980 · T+5 -10,020 (Critical)
+	· T+6 -10,020. The thresholds are set last (the fixture itself is not checked)."""
+	t0 = today_date()
+	bank = ensure_alert_bank()
+	fund_bank(bank, 60000, add_days(t0, -2))
+	facility = make_bank_facility(
+		bank_account=bank.bank_account,
+		start_date=add_days(t0, -30),
+		expiry_date=add_days(t0, 365),
+		limits=[{"limit_type": "Short Term Loan", "limit_amount": 1_000_000, "interest_rate": 0}],
+	)
+	drawdown = make_drawdown(
+		facility,
+		amount=40000,
+		drawdown_date=add_days(t0, -1),
+		tenor_months=1,
+		frequency="Bullet",
+		method="Bullet",
+		first_repayment_date=add_days(t0, 5),
+	)
+	c1 = make_pdc_cheque(amount=30000, issue_date=t0, due_date=add_days(t0, 1), bank_account=bank.bank_account)
+	c1.deliver(handover_date=t0)
+	c2 = make_pdc_cheque(
+		"Incoming", amount=10000, issue_date=t0, due_date=add_days(t0, 2), bank_account=bank.bank_account
+	)
+	c2.receive(receipt_date=t0)
+	set_fee_rules(testcase, [fee_rule(bank.bank_account, "Normal", fixed_fee=20)])
+	tr1 = make_bank_transfer(amount=50000, bank_account=bank.bank_account, execution_date=add_days(t0, 3))
+	set_thresholds(
+		testcase, [{"bank_account": bank.bank_account, "warning_balance": 50000, "minimum_balance": 20000}]
+	)
+	return frappe._dict(
+		bank=bank,
+		bank_account=bank.bank_account,
+		today=t0,
+		facility=facility.name,
+		drawdown=drawdown.name,
+		c1=c1.name,
+		c2=c2.name,
+		tr1=tr1.name,
+	)
+
+
+def today_date():
+	return getdate(today())
+
+
+class BalanceAlertTestMixin(TreasuryTestMixin):
+	"""Phase 7e test classes: dates relative to the real today; every test starts from the shipped alert
+	settings, no thresholds, no recipients and On Low Projected Balance = Warn; `frappe.enqueue` is replaced by
+	a mock (`self.enqueue`), so the event trigger is recorded, not queued."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		for offset in (-35, 0, 40, 400):
+			ensure_fiscal_year(COMPANY, add_days(today(), offset))
+
+	def setUp(self):
+		from unittest.mock import patch
+
+		super().setUp()
+		self.use_company_settings(**DEFAULT_PDC_SETTINGS, **TRANSFER_SETTINGS, on_low_balance="Warn")
+		set_alert_settings(self)
+		set_thresholds(self, [])
+		set_recipients(self, [])
+		enqueue = patch("frappe.enqueue")
+		self.enqueue = enqueue.start()
+		self.addCleanup(enqueue.stop)
+		self.today = today_date()
+
+	def day(self, offset: int):
+		"""The real today + `offset` days."""
+		return getdate(add_days(self.today, offset))
+
+	def balance_jobs(self) -> list:
+		"""The event-trigger calls recorded on the `frappe.enqueue` mock."""
+		return [
+			c
+			for c in self.enqueue.call_args_list
+			if c.args and c.args[0] == "treasury.balance_alerts.scheduler.evaluate_company"
+		]
+
+
+# ---------------------------------------------------------------------------
 # Assertions / queries
 # ---------------------------------------------------------------------------
 

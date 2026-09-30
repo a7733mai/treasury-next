@@ -219,8 +219,12 @@ def encash(
 	bank_account: str | None = None,
 	references=None,
 	remarks: str | None = None,
+	allow_low_balance=0,
 ) -> dict:
 	"""Convert the security cheque into a PDC Cheque — the only way it reaches the accounts.
+
+	An outgoing encashment delivers the PDC Cheque through `pdc_lifecycle.deliver`, whose low balance guard
+	applies (`allow_low_balance`: a Treasury Manager's override); a Block rolls the encashment back.
 
 	Incoming (we present the party's cheque): a PDC Cheque (Incoming) to be deposited to `bank_account`, received
 	on the encashment date, so it is posted to the party per Treasury Company Settings. `references` (invoices /
@@ -258,7 +262,7 @@ def encash(
 		if doc.direction == INCOMING:
 			pdc_lifecycle.receive(cheque.name, date, remarks)
 		else:
-			pdc_lifecycle.deliver(cheque.name, date, remarks)
+			pdc_lifecycle.deliver(cheque.name, date, remarks, allow_low_balance)
 	except Exception:
 		frappe.db.rollback(save_point=ENCASH_SAVEPOINT)
 		raise
