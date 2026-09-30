@@ -8698,3 +8698,184 @@ msgstr "المفوض بالتوقيع"
 msgctxt "Bank Transfer Order"
 msgid "Print Date"
 msgstr "تاريخ الطباعة"
+
+# Phase 7c — pay / receive from any ERPNext screen, document connections
+msgctxt "Treasury Company Settings"
+msgid "Pay / Receive from Documents"
+msgstr "الدفع / التحصيل من المستندات"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Bank (Outgoing Cheques)"
+msgstr "البنك الافتراضي (الشيكات الصادرة)"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Deposit Bank (Incoming Cheques)"
+msgstr "بنك الإيداع الافتراضي (الشيكات الواردة)"
+
+msgctxt "Treasury Company Settings"
+msgid "Use the Bank's Active Cheque Book"
+msgstr "استخدام دفتر الشيكات النشط للبنك"
+
+msgctxt "Treasury Company Settings"
+msgid "Installment Cheques (Count)"
+msgstr "شيكات الأقساط (العدد)"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Installment Frequency"
+msgstr "تكرار الأقساط الافتراضي"
+
+msgctxt "Treasury Company Settings"
+msgid "Tender Bond %"
+msgstr "نسبة التأمين الابتدائي %"
+
+msgctxt "Treasury Company Settings"
+msgid "Monthly"
+msgstr "شهري"
+
+msgctxt "Treasury Company Settings"
+msgid "Quarterly"
+msgstr "ربع سنوي"
+
+msgctxt "Treasury Company Settings"
+msgid "Yearly"
+msgstr "سنوي"
+
+msgctxt "Treasury Company Settings"
+msgid "Weekly"
+msgstr "أسبوعي"
+
+msgid "Cheques and installment cheques created from invoices, orders and parties."
+msgstr "الشيكات وشيكات الأقساط المنشأة من الفواتير والأوامر والأطراف."
+
+msgid "Optional."
+msgstr "اختياري."
+
+msgid "Outgoing cheques take the next leaf of the oldest active cheque book of the bank."
+msgstr "تأخذ الشيكات الصادرة الورقة التالية من أقدم دفتر شيكات نشط للبنك."
+
+msgid "Security cheques created from a quotation: this % of its grand total. 0 = enter the amount."
+msgstr "شيكات الضمان المنشأة من عرض سعر: هذه النسبة % من إجماليه. 0 = إدخال المبلغ يدويًا."
+
+msgctxt "Cheque Batch"
+msgid "Created From Type"
+msgstr "نوع المستند المصدر"
+
+msgctxt "Cheque Batch"
+msgid "Created From"
+msgstr "أُنشئت من"
+
+msgid "Generate Cheques allocates the cheques to this document."
+msgstr "يخصص زر إنشاء الشيكات الشيكات لهذا المستند."
+
+msgid "{0} cannot be created from {1}."
+msgstr "لا يمكن إنشاء {0} من {1}."
+
+msgid "{0} needs the HRMS app."
+msgstr "{0} يتطلب تطبيق الموارد البشرية (HRMS)."
+
+msgid "{0} {1} is a return; settle it from ERPNext."
+msgstr "{0} {1} مرتجع؛ قم بتسويته من ERPNext."
+
+msgid "{0} {1} is on hold."
+msgstr "{0} {1} موقوف مؤقتًا."
+
+msgid "{0} {1} is {2}."
+msgstr "{0} {1} حالته {2}."
+
+msgid "{0} {1} is fully billed: pay its invoices instead."
+msgstr "{0} {1} مفوتر بالكامل: ادفع فواتيره بدلًا منه."
+
+msgid "{0} {1} is already covered by open cheques or scheduled transfers."
+msgstr "{0} {1} مغطى بالفعل بشيكات مفتوحة أو تحويلات مجدولة."
+
+msgid "{0} {1} uses account {2}, but Treasury settles {3} {4} on account {5}. Settle it from ERPNext."
+msgstr "{0} {1} يستخدم الحساب {2}، بينما تسوي الخزينة {3} {4} على الحساب {5}. قم بتسويته من ERPNext."
+
+msgid "This HRMS version does not accept {0} as a Payment Entry reference; pay it from HRMS."
+msgstr "إصدار الموارد البشرية هذا لا يقبل {0} كمرجع في قيد الدفع؛ ادفعه من الموارد البشرية."
+
+msgid "{0} cannot be read with this HRMS version."
+msgstr "لا يمكن قراءة {0} مع إصدار الموارد البشرية هذا."
+
+msgid "Journal Entry {0} has no open party to settle."
+msgstr "قيد اليومية {0} ليس به طرف مفتوح للتسوية."
+
+msgid "Journal Entry {0} has several open parties: choose one."
+msgstr "قيد اليومية {0} به عدة أطراف مفتوحة: اختر أحدها."
+
+msgid "{0} {1} is not an open party of Journal Entry {2}."
+msgstr "{0} {1} ليس طرفًا مفتوحًا في قيد اليومية {2}."
+
+msgid "You are not permitted to create {0} for company {1}."
+msgstr "غير مسموح لك بإنشاء {0} للشركة {1}."
+
+msgid "{0} {1} is cancelled."
+msgstr "{0} {1} ملغى."
+
+msgid "{0} cannot be a Cheque Batch source."
+msgstr "لا يمكن أن يكون {0} مصدرًا لدفعة شيكات."
+
+msgid "{0} {1} does not belong to {2} {3}."
+msgstr "{0} {1} لا يخص {2} {3}."
+
+msgid "{0} {1} needs a row in PDC Accounts."
+msgstr "{0} {1} يحتاج إلى صف في حسابات الشيكات الآجلة."
+
+msgid "Installment Cheques (Count) must be between 1 and {0}."
+msgstr "يجب أن يكون عدد شيكات الأقساط بين 1 و {0}."
+
+msgid "Tender Bond % must be between 0 and 100."
+msgstr "يجب أن تكون نسبة التأمين الابتدائي بين 0 و 100."
+
+msgid "Allocate the cheques by hand: the batch currency differs from the party account currency."
+msgstr "خصص الشيكات يدويًا: عملة الدفعة تختلف عن عملة حساب الطرف."
+
+msgid "Tender bond for {0} {1}"
+msgstr "تأمين ابتدائي عن {0} {1}"
+
+msgid "Guarantee for {0} {1}"
+msgstr "ضمان عن {0} {1}"
+
+msgctxt "Treasury"
+msgid "Accounting"
+msgstr "المحاسبة"
+
+msgid "Drawdowns"
+msgstr "السحوبات"
+
+msgid "Instruments"
+msgstr "الأدوات البنكية"
+
+msgid "Facility"
+msgstr "التسهيل"
+
+msgid "Pay by Cheque"
+msgstr "الدفع بشيك"
+
+msgid "Receive by Cheque"
+msgstr "التحصيل بشيك"
+
+msgctxt "Treasury"
+msgid "Cheque"
+msgstr "شيك"
+
+msgid "Fawran"
+msgstr "فوران"
+
+msgid "Installment Cheques"
+msgstr "شيكات أقساط"
+
+msgid "Security Cheque (Tender Bond)"
+msgstr "شيك ضمان (تأمين ابتدائي)"
+
+msgid "This Journal Entry has no open party to settle."
+msgstr "قيد اليومية هذا ليس به طرف مفتوح للتسوية."
+
+msgid "Choose the party"
+msgstr "اختر الطرف"
+
+msgid "Allocated to {0}: {1}"
+msgstr "تم التخصيص إلى {0}: {1}"
+
+msgid "You have unsaved changes in this form. Please save before you continue."
+msgstr "لديك تغييرات غير محفوظة في هذا النموذج. يرجى الحفظ قبل المتابعة."

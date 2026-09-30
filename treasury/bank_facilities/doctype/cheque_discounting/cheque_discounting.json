@@ -315,13 +315,8 @@
   }
  ],
  "is_submittable": 1,
- "links": [
-  {
-   "link_doctype": "PDC Cheque",
-   "link_fieldname": "cheque_discounting"
-  }
- ],
- "modified": "2026-09-29 18:00:00.000000",
+ "links": [],
+ "modified": "2026-10-01 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Cheque Discounting",

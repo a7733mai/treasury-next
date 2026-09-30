@@ -531,6 +531,44 @@ Reports: **Bank Transfer Register** and **Transfer Fees Analysis** (per month, b
 with a chart). Scheduled transfers are expected flows of the Bank Position Forecast; Sent ones not yet
 confirmed show as a summary card (they are in the GL already).
 
+#### Pay or receive from any screen
+
+A **Treasury** button group on Sales / Purchase Invoice, Sales / Purchase Order, Journal Entry, Customer,
+Supplier, Employee, Quotation, Supplier Quotation and (with HRMS) Expense Claim / Employee Advance opens a new,
+**unsaved** Treasury document prepared from the one on screen: *Pay / Receive by Cheque* (PDC Cheque),
+*Bank Transfer*, *Fawran*, *Installment Cheques* (Cheque Batch) and *Security Cheque* (a tender bond on a
+quotation). Nothing is written until the user saves it, through the normal validations; the buttons are hints
+only (the server checks the permissions and the document again).
+
+- **Amount**: what is still outstanding on the invoice / order / Journal Entry / Expense Claim, less what open
+  (not posted) cheques and Scheduled transfers already allocate to it, allocated to it as a reference. A
+  document already covered is refused, and so are returns, invoices on hold, closed / on hold / completed or
+  fully billed orders. A party master opens an empty document (advance).
+- **Bank and cheque book** (*Treasury Company Settings → Pay / Receive from Documents*): the default bank of
+  the direction when it can settle the party's currency, else the first *PDC Accounts* bank in the party's
+  currency (outgoing: else the only mapped bank); with *Use the Bank's Active Cheque Book* an outgoing cheque
+  takes the next leaf of the bank's oldest active cheque book **when it is saved**. So an outgoing cheque from
+  an invoice needs no typing at all, an incoming one only its cheque number.
+- **Installment Cheques**: count and frequency from the settings, the outstanding split evenly. The batch
+  remembers the document it was created from (*Created From*) and **Generate Cheques** allocates the cheques
+  to it, earliest due first (the rest stays an advance; a batch in another currency than the party account is
+  allocated by hand).
+- **Journal Entry**: one of its open parties (asked when there are several). **Expense Claim / Employee
+  Advance**: only where HRMS is installed and its Payment Entry accepts them as references.
+- **Tender bond**: *Tender Bond %* of the quotation's grand total (0 = enter the amount); a quotation to a
+  Lead becomes a security cheque of party type *Other*. Security cheques never post.
+- Treasury always settles on the party's **default** party account: a Journal Entry row, Expense Claim or
+  Employee Advance booked on another account (e.g. an employee advance account) is refused ("Settle it from
+  ERPNext"). With *Book Advance Payments in Separate Party Account*, order advances are posted as in 1.0 (on
+  the default party account).
+
+**Connections**: those documents (and Payment Entry, Journal Entry, Bank Account) show a *Treasury* group in
+their Connections with the cheques, batches, transfers, security cheques (and on a Bank Account the facility
+documents) linked to them; the Treasury documents show their vouchers (*Accounting*) and each other (facility
+↔ drawdown ↔ repayment, facility ↔ security cheque, discounting ↔ cheques). Counts of references and vouchers
+have no document type filter (names are unique per series); an incoming transfer's target bank is not counted
+on the Bank Account.
+
 ### Reports and workspace
 
 The **Treasury** workspace (sidebar + desktop icon; shown to Treasury Manager / User, Accounts Manager /
@@ -616,6 +654,10 @@ set up, by email, listing only the documents each recipient may read.
   projected balance negative. No customer / supplier portal.
 - **Cheque Batch**: party cheques only; one reference per row; FIFO needs the party account in the cheque
   currency; at most 120 cheques per batch; the batch link on a cheque is set only by the batch.
+- **Pay / receive from documents**: installments are not prefilled from an invoice's Payment Schedule; an
+  Employee Advance booked on an advance account cannot be paid from Treasury (no custom party account yet);
+  a supplier on payment hold is refused by ERPNext only when the cheque is posted; a tender bond is not
+  re-linked when its Lead becomes a Customer.
 - **Security Cheques**: encashing against a claim or penalty income account by Journal Entry is not
   implemented (an encashment settles the party's invoices or stays an advance); encashment for Other
   parties, alerts before the end of the linked contract, an approval workflow for Open / Blank

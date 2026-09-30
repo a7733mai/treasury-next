@@ -5,7 +5,10 @@ Transfer): which reference types a direction and party allow, and the validation
 import erpnext
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Sum
 from frappe.utils import flt
+
+from treasury.utils import hrms
 
 
 def reference_rules(direction: str | None, party_type: str | None) -> dict:
@@ -18,7 +21,33 @@ def reference_rules(direction: str | None, party_type: str | None) -> dict:
 		return {"Purchase Invoice": "supplier", "Purchase Order": "supplier", "Journal Entry": None}
 	if (direction, party_type) == ("Incoming", "Customer"):
 		return {"Sales Invoice": "customer", "Sales Order": "customer", "Journal Entry": None}
+	if (direction, party_type) == ("Outgoing", "Employee"):
+		# Expense Claims / Employee Advances only where the Payment Entry class accepts them (hrms)
+		return {"Journal Entry": None, **{d: "employee" for d in hrms.supported_reference_doctypes()}}
 	return {"Journal Entry": None}
+
+
+def scheduled_transfer_amounts(reference_doctype: str, names: list[str]) -> dict:
+	"""{reference name: amount} allocated by submitted Bank Transfers still Scheduled (not posted yet)."""
+	if not names:
+		return {}
+	ref = frappe.qb.DocType("PDC Cheque Reference")
+	transfer = frappe.qb.DocType("Bank Transfer")
+	rows = (
+		frappe.qb.from_(ref)
+		.join(transfer)
+		.on(ref.parent == transfer.name)
+		.select(ref.reference_name, Sum(ref.allocated_amount))
+		.where(
+			(ref.parenttype == "Bank Transfer")
+			& (ref.reference_doctype == reference_doctype)
+			& (ref.reference_name.isin(names))
+			& (transfer.docstatus == 1)
+			& (transfer.status == "Scheduled")
+		)
+		.groupby(ref.reference_name)
+	).run()
+	return {name: flt(amount) for name, amount in rows}
 
 
 def allocation_precision() -> int:

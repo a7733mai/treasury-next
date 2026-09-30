@@ -31,6 +31,7 @@ from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
 from frappe.utils import cint, flt, getdate
 
+from treasury.utils import hrms
 from treasury.utils.context import elevated, real_user
 
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
@@ -819,6 +820,9 @@ def _get_reference_outstanding(
 	doctype: str, name: str, party_type: str, party: str, party_currency: str, precision: int
 ) -> float:
 	"""Outstanding of a reference document in the party account currency (0 if not submitted)."""
+	if doctype in hrms.HRMS_DOCTYPES and doctype in hrms.supported_reference_doctypes():
+		# Expense Claim / Employee Advance: only where the Payment Entry class accepts them (hrms)
+		return hrms.outstanding(doctype, name, party_currency)
 	if doctype not in REFERENCE_DOCTYPES:
 		frappe.throw(_("Reference type {0} is not supported.").format(_(doctype)))
 	if frappe.db.get_value(doctype, name, "docstatus") != 1:
@@ -843,6 +847,11 @@ def _get_order_outstanding(doctype: str, name: str, party_currency: str) -> floa
 	else:
 		total = flt(order.base_rounded_total) or flt(order.base_grand_total)
 	return total - flt(order.advance_paid)
+
+
+def get_ledger_outstanding(voucher_type: str, voucher_no: str, party_type: str, party: str) -> float:
+	"""Open amount (party account currency) of a voucher for a party, from the Payment Ledger."""
+	return _get_ledger_outstanding(voucher_type, voucher_no, party_type, party)
 
 
 def _get_ledger_outstanding(voucher_type: str, voucher_no: str, party_type: str, party: str) -> float:

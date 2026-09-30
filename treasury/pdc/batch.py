@@ -209,7 +209,80 @@ def generate_rows(batch) -> dict:
 	result = {"rows": count, "total_amount": batch.total_amount}
 	if uses_book:
 		result["cheque_numbers"] = preview_leaves(batch.cheque_book, count)
+	if batch.get("source_name") and batch.allocation_method == MANUAL:
+		result["allocated"] = allocate_to_source(batch)
 	return result
+
+
+# ---------------------------------------------------------------------------
+# Source ("Created From")
+# ---------------------------------------------------------------------------
+
+
+def validate_source(batch):
+	"""The document a batch was created from: a submitted invoice / order / Journal Entry / hrms document of
+	the batch's company and party. Returns it (None without a source); a half-set pair is cleared."""
+	from treasury.utils import source_documents
+
+	if not (batch.get("source_doctype") and batch.get("source_name")):
+		batch.source_doctype = batch.source_name = None
+		return None
+	doctype, name = batch.source_doctype, batch.source_name
+	if doctype not in source_documents.REFERENCE_SOURCES:
+		frappe.throw(_("{0} cannot be a Cheque Batch source.").format(_(doctype)))
+	values = frappe.db.get_value(doctype, name, ["docstatus", "company"], as_dict=True)
+	if (
+		not values
+		or values.docstatus != 1
+		or values.company != batch.company
+		or not source_documents.source_party(doctype, name, batch.party_type, batch.party)
+	):
+		frappe.throw(
+			_("{0} {1} does not belong to {2} {3}.").format(
+				_(doctype), frappe.bold(name), _(batch.party_type or "-"), frappe.bold(batch.party or "-")
+			)
+		)
+	return frappe.get_doc(doctype, name)
+
+
+def allocate_to_source(batch) -> float:
+	"""Allocate the rows to the batch's source, earliest due first, up to what is left of it (party account
+	currency); the rows after that stay unallocated (an advance). Returns the total allocated."""
+	from treasury.utils import source_documents
+
+	source = validate_source(batch)
+	if not source:
+		return 0
+	header = transient_cheque(batch)
+	header.set_currency_and_rate()  # the batch may not be saved yet
+	batch.currency = header.currency
+	party_currency = get_account_currency(
+		posting.get_party_account(batch.party_type, batch.party, batch.company)
+	)
+	for row in batch.cheques:
+		row.reference_doctype = row.reference_name = None
+		row.allocated_amount = 0
+	if party_currency != batch.currency:
+		frappe.msgprint(
+			_("Allocate the cheques by hand: the batch currency differs from the party account currency."),
+			title=_("Not Allocated"),
+			indicator="orange",
+		)
+		return 0
+	precision = _precision("PDC Cheque Reference", "allocated_amount")
+	info = frappe._dict(party_type=batch.party_type, party=batch.party)
+	remaining = source_documents.available_outstanding(
+		source, info, party_currency, precision, exclude_batch=batch.name
+	)
+	allocated = 0.0
+	for row in sorted(batch.cheques, key=lambda r: (getdate(r.due_date), r.idx)):
+		take = flt(min(flt(row.amount, precision), remaining), precision)
+		if take <= 0:
+			break
+		row.reference_doctype, row.reference_name, row.allocated_amount = source.doctype, source.name, take
+		remaining = flt(remaining - take, precision)
+		allocated = flt(allocated + take, precision)
+	return allocated
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +317,7 @@ def validate_batch(batch):
 	header = transient_cheque(batch)
 	header.validate_party()
 	batch.party_name = header.party_name
+	validate_source(batch)
 	header.validate_bank_account()
 	# the defaults every cheque of the batch will get, shown on the batch (the ones that came with a previous
 	# bank / party of the draft are dropped first)

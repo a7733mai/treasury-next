@@ -189,6 +189,15 @@ frappe.ui.form.on("Cheque Batch", {
 							indicator: "blue",
 						});
 					}
+					if (r.message && r.message.allocated !== undefined && frm.doc.source_name) {
+						frappe.show_alert({
+							message: __("Allocated to {0}: {1}", [
+								frm.doc.source_name,
+								format_currency(r.message.allocated, frm.doc.currency),
+							]),
+							indicator: r.message.allocated ? "green" : "orange",
+						});
+					}
 				});
 			if ((frm.doc.cheques || []).length) {
 				frappe.confirm(__("Replace the {0} existing rows?", [frm.doc.cheques.length]), generate);

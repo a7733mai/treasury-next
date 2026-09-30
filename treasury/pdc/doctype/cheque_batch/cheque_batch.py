@@ -61,6 +61,8 @@ class ChequeBatch(Document):
 		project: DF.Link | None
 		purpose: DF.Literal["", "Rent", "Installments", "Supplier Settlement", "Customer Settlement", "Other"]
 		remarks: DF.SmallText | None
+		source_doctype: DF.Link | None
+		source_name: DF.DynamicLink | None
 		status: DF.Literal[
 			"Draft",
 			"Submitted",

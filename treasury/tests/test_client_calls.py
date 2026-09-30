@@ -18,6 +18,9 @@ APP_PATH = Path(frappe.get_app_path("treasury"))
 CALL_START = re.compile(r"frm\.call\(\s*\{")
 LITERAL_METHOD = re.compile(r"""method:\s*["']([a-z_]+)["']""")
 ACTION_HELPER = re.compile(r"""_action\(\s*frm\s*,\s*["']([a-z_]+)["']""")
+# dotted server paths called by the plain scripts of public/js
+DOTTED_METHOD = re.compile(r"""method:\s*["'](treasury(?:\.\w+)+)["']""")
+XCALL_METHOD = re.compile(r"""frappe\.xcall\(\s*["'](treasury(?:\.\w+)+)["']""")
 
 
 def form_scripts():
@@ -73,6 +76,34 @@ class TestClientCalls(UnitTestCase):
 		self.assertEqual(missing, [])
 		self.assertGreater(checked, 20)  # the scan really sees the action buttons
 
+	def test_public_scripts_call_whitelisted_paths(self):
+		"""Phase 7c: the plain scripts of public/js (loaded by `doctype_js`) call existing whitelisted methods."""
+		missing, checked = [], 0
+		for path in sorted((APP_PATH / "public" / "js").glob("*.js")):
+			source = path.read_text(encoding="utf-8")
+			for pattern in (DOTTED_METHOD, XCALL_METHOD):
+				for dotted in pattern.findall(source):
+					checked += 1
+					try:
+						method = frappe.get_attr(dotted)
+					except Exception:
+						method = None
+					if not method or method not in frappe.whitelisted:
+						missing.append(f"{path.name}: {dotted}")
+		self.assertEqual(missing, [])
+		self.assertGreaterEqual(checked, 5)
+
+	def test_doctype_js_files_exist(self):
+		"""Every `doctype_js` hook path (a string or a list of them) is a file of the app."""
+		missing, checked = [], 0
+		for doctype, paths in frappe.get_hooks("doctype_js", app_name="treasury").items():
+			for path in paths if isinstance(paths, list | tuple) else [paths]:
+				checked += 1
+				if not (APP_PATH / path).is_file():
+					missing.append(f"{doctype}: {path}")
+		self.assertEqual(missing, [])
+		self.assertGreater(checked, 10)
+
 	def test_state_changing_methods_reject_get(self):
 		"""The Phase 7a actions change data: POST only (Frappe checks the CSRF token only on POST)."""
 		from types import SimpleNamespace
@@ -117,10 +148,22 @@ class TestClientCalls(UnitTestCase):
 		from frappe.handler import is_valid_http_method
 
 		from treasury.bank_transfers.api import get_fee_preview, get_transfer_settings, make_bank_transfer
+		from treasury.pdc.api import make_cheque_batch, make_pdc_cheque
+		from treasury.security_cheques.api import make_security_cheque
+		from treasury.utils.source_documents import get_journal_parties
 
 		previous = getattr(frappe.local, "request", None)
 		try:
-			for method in (make_bank_transfer, get_fee_preview, get_transfer_settings):
+			for method in (
+				make_bank_transfer,
+				get_fee_preview,
+				get_transfer_settings,
+				# Phase 7c mappers: they return an unsaved document, like frappe.model.mapper.make_mapped_doc
+				make_pdc_cheque,
+				make_cheque_batch,
+				make_security_cheque,
+				get_journal_parties,
+			):
 				with self.subTest(method=method.__qualname__):
 					self.assertIn(method, frappe.whitelisted)
 					frappe.local.request = SimpleNamespace(method="GET")

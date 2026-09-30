@@ -928,6 +928,226 @@ def make_sales_order(amount: float, transaction_date=None, customer: str = CUSTO
 
 
 # ---------------------------------------------------------------------------
+# Phase 7c: pay / receive from documents
+# ---------------------------------------------------------------------------
+
+LEAD_NAME = "_Test Treasury Lead"
+EXPENSE_CLAIM_TYPE = "_Test Treasury Travel"
+# The "Pay / Receive from Documents" settings every 7c test starts from (the shipped defaults, no default banks).
+DOCUMENT_SETTINGS = {
+	"default_outgoing_cheque_bank_account": None,
+	"default_incoming_cheque_bank_account": None,
+	"auto_select_cheque_book": 1,
+	"default_installment_count": 12,
+	"default_installment_frequency": "Monthly",
+	"tender_bond_percent": 0,
+}
+
+
+def settings_for_documents(**values) -> dict:
+	"""DOCUMENT_SETTINGS with `values` (for `use_company_settings`)."""
+	return {**DOCUMENT_SETTINGS, **values}
+
+
+def make_purchase_order(amount: float, transaction_date=None, supplier: str = SUPPLIER, submit: bool = True):
+	"""Purchase Order of one non-stock item, in the company currency."""
+	transaction_date = getdate(transaction_date or today())
+	po = frappe.get_doc(
+		{
+			"doctype": "Purchase Order",
+			"company": COMPANY,
+			"supplier": supplier,
+			"transaction_date": transaction_date,
+			"schedule_date": add_days(transaction_date, 30),
+			"currency": "EGP",
+			"conversion_rate": 1,
+			"buying_price_list": BUYING_PRICE_LIST,
+			"plc_conversion_rate": 1,
+			"ignore_pricing_rule": 1,
+			"items": [
+				{
+					"item_code": ITEM,
+					"qty": 1,
+					"rate": amount,
+					"schedule_date": add_days(transaction_date, 30),
+					"cost_center": acc("Main"),
+					"expense_account": acc("Cost of Goods Sold"),
+				}
+			],
+		}
+	)
+	po.insert(ignore_permissions=True)
+	if submit:
+		po.submit()
+	return po
+
+
+def ensure_lead() -> str:
+	existing = frappe.db.get_value("Lead", {"first_name": LEAD_NAME})
+	if existing:
+		return existing
+	return (
+		frappe.get_doc({"doctype": "Lead", "first_name": LEAD_NAME, "company_name": f"{LEAD_NAME} Co"})
+		.insert(ignore_permissions=True)
+		.name
+	)
+
+
+def make_quotation(amount: float, quotation_to: str = "Customer", submit: bool = False, valid_days: int = 30):
+	"""Quotation of one non-stock item to CUSTOMER or to the test Lead (draft unless `submit`)."""
+	party = CUSTOMER if quotation_to == "Customer" else ensure_lead()
+	date = getdate(today())
+	quotation = frappe.get_doc(
+		{
+			"doctype": "Quotation",
+			"company": COMPANY,
+			"quotation_to": quotation_to,
+			"party_name": party,
+			"order_type": "Sales",
+			"transaction_date": date,
+			"valid_till": add_days(date, valid_days),
+			"currency": "EGP",
+			"conversion_rate": 1,
+			"selling_price_list": SELLING_PRICE_LIST,
+			"plc_conversion_rate": 1,
+			"ignore_pricing_rule": 1,
+			"items": [{"item_code": ITEM, "qty": 1, "rate": amount}],
+		}
+	)
+	quotation.insert(ignore_permissions=True)
+	if submit:
+		quotation.submit()
+	return quotation
+
+
+def make_supplier_quotation(amount: float, supplier: str = SUPPLIER, submit: bool = False):
+	date = getdate(today())
+	quotation = frappe.get_doc(
+		{
+			"doctype": "Supplier Quotation",
+			"company": COMPANY,
+			"supplier": supplier,
+			"transaction_date": date,
+			"valid_till": add_days(date, 30),
+			"currency": "EGP",
+			"conversion_rate": 1,
+			"buying_price_list": BUYING_PRICE_LIST,
+			"plc_conversion_rate": 1,
+			"ignore_pricing_rule": 1,
+			"items": [{"item_code": ITEM, "qty": 1, "rate": amount, "uom": UOM, "conversion_factor": 1}],
+		}
+	)
+	quotation.insert(ignore_permissions=True)
+	if submit:
+		quotation.submit()
+	return quotation
+
+
+def make_party_journal_entry(
+	party_type: str,
+	party: str,
+	amount: float,
+	debit_account: str,
+	submit: bool = True,
+	party_account: str | None = None,
+	posting_date=None,
+):
+	"""A Journal Entry opening `amount` for a party against `debit_account` (the other row): a payable party is
+	credited (Dr `debit_account` / Cr party), a receivable party debited (Dr party / Cr `debit_account`)."""
+	receivable = frappe.get_cached_value("Party Type", party_type, "account_type") == "Receivable"
+	party_account = party_account or frappe.get_cached_value(
+		"Company", COMPANY, "default_receivable_account" if receivable else "default_payable_account"
+	)
+	party_side = "debit_in_account_currency" if receivable else "credit_in_account_currency"
+	other_side = "credit_in_account_currency" if receivable else "debit_in_account_currency"
+	je = frappe.get_doc(
+		{
+			"doctype": "Journal Entry",
+			"company": COMPANY,
+			"posting_date": getdate(posting_date or today()),
+			"accounts": [
+				{"account": debit_account, other_side: amount, "cost_center": acc("Main")},
+				{
+					"account": party_account,
+					"party_type": party_type,
+					"party": party,
+					party_side: amount,
+					"cost_center": acc("Main"),
+				},
+			],
+		}
+	)
+	je.insert(ignore_permissions=True)
+	if submit:
+		je.submit()
+	return je
+
+
+def hrms_installed() -> bool:
+	return "hrms" in frappe.get_installed_apps()
+
+
+def make_expense_claim(amount: float, employee: str | None = None, payable_account: str | None = None):
+	"""An approved, submitted Expense Claim of the test Employee (hrms only), booked on `payable_account`
+	(default: the company's default payable account, the Employee's default party account)."""
+	employee = employee or ensure_employee()
+	if not frappe.db.exists("Expense Claim Type", EXPENSE_CLAIM_TYPE):
+		frappe.get_doc(
+			{
+				"doctype": "Expense Claim Type",
+				"expense_type": EXPENSE_CLAIM_TYPE,
+				"accounts": [{"company": COMPANY, "default_account": acc("Cost of Goods Sold")}],
+			}
+		).insert(ignore_permissions=True)
+	claim = frappe.get_doc(
+		{
+			"doctype": "Expense Claim",
+			"company": COMPANY,
+			"employee": employee,
+			"posting_date": getdate(today()),
+			"approval_status": "Approved",
+			"currency": "EGP",
+			"payable_account": payable_account
+			or frappe.get_cached_value("Company", COMPANY, "default_payable_account"),
+			"cost_center": acc("Main"),
+			"expenses": [
+				{
+					"expense_date": getdate(today()),
+					"expense_type": EXPENSE_CLAIM_TYPE,
+					"amount": amount,
+					"sanctioned_amount": amount,
+					"cost_center": acc("Main"),
+				}
+			],
+		}
+	)
+	# an approver may be mandatory in HR Settings; the claim is approved already
+	claim.flags.ignore_mandatory = True
+	claim.insert(ignore_permissions=True)
+	claim.submit()
+	return claim
+
+
+def set_pdc_accounts(testcase, bank_accounts: list[str]):
+	"""Keep only the PDC Accounts rows of `bank_accounts` for the current test (restored by a cleanup)."""
+	previous = [dict(row) for row in _child_rows("PDC Account Mapping", "pdc_accounts")]
+	kept = [row for row in previous if row["bank_account"] in bank_accounts]
+	_write_child_rows("PDC Account Mapping", "pdc_accounts", kept)
+	testcase.addCleanup(_write_child_rows, "PDC Account Mapping", "pdc_accounts", previous)
+
+
+def isolate_cheque_books(testcase, bank_account: str):
+	"""Close the other active cheque books of `bank_account` for the current test (restored by a cleanup), so
+	`default_cheque_book` picks the one the test creates."""
+	books = frappe.get_all(
+		"Cheque Book", filters={"bank_account": bank_account, "status": "Active"}, pluck="name"
+	)
+	for name in books:
+		frappe.db.set_value("Cheque Book", name, "status", "Closed", update_modified=False)
+		testcase.addCleanup(frappe.db.set_value, "Cheque Book", name, "status", "Active", update_modified=False)
+
+
+# ---------------------------------------------------------------------------
 # Extra bank
 # ---------------------------------------------------------------------------
 

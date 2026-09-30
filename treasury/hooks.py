@@ -46,10 +46,23 @@ required_apps = ["erpnext"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# Plain files (no bundle): a "Managed by Treasury" intro and a link back to the source document.
+# Plain files (no bundle): a "Managed by Treasury" intro and a link back to the source document; the Treasury
+# buttons (pay / receive by cheque, bank transfer, installment cheques, security cheque) of the ERPNext and hrms
+# documents (hooks of doctypes absent without hrms are never loaded).
 doctype_js = {
 	"Payment Entry": "public/js/voucher_treasury_link.js",
-	"Journal Entry": "public/js/voucher_treasury_link.js",
+	"Journal Entry": ["public/js/voucher_treasury_link.js", "public/js/treasury_payment_buttons.js"],
+	"Sales Invoice": "public/js/treasury_payment_buttons.js",
+	"Purchase Invoice": "public/js/treasury_payment_buttons.js",
+	"Sales Order": "public/js/treasury_payment_buttons.js",
+	"Purchase Order": "public/js/treasury_payment_buttons.js",
+	"Quotation": "public/js/treasury_payment_buttons.js",
+	"Supplier Quotation": "public/js/treasury_payment_buttons.js",
+	"Customer": "public/js/treasury_payment_buttons.js",
+	"Supplier": "public/js/treasury_payment_buttons.js",
+	"Employee": "public/js/treasury_payment_buttons.js",
+	"Expense Claim": "public/js/treasury_payment_buttons.js",
+	"Employee Advance": "public/js/treasury_payment_buttons.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -255,9 +268,24 @@ treasury_facility_utilisation_sources = [
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "treasury.task.get_dashboard_data"
-# }
+# Connections: a "Treasury" group with the cheques, batches, transfers and security cheques of the document
+# (they only add to the dashboard: see treasury.overrides.dashboards).
+override_doctype_dashboards = {
+	"Sales Invoice": "treasury.overrides.dashboards.sales_invoice",
+	"Purchase Invoice": "treasury.overrides.dashboards.purchase_invoice",
+	"Sales Order": "treasury.overrides.dashboards.sales_order",
+	"Purchase Order": "treasury.overrides.dashboards.purchase_order",
+	"Payment Entry": "treasury.overrides.dashboards.payment_entry",
+	"Journal Entry": "treasury.overrides.dashboards.journal_entry",
+	"Customer": "treasury.overrides.dashboards.customer",
+	"Supplier": "treasury.overrides.dashboards.supplier",
+	"Employee": "treasury.overrides.dashboards.employee",
+	"Bank Account": "treasury.overrides.dashboards.bank_account",
+	"Quotation": "treasury.overrides.dashboards.quotation",
+	"Supplier Quotation": "treasury.overrides.dashboards.supplier_quotation",
+	"Expense Claim": "treasury.overrides.dashboards.expense_claim",
+	"Employee Advance": "treasury.overrides.dashboards.employee_advance",
+}
 
 # exempt linked doctypes from being automatically cancelled
 #

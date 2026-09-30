@@ -21,6 +21,8 @@ TRANSFER_DEFAULT_BANK_FIELDS = {
 }
 SWIFT = "SWIFT"
 INTERNATIONAL = "International"
+# Pay / receive from documents: the default bank of the cheques created from ERPNext documents.
+DOCUMENT_DEFAULT_BANK_FIELDS = ("default_outgoing_cheque_bank_account", "default_incoming_cheque_bank_account")
 
 # PDC accounts must be of type "Bank" so that Payment Entry accepts them as the bank side,
 # and must sit on the correct side of the balance sheet.
@@ -50,12 +52,19 @@ class TreasuryCompanySettings(Document):
 		)
 
 		accrue_facility_interest: DF.Check
+		auto_select_cheque_book: DF.Check
 		bank_settlement_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bounce_charges_account: DF.Link | None
 		company: DF.Link
 		default_charge_bearer: DF.Literal["OUR", "SHA", "BEN"]
 		default_fawran_bank_account: DF.Link | None
+		default_incoming_cheque_bank_account: DF.Link | None
+		default_installment_count: DF.Int
+		default_installment_frequency: DF.Literal[
+			"Monthly", "Every 2 Months", "Quarterly", "Semi-Annually", "Yearly", "Weekly"
+		]
 		default_normal_bank_account: DF.Link | None
+		default_outgoing_cheque_bank_account: DF.Link | None
 		default_swift_bank_account: DF.Link | None
 		default_transfer_method: DF.Literal["Normal", "Fawran", "SWIFT"]
 		incoming_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
@@ -68,6 +77,7 @@ class TreasuryCompanySettings(Document):
 		payment_modes: DF.Table[TreasuryPaymentModeMap]
 		pdc_accounts: DF.Table[PDCAccountMapping]
 		refund_fees_on_return: DF.Check
+		tender_bond_percent: DF.Percent
 		transfer_approval_threshold: DF.Currency
 		transfer_completion: DF.Literal["On Bank Confirmation", "On Send for Fawran", "On Send"]
 		transfer_fee_rules: DF.Table[BankTransferFeeRule]
@@ -110,6 +120,29 @@ class TreasuryCompanySettings(Document):
 		payment_modes.validate_name_template(self.mode_name_template)
 		self.validate_payment_modes()
 		self.validate_transfer_settings()
+		self.validate_document_settings()
+
+	# ------------------------------------------------------------------ pay / receive from documents
+
+	def validate_document_settings(self):
+		"""Default cheque banks (company banks with a PDC Accounts row), installment count, tender bond %."""
+		from treasury.pdc.batch import MAX_ROWS
+
+		mapped = {row.bank_account for row in self.get("pdc_accounts")}
+		for fieldname in DOCUMENT_DEFAULT_BANK_FIELDS:
+			bank_account = self.get(fieldname)
+			if not bank_account:
+				continue
+			label = _(self.meta.get_label(fieldname))
+			self.validate_bank_account(frappe._dict(idx=0, bank_account=bank_account), label)
+			if bank_account not in mapped:
+				frappe.throw(
+					_("{0} {1} needs a row in PDC Accounts.").format(label, frappe.bold(bank_account))
+				)
+		if not 1 <= cint(self.default_installment_count) <= MAX_ROWS:
+			frappe.throw(_("Installment Cheques (Count) must be between 1 and {0}.").format(MAX_ROWS))
+		if not 0 <= flt(self.tender_bond_percent) <= 100:
+			frappe.throw(_("Tender Bond % must be between 0 and 100."))
 
 	# ------------------------------------------------------------------ bank transfers
 

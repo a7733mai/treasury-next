@@ -58,6 +58,16 @@ frappe.ui.form.on("Treasury Company Settings", {
 		["default_normal_bank_account", "default_fawran_bank_account", "default_swift_bank_account"].forEach(
 			(fieldname) => frm.set_query(fieldname, company_bank)
 		);
+		// Pay / receive from documents: banks with a PDC Accounts row
+		["default_outgoing_cheque_bank_account", "default_incoming_cheque_bank_account"].forEach((fieldname) =>
+			frm.set_query(fieldname, () => ({
+				filters: {
+					company: frm.doc.company,
+					is_company_account: 1,
+					name: ["in", (frm.doc.pdc_accounts || []).map((row) => row.bank_account).filter(Boolean)],
+				},
+			}))
+		);
 		frm.set_query("bank_account", "transfer_fee_rules", company_bank);
 		frm.set_query("bank_account", "transfer_limits", company_bank);
 		frm.set_query("expense_account", "transfer_fee_rules", () => ({

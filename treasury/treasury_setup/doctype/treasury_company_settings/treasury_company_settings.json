@@ -44,6 +44,14 @@
   "transfer_fees_help",
   "transfer_limits_section",
   "transfer_limits",
+  "documents_section",
+  "default_outgoing_cheque_bank_account",
+  "default_incoming_cheque_bank_account",
+  "auto_select_cheque_book",
+  "column_break_documents",
+  "default_installment_count",
+  "default_installment_frequency",
+  "tender_bond_percent",
   "facilities_section",
   "accrue_facility_interest"
  ],
@@ -302,6 +310,57 @@
    "options": "Bank Transfer Limit"
   },
   {
+   "fieldname": "documents_section",
+   "fieldtype": "Section Break",
+   "label": "Pay / Receive from Documents"
+  },
+  {
+   "description": "Cheques and installment cheques created from invoices, orders and parties.",
+   "fieldname": "default_outgoing_cheque_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Bank (Outgoing Cheques)",
+   "options": "Bank Account"
+  },
+  {
+   "description": "Optional.",
+   "fieldname": "default_incoming_cheque_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Deposit Bank (Incoming Cheques)",
+   "options": "Bank Account"
+  },
+  {
+   "default": "1",
+   "description": "Outgoing cheques take the next leaf of the oldest active cheque book of the bank.",
+   "fieldname": "auto_select_cheque_book",
+   "fieldtype": "Check",
+   "label": "Use the Bank's Active Cheque Book"
+  },
+  {
+   "fieldname": "column_break_documents",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "12",
+   "fieldname": "default_installment_count",
+   "fieldtype": "Int",
+   "label": "Installment Cheques (Count)",
+   "non_negative": 1
+  },
+  {
+   "default": "Monthly",
+   "fieldname": "default_installment_frequency",
+   "fieldtype": "Select",
+   "label": "Default Installment Frequency",
+   "options": "Monthly\nEvery 2 Months\nQuarterly\nSemi-Annually\nYearly\nWeekly"
+  },
+  {
+   "default": "0",
+   "description": "Security cheques created from a quotation: this % of its grand total. 0 = enter the amount.",
+   "fieldname": "tender_bond_percent",
+   "fieldtype": "Percent",
+   "label": "Tender Bond %"
+  },
+  {
    "fieldname": "facilities_section",
    "fieldtype": "Section Break",
    "label": "Bank Facilities"
@@ -315,7 +374,7 @@
   }
  ],
  "links": [],
- "modified": "2026-09-30 18:00:00.000000",
+ "modified": "2026-10-01 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

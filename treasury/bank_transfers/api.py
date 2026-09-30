@@ -1,7 +1,8 @@
 """Bank Transfer helpers for the forms (read only: they never write).
 
-- `make_bank_transfer`: a new, unsaved Bank Transfer for an invoice, order or party (the buttons on the ERPNext
-  documents come in a later phase); the client opens it with `frappe.model.sync` + `set_route`.
+- `make_bank_transfer`: a new, unsaved Bank Transfer for an invoice, order, Journal Entry, hrms document or
+  party (the Treasury buttons of those forms, public/js/treasury_payment_buttons.js); the client opens it with
+  `frappe.model.sync` + `set_route`. Source rules: treasury.utils.source_documents.
 - `get_fee_preview`: the scope, the fee of the matching rule and the limit messages of a transfer being
   entered, for the fee preview of the form; also the bank currencies, the party's default bank details, the
   method limit and whether the transfer needs a Treasury Manager's approval (Treasury roles cannot read
@@ -20,46 +21,60 @@ from frappe import _
 from frappe.contacts.doctype.contact.contact import get_default_contact
 from frappe.utils import flt, getdate, today
 
-from treasury.accounting import dimensions, posting
+from treasury.accounting import posting
 from treasury.bank_transfers import fees, lifecycle
 from treasury.bank_transfers.doctype.bank_transfer.bank_transfer import transfer_settings
 from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
 	TRANSFER_DEFAULT_BANK_FIELDS,
 )
+from treasury.utils import source_documents as sd
 from treasury.utils.party import can_read_party, get_party_name
 
 DOCTYPE = "Bank Transfer"
 METHODS = ("Normal", "Fawran", "SWIFT")
-# source doctype -> (transfer type, party type, party field)
-SOURCES = {
-	"Purchase Invoice": (lifecycle.PARTY_PAYMENT, "Supplier", "supplier"),
-	"Purchase Order": (lifecycle.PARTY_PAYMENT, "Supplier", "supplier"),
-	"Sales Invoice": (lifecycle.PARTY_RECEIPT, "Customer", "customer"),
-	"Sales Order": (lifecycle.PARTY_RECEIPT, "Customer", "customer"),
-	"Supplier": (lifecycle.PARTY_PAYMENT, "Supplier", None),
-	"Customer": (lifecycle.PARTY_RECEIPT, "Customer", None),
-	"Employee": (lifecycle.PARTY_PAYMENT, "Employee", None),
-}
-PARTY_MASTERS = ("Supplier", "Customer", "Employee")
+# Documents a transfer may be created from (treasury.utils.source_documents gives their party and direction:
+# Outgoing = Party Payment, Incoming = Party Receipt; a Journal Entry's from the party row chosen).
+SOURCES = (
+	"Purchase Invoice",
+	"Purchase Order",
+	"Sales Invoice",
+	"Sales Order",
+	"Journal Entry",
+	"Expense Claim",
+	"Employee Advance",
+	"Supplier",
+	"Customer",
+	"Employee",
+)
+PARTY_MASTERS = sd.PARTY_MASTERS
+TRANSFER_TYPE = {sd.OUTGOING: lifecycle.PARTY_PAYMENT, sd.INCOMING: lifecycle.PARTY_RECEIPT}
 
 
 @frappe.whitelist()
 def make_bank_transfer(
-	source_doctype: str, source_name: str, method: str | None = None, company: str | None = None
+	source_doctype: str,
+	source_name: str,
+	method: str | None = None,
+	company: str | None = None,
+	party_type: str | None = None,
+	party: str | None = None,
 ) -> dict:
-	"""A new Bank Transfer (not inserted) paying / receiving the outstanding of an invoice or order, or for a
-	party master (no amount). `company`: for a party master (default: the user's default company); a
-	document's own company always wins."""
+	"""A new Bank Transfer (not inserted) paying / receiving what is left of an invoice, order, Journal Entry or
+	hrms document, or for a party master (no amount). `company`: for a party master (default: the user's
+	default company); a document's own company always wins. `party_type` / `party`: the party row of a
+	Journal Entry with several open parties."""
 	frappe.has_permission(DOCTYPE, "create", throw=True)
 	if source_doctype not in SOURCES:
 		frappe.throw(_("Bank Transfer cannot be created from {0}.").format(_(source_doctype or "-")))
 	if method and method not in METHODS:
 		frappe.throw(_("Unknown method {0}.").format(frappe.bold(method)))
-	source = frappe.get_doc(source_doctype, source_name)
-	source.check_permission("read")
-	transfer_type, party_type, party_field = SOURCES[source_doctype]
-	company = source.get("company") or company or frappe.defaults.get_user_default("Company")
+	source = sd.get_source(source_doctype, source_name, _(DOCTYPE))
+	info = sd.resolve(source, party_type, party)
+	transfer_type = TRANSFER_TYPE[info.direction]
+	company = info.company or company or frappe.defaults.get_user_default("Company")
+	info.company = company
 	check_company_permission(company)
+	sd.check_payable(source, info)
 	settings = posting.get_company_settings(company)
 
 	doc = frappe.new_doc(DOCTYPE)
@@ -74,20 +89,17 @@ def make_bank_transfer(
 		doc.currency = get_account_currency(gl_account) if gl_account else None
 		if doc.currency:
 			doc.exchange_rate = posting.get_cheque_exchange_rate(doc.currency, company, doc.execution_date)
-	doc.party_type = party_type
-	doc.party = source.get(party_field) if party_field else source.name
-	doc.party_name = get_party_name(party_type, doc.party)
-	if can_read_party(party_type, doc.party):
-		doc.party_bank_account = get_party_bank_account(party_type, doc.party)
+	doc.party_type = info.party_type
+	doc.party = info.party
+	doc.party_name = get_party_name(doc.party_type, doc.party)
+	if can_read_party(doc.party_type, doc.party):
+		doc.party_bank_account = get_party_bank_account(doc.party_type, doc.party)
 	doc.contact_person = source.get("contact_person") or (
-		get_default_contact(party_type, doc.party) if party_type != "Employee" else None
+		get_default_contact(doc.party_type, doc.party) if doc.party_type != "Employee" else None
 	)
-	for fieldname in ("cost_center", "project"):
-		if source.meta.has_field(fieldname) and source.get(fieldname):
-			doc.set(fieldname, source.get(fieldname))
-	dimensions.copy_dimensions(source, doc)
+	sd.copy_accounting(source, doc)
 	if source_doctype not in PARTY_MASTERS:
-		_set_amount(doc, source)
+		_set_amount(doc, source, info)
 		label = (
 			_("Payment of {0} {1}") if transfer_type == lifecycle.PARTY_PAYMENT else _("Receipt of {0} {1}")
 		)
@@ -95,39 +107,22 @@ def make_bank_transfer(
 	return doc.as_dict()
 
 
-def _set_amount(doc, source):
-	"""The outstanding of the invoice / order (party account currency), in the bank currency."""
-	if source.docstatus != 1:
-		frappe.throw(
-			_("{0} {1} has nothing outstanding.").format(_(source.doctype), frappe.bold(source.name))
-		)
+def _set_amount(doc, source, info):
+	"""What is left of the source (party account currency: allocated), in the bank currency (the amount)."""
 	precision = frappe.get_precision(DOCTYPE, "amount") or 2
 	party_account = posting.get_party_account(doc.party_type, doc.party, doc.company)
 	party_currency = get_account_currency(party_account)
-	outstanding = posting.get_reference_outstanding(
-		source.doctype, source.name, doc.party_type, doc.party, party_currency, precision
+	outstanding = sd.available_outstanding(source, info, party_currency, precision)
+	doc.amount = sd.to_document_currency(
+		outstanding,
+		party_currency,
+		doc.currency,
+		doc.company,
+		doc.exchange_rate,
+		doc.bank_account,
+		source,
+		precision,
 	)
-	if outstanding <= 0:
-		frappe.throw(
-			_("{0} {1} has nothing outstanding.").format(_(source.doctype), frappe.bold(source.name))
-		)
-	if party_currency == doc.currency or not doc.currency:
-		doc.amount = outstanding
-	elif party_currency == erpnext.get_company_currency(doc.company) and flt(doc.exchange_rate):
-		doc.amount = flt(outstanding / flt(doc.exchange_rate), precision)
-	else:
-		# e.g. a USD supplier and an EGP bank: the transfer amount cannot be derived from the outstanding
-		frappe.throw(
-			_(
-				"Bank Account {0} is in {1} and cannot settle the {2} outstanding of {3} {4}. Choose a Bank Account in {2}."
-			).format(
-				frappe.bold(doc.bank_account),
-				doc.currency,
-				party_currency,
-				_(source.doctype),
-				frappe.bold(source.name),
-			)
-		)
 	doc.append(
 		"references",
 		{"reference_doctype": source.doctype, "reference_name": source.name, "allocated_amount": outstanding},

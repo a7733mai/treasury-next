@@ -1,8 +1,11 @@
 """Phase 7b: `make_bank_transfer` builds an unsaved Bank Transfer for an invoice, order or party (spec 7b §3.5,
 §7 G)."""
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import today
 
 from treasury.bank_transfers.api import make_bank_transfer as build_transfer
 from treasury.tests.utils import (
@@ -11,9 +14,13 @@ from treasury.tests.utils import (
 	SUPPLIER,
 	TRANSFER_SETTINGS,
 	TreasuryTestMixin,
+	acc,
+	ensure_fiscal_year,
 	ensure_party_bank_account,
 	ensure_user,
 	make_iban,
+	make_party_journal_entry,
+	make_pdc_cheque,
 	make_purchase_invoice,
 	make_sales_invoice,
 	make_sales_order,
@@ -117,3 +124,39 @@ class TestBankTransferAPI(TreasuryTestMixin, IntegrationTestCase):
 		for user in (READER, NO_ACCESS_USER, TREASURY_USER):
 			with self.subTest(user=user), self.set_user(user):
 				self.assertRaises(frappe.PermissionError, build_transfer, "Purchase Invoice", pi.name)
+
+	# ------------------------------------------------------------------ Phase 7c
+
+	def test_journal_entry_sources(self):
+		ensure_fiscal_year(COMPANY, today())
+		supplier_je = make_party_journal_entry("Supplier", SUPPLIER, 5000, acc("Cost of Goods Sold"))
+		values = build_transfer("Journal Entry", supplier_je.name)
+		self.assertEqual(
+			(values["transfer_type"], values["party_type"], values["party"], values["amount"]),
+			("Party Payment", "Supplier", SUPPLIER, 5000),
+		)
+		self.assertEqual(
+			[(r["reference_doctype"], r["reference_name"]) for r in values["references"]],
+			[("Journal Entry", supplier_je.name)],
+		)
+		customer_je = make_party_journal_entry("Customer", CUSTOMER, 700, acc("Sales"))
+		values = build_transfer("Journal Entry", customer_je.name, "Fawran")
+		self.assertEqual(
+			(values["transfer_type"], values["party"], values["amount"], values["method"]),
+			("Party Receipt", CUSTOMER, 700, "Fawran"),
+		)
+
+	def test_reserved_amount(self):
+		pi = make_purchase_invoice(10000)
+		make_pdc_cheque(amount=6000, invoice=pi)
+		values = build_transfer("Purchase Invoice", pi.name)
+		self.assertEqual(values["amount"], 4000)
+		self.assertEqual(values["references"][0]["allocated_amount"], 4000)
+
+	def test_hrms_sources_gated(self):
+		with patch("treasury.utils.hrms.hrms_installed", return_value=False):
+			for doctype in ("Expense Claim", "Employee Advance"):
+				with self.subTest(doctype=doctype):
+					self.assertRaisesRegex(
+						frappe.ValidationError, f"{doctype} needs the HRMS app", build_transfer, doctype, "X"
+					)
