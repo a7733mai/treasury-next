@@ -229,7 +229,7 @@ def get_summary(rows: list) -> list[dict]:
 
 
 def get_columns() -> list[dict]:
-	"""Read as a sentence: date – cheque – party – what happened – from → to – who (design 7f §10.2)."""
+	"""Read as a sentence: date - cheque - party - what happened - from → to - who (design 7f §10.2)."""
 	return [
 		column("movement_date", _("Date", context="Treasury"), "Date", 95),
 		column("security_cheque", _("Security Cheque"), "Link", 140, options=DOCTYPE),

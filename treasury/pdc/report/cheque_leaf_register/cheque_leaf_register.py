@@ -169,8 +169,8 @@ def get_chart(leaves: list) -> dict | None:
 		"data": {
 			"labels": [
 				_("Unused", context="Cheque Leaf"),
-				_("Used – Payment"),
-				_("Used – Security"),
+				_("Used – Payment"),  # noqa: RUF001 (translated text)
+				_("Used – Security"),  # noqa: RUF001 (translated text)
 				_("Cancelled Leaves"),
 				_("Void Leaves"),
 			],

@@ -166,7 +166,7 @@ class ChequeLayout(Document):
 	def validate_leaf_size(self):
 		width, height = flt(self.leaf_width_mm), flt(self.leaf_height_mm)
 		if not (MIN_WIDTH <= width <= MAX_WIDTH and MIN_HEIGHT <= height <= MAX_HEIGHT):
-			frappe.throw(_("The cheque leaf must be 50–300 mm wide and 30–150 mm high."))
+			frappe.throw(_("The cheque leaf must be 50–300 mm wide and 30–150 mm high."))  # noqa: RUF001 (translated text)
 
 	def validate_boxes(self):
 		width, height = flt(self.leaf_width_mm), flt(self.leaf_height_mm)
@@ -176,7 +176,7 @@ class ChequeLayout(Document):
 			bottom = top + flt(self.get(height_field)) if height_field else top
 			if top < 0 or left < 0 or box_width <= 0 or left + box_width > width + 0.01 or bottom > height:
 				frappe.throw(
-					_("{0} is outside the cheque leaf ({1} × {2} mm).").format(
+					_("{0} is outside the cheque leaf ({1} × {2} mm).").format(  # noqa: RUF001 (translated text)
 						_(self.meta.get_label(section), context=self.doctype),
 						frappe.format(width, {"fieldtype": "Float", "precision": 1}),
 						frappe.format(height, {"fieldtype": "Float", "precision": 1}),
