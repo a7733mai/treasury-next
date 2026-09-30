@@ -14,7 +14,10 @@ DEFAULT_CATEGORIES = [
 	},
 	{"category_name": "Cheque Book", "keywords": ["cheque book", "chequebook", "check book", "دفتر شيكات"]},
 	{"category_name": "SMS Alerts", "keywords": ["sms", "alert fee", "رسائل"]},
-	{"category_name": "Returned Cheque", "keywords": ["returned cheque", "return chq", "rtn chq", "شيك مرتد"]},
+	{
+		"category_name": "Returned Cheque",
+		"keywords": ["returned cheque", "return chq", "rtn chq", "شيك مرتد"],
+	},
 	{
 		"category_name": "Transfer Fees",
 		"keywords": ["transfer fee", "trf fee", "swift charge", "fawran fee", "رسوم تحويل"],

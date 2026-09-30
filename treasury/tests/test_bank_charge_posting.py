@@ -58,7 +58,9 @@ def own_bank_account(bank: str | None) -> str:
 
 
 def ple_count(voucher_no: str) -> int:
-	return frappe.db.count("Payment Ledger Entry", {"voucher_type": "Payment Entry", "voucher_no": voucher_no})
+	return frappe.db.count(
+		"Payment Ledger Entry", {"voucher_type": "Payment Entry", "voucher_no": voucher_no}
+	)
 
 
 class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
@@ -114,11 +116,15 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 	def test_pe_charge_usd(self):
 		usd = self.data.usd
 		charge = make_bank_charge(bank_account=bank_account_name("USD"), amount=20)
-		self.assertEqual((charge.currency, flt(charge.exchange_rate), flt(charge.base_amount)), ("USD", 50, 1000))
+		self.assertEqual(
+			(charge.currency, flt(charge.exchange_rate), flt(charge.base_amount)), ("USD", 50, 1000)
+		)
 		pe = get_pe(charge.payment_entry)
 		self.assertEqual((flt(pe.paid_amount), flt(pe.received_amount)), (20, 1000))
 		assert_deductions(self, pe, [(self.charges_account, 1000, 0)])
-		assert_gl_entries(self, "Payment Entry", pe.name, [(self.charges_account, 1000, 0), (usd.bank_gl, 0, 1000)])
+		assert_gl_entries(
+			self, "Payment Entry", pe.name, [(self.charges_account, 1000, 0), (usd.bank_gl, 0, 1000)]
+		)
 		bank_row = frappe.get_all(
 			"GL Entry",
 			filters={"voucher_no": pe.name, "account": usd.bank_gl, "is_cancelled": 0},
@@ -152,7 +158,9 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 		charge = make_bank_charge(bank_account=bank_account_name("USD"), amount=20)
 		je = frappe.get_doc("Journal Entry", charge.journal_entry)
 		self.assertEqual((je.voucher_type, je.cheque_no, je.multi_currency), ("Bank Entry", charge.name, 1))
-		assert_gl_entries(self, "Journal Entry", je.name, [(self.charges_account, 1000, 0), (usd.bank_gl, 0, 1000)])
+		assert_gl_entries(
+			self, "Journal Entry", je.name, [(self.charges_account, 1000, 0), (usd.bank_gl, 0, 1000)]
+		)
 		bank_row = next(row for row in je.accounts if row.account == usd.bank_gl)
 		self.assertEqual((flt(bank_row.credit_in_account_currency), flt(bank_row.exchange_rate)), (20, 50))
 
@@ -274,7 +282,11 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 		cost_center = frappe.get_cached_value("Company", COMPANY, "cost_center")
 		project = (
 			frappe.get_doc(
-				{"doctype": "Project", "project_name": f"BC {frappe.generate_hash(length=5)}", "company": COMPANY}
+				{
+					"doctype": "Project",
+					"project_name": f"BC {frappe.generate_hash(length=5)}",
+					"company": COMPANY,
+				}
 			)
 			.insert(ignore_permissions=True)
 			.name
@@ -299,7 +311,8 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 		je = frappe.get_doc("Journal Entry", charge.journal_entry)
 		expense = next(row for row in je.accounts if row.account == self.charges_account)
 		self.assertEqual(
-			(expense.cost_center, expense.project, expense.get(self.branch_field)), (cost_center, project, branch)
+			(expense.cost_center, expense.project, expense.get(self.branch_field)),
+			(cost_center, project, branch),
 		)
 
 	# ------------------------------------------------------------------ posting service, idempotency

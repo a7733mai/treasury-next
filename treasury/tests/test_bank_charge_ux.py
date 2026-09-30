@@ -63,10 +63,16 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		charge.run_method("onload")
 		settings = charge.get_onload().charge_settings
 		self.assertEqual(
-			(settings["bank_charge_voucher"], settings["bank_charge_clearance"], settings["company_currency"]),
+			(
+				settings["bank_charge_voucher"],
+				settings["bank_charge_clearance"],
+				settings["company_currency"],
+			),
 			("Payment Entry", "On Posting", "EGP"),
 		)
-		self.use_company_settings(bank_charge_voucher="Journal Entry", bank_charge_clearance="On Bank Transaction")
+		self.use_company_settings(
+			bank_charge_voucher="Journal Entry", bank_charge_clearance="On Bank Transaction"
+		)
 		charge = frappe.get_doc(DOCTYPE, charge.name)
 		charge.run_method("onload")
 		settings = charge.get_onload().charge_settings
@@ -104,7 +110,13 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 			as_dict=True,
 		)
 		frappe.db.set_value("PDC Account Mapping", row.name, "bank_charges_account", other.name)
-		self.addCleanup(frappe.db.set_value, "PDC Account Mapping", row.name, "bank_charges_account", row.bank_charges_account)
+		self.addCleanup(
+			frappe.db.set_value,
+			"PDC Account Mapping",
+			row.name,
+			"bank_charges_account",
+			row.bank_charges_account,
+		)
 		self.assertIsNone(get_company_charge_account(COMPANY))
 
 	# ------------------------------------------------------------------ clearing proposals (P14)
@@ -113,8 +125,12 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		egp = self.data.egp
 		manual = ensure_charge_category("_Test BCH UX Manual", keywords=("ux manual fee",), auto_select=0)
 		auto = ensure_charge_category("_Test BCH UX Auto", keywords=("ux auto fee",))
-		manual_bt = make_bank_transaction(egp.bank_account, day(-4), withdrawal=321.1, description="UX MANUAL FEE")
-		auto_bt = make_bank_transaction(egp.bank_account, day(-4), withdrawal=321.2, description="UX AUTO FEE")
+		manual_bt = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=321.1, description="UX MANUAL FEE"
+		)
+		auto_bt = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=321.2, description="UX AUTO FEE"
+		)
 
 		tool = frappe.get_doc("PDC Bank Clearing")
 		tool.update(
@@ -123,7 +139,9 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		tool.set("matches", [])
 		tool.get_suggestions()
 		rows = {row.bank_transaction: row for row in tool.matches}
-		self.assertEqual((rows[manual_bt.name].bank_charge_category, rows[manual_bt.name].selected), (manual, 0))
+		self.assertEqual(
+			(rows[manual_bt.name].bank_charge_category, rows[manual_bt.name].selected), (manual, 0)
+		)
 		self.assertIn(NOT_PRESELECTED, rows[manual_bt.name].result)
 		self.assertEqual((rows[auto_bt.name].bank_charge_category, rows[auto_bt.name].selected), (auto, 1))
 		self.assertFalse(rows[auto_bt.name].result)
@@ -157,7 +175,9 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		settings = frappe.get_meta("Treasury Settings")
 		hint = settings.get_field("bank_suppliers_hint")
 		self.assertEqual((hint.fieldtype, hint.depends_on), ("HTML", "eval:!(doc.bank_suppliers||[]).length"))
-		self.assertTrue(frappe.get_meta("Treasury Company Settings").get_field("bank_charges_section").collapsible)
+		self.assertTrue(
+			frappe.get_meta("Treasury Company Settings").get_field("bank_charges_section").collapsible
+		)
 
 		category = frappe.get_meta("Bank Charge Category")
 		order = [df.fieldname for df in category.fields]
@@ -178,7 +198,11 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		path = APP_PATH / "pdc" / "workspace" / "treasury" / "treasury.json"
 		workspace = json.loads(path.read_text(encoding="utf-8"))
 		links = workspace["links"]
-		start = next(i for i, link in enumerate(links) if link["type"] == "Card Break" and link["label"] == "Bank Transfers")
+		start = next(
+			i
+			for i, link in enumerate(links)
+			if link["type"] == "Card Break" and link["label"] == "Bank Transfers"
+		)
 		card = []
 		for link in links[start + 1 :]:
 			if link["type"] == "Card Break":

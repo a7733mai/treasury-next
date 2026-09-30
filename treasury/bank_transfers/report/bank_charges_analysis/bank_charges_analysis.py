@@ -55,9 +55,7 @@ def execute(filters=None):
 	validate_date_range(from_date, to_date)
 	group_by = filters.group_by or MONTH
 	if group_by not in GROUPS:
-		frappe.throw(
-			_("Group By must be one of: {0}.").format(", ".join(_(g, context=CTX) for g in GROUPS))
-		)
+		frappe.throw(_("Group By must be one of: {0}.").format(", ".join(_(g, context=CTX) for g in GROUPS)))
 	view = filters.view or SUMMARY
 	if view not in (SUMMARY, DETAIL):
 		frappe.throw(_("View must be Summary or Detail."))
@@ -140,7 +138,9 @@ def get_rows(company: str, from_date, to_date, filters) -> list[frappe._dict]:
 	return rows
 
 
-def gl_amounts(company: str, from_date, to_date, events: list[str], doctypes: list[str]) -> list[frappe._dict]:
+def gl_amounts(
+	company: str, from_date, to_date, events: list[str], doctypes: list[str]
+) -> list[frappe._dict]:
 	"""Net Expense amount per Treasury voucher of `events` posted in the period (one query per doctype)."""
 	if not events:
 		return []
@@ -335,7 +335,13 @@ def report_summary(rows: list, currency: str) -> list[dict]:
 	net = flt(charges - refunds, precision)
 
 	def money(label, value, indicator="Blue"):
-		return {"label": label, "value": value, "datatype": "Currency", "currency": currency, "indicator": indicator}
+		return {
+			"label": label,
+			"value": value,
+			"datatype": "Currency",
+			"currency": currency,
+			"indicator": indicator,
+		}
 
 	summary = [
 		money(_("Charges", context=REPORT), charges, "Orange"),
@@ -375,7 +381,9 @@ def get_chart(rows: list, data: list, group_by: str, currency: str) -> dict | No
 			for row in rows:
 				if row.source == source:
 					net[row.posting_date.strftime("%Y-%m")] += row.amount
-			datasets.append({"name": source_label(source), "values": [flt(net[m], precision) for m in months]})
+			datasets.append(
+				{"name": source_label(source), "values": [flt(net[m], precision) for m in months]}
+			)
 		return {
 			"data": {"labels": labels, "datasets": datasets},
 			"type": "bar",
@@ -401,7 +409,9 @@ def money_column(fieldname: str, label: str, width: int = 150) -> dict:
 
 
 def currency_column() -> dict:
-	return column("company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1)
+	return column(
+		"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
+	)
 
 
 def summary_columns() -> list[dict]:

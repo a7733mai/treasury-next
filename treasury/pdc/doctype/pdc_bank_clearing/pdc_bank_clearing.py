@@ -111,7 +111,11 @@ class PDCBankClearing(Document):
 		documents += [(TRANSFER, t) for t in self.get_open_transfers()]
 		documents += [(BANK_CHARGE, c) for c in self.get_open_bank_charges()]
 		tolerance = cint(self.date_tolerance)
-		quality_of = {CHEQUE: match_quality, TRANSFER: transfer_match_quality, BANK_CHARGE: charge_match_quality}
+		quality_of = {
+			CHEQUE: match_quality,
+			TRANSFER: transfer_match_quality,
+			BANK_CHARGE: charge_match_quality,
+		}
 
 		candidates = []
 		for bt in transactions:
@@ -433,7 +437,9 @@ class PDCBankClearing(Document):
 				if kind == TRANSFER_ROW:
 					title = _("PDC Bank Clearing failed for Bank Transfer {0}").format(row.bank_transfer)
 				elif kind == CHARGE_ROW:
-					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(row.bank_transaction)
+					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(
+						row.bank_transaction
+					)
 				else:
 					title = _("PDC Bank Clearing failed for cheque {0}").format(row.cheque)
 				frappe.log_error(title=title)
@@ -447,7 +453,9 @@ class PDCBankClearing(Document):
 		if not row.bank_transaction:
 			frappe.throw(_("The bank transaction no longer exists."))
 		if row.get("bank_charge"):
-			charge = frappe.db.get_value(BANK_CHARGE, row.bank_charge, ["company", "bank_account"], as_dict=True)
+			charge = frappe.db.get_value(
+				BANK_CHARGE, row.bank_charge, ["company", "bank_account"], as_dict=True
+			)
 			if not charge or (charge.company, charge.bank_account) != (self.company, self.bank_account):
 				frappe.throw(
 					_("Bank Charge {0} does not belong to Bank Account {1}.").format(
@@ -668,7 +676,7 @@ class PDCBankClearing(Document):
 
 
 def row_kind(row) -> str:
-	""""cheque", "transfer" or "charge" from the row's document type (rows without one: by their links)."""
+	""" "cheque", "transfer" or "charge" from the row's document type (rows without one: by their links)."""
 	doctype = row.get("reference_doctype")
 	if doctype == TRANSFER or (doctype != BANK_CHARGE and row.get("bank_transfer") and not row.get("cheque")):
 		return TRANSFER_ROW

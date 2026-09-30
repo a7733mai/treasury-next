@@ -162,7 +162,9 @@ class BankCharge(Document):
 		if self.currency == erpnext.get_company_currency(self.company):
 			self.exchange_rate = 1
 		elif flt(self.exchange_rate) <= 0:
-			self.exchange_rate = posting.get_cheque_exchange_rate(self.currency, self.company, self.posting_date)
+			self.exchange_rate = posting.get_cheque_exchange_rate(
+				self.currency, self.company, self.posting_date
+			)
 		self.base_amount = flt(self.amount * flt(self.exchange_rate), self.precision("base_amount"))
 
 	def set_refund_defaults(self):
@@ -209,7 +211,16 @@ class BankCharge(Document):
 		charge = frappe.db.get_value(
 			DOCTYPE,
 			self.against_bank_charge,
-			["docstatus", "entry_type", "company", "bank_account", "currency", "category", "expense_account", "amount"],
+			[
+				"docstatus",
+				"entry_type",
+				"company",
+				"bank_account",
+				"currency",
+				"category",
+				"expense_account",
+				"amount",
+			],
 			as_dict=True,
 		)
 		if (
@@ -243,7 +254,9 @@ class BankCharge(Document):
 		for fieldname, value in dimensions.default_dimensions(self.company).items():
 			if value and self.meta.has_field(fieldname) and not self.get(fieldname):
 				self.set(fieldname, value)
-		cost_center = frappe.db.get_value("Cost Center", self.cost_center, ["company", "is_group"], as_dict=True)
+		cost_center = frappe.db.get_value(
+			"Cost Center", self.cost_center, ["company", "is_group"], as_dict=True
+		)
 		if self.cost_center and (not cost_center or cost_center.company != self.company):
 			frappe.throw(
 				_("Cost Center {0} does not belong to company {1}.").format(
@@ -310,7 +323,9 @@ def get_category_defaults(category: str, company: str) -> dict:
 	if not (frappe.has_permission(DOCTYPE, "create") or frappe.has_permission(DOCTYPE, "write")):
 		frappe.throw(_("You are not permitted to create or change Bank Charges."), frappe.PermissionError)
 	row = get_account_row(category, company) or frappe._dict()
-	description = frappe.db.get_value("Bank Charge Category", category, "default_description") if category else None
+	description = (
+		frappe.db.get_value("Bank Charge Category", category, "default_description") if category else None
+	)
 	return {
 		"expense_account": row.get("expense_account"),
 		"cost_center": row.get("cost_center"),
@@ -323,7 +338,10 @@ def charge_settings(company: str | None) -> dict:
 	clearance setting, and its currency."""
 	settings = (
 		frappe.db.get_value(
-			"Treasury Company Settings", company, ["bank_charge_voucher", "bank_charge_clearance"], as_dict=True
+			"Treasury Company Settings",
+			company,
+			["bank_charge_voucher", "bank_charge_clearance"],
+			as_dict=True,
 		)
 		if company
 		else None

@@ -67,23 +67,35 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 		bt.reload()
 		self.assertEqual(bt.status, "Reconciled")
 		self.assertEqual(flt(bt.unallocated_amount), 0)
-		self.assertEqual([(p.payment_document, p.payment_entry) for p in bt.payment_entries], [(voucher_type, voucher)])
+		self.assertEqual(
+			[(p.payment_document, p.payment_entry) for p in bt.payment_entries], [(voucher_type, voucher)]
+		)
 
 	# ------------------------------------------------------------------ keyword proposals
 
 	def test_keyword_proposal_create_and_reconcile(self):
 		egp = self.data.egp
-		bt = make_bank_transaction(egp.bank_account, day(-4), withdrawal=211.5, description="ACCT MAINT FEE SEP")
+		bt = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=211.5, description="ACCT MAINT FEE SEP"
+		)
 		tool = self.tool()
 		tool.get_suggestions()
 		rows = self.rows_for(tool, bt)
 		self.assertEqual(len(rows), 1)
 		row = rows[0]
 		self.assertEqual(
-			(row.match_quality, row.reference_doctype, row.bank_charge_category, row.selected, row.bank_charge),
+			(
+				row.match_quality,
+				row.reference_doctype,
+				row.bank_charge_category,
+				row.selected,
+				row.bank_charge,
+			),
 			("Keyword", DOCTYPE, self.category, 1, None),
 		)
-		self.assertEqual((flt(row.amount), row.description, row.direction), (211.5, "ACCT MAINT FEE SEP", "Outgoing"))
+		self.assertEqual(
+			(flt(row.amount), row.description, row.direction), (211.5, "ACCT MAINT FEE SEP", "Outgoing")
+		)
 
 		self.select_only(tool, bt)
 		result = tool.clear_selected()
@@ -93,7 +105,13 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(result["skipped"], [])
 		charge = frappe.get_doc(DOCTYPE, name)
 		self.assertEqual(
-			(charge.docstatus, charge.status, getdate(charge.posting_date), flt(charge.amount), charge.bank_transaction),
+			(
+				charge.docstatus,
+				charge.status,
+				getdate(charge.posting_date),
+				flt(charge.amount),
+				charge.bank_transaction,
+			),
 			(1, "Reconciled", day(-4), 211.5, bt.name),
 		)
 		self.assertEqual(charge.category, self.category)
@@ -109,11 +127,19 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 	def test_bulk(self):
 		egp = self.data.egp
 		other = ensure_charge_category("_Test BC Bulk Other", keywords=("chq bk fee",))
-		no_account = ensure_charge_category("_Test BC Bulk No Account", keywords=("nacct svc fee",), account=False)
-		first = make_bank_transaction(egp.bank_account, day(-4), withdrawal=221.1, description="ACCT MAINT FEE 1")
-		second = make_bank_transaction(egp.bank_account, day(-4), withdrawal=221.2, reference_number="ACCT MAINT FEE 2")
+		no_account = ensure_charge_category(
+			"_Test BC Bulk No Account", keywords=("nacct svc fee",), account=False
+		)
+		first = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=221.1, description="ACCT MAINT FEE 1"
+		)
+		second = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=221.2, reference_number="ACCT MAINT FEE 2"
+		)
 		third = make_bank_transaction(egp.bank_account, day(-4), withdrawal=221.3, description="CHQ BK FEE")
-		failing = make_bank_transaction(egp.bank_account, day(-4), withdrawal=221.4, description="NACCT SVC FEE")
+		failing = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=221.4, description="NACCT SVC FEE"
+		)
 
 		tool = self.tool()
 		tool.get_suggestions()
@@ -144,11 +170,21 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 		frappe.db.set_value("Bank Charge Category", disabled, "disabled", 1)
 		self.addCleanup(frappe.db.set_value, "Bank Charge Category", disabled, "disabled", 0)
 
-		tie = make_bank_transaction(egp.bank_account, day(-4), withdrawal=231.1, description="TIE ALPHA TIE BRAVO")
-		wins = make_bank_transaction(egp.bank_account, day(-4), withdrawal=231.2, description="Longer  KW fee")
-		unselected = make_bank_transaction(egp.bank_account, day(-4), withdrawal=231.3, description="MANUAL PICK FEE")
-		off = make_bank_transaction(egp.bank_account, day(-4), withdrawal=231.4, description="SWITCHED OFF FEE")
-		deposit = make_bank_transaction(egp.bank_account, day(-4), deposit=231.5, description="ACCT MAINT FEE")
+		tie = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=231.1, description="TIE ALPHA TIE BRAVO"
+		)
+		wins = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=231.2, description="Longer  KW fee"
+		)
+		unselected = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=231.3, description="MANUAL PICK FEE"
+		)
+		off = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=231.4, description="SWITCHED OFF FEE"
+		)
+		deposit = make_bank_transaction(
+			egp.bank_account, day(-4), deposit=231.5, description="ACCT MAINT FEE"
+		)
 
 		tool = self.tool()
 		tool.get_suggestions()
@@ -167,7 +203,9 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 	def test_existing_charge_is_matched_not_proposed(self):
 		egp = self.data.egp
 		charge = make_bank_charge(amount=241.5, bank_reference="BC-77")
-		bt = make_bank_transaction(egp.bank_account, day(-4), withdrawal=241.5, description="ACCT MAINT FEE BC-77")
+		bt = make_bank_transaction(
+			egp.bank_account, day(-4), withdrawal=241.5, description="ACCT MAINT FEE BC-77"
+		)
 		tool = self.tool()
 		tool.get_suggestions()
 		rows = self.rows_for(tool, bt)
@@ -187,17 +225,23 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 		self.use_company_settings(**TRANSFER_SETTINGS)
 		set_fee_rules(self, [])
 		egp = self.data.egp
-		transfer = make_bank_transfer(amount=2512.5, execution_date=day(-6), request_date=day(-6), bank_reference="FT-BC-5")
+		transfer = make_bank_transfer(
+			amount=2512.5, execution_date=day(-6), request_date=day(-6), bank_reference="FT-BC-5"
+		)
 		bt = make_bank_transaction(
 			egp.bank_account, day(-5), withdrawal=2512.5, description="TRF FT-BC-5 ACCT MAINT FEE"
 		)
 		tool = self.tool()
 		tool.get_suggestions()
 		rows = self.rows_for(tool, bt)
-		self.assertEqual([(r.reference_doctype, r.bank_transfer) for r in rows], [("Bank Transfer", transfer.name)])
+		self.assertEqual(
+			[(r.reference_doctype, r.bank_transfer) for r in rows], [("Bank Transfer", transfer.name)]
+		)
 
 	def test_idempotent_clearing(self):
-		bt = make_bank_transaction(self.data.egp.bank_account, day(-4), withdrawal=261.5, description="ACCT MAINT FEE")
+		bt = make_bank_transaction(
+			self.data.egp.bank_account, day(-4), withdrawal=261.5, description="ACCT MAINT FEE"
+		)
 		tool = self.tool()
 		tool.get_suggestions()
 		self.select_only(tool, bt)
@@ -213,7 +257,9 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 	# ------------------------------------------------------------------ permissions
 
 	def test_permissions(self):
-		bt = make_bank_transaction(self.data.egp.bank_account, day(-4), withdrawal=271.5, description="ACCT MAINT FEE")
+		bt = make_bank_transaction(
+			self.data.egp.bank_account, day(-4), withdrawal=271.5, description="ACCT MAINT FEE"
+		)
 		original = frappe.has_permission
 
 		def no_charge_create(doctype=None, ptype="read", *args, **kwargs):

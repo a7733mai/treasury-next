@@ -51,15 +51,26 @@ def _ensure(bank: str) -> str:
 
 	name = frappe.db.get_value("Bank", bank, "bank_name") or bank
 	existing = frappe.get_all(
-		"Supplier", filters={"supplier_name": name, "disabled": 0}, pluck="name", order_by="creation asc", limit=1
+		"Supplier",
+		filters={"supplier_name": name, "disabled": 0},
+		pluck="name",
+		order_by="creation asc",
+		limit=1,
 	)
 	if existing:
 		supplier = existing[0]
 	else:
 		if not is_leaf:
-			frappe.throw(_("Set a valid Payee Supplier Group in Treasury Settings."), title=_("Missing Settings"))
+			frappe.throw(
+				_("Set a valid Payee Supplier Group in Treasury Settings."), title=_("Missing Settings")
+			)
 		doc = frappe.get_doc(
-			{"doctype": "Supplier", "supplier_name": name, "supplier_group": group, "supplier_type": "Company"}
+			{
+				"doctype": "Supplier",
+				"supplier_name": name,
+				"supplier_group": group,
+				"supplier_type": "Company",
+			}
 		)
 		doc.insert(ignore_permissions=True)
 		user = real_user()

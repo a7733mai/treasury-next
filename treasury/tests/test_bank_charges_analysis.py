@@ -232,7 +232,8 @@ class TestBankChargesAnalysis(TreasuryTestMixin, IntegrationTestCase):
 			with self.subTest(source=source):
 				row = self.group(data, source)
 				self.assertEqual(
-					(flt(row.charges), flt(row.refunds), flt(row.net), row.vouchers), (charges, refunds, net, vouchers)
+					(flt(row.charges), flt(row.refunds), flt(row.net), row.vouchers),
+					(charges, refunds, net, vouchers),
 				)
 		total = data[-1]
 		self.assertTrue(total.is_total)
@@ -292,7 +293,9 @@ class TestBankChargesAnalysis(TreasuryTestMixin, IntegrationTestCase):
 			("Payment Entry", self.fixture.c1.payment_entry, 150, "Account Maintenance", "Bank Charge"),
 		)
 		self.assertEqual((c1.bank, c1.bank_account), (BANK, bank_account_name("EGP")))
-		self.assertEqual([getdate(r.posting_date) for r in rows], sorted(getdate(r.posting_date) for r in rows))
+		self.assertEqual(
+			[getdate(r.posting_date) for r in rows], sorted(getdate(r.posting_date) for r in rows)
+		)
 		reversal = next(row for row in rows if row.document == self.fixture.t2.name and flt(row.amount) < 0)
 		self.assertEqual((reversal.voucher_no, flt(reversal.amount)), (self.fixture.t2.reversal_journal, -20))
 
@@ -338,7 +341,9 @@ class TestBankChargesAnalysis(TreasuryTestMixin, IntegrationTestCase):
 		)
 		egl_account = frappe.get_cached_value("Company", COMPANY, "exchange_gain_loss_account")
 		self.assertTrue(
-			frappe.db.exists("GL Entry", {"voucher_no": egl_journal, "account": egl_account, "is_cancelled": 0})
+			frappe.db.exists(
+				"GL Entry", {"voucher_no": egl_journal, "account": egl_account, "is_cancelled": 0}
+			)
 		)
 
 		rows = detail()
@@ -385,7 +390,10 @@ class TestBankChargesAnalysis(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(len(chart["data"]["datasets"]), len(SOURCES))
 		for dataset, source in zip(chart["data"]["datasets"], SOURCES, strict=True):
 			expected = [
-				flt(sum(r.amount for r in rows if r.source_value == source and str(r.posting_date)[:7] == m), 2)
+				flt(
+					sum(r.amount for r in rows if r.source_value == source and str(r.posting_date)[:7] == m),
+					2,
+				)
 				for m in months
 			]
 			self.assertEqual([flt(v, 2) for v in dataset["values"]], expected, source)

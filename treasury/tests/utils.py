@@ -1573,7 +1573,9 @@ def _bank_supplier_rows() -> list[dict]:
 
 
 def _write_bank_supplier_rows(rows: list[dict]):
-	frappe.db.delete(BANK_SUPPLIER_DOCTYPE, {"parenttype": "Treasury Settings", "parent": "Treasury Settings"})
+	frappe.db.delete(
+		BANK_SUPPLIER_DOCTYPE, {"parenttype": "Treasury Settings", "parent": "Treasury Settings"}
+	)
 	for idx, row in enumerate(rows, 1):
 		frappe.get_doc(
 			{

@@ -52,7 +52,9 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		rejects("greater than zero", amount=-5)
 
 		ensure_company(OTHER_COMPANY, OTHER_ABBR)
-		other_gl = ensure_account("BC Other Co Bank", "Bank Accounts", "Bank", company=OTHER_COMPANY, abbr=OTHER_ABBR)
+		other_gl = ensure_account(
+			"BC Other Co Bank", "Bank Accounts", "Bank", company=OTHER_COMPANY, abbr=OTHER_ABBR
+		)
 		other_account = frappe.get_doc(
 			{
 				"doctype": "Bank Account",
@@ -88,7 +90,12 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		rejects("not a submitted charge", entry_type="Refund", against_bank_charge=draft.name, amount=10)
 		cancelled = make_bank_charge()
 		cancelled.cancel()
-		rejects("not a submitted charge|Cannot link cancelled document", entry_type="Refund", against_bank_charge=cancelled.name, amount=10)
+		rejects(
+			"not a submitted charge|Cannot link cancelled document",
+			entry_type="Refund",
+			against_bank_charge=cancelled.name,
+			amount=10,
+		)
 		usd_charge = make_bank_charge(bank_account=bank_account_name("USD"), amount=10)
 		rejects("not a submitted charge", entry_type="Refund", against_bank_charge=usd_charge.name, amount=5)
 
@@ -137,7 +144,9 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 
 		charge = make_bank_charge()
 		refund = make_bank_charge(entry_type="Refund", against_bank_charge=charge.name, amount=40)
-		self.assertRaisesRegex(frappe.ValidationError, "has submitted refunds", get_charge(charge.name).cancel)
+		self.assertRaisesRegex(
+			frappe.ValidationError, "has submitted refunds", get_charge(charge.name).cancel
+		)
 		refund.cancel()
 		charge.reload()
 		self.assertEqual(flt(charge.refunded_amount), 0)
@@ -223,7 +232,10 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		):
 			with self.subTest(bt=bt.name):
 				self.assertRaisesRegex(
-					frappe.ValidationError, pattern, get_charge(charge.name).reconcile_bank_transaction, bt.name
+					frappe.ValidationError,
+					pattern,
+					get_charge(charge.name).reconcile_bank_transaction,
+					bt.name,
 				)
 
 		bt = make_bank_transaction(egp, day(-3), withdrawal=150, reference_number="BCR-1")
@@ -239,7 +251,10 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(bt.status, "Reconciled")
 		self.assertEqual(charge.status_log[-1].event, "Reconciled")
 		self.assertRaisesRegex(
-			frappe.ValidationError, "already Reconciled", get_charge(charge.name).reconcile_bank_transaction, bt.name
+			frappe.ValidationError,
+			"already Reconciled",
+			get_charge(charge.name).reconcile_bank_transaction,
+			bt.name,
 		)
 
 		# a statement line already used by another charge
@@ -273,7 +288,11 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(get_voucher_count(DOCTYPE, charge.name), 1)
 
 		self.assertRaisesRegex(
-			frappe.ValidationError, "is not an open transaction", make_bank_charge, submit=False, bank_transaction=bt.name
+			frappe.ValidationError,
+			"is not an open transaction",
+			make_bank_charge,
+			submit=False,
+			bank_transaction=bt.name,
 		)
 		open_bt = make_bank_transaction(bank_account_name("EGP"), day(-3), withdrawal=150)
 		make_bank_charge(submit=False, bank_transaction=open_bt.name)

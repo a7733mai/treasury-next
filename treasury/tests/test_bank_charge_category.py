@@ -70,7 +70,11 @@ class TestBankChargeCategory(TreasuryTestMixin, IntegrationTestCase):
 		doc = category(accounts=[self.row(cost_center=main)], default_description="Monthly fee").insert()
 		self.assertEqual(
 			get_category_defaults(doc.name, COMPANY),
-			{"expense_account": acc("Treasury Bank Charges"), "cost_center": main, "default_description": "Monthly fee"},
+			{
+				"expense_account": acc("Treasury Bank Charges"),
+				"cost_center": main,
+				"default_description": "Monthly fee",
+			},
 		)
 		with self.set_user(NO_ACCESS_USER):
 			self.assertRaises(frappe.PermissionError, get_category_defaults, doc.name, COMPANY)
@@ -87,7 +91,9 @@ class TestBankChargeCategory(TreasuryTestMixin, IntegrationTestCase):
 		frappe.db.set_global(charge_defaults.DEFAULTS_CREATED_KEY, None)
 		self.assertEqual(sorted(charge_defaults.ensure_default_categories()), sorted(names))
 		self.assertEqual(frappe.db.get_global(charge_defaults.DEFAULTS_CREATED_KEY), "1")
-		self.assertEqual(get_account_row("Account Maintenance", COMPANY).expense_account, acc("Treasury Bank Charges"))
+		self.assertEqual(
+			get_account_row("Account Maintenance", COMPANY).expense_account, acc("Treasury Bank Charges")
+		)
 		self.assertEqual(frappe.db.get_value(DOCTYPE, "Transfer Fees", "auto_select_proposals"), 0)
 		self.assertIn("sms", parse_keywords(frappe.db.get_value(DOCTYPE, "SMS Alerts", "keywords")))
 
@@ -114,7 +120,13 @@ class TestBankChargeCategory(TreasuryTestMixin, IntegrationTestCase):
 			as_dict=True,
 		)
 		frappe.db.set_value("PDC Account Mapping", row.name, "bank_charges_account", other_account.name)
-		self.addCleanup(frappe.db.set_value, "PDC Account Mapping", row.name, "bank_charges_account", row.bank_charges_account)
+		self.addCleanup(
+			frappe.db.set_value,
+			"PDC Account Mapping",
+			row.name,
+			"bank_charges_account",
+			row.bank_charges_account,
+		)
 		for name in names:
 			if frappe.db.exists(DOCTYPE, name):
 				frappe.delete_doc(DOCTYPE, name, ignore_permissions=True, force=True)

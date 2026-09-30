@@ -266,7 +266,9 @@ def update_refunds(charge_name: str, refund_doc, event: str):
 		frappe.throw(
 			_("Refunds of Bank Charge {0} cannot exceed its amount ({1} left).").format(
 				frappe.bold(charge_name),
-				fmt_money(max(flt(charge.amount) - (refunded - flt(refund_doc.amount)), 0), currency=charge.currency),
+				fmt_money(
+					max(flt(charge.amount) - (refunded - flt(refund_doc.amount)), 0), currency=charge.currency
+				),
 			)
 		)
 	first_new_row = len(charge.status_log)
@@ -312,7 +314,9 @@ def validate_bank_transaction(doc, bank_transaction: str, submitted: bool = Fals
 		or bt.status not in OPEN_TRANSACTION_STATUSES
 	):
 		frappe.throw(
-			_("Bank Transaction {0} is not an open transaction of this bank account.").format(bank_transaction)
+			_("Bank Transaction {0} is not an open transaction of this bank account.").format(
+				bank_transaction
+			)
 		)
 	precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount") or 2
 	side = "withdrawal" if doc.entry_type == CHARGE else "deposit"
@@ -331,7 +335,9 @@ def validate_bank_transaction(doc, bank_transaction: str, submitted: bool = Fals
 		filters["name"] = ["!=", doc.name]
 	other = frappe.get_all(DOCTYPE, filters=filters, pluck="name", limit=1)
 	if other:
-		frappe.throw(_("Bank Transaction {0} already has Bank Charge {1}.").format(bank_transaction, other[0]))
+		frappe.throw(
+			_("Bank Transaction {0} already has Bank Charge {1}.").format(bank_transaction, other[0])
+		)
 	return bt
 
 
@@ -359,7 +365,9 @@ def reconcile(name: str, bank_transaction: str) -> dict:
 	return _result(doc)
 
 
-def create_from_bank_transaction(bank_transaction: str, category: str, company: str, bank_account: str) -> str:
+def create_from_bank_transaction(
+	bank_transaction: str, category: str, company: str, bank_account: str
+) -> str:
 	"""Create and submit a Charge of `category` for an open withdrawal (PDC Bank Clearing): posted on the
 	statement date for its open amount and reconciled with it on submit. The user's own permissions apply."""
 	frappe.has_permission(DOCTYPE, "create", throw=True)
@@ -392,7 +400,9 @@ def create_from_bank_transaction(bank_transaction: str, category: str, company: 
 		limit=1,
 	)
 	if existing:
-		frappe.throw(_("Bank Transaction {0} already has Bank Charge {1}.").format(bank_transaction, existing[0]))
+		frappe.throw(
+			_("Bank Transaction {0} already has Bank Charge {1}.").format(bank_transaction, existing[0])
+		)
 	if (
 		not bt
 		or bt.docstatus != 1

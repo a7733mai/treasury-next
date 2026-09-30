@@ -48,7 +48,9 @@ class BankChargeCategory(Document):
 		for row in self.get("accounts"):
 			if row.company in seen:
 				frappe.throw(
-					_("Row #{0}: Company {1} already has an account.").format(row.idx, frappe.bold(row.company))
+					_("Row #{0}: Company {1} already has an account.").format(
+						row.idx, frappe.bold(row.company)
+					)
 				)
 			seen.add(row.company)
 			label = _(row.meta.get_label("expense_account"))
@@ -75,7 +77,9 @@ def clean_keywords(text: str | None) -> str | None:
 			continue
 		if len(keyword) < MIN_KEYWORD_LENGTH:
 			frappe.throw(
-				_('Keyword "{0}" is too short (at least 3 characters).').format(frappe.utils.escape_html(keyword))
+				_('Keyword "{0}" is too short (at least 3 characters).').format(
+					frappe.utils.escape_html(keyword)
+				)
 			)
 		if keyword.casefold() in seen:
 			continue
