@@ -18,10 +18,10 @@ import frappe
 from frappe.utils import add_days, cint, flt, getdate
 
 from treasury.pdc.report.bank_position_forecast.bank_position_forecast import (
-	BankPositionForecast,
 	DAILY,
 	IN,
 	OUT,
+	BankPositionForecast,
 )
 from treasury.pdc.report_utils import (
 	get_gl_balances_by_account,

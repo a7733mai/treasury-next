@@ -215,9 +215,7 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 		)
 		# a user who may not see any bank
 		self.assertIsNone(hidden["html"])
-		self.assertEqual(
-			hidden["message"], _("{0} may not see any bank of {1}.").format(DESK_USER, COMPANY)
-		)
+		self.assertEqual(hidden["message"], _("{0} may not see any bank of {1}.").format(DESK_USER, COMPANY))
 		# managers only
 		with self.set_user(USER):
 			self.assertRaises(frappe.PermissionError, notify.preview_digest, COMPANY, USER)
@@ -332,7 +330,7 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 		# security Minor 4: the User Permissions on Bank Account apply
 		self.limit_to_bank(usd.bank_account)
 		with self.set_user(LIMITED_MANAGER):
-			limited =frappe.get_doc("Treasury Company Settings", COMPANY).get_threshold_banks()
+			limited = frappe.get_doc("Treasury Company Settings", COMPANY).get_threshold_banks()
 		self.assertEqual([b["bank_account"] for b in limited], [usd.bank_account])
 		self.assertGreater(len(banks), 1)
 

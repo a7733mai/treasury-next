@@ -253,9 +253,7 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.mode("Block")
 		# Scheduled on T+2: T+2 falls to 19,980
 		with self.assertRaises(guard.LowBalanceError):
-			self.attempt(
-				make_bank_transfer, amount=60000, bank_account=self.bank, execution_date=self.day(2)
-			)
+			self.attempt(make_bank_transfer, amount=60000, bank_account=self.bank, execution_date=self.day(2))
 
 		# Send Now of TR1 (T+3 -> today): T+1 falls to 19,980
 		tr1 = frappe.get_doc("Bank Transfer", self.e1.tr1)
@@ -444,8 +442,7 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 			"issue_date": self.today,
 			"purpose": "Rent",
 			"cheques": [
-				{"due_date": self.day(1), "amount": 30000, "cheque_no": unique_cheque_no()}
-				for _i in range(3)
+				{"due_date": self.day(1), "amount": 30000, "cheque_no": unique_cheque_no()} for _i in range(3)
 			],
 			**values,
 		}

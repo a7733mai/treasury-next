@@ -114,7 +114,12 @@ def _log_failure(company: str):
 	title = _("Bank position alerts failed for company {0}").format(company)
 	if frappe.db.exists(
 		"Error Log",
-		{"reference_doctype": "Company", "reference_name": company, "method": title, "creation": [">=", today()]},
+		{
+			"reference_doctype": "Company",
+			"reference_name": company,
+			"method": title,
+			"creation": [">=", today()],
+		},
 	):
 		return
 	frappe.log_error(title=title, reference_doctype="Company", reference_name=company)
@@ -160,18 +165,14 @@ def send_digest_if_due(company: str, positions: list, now) -> list[str]:
 		banks = set(recipients.visible_banks(user, company, [p.bank_account for p in positions]))
 		if not banks:
 			continue
-		if _locked(
-			{"alert_type": DIGEST, "company": company, "user": user, "alert_date": alert_date}
-		):
+		if _locked({"alert_type": DIGEST, "company": company, "user": user, "alert_date": alert_date}):
 			continue
 		visible = [p for p in positions if p.bank_account in banks]
 
 		def render(user, visible=visible):
 			return notify.digest_message(company, visible, alert_date, days, zero_days, user)
 
-		outcome = notify.deliver(
-			user, render, None, link, _("Bank position digest e-mail could not be sent")
-		)
+		outcome = notify.deliver(user, render, None, link, _("Bank position digest e-mail could not be sent"))
 		if not (outcome.notified or outcome.emailed):
 			continue
 		insert_log(

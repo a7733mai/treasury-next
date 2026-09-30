@@ -45,7 +45,9 @@ def get_thresholds(company: str) -> dict[str, frappe._dict]:
 
 def with_gl_siblings(company: str, banks: list[str]) -> list[str]:
 	"""`banks` and the company bank accounts sharing their GL accounts (one merged position), name order."""
-	accounts = frappe.get_all("Bank Account", filters={"name": ["in", banks]}, pluck="account") if banks else []
+	accounts = (
+		frappe.get_all("Bank Account", filters={"name": ["in", banks]}, pluck="account") if banks else []
+	)
 	accounts = [a for a in accounts if a]
 	siblings = (
 		frappe.get_all(
@@ -146,9 +148,7 @@ def get_day(position, date) -> frappe._dict | None:
 def top_movements(position, date, n: int = 5) -> list[frappe._dict]:
 	"""The largest expected outflows dated up to `date` (overdue ones included), amount descending then date."""
 	date = getdate(date)
-	flows = [
-		f for day in position.days for f in day.flows if f.direction == OUT and getdate(f.date) <= date
-	]
+	flows = [f for day in position.days for f in day.flows if f.direction == OUT and getdate(f.date) <= date]
 	flows.sort(key=lambda f: (-flt(f.amount), getdate(f.date), f.get("reference_name") or ""))
 	return [
 		frappe._dict(

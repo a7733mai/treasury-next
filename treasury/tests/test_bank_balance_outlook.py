@@ -152,9 +152,7 @@ class TestBankBalanceOutlook(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual(card["value"], 1)
 		self.assertEqual(card["fieldtype"], "Int")
 		self.assertEqual(card["route"], ["query-report", "Bank Balance Outlook"])
-		self.assertEqual(
-			card["route_options"], {"company": COMPANY, "horizon_days": 7, "level": "Critical"}
-		)
+		self.assertEqual(card["route_options"], {"company": COMPANY, "horizon_days": 7, "level": "Critical"})
 		# JSON filters (the Number Card passes a string), default horizon
 		self.assertEqual(dashboard.get_low_balance_card(frappe.as_json({"company": COMPANY}))["value"], 1)
 		self.assertEqual(dashboard.get_low_balance_card({"company": COMPANY, "horizon_days": 3})["value"], 0)

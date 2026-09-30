@@ -20,7 +20,6 @@ from frappe.utils import add_days, escape_html, fmt_money, formatdate, get_datet
 
 from treasury.balance_alerts import notify, recipients, scheduler
 from treasury.balance_alerts.positions import evaluate, top_movements
-from treasury.treasury_setup.doctype.treasury_alert_log.treasury_alert_log import TreasuryAlertLog
 from treasury.tests.utils import (
 	ALERT_LOG_DOCTYPE,
 	COMPANY,
@@ -40,6 +39,7 @@ from treasury.tests.utils import (
 	set_recipients,
 	set_thresholds,
 )
+from treasury.treasury_setup.doctype.treasury_alert_log.treasury_alert_log import TreasuryAlertLog
 
 MANAGER = "treasury-alerts-mgr@example.com"
 USER = "treasury-alerts-user@example.com"
@@ -334,9 +334,7 @@ class TestBalanceAlerts(BalanceAlertTestMixin, IntegrationTestCase):
 				logs = alert_logs(company=COMPANY)
 				if notification or email:
 					self.assertEqual(result["digest"], [MANAGER])
-					self.assertEqual(
-						{(log.notified, log.emailed) for log in logs}, {(notification, email)}
-					)
+					self.assertEqual({(log.notified, log.emailed) for log in logs}, {(notification, email)})
 				else:
 					self.assertEqual(result, {"digest": [], "alerts": []})
 					self.assertEqual(logs, [])
@@ -431,7 +429,9 @@ class TestBalanceAlerts(BalanceAlertTestMixin, IntegrationTestCase):
 
 	def test_event_trigger_enqueued(self):
 		e1 = make_alert_fixture_e1(self)
-		self.assertEqual(self.balance_jobs(), [], "no trigger without thresholds (the fixture sets them last)")
+		self.assertEqual(
+			self.balance_jobs(), [], "no trigger without thresholds (the fixture sets them last)"
+		)
 		for mode in ("Ignore", "Warn", "Block"):
 			with self.subTest(mode=mode):
 				self.use_company_settings(on_low_balance=mode)

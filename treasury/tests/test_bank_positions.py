@@ -93,8 +93,7 @@ class TestBankPositions(BalanceAlertTestMixin, IntegrationTestCase):
 		usd_cheque.deliver(handover_date=self.today)
 
 		positions = {
-			p.bank_account: p
-			for p in get_bank_positions(COMPANY, 7, [e1.bank_account, usd.bank_account])
+			p.bank_account: p for p in get_bank_positions(COMPANY, 7, [e1.bank_account, usd.bank_account])
 		}
 		self.assertEqual(set(positions), {e1.bank_account, usd.bank_account})
 		for bank_account, position in positions.items():
@@ -204,7 +203,10 @@ class TestBankPositions(BalanceAlertTestMixin, IntegrationTestCase):
 			bank = ensure_alert_bank()
 			fund_bank(bank, 10000, self.day(-1))
 			cheque = make_pdc_cheque(
-				amount=100 + index, issue_date=self.today, due_date=self.day(1), bank_account=bank.bank_account
+				amount=100 + index,
+				issue_date=self.today,
+				due_date=self.day(1),
+				bank_account=bank.bank_account,
 			)
 			cheque.deliver(handover_date=self.today)
 			banks.append(bank.bank_account)

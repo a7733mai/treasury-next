@@ -92,7 +92,9 @@ class TestBalanceAlertSettings(BalanceAlertTestMixin, IntegrationTestCase):
 		)
 		row = {"bank_account": egp.bank_account, "warning_balance": 10, "minimum_balance": 5}
 		doc = self.company_settings([row, dict(row)])
-		self.assertRaisesRegex(frappe.ValidationError, "already has thresholds", doc.validate_balance_thresholds)
+		self.assertRaisesRegex(
+			frappe.ValidationError, "already has thresholds", doc.validate_balance_thresholds
+		)
 		doc = self.company_settings(
 			[{"bank_account": egp.bank_account, "warning_balance": 4, "minimum_balance": 5}]
 		)

@@ -253,7 +253,12 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 		meta = frappe.get_meta("Treasury Alert Log")
 		self.assertEqual((meta.in_create, meta.read_only, meta.track_changes), (1, 1, 0))
 		log = frappe.get_doc(
-			{"doctype": "Treasury Alert Log", "alert_type": "Digest", "company": COMPANY, "alert_date": day(0)}
+			{
+				"doctype": "Treasury Alert Log",
+				"alert_type": "Digest",
+				"company": COMPANY,
+				"alert_date": day(0),
+			}
 		)
 		with self.set_user(TREASURY_MANAGER):
 			self.assertRaises(frappe.PermissionError, log.insert)

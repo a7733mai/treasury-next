@@ -228,7 +228,9 @@ def finish(
 			_record_override(snapshot, doctype, name, found[0], text)
 			recorded = _("Low balance override recorded: {0}").format(f"{_(doctype)} {name}")
 			frappe.msgprint(
-				f"<p><b>{frappe.utils.escape_html(recorded)}</b></p>{message}", title=title, indicator="orange"
+				f"<p><b>{frappe.utils.escape_html(recorded)}</b></p>{message}",
+				title=title,
+				indicator="orange",
 			)
 		else:
 			hint = (

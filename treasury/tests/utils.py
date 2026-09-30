@@ -1800,7 +1800,9 @@ def make_alert_fixture_e1(testcase) -> frappe._dict:
 		method="Bullet",
 		first_repayment_date=add_days(t0, 5),
 	)
-	c1 = make_pdc_cheque(amount=30000, issue_date=t0, due_date=add_days(t0, 1), bank_account=bank.bank_account)
+	c1 = make_pdc_cheque(
+		amount=30000, issue_date=t0, due_date=add_days(t0, 1), bank_account=bank.bank_account
+	)
 	c1.deliver(handover_date=t0)
 	c2 = make_pdc_cheque(
 		"Incoming", amount=10000, issue_date=t0, due_date=add_days(t0, 2), bank_account=bank.bank_account

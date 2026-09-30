@@ -32,7 +32,9 @@ class BankBalanceOutlook:
 	def __init__(self, filters=None):
 		filters = frappe._dict(filters or {})
 		self.company = validate_company(filters.company)
-		self.horizon = cint(filters.horizon_days) if filters.get("horizon_days") not in (None, "") else horizon()
+		self.horizon = (
+			cint(filters.horizon_days) if filters.get("horizon_days") not in (None, "") else horizon()
+		)
 		if not 1 <= self.horizon <= MAX_HORIZON_DAYS:
 			frappe.throw(_("Horizon must be between 1 and 31 days."))
 		# a bank sharing its GL account with another one is one position: selecting one of them selects both,
@@ -85,7 +87,9 @@ class BankBalanceOutlook:
 			first_breach=position.first_breach,
 			shortfall=flt(shortfall, self.precision),
 			lowest_company_currency=flt(flt(lowest.closing) * rate, self.precision),
-			minimum_company_currency=flt(flt(minimum) * rate, self.precision) if minimum is not None else None,
+			minimum_company_currency=flt(flt(minimum) * rate, self.precision)
+			if minimum is not None
+			else None,
 			current_company_currency=flt(flt(position.current_balance) * rate, self.precision),
 			company_currency=self.company_currency,
 		)
@@ -97,7 +101,9 @@ class BankBalanceOutlook:
 			return column(fieldname, label, "Currency", width, options=options)
 
 		return [
-			column("bank_account", _("Bank Account", context="Treasury"), "Link", 200, options="Bank Account"),
+			column(
+				"bank_account", _("Bank Account", context="Treasury"), "Link", 200, options="Bank Account"
+			),
 			column("level_label", _("Level", context=CTX), "Data", 110),
 			amount("current_balance", _("Current Balance")),
 			amount("lowest_balance", _("Lowest Projected")),
