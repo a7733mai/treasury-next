@@ -1,8 +1,8 @@
 """Naming series of the Treasury DocTypes (spec 7h §2.4 / §3.5), read only: the "Naming Series" section of
 Treasury Company Settings documents them. Treasury adds no naming mechanism of its own:
 
-- the options of a `naming_series` field (and so its default, the first option) are changed with Frappe's
-  Document Naming Settings, which stores them as Property Setters;
+- the options of a `naming_series` field and its default (the field's `default`, else the first option) are
+  changed with Frappe's Document Naming Settings, which stores them as Property Setters;
 - PDC Cheque, Cheque Batch and Security Cheque force their series by direction in `before_insert`
   (`NAMING_SERIES` of their controllers), so re-ordering their options changes nothing;
 - per-bank (or any per-condition) naming is Frappe's Document Naming Rule: rules are evaluated before the
@@ -46,8 +46,9 @@ FORCED_SERIES = {  # the controllers' NAMING_SERIES dicts (single source)
 def get_series_overview() -> list[frappe._dict]:
 	"""One row per Treasury DocType with a naming series: {doctype, series_field, options, default (a series,
 	or {direction: series} when forced by direction), forced_by, bank_field, rules}. Two queries for the rules
-	(the metas are cached)."""
-	rules = get_rules([dt for dt, _direction, _bank in SERIES_DOCTYPES])
+	(the metas are cached). The rules (a System Manager DocType: prefixes, counters, bank names in the
+	conditions) are listed only for a user who may read Document Naming Rule, else `rules` is empty."""
+	rules = get_rules([dt for dt, _direction, _bank in SERIES_DOCTYPES]) if can_read_rules() else {}
 	rows = []
 	for doctype, direction_field, bank_field in SERIES_DOCTYPES:
 		options = [o for o in frappe.get_meta(doctype).get_naming_series_options() if o]
@@ -57,13 +58,24 @@ def get_series_overview() -> list[frappe._dict]:
 				doctype=doctype,
 				series_field=SERIES_FIELD,
 				options=options,
-				default=dict(forced) if forced else get_default_naming_series(doctype),
+				default=dict(forced) if forced else default_series(doctype),
 				forced_by=direction_field,
 				bank_field=bank_field,
 				rules=rules.get(doctype, []),
 			)
 		)
 	return rows
+
+
+def can_read_rules() -> bool:
+	return bool(frappe.has_permission(RULE, "read"))
+
+
+def default_series(doctype: str) -> str | None:
+	"""The series a new document gets: the field's `default` (the DocField's own, or the one Document Naming
+	Settings writes with the options), else the first option."""
+	field = frappe.get_meta(doctype).get_field(SERIES_FIELD)
+	return (field and field.default) or get_default_naming_series(doctype)
 
 
 def get_rules(doctypes: list[str]) -> dict[str, list[frappe._dict]]:

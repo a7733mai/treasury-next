@@ -947,7 +947,13 @@ function tcs_fix(frm, item) {
 		action.field && frm.scroll_to_field(action.field);
 		return;
 	}
-	const go = () => frappe.set_route(...action.route, action.route_options || {});
+	// a field of the target form: its refresh scrolls to route_options.scroll_to (form.js scroll_to_element)
+	const route_options = Object.assign(
+		{},
+		action.route_options || {},
+		action.field ? { scroll_to: action.field } : {}
+	);
+	const go = () => frappe.set_route(...action.route, route_options);
 	if (!frm.is_dirty()) {
 		go();
 		return;
@@ -1008,6 +1014,24 @@ const TCS_FIXED_NAMING = [
 	"Treasury Company Settings",
 	"Treasury Alert Log",
 ];
+
+function tcs_open_naming_settings(doctype) {
+	// route_options only fill new documents, and the Single form never reads them: a one-shot refresh handler
+	// selects the doctype instead (bound once; the pending value is cleared when used)
+	frappe.provide("treasury");
+	treasury.tcs_naming_doctype = doctype;
+	if (!treasury.tcs_naming_handler_bound) {
+		treasury.tcs_naming_handler_bound = true;
+		frappe.ui.form.on("Document Naming Settings", "refresh", (dns_frm) => {
+			const pending = treasury.tcs_naming_doctype;
+			treasury.tcs_naming_doctype = null;
+			if (pending && dns_frm.doc.transaction_type !== pending) {
+				dns_frm.set_value("transaction_type", pending);
+			}
+		});
+	}
+	frappe.set_route("Form", "Document Naming Settings");
+}
 
 function tcs_render_naming_series(frm) {
 	const field = frm.get_field("naming_series_help");
@@ -1101,8 +1125,7 @@ function tcs_render_naming_series(frm) {
 	});
 	field.$wrapper.find(".tcs-naming-settings").on("click", (e) => {
 		const row = rows[cint($(e.currentTarget).attr("data-index"))];
-		frappe.route_options = { transaction_type: row.doctype };
-		frappe.set_route("Form", "Document Naming Settings");
+		tcs_open_naming_settings(row.doctype);
 	});
 	field.$wrapper.find(".tcs-naming-rule").on("click", (e) => {
 		const row = rows[cint($(e.currentTarget).attr("data-index"))];

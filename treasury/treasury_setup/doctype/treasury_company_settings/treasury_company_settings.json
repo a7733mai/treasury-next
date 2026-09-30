@@ -87,7 +87,7 @@
   },
   {
    "collapsible": 1,
-   "collapsible_depends_on": "eval:doc.__onload && doc.__onload.setup_complete",
+   "collapsible_depends_on": "eval:!(doc.__onload && doc.__onload.setup_complete)",
    "fieldname": "setup_checklist_section",
    "fieldtype": "Section Break",
    "label": "Setup Checklist"

@@ -235,19 +235,35 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 	}
 
 	set_setup_button(setup) {
-		// only for a user who may read the company's settings (spec: `setup` is null otherwise)
-		if (setup && !this.$setup_button) {
+		// only for a user who may read the company's settings (spec: `setup` is null otherwise) and, without
+		// settings, create them (`route` is null otherwise)
+		const show = !!(setup && setup.route);
+		if (show && !this.$setup_button) {
 			this.$setup_button = this.page.add_inner_button(
 				__("Setup Checklist"),
 				() => this.data && this.data.setup && this.open_setup(this.data.setup),
 				__("Open", null, TD_CTX)
 			);
 		}
-		this.$setup_button && this.$setup_button.toggleClass("hidden", !setup);
+		if (this.$setup_button) {
+			// add_inner_button also adds a mobile menu entry ("Open > Setup Checklist"): toggle both
+			this.$setup_button.toggleClass("hidden", !show);
+			this.setup_menu_item().toggleClass("hidden", !show);
+		}
+	}
+
+	setup_menu_item() {
+		const label = `${__("Open", null, TD_CTX)} > ${__("Setup Checklist")}`;
+		return this.page.menu
+			.find(".menu-item-label")
+			.filter((_i, el) => $(el).text().trim() === label)
+			.closest("li");
 	}
 
 	open_setup(setup) {
-		this.go(setup.route, setup.route_options || {});
+		if (setup && setup.route) {
+			this.go(setup.route, setup.route_options || {});
+		}
 	}
 
 	go(route, route_options) {
@@ -517,8 +533,10 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 	}
 
 	multi_bank_note(route) {
-		const selected = this.filters().bank_accounts.length;
-		return selected > 1 && route && TD_SINGLE_BANK_ROUTES.includes(route[1])
+		// the effective banks (the server adds the GL siblings): one selected bank may count as two, and then
+		// the single-bank report opens without its bank filter
+		const effective = (this.data.bank_accounts || []).length;
+		return effective > 1 && route && TD_SINGLE_BANK_ROUTES.includes(route[1])
 			? __("The report opens for all banks of the company.")
 			: "";
 	}
@@ -727,12 +745,16 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 			color === "orange"
 				? `<a href="#" class="trd-dismiss" aria-label="${this.esc(__("Dismiss", null, TD_CTX))}">×</a>`
 				: "";
+		// no route: the user may not create the settings, so no button leading to a form they cannot save
+		const action = setup.route
+			? `<a href="#" class="btn btn-xs btn-default"${this.drill({
+					route: setup.route,
+					route_options: setup.route_options,
+			  })}>${this.esc(button)}</a>`
+			: `<span class="text-muted small">${this.esc(__("Ask your Treasury Manager to set it up."))}</span>`;
 		return `<div class="trd-banner trd-banner-${color}" role="status">
 			<span class="trd-banner-text">${this.esc(text)}</span>
-			<a href="#" class="btn btn-xs btn-default"${this.drill({
-				route: setup.route,
-				route_options: setup.route_options,
-			})}>${this.esc(button)}</a>
+			${action}
 			${dismiss}
 		</div>`;
 	}
@@ -806,11 +828,11 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 
 	empty_positions() {
 		const setup = this.data.setup;
-		const link = setup
-			? ` <a href="#"${this.drill({ route: setup.route, route_options: setup.route_options })}>${this.esc(
-					__("Open Setup Checklist")
-			  )}</a>`
-			: "";
+		const open = __("Open Setup Checklist");
+		const link =
+			setup && setup.route
+				? ` <a href="#"${this.drill({ route: setup.route, route_options: setup.route_options })}>${this.esc(open)}</a>`
+				: "";
 		return `<div class="trd-section"><div class="trd-empty text-muted">${this.esc(
 			__("No company bank account with a GL account.")
 		)}${link}</div></div>`;
@@ -1331,9 +1353,35 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 		});
 	}
 
+	/**
+	 * frappe-charts writes axis labels, legend (dataset names), marker labels and tooltip titles as innerHTML:
+	 * every text given to it is escaped here (bank account and category names are user data). The chart
+	 * builders keep the raw texts; this is the single place where they reach the chart.
+	 */
+	safe_chart_data(data) {
+		const safe = Object.assign({}, data, {
+			labels: (data.labels || []).map((label) => this.esc(label)),
+			datasets: (data.datasets || []).map((d) => Object.assign({}, d, { name: this.esc(d.name) })),
+		});
+		if (data.yMarkers) {
+			safe.yMarkers = data.yMarkers.map((m) => Object.assign({}, m, { label: this.esc(m.label) }));
+		}
+		return safe;
+	}
+
+	safe_tooltip(options) {
+		// the chart hands back the escaped label: format the raw one, then escape the result
+		const raw = new Map();
+		(options.data.labels || []).forEach((label) => raw.set(this.esc(label), label));
+		const format_x = options.format_x || ((label) => label);
+		return {
+			formatTooltipX: (label) => this.esc(format_x(raw.has(label) ? raw.get(label) : label)),
+			formatTooltipY: (value) => this.esc(format_currency(value, this.data.company_currency)),
+		};
+	}
+
 	mount_charts() {
 		const phone = this.is_phone();
-		const currency = this.data.company_currency;
 		this.$body.find("[data-chart]").each((_i, el) => {
 			const build = this.charts[cint($(el).attr("data-chart"))];
 			const options = build && build();
@@ -1346,17 +1394,14 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 			}
 			try {
 				new frappe.Chart(el, {
-					data: options.data,
+					data: this.safe_chart_data(options.data),
 					type: options.type,
 					height: phone ? 200 : 240,
 					colors: options.colors,
 					barOptions: options.bar_options,
 					lineOptions: { regionFill: 0, hideDots: this.data.horizon > 14 ? 1 : 0 },
 					axisOptions: { xIsSeries: 1, shortenYAxisNumbers: 1 },
-					tooltipOptions: {
-						formatTooltipX: options.format_x || ((label) => label),
-						formatTooltipY: (value) => format_currency(value, currency),
-					},
+					tooltipOptions: this.safe_tooltip(options),
 				});
 			} catch (e) {
 				console.error(e);

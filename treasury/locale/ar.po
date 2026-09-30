@@ -13184,6 +13184,12 @@ msgstr "اختر شركة لعرض مركز الخزينة."
 msgid "Ask your Treasury Manager for access."
 msgstr "اطلب الصلاحية من مدير الخزينة."
 
+msgid "Ask your Treasury Manager to set it up."
+msgstr "اطلب من مدير الخزينة إعدادها."
+
+msgid "Invalid Bank Account."
+msgstr "حساب بنكي غير صالح."
+
 msgid "Some sections are hidden because of your permissions."
 msgstr "بعض الأقسام مخفية بسبب صلاحياتك."
 

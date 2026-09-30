@@ -23,6 +23,7 @@ from treasury.tests.utils import (
 	ensure_charge_category,
 	ensure_company,
 	ensure_mode,
+	ensure_user,
 	fee_rule,
 	make_bank_transfer,
 	make_cheque_layout,
@@ -38,6 +39,7 @@ from treasury.treasury_setup.checklist import ITEMS, MISSING, OK, RECOMMENDED, R
 from treasury.utils.naming import SERIES_DOCTYPES, get_series_overview
 
 SETTINGS = "Treasury Company Settings"
+NAMING_READER = "treasury-naming-reader@example.com"
 NO_DEFAULT_BANKS = {
 	"default_outgoing_cheque_bank_account": None,
 	"default_normal_bank_account": None,
@@ -216,6 +218,54 @@ class TestSetupChecklist(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual(status.route, ["Form", SETTINGS, "new"])
 		self.assertEqual(status.route_options, {"company": OTHER_COMPANY})
+
+	def test_checklist_open_until_setup_is_complete(self):
+		# Frappe collapses a collapsible section while `collapsible_depends_on` is false (layout.js): the
+		# checklist stays open while setup is incomplete and folds once it is complete
+		section = frappe.get_meta(SETTINGS).get_field("setup_checklist_section")
+		self.assertEqual(section.collapsible, 1)
+		self.assertEqual(section.collapsible_depends_on, "eval:!(doc.__onload && doc.__onload.setup_complete)")
+
+	def test_naming_rules_only_for_rule_readers(self):
+		rule = frappe.get_doc(
+			{
+				"doctype": "Document Naming Rule",
+				"document_type": "Bank Charge",
+				"prefix": "BCH-SECRET-",
+				"prefix_digits": 4,
+				"conditions": [{"field": "bank_account", "condition": "=", "value": self.data.egp.bank_account}],
+			}
+		).insert(ignore_permissions=True)
+		self.addCleanup(
+			frappe.delete_doc, "Document Naming Rule", rule.name, ignore_permissions=True, force=True
+		)
+		row = next(r for r in get_series_overview() if r.doctype == "Bank Charge")
+		self.assertIn(rule.name, [r.name for r in row.rules])
+
+		user = ensure_user(NAMING_READER, ["Treasury User"])  # reads the settings, not the rules
+		self.assertFalse(frappe.has_permission("Document Naming Rule", "read", user=user))
+		with self.set_user(user):
+			rows = get_series_overview()
+		self.assertEqual(len(rows), len(SERIES_DOCTYPES))
+		self.assertTrue(all(r.rules == [] for r in rows))
+		self.assertNotIn("BCH-SECRET-", frappe.as_json(rows))
+
+	def test_naming_default_is_the_field_default(self):
+		# Bank Transfer's DocField default wins over the first option (Customize Form re-ordering)
+		setter = make_property_setter(
+			"Bank Transfer", "naming_series", "options", "BTX-.YYYY.-.#####\nBT-.YYYY.-.#####", "Text"
+		)
+		self.addCleanup(frappe.clear_cache, doctype="Bank Transfer")
+		self.addCleanup(frappe.delete_doc, "Property Setter", setter.name, ignore_permissions=True, force=True)
+		frappe.clear_cache(doctype="Bank Transfer")
+		field_default = frappe.get_meta("Bank Transfer").get_field("naming_series").default
+		self.assertEqual(field_default, "BT-.YYYY.-.#####")
+		row = next(r for r in get_series_overview() if r.doctype == "Bank Transfer")
+		self.assertEqual(row.default, field_default)
+		# a series field without a default: the first option
+		self.assertFalse(frappe.get_meta("Letter of Guarantee").get_field("naming_series").default)
+		row = next(r for r in get_series_overview() if r.doctype == "Letter of Guarantee")
+		self.assertEqual(row.default, row.options[0])
 
 	def test_naming_overview(self):
 		rows = {row.doctype: row for row in get_series_overview()}

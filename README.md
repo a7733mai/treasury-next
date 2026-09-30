@@ -174,9 +174,9 @@ fix it; *Required* items must be done before the first cheque, *Recommended* one
 | PDC Cheque | `naming_series` (hidden) | `PDC-OUT-.YYYY.-.#####`, `PDC-IN-.YYYY.-.#####` | fixed by direction | `bank_account` (+ `direction`) |
 | Cheque Batch | `naming_series` (hidden) | `CHQB-OUT-.YYYY.-.####`, `CHQB-IN-.YYYY.-.####` | fixed by direction | `bank_account` (+ `direction`) |
 | Security Cheque | `naming_series` (hidden) | `SEC-IN-.YYYY.-.#####`, `SEC-OUT-.YYYY.-.#####` | fixed by direction | `bank_account` (+ `direction`) |
-| Cheque Book | `naming_series` (hidden) | `CHB-.YYYY.-.####` | first option (Document Naming Settings) | `bank_account` |
-| Bank Transfer | `naming_series` (visible) | `BT-.YYYY.-.#####` | user / first option | `bank_account` |
-| Bank Charge | `naming_series` (visible) | `BCH-.YYYY.-.#####` | user / first option | `bank_account` |
+| Cheque Book | `naming_series` (hidden) | `CHB-.YYYY.-.####` | field default (Document Naming Settings) | `bank_account` |
+| Bank Transfer | `naming_series` (visible) | `BT-.YYYY.-.#####` | user / field default | `bank_account` |
+| Bank Charge | `naming_series` (visible) | `BCH-.YYYY.-.#####` | user / field default | `bank_account` |
 | Bank Facility | `naming_series` (hidden) | `BF-.YYYY.-.#####` | first option | `default_bank_account` |
 | Facility Drawdown | `naming_series` (hidden) | `FDD-.YYYY.-.#####` | first option | `bank_account` |
 | Facility Repayment | `naming_series` (hidden) | `FRP-.YYYY.-.#####` | first option | `bank_account` |
@@ -190,6 +190,9 @@ priority first; its counter is one number that does not restart each year. PDC C
 Security Cheque pick their series by direction, so re-ordering their options in Document Naming Settings
 changes nothing: use a rule with a `direction` condition. Cheque Layout (`CHL-#####`), Bank Charge Category,
 Custody Location, Treasury Company Settings (by name) and Treasury Alert Log (hash) are named by the app.
+The default of a series is the field's default (the one Document Naming Settings writes; Bank Transfer, Bank
+Charge and Cheque Book ship one), else the first option. The section lists the existing rules only to users
+who may read Document Naming Rule (System Manager).
 
 ### Configuration
 
@@ -911,8 +914,9 @@ of its sidebar) shows the treasury of one company at a glance. It only reads dat
 when clicked (with the same filters).
 
 - **Filters**: Company, Bank Accounts (several; a bank sharing its GL account with a selected one is added,
-  as in Bank Balance Outlook), Horizon 7 / 14 / 30 days. The last filters are remembered in the browser.
-- **Bank positions** (bank filter applies): *Cash Today* and *Projected in 7 Days* (company currency),
+  as in Bank Balance Outlook, unless a User Permission hides it from the user), Horizon 7 / 14 / 30 days. The last filters are remembered in the browser.
+- **Bank positions** (bank filter applies): *Cash Today* and *Projected in {H} Days* (the closing at the end
+  of the chosen horizon H, company currency),
   *Banks Below Minimum* / *Below Warning* (Bank Balance Outlook for the horizon), one row per bank (level,
   current, lowest and closing balance in the bank currency — equal to the Bank Balance Outlook row), the
   projected balance curve and the daily (weekly for 30 days) inflows / outflows. The positions come from one
@@ -927,7 +931,8 @@ when clicked (with the same filters).
   "and N more"), overdue and next installments (the facility cards), Letters of Guarantee / Credit expiring
   within 30 days (LG / LC Register, *Expiring Within (Days)* 30) and the 30-day maturities chart by category.
 - **Setup banner**: the number of Setup Checklist items missing (red while a *Required* one is), for users who
-  may read the company's Treasury Company Settings.
+  may read the company's Treasury Company Settings (the "Create Company Settings" button only for users who
+  may create them).
 - **Permissions**: the page is open to Treasury Manager / User, Cheque Approver, Accounts Manager / User and
   System Manager. A section whose DocType the user may not read for the company (or that a User Permission
   forbids, e.g. on a Bank Account) is left out; a user who may read none gets a permission error. Amounts in the
@@ -1095,6 +1100,11 @@ Deleted with the app's doctypes (they would be orphans): every **Property Setter
 Document Naming Settings), **Document Naming Rule** and **Custom Field** (e.g. the accounting dimension fields
 ERPNext added) that targets a Treasury DocType — `bench uninstall-app` itself does not delete those without a
 module. Property Setters on core doctypes (the Payment Entry series) are kept.
+
+Not deleted (remove them by hand before uninstalling if you made any): other customisations that point to a
+Treasury DocType — Client Scripts, Server Scripts, Custom DocPerms (role permissions changed in Role
+Permissions Manager), Workflows, Notifications, non-standard Print Formats / Reports, and User Permissions
+whose *Allow* is a Treasury DocType. They stay as orphan records that no longer do anything.
 
 ### Testing
 

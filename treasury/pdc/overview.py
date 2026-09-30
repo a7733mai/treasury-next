@@ -31,7 +31,7 @@ from treasury.balance_alerts.positions import (
 	apply_thresholds,
 	get_thresholds,
 	level_order,
-	with_gl_siblings,
+	with_permitted_gl_siblings,
 )
 from treasury.pdc.bank_positions import collect_positions
 from treasury.pdc.report.bank_balance_outlook.bank_balance_outlook import LEVEL_CTX
@@ -115,7 +115,8 @@ def get_overview(company, bank_accounts=None, horizon=DEFAULT_HORIZON, today=Non
 	banks = None
 	if names:
 		get_bank_accounts(company, names)  # another company's bank or a forbidden one raises
-		banks = with_gl_siblings(company, names)
+		# a sibling the user may not see is neither named nor counted
+		banks = with_permitted_gl_siblings(company, names)
 
 	ctx = frappe._dict(
 		company=company,
@@ -567,6 +568,7 @@ def facilities_section(ctx) -> frappe._dict:
 	converter = company_converter(ctx)
 	rows = []
 	for facility in facilities[:MAX_FACILITIES]:
+		# no `as_on`, as the report without its "As On" filter (everything posted); only the rate is at ctx.today
 		u = get_utilisation(facility.name)
 		rate = converter.rate(facility.currency)
 		rows.append(
@@ -645,53 +647,43 @@ def installments_section(ctx) -> frappe._dict:
 	)
 
 
-def guarantees_section(ctx) -> frappe._dict:
-	from treasury.bank_facilities.report.lg_register import lg_register
-
+def instruments_section(ctx, register, report: str, number: str, party: str) -> frappe._dict:
+	"""The open instruments of `register` (LG / LC Register module) expiring within EXPIRY_WINDOW_DAYS of the
+	dashboard's today: count, open amount and the next NEXT_INSTRUMENTS by expiry date."""
 	filters = {"company": ctx.company, "open_only": 1, "expiring_within": EXPIRY_WINDOW_DAYS}
-	data = lg_register.execute(dict(filters))[1]
-	return frappe._dict(
-		count=len(data),
-		amount=flt(sum(flt(r.open_company) for r in data), ctx.precision),
-		next=[
-			frappe._dict(
-				name=r.name,
-				lg_no=r.lg_no,
-				beneficiary_name=r.beneficiary_name,
-				effective_expiry_date=iso(r.effective_expiry_date),
-				days_to_expiry=r.days_to_expiry,
-				open_company=r.open_company,
-			)
-			for r in data[:NEXT_INSTRUMENTS]
-		],
-		route=["query-report", "LG Register"],
-		route_options=filters,
-	)
-
-
-def credits_section(ctx) -> frappe._dict:
-	from treasury.bank_facilities.report.lc_register import lc_register
-
-	filters = {"company": ctx.company, "open_only": 1, "expiring_within": EXPIRY_WINDOW_DAYS}
-	data = lc_register.execute(dict(filters))[1]
+	data = register.execute(dict(filters), today=ctx.today)[1]
 	data = sorted(data, key=lambda r: (getdate(r.effective_expiry_date), r.name))
 	return frappe._dict(
 		count=len(data),
 		amount=flt(sum(flt(r.open_company) for r in data), ctx.precision),
 		next=[
 			frappe._dict(
-				name=r.name,
-				lc_no=r.lc_no,
-				supplier_name=r.supplier_name,
-				effective_expiry_date=iso(r.effective_expiry_date),
-				days_to_expiry=r.days_to_expiry,
-				open_company=r.open_company,
+				{
+					"name": r.name,
+					number: r.get(number),
+					party: r.get(party),
+					"effective_expiry_date": iso(r.effective_expiry_date),
+					"days_to_expiry": r.days_to_expiry,
+					"open_company": r.open_company,
+				}
 			)
 			for r in data[:NEXT_INSTRUMENTS]
 		],
-		route=["query-report", "LC Register"],
+		route=["query-report", report],
 		route_options=filters,
 	)
+
+
+def guarantees_section(ctx) -> frappe._dict:
+	from treasury.bank_facilities.report.lg_register import lg_register
+
+	return instruments_section(ctx, lg_register, "LG Register", "lg_no", "beneficiary_name")
+
+
+def credits_section(ctx) -> frappe._dict:
+	from treasury.bank_facilities.report.lc_register import lc_register
+
+	return instruments_section(ctx, lc_register, "LC Register", "lc_no", "supplier_name")
 
 
 SECTION_BUILDERS = {

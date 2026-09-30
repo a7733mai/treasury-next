@@ -11,8 +11,13 @@ frappe.query_reports["Bounced and Postponed Cheques"] = {
 			default: frappe.defaults.get_user_default("Company"),
 			reqd: 1,
 			on_change: function () {
-				// another company's bank account does not apply (design 7h §5)
-				frappe.query_report.set_filter_value("bank_account", "");
+				// another company's bank account does not apply (design 7h §5). An on_change replaces the
+				// report's own refresh, and clearing an already empty filter fires nothing: refresh here then.
+				if (frappe.query_report.get_filter_value("bank_account")) {
+					frappe.query_report.set_filter_value("bank_account", "");
+				} else {
+					frappe.query_report.refresh();
+				}
 			},
 		},
 		{

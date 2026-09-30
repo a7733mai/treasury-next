@@ -82,15 +82,17 @@ def get_checklist(settings_doc) -> list[frappe._dict]:
 
 def get_status(company: str) -> frappe._dict:
 	"""{exists, complete, missing, required_missing, route (, route_options)} of the company's checklist:
-	`missing` = the number of items Missing, `complete` = no Required item Missing."""
+	`missing` = the number of items Missing, `complete` = no Required item Missing. Without settings, the route
+	to create them is given only to a user who may create them (else `route` is None)."""
 	if not frappe.db.exists(SETTINGS, company):
+		can_create = frappe.has_permission(SETTINGS, "create")
 		return frappe._dict(
 			exists=0,
 			complete=0,
 			missing=len(ITEMS),
 			required_missing=1,
-			route=["Form", SETTINGS, "new"],
-			route_options={"company": company},
+			route=["Form", SETTINGS, "new"] if can_create else None,
+			route_options={"company": company} if can_create else None,
 		)
 	doc = frappe.get_doc(SETTINGS, company)
 	doc.check_permission("read")

@@ -11,6 +11,7 @@ from frappe.utils import cint, flt, getdate
 
 from treasury.pdc.bank_positions import get_bank_positions
 from treasury.pdc.report.bank_position_forecast.bank_position_forecast import OUT
+from treasury.pdc.report_utils import is_permitted_value
 from treasury.utils.settings import stored_single_value
 
 WARNING, CRITICAL, OK, NO_THRESHOLD = "Warning", "Critical", "OK", "No Threshold"
@@ -59,6 +60,15 @@ def with_gl_siblings(company: str, banks: list[str]) -> list[str]:
 		else []
 	)
 	return sorted(set(banks) | set(siblings))
+
+
+def with_permitted_gl_siblings(company: str, banks: list[str]) -> list[str]:
+	"""`with_gl_siblings` for a user's view (reports, dashboard): a sibling the user may not see (User
+	Permission on Bank Account) is left out, never named nor counted. The selected `banks` stay as given (a
+	forbidden one is refused by the engine)."""
+	return [
+		b for b in with_gl_siblings(company, banks) if b in banks or is_permitted_value("Bank Account", b)
+	]
 
 
 def alert_settings() -> frappe._dict:

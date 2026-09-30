@@ -15,7 +15,13 @@ from frappe import _
 from frappe.utils import cint, flt, fmt_money
 
 from treasury.accounting import posting
-from treasury.balance_alerts.positions import LEVELS, evaluate, horizon, level_order, with_gl_siblings
+from treasury.balance_alerts.positions import (
+	LEVELS,
+	evaluate,
+	horizon,
+	level_order,
+	with_permitted_gl_siblings,
+)
 from treasury.pdc.report_utils import as_list, column, get_precision, report_today, validate_company
 
 MAX_HORIZON_DAYS = 31
@@ -38,8 +44,9 @@ class BankBalanceOutlook:
 		if not 1 <= self.horizon <= MAX_HORIZON_DAYS:
 			frappe.throw(_("Horizon must be between 1 and 31 days."))
 		# a bank sharing its GL account with another one is one position: selecting one of them selects both,
-		# so the row keeps its pooled flows and strictest thresholds (the GL balance covers both anyway)
-		self.banks = with_gl_siblings(self.company, as_list(filters.bank_account))
+		# so the row keeps its pooled flows and strictest thresholds (the GL balance covers both anyway); a
+		# sibling the user may not see is left out
+		self.banks = with_permitted_gl_siblings(self.company, as_list(filters.bank_account))
 		self.level = filters.level or None
 		if self.level and self.level not in LEVELS:
 			frappe.throw(_("Invalid level: {0}").format(self.level))

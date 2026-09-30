@@ -13,6 +13,7 @@ from frappe.utils import add_days, flt, formatdate, get_first_day, getdate
 
 from treasury.bank_facilities.dashboard import get_facility_card
 from treasury.pdc import dashboard
+from treasury.pdc import overview as overview_module
 from treasury.pdc.overview import HORIZONS, get_overview
 from treasury.pdc.page.treasury_dashboard.treasury_dashboard import get_dashboard_data
 from treasury.tests.test_bank_positions import add_twin
@@ -405,3 +406,42 @@ class TestTreasuryDashboard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual(json.loads(frappe.as_json(data)), json.loads(frappe.as_json(self.overview(7))))
 		data = get_dashboard_data(COMPANY, None, None)
 		self.assertEqual((data.horizon, data.bank_accounts), (7, []))
+		# anything but a list of names is a clean validation error, not a failing query
+		for bad in (json.dumps([{"name": self.bank}]), json.dumps([1]), json.dumps([[self.bank]]), "[oops"):
+			with self.subTest(bank_accounts=bad):
+				self.assertRaisesRegex(
+					frappe.ValidationError, "Invalid Bank Account", get_dashboard_data, COMPANY, bad, "7"
+				)
+
+	def test_instruments_follow_the_dashboard_today(self):
+		"""The LG / LC sections use the dashboard's today (not the reports' own) and list by expiry date."""
+		bank = make_own_bank()
+		facility = make_bank_facility(
+			total_limit=2_000_000,
+			limits=[
+				{"limit_type": "Letter of Guarantee", "limit_amount": 1_000_000},
+				{"limit_type": "Letter of Credit", "limit_amount": 1_000_000},
+			],
+			bank_account=bank.bank_account,
+			start_date=self.day(-30),
+			expiry_date=self.day(365),
+		)
+		late_lg = make_letter_of_guarantee(facility, amount=1000, issue_date=self.today, expiry_date=self.day(60))
+		late_lc = make_letter_of_credit(facility, amount=1000, issue_date=self.today, expiry_date=self.day(60))
+		make_letter_of_guarantee(facility, amount=1000, issue_date=self.today, expiry_date=self.day(20))
+
+		now = frappe._dict(company=COMPANY, today=self.today, precision=2)
+		later = frappe._dict(now, today=self.day(40))
+		sections = (
+			(overview_module.guarantees_section, late_lg),
+			(overview_module.credits_section, late_lc),
+		)
+		for section, late in sections:
+			with self.subTest(section=section.__name__):
+				self.assertNotIn(late.name, [r.name for r in section(now).next])
+				result = section(later)
+				self.assertIn(late.name, [r.name for r in result.next])
+				first = result.next[0]
+				self.assertEqual(first.days_to_expiry, (getdate(first.effective_expiry_date) - later.today).days)
+				dates = [r.effective_expiry_date for r in result.next]
+				self.assertEqual(dates, sorted(dates))

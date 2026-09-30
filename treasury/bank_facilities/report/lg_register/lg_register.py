@@ -11,7 +11,7 @@ Guarantees are read with `frappe.get_list` (permissions and User Permissions app
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, date_diff, flt
+from frappe.utils import add_days, cint, date_diff, flt, getdate
 
 from treasury.bank_facilities import lg
 from treasury.bank_facilities.report_utils import CompanyConverter, report_today
@@ -40,11 +40,12 @@ FIELDS = [
 ]
 
 
-def execute(filters=None):
+def execute(filters=None, today=None):
+	"""`today` (default: the reports' today) is for the callers of the code, e.g. the Treasury Dashboard."""
 	filters = frappe._dict(filters or {})
 	company = validate_company(filters.company, lg.DOCTYPE)
-	today = report_today()
-	converter = CompanyConverter(company)
+	today = getdate(today) if today else report_today()
+	converter = CompanyConverter(company, today)
 	precision = get_precision()
 
 	conditions = {"company": company, "docstatus": 1}
