@@ -343,7 +343,10 @@ def delete_custom_fields():
 def app_doctypes() -> list[str]:
 	"""The DocTypes of the app's Module Defs."""
 	return frappe.get_all(
-		"DocType", filters={"module": ["in", frappe.get_module_list("treasury")]}, pluck="name", order_by="name"
+		"DocType",
+		filters={"module": ["in", frappe.get_module_list("treasury")]},
+		pluck="name",
+		order_by="name",
 	)
 
 

@@ -165,7 +165,9 @@ class TestInstall(IntegrationTestCase):
 		deleted, output = self.record_uninstall()
 
 		expected = [
-			(doctype, name) for doctype, names in install.app_doctype_customisations().items() for name in names
+			(doctype, name)
+			for doctype, names in install.app_doctype_customisations().items()
+			for name in names
 		]
 		self.assertEqual(deleted, expected)
 		self.assertLessEqual(

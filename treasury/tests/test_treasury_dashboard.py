@@ -350,7 +350,9 @@ class TestTreasuryDashboard(BalanceAlertTestMixin, IntegrationTestCase):
 		for days in (10, 60):
 			make_letter_of_guarantee(facility, amount=1000, issue_date=self.today, expiry_date=self.day(days))
 			make_letter_of_credit(facility, amount=1000, issue_date=self.today, expiry_date=self.day(days))
-		accepted = make_letter_of_credit(facility, amount=1000, issue_date=self.today, expiry_date=self.day(5))
+		accepted = make_letter_of_credit(
+			facility, amount=1000, issue_date=self.today, expiry_date=self.day(5)
+		)
 		frappe.db.set_value("Letter of Credit", accepted.name, "status", "Accepted")
 
 		after = self.overview()

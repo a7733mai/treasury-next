@@ -57,7 +57,9 @@ class TestTreasuryDashboardQueries(BalanceAlertTestMixin, IntegrationTestCase):
 			start_date=self.day(-30),
 			expiry_date=self.day(365),
 		)
-		make_letter_of_guarantee(self.instruments, amount=500, issue_date=self.today, expiry_date=self.day(20))
+		make_letter_of_guarantee(
+			self.instruments, amount=500, issue_date=self.today, expiry_date=self.day(20)
+		)
 		make_letter_of_credit(self.instruments, amount=500, issue_date=self.today, expiry_date=self.day(20))
 
 	def measure(self) -> int:
@@ -89,7 +91,9 @@ class TestTreasuryDashboardQueries(BalanceAlertTestMixin, IntegrationTestCase):
 		held = make_security_cheque("Incoming", amount=4000, issue_date=self.today)
 		held.receive(receipt_date=self.today)
 		make_security_cheque("Outgoing", amount=1500, issue_date=self.today).issue(handover_date=self.today)
-		make_letter_of_guarantee(self.instruments, amount=1000, issue_date=self.today, expiry_date=self.day(10))
+		make_letter_of_guarantee(
+			self.instruments, amount=1000, issue_date=self.today, expiry_date=self.day(10)
+		)
 		make_letter_of_credit(self.instruments, amount=1000, issue_date=self.today, expiry_date=self.day(10))
 		make_drawdown(
 			self.fx.facility,

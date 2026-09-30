@@ -152,9 +152,7 @@ class TestSetupChecklist(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(item.status, MISSING)
 		self.assertIn(egp, item.missing)
 		banks = [b.name for b in checklist.company_banks(COMPANY)]
-		set_thresholds(
-			self, [{"bank_account": b, "warning_balance": 0, "minimum_balance": 0} for b in banks]
-		)
+		set_thresholds(self, [{"bank_account": b, "warning_balance": 0, "minimum_balance": 0} for b in banks])
 		self.assertEqual(self.items()["balance_thresholds"].status, OK)
 
 		# cheque layouts (the PDC Accounts rows have no Cheque Print Format)

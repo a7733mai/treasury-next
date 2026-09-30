@@ -602,8 +602,8 @@ def facilities_section(ctx) -> frappe._dict:
 
 
 def installments_section(ctx) -> frappe._dict:
-	from treasury.bank_facilities.report_utils import get_installments
 	from treasury.bank_facilities.repayment import OVERDUE
+	from treasury.bank_facilities.report_utils import get_installments
 
 	route = ["query-report", "Facility Repayment Schedule Report"]
 	until = getdate(add_days(ctx.today, MATURITY_DAYS))
