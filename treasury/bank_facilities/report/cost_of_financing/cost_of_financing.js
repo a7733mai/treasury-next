@@ -1,6 +1,10 @@
 // Copyright (c) 2026, Ahmed Abdelmageed and contributors
 // For license information, please see license.txt
 
+// Design 7g §8.1: one column per cost category (the server leaves out a category that is 0 everywhere, P20);
+// amounts are blank when 0 so the eye finds the money.
+const COST_OF_FINANCING_AMOUNTS = ["interest", "profit", "ijarah", "commission", "fees", "penalty", "charity", "total"];
+
 frappe.query_reports["Cost of Financing"] = {
 	filters: [
 		{
@@ -38,6 +42,15 @@ frappe.query_reports["Cost of Financing"] = {
 			reqd: 1,
 		},
 		{
+			fieldname: "lender_type",
+			label: __("Lender Type"),
+			fieldtype: "Select",
+			options: ["", "Bank", "Finance Company"].map((value) => ({
+				value,
+				label: value ? __(value, null, "Bank Facility") : "",
+			})),
+		},
+		{
 			fieldname: "bank",
 			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
@@ -50,15 +63,6 @@ frappe.query_reports["Cost of Financing"] = {
 			options: "Bank Facility",
 			get_query: () => ({ filters: { company: frappe.query_report.get_filter_value("company") } }),
 		},
-		{
-			fieldname: "lender_type",
-			label: __("Lender Type"),
-			fieldtype: "Select",
-			options: ["", "Bank", "Finance Company"].map((value) => ({
-				value,
-				label: value ? __(value, null, "Bank Facility") : "",
-			})),
-		},
 	],
 
 	tree: true,
@@ -67,8 +71,17 @@ frappe.query_reports["Cost of Financing"] = {
 	initial_depth: 1,
 
 	formatter: function (value, row, column, data, default_formatter) {
+		if (data && COST_OF_FINANCING_AMOUNTS.includes(column.fieldname) && !flt(value)) {
+			return "";
+		}
 		let formatted = default_formatter(value, row, column, data);
-		if (data && !data.indent && ["label", "total"].includes(column.fieldname)) {
+		if (!data) {
+			return formatted;
+		}
+		if (column.fieldname === "lender_type") {
+			return `<span class="text-muted">${formatted}</span>`;
+		}
+		if ((!data.indent && column.fieldname === "label") || column.fieldname === "total") {
 			formatted = `<b>${formatted}</b>`;
 		}
 		return formatted;

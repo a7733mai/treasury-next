@@ -8,6 +8,8 @@ const PBC_MATCH = "PDC Clearing Match";
 const PBC_CHARGE = "Bank Charge";
 const PBC_KEYWORD = "Keyword";
 const PBC_QUALITY_COLORS = { Strong: "green", Weak: "orange", Keyword: "blue" };
+// auto-debited facility installments (spec 7g §3.7): the repayment to reconcile, or the drawdown to post
+const PBC_INSTALLMENT_DOCTYPES = ["Facility Drawdown", "Facility Repayment"];
 
 frappe.ui.form.on("PDC Bank Clearing", {
 	setup(frm) {
@@ -68,7 +70,16 @@ frappe.ui.form.on("PDC Bank Clearing", {
 			return;
 		}
 		let message;
-		if (counts.reconcile || counts.create) {
+		if (counts.installment) {
+			// design 7g §5.3: auto-debited facility installments too
+			message = frappe.utils.escape_html(
+				__(
+					"Clear {0} cheque(s), {1} bank transfer(s), {2} installment(s), reconcile {3} bank charge(s) and create {4} bank charge(s)?",
+					[counts.cheque, counts.transfer, counts.installment, counts.reconcile, counts.create]
+				)
+			);
+			message += pbc_create_table(selected);
+		} else if (counts.reconcile || counts.create) {
 			message = frappe.utils.escape_html(
 				__(
 					"Clear {0} cheque(s), {1} bank transfer(s), reconcile {2} bank charge(s) and create {3} bank charge(s)?",
@@ -135,6 +146,9 @@ function pbc_apply_route_options(frm) {
 function pbc_kind(row) {
 	// mirrors row_kind of pdc_bank_clearing.py; a charge row is reconciled (existing) or created (proposal)
 	const doctype = row.reference_doctype;
+	if (PBC_INSTALLMENT_DOCTYPES.includes(doctype)) {
+		return "installment";
+	}
 	if (doctype === "Bank Transfer" || (doctype !== PBC_CHARGE && row.bank_transfer && !row.cheque)) {
 		return "transfer";
 	}
@@ -145,7 +159,7 @@ function pbc_kind(row) {
 }
 
 function pbc_counts(rows) {
-	const counts = { cheque: 0, transfer: 0, reconcile: 0, create: 0 };
+	const counts = { cheque: 0, transfer: 0, reconcile: 0, create: 0, installment: 0 };
 	rows.forEach((row) => (counts[pbc_kind(row)] += 1));
 	return counts;
 }
@@ -193,6 +207,17 @@ function pbc_set_formatters(frm) {
 			}
 			if (row.cheque) {
 				return pbc_link("PDC Cheque", row.cheque);
+			}
+			if (pbc_kind(row) === "installment" && row.facility_drawdown) {
+				// design 7g §5.3: "Installment" pill, the drawdown #n, and the repayment already posted
+				const title = row.facility_repayment ? __("Auto debit to reconcile") : __("Auto debit to post");
+				let html = `<span class="indicator-pill light-blue" title="${esc(title)}">${esc(
+					__("Installment", null, "PDC Bank Clearing")
+				)}</span> ${pbc_link("Facility Drawdown", row.facility_drawdown)} <bdi>#${cint(row.installment_no)}</bdi>`;
+				if (row.facility_repayment) {
+					html += ` → ${pbc_link("Facility Repayment", row.facility_repayment)}`;
+				}
+				return html;
 			}
 			if (row.bank_transfer) {
 				return pbc_link("Bank Transfer", row.bank_transfer);
@@ -252,6 +277,8 @@ function pbc_add_grid_buttons(frm) {
 			() => pbc_select(frm, (row) => pbc_kind(row) !== "create" || !!row.bank_charge_category),
 		],
 		[__("Strong Only", null, PBC_MATCH), () => pbc_select(frm, (row) => row.match_quality === "Strong")],
+		// design 7g P17: the month's auto debits in one click
+		[__("Installments Only", null, "PDC Bank Clearing"), () => pbc_select(frm, (row) => pbc_kind(row) === "installment")],
 		[
 			__("Charge Proposals", null, PBC_MATCH),
 			() => pbc_select(frm, (row) => pbc_kind(row) === "create" && !!row.bank_charge_category),
@@ -311,7 +338,8 @@ function pbc_update_counter(frm) {
 			counts.create,
 			format_currency(total, selected[0].currency),
 		]);
-		html = `<span class="text-muted">${frappe.utils.escape_html(text)}</span>`;
+		const installments = counts.installment ? ` ${__("· {0} installment(s)", [counts.installment])}` : "";
+		html = `<span class="text-muted">${frappe.utils.escape_html(text + installments)}</span>`;
 	}
 	const field = frm.get_field("matches");
 	if (field && field.df.description !== html) {

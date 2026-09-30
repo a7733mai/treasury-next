@@ -444,7 +444,7 @@ linked back to the source document, idempotent per source, event and month.
   created and stored on the facility on first use. *Lender Name* is shown on the forms and reports. Lender
   type, lender and the Islamic flag are locked once the facility is activated.
 - **Islamic**: a Murabaha, Tawarruq, Ijarah or Istisna'a sub-limit makes the facility Islamic (*Islamic
-  Facility*): forms, reports and remarks say *Profit* instead of *Interest*. *Late Payment Penalty*: paid to
+  Facility*): forms, reports and remarks say *Profit* instead of *Interest*. *Late Payment Mode*: paid to
   the lender with the installment, or *Payable to Charity*: the repayment's penalty is then not paid through
   the bank but booked Dr *Late Payment (Charity) Account* / Cr *Charity Payable Account* (its own Journal
   Entry, cancelled with the repayment).

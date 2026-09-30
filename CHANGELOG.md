@@ -27,6 +27,17 @@
   installment and its cheque; installment cheques left out of the Projected Party Statement.
 - Patch `set_facility_defaults` (the schedule's `payment_journal` becomes a Dynamic Link on
   `payment_voucher_type`).
+- **Facilities UX**: one word per facility on every form (*Interest* / *Profit*, *Rental* for Ijarah) with an
+  *Islamic* tag; lender indicators (Bank / Finance Company), a *Late Payment* section, sub-limit types filtered
+  for a finance company, row hints; the schedule grid shows the state of each installment (*Cheque Issued*,
+  *Cheque Due*, *Awaiting Statement*, *Posting Today*), its cheque with a status dot and its payment voucher;
+  drawdown headline / intro per repayment mode, the *Generate Installment Cheques* preview dialog, the *Disburse
+  Stage* dialog and the Istisna'a progress bar; repayment *Settled By* indicator and headline; installment
+  cheque and batch intros; *Installment* rows and *Installments Only* in PDC Bank Clearing; the LC settle dialog
+  with a live Trust Receipt preview. Cost of Financing drops all-zero categories and gets a stacked chart;
+  Facility Utilisation is grouped by lender (Istisna'a commitment tooltip); the schedule report shows the same
+  installment states and a *Covered by Cheques* card. Number card **Auto Debits Awaiting Statement**; *Invoice
+  Discounting* in the workspace and the facility's Connections (only Active facilities of the company offered).
 
 ### Cheque Leaves, Cheque Printing and Security Reports (Phase 7f)
 - **Cheque Leaf Register** (every leaf of the outgoing books with its status, usage, party, dates, Payment

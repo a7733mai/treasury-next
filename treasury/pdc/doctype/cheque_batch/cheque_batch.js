@@ -224,6 +224,10 @@ frappe.ui.form.on("Cheque Batch", {
 	},
 
 	add_draft_buttons(frm) {
+		if (frm.doc.facility_drawdown) {
+			// installment cheques: the rows come from the drawdown's schedule (facility_cheques.validate_batch)
+			return;
+		}
 		frm.add_custom_button(__("Generate Cheques"), () => {
 			const generate = () =>
 				frm.call({ doc: frm.doc, method: "generate_rows", doc: frm.doc, freeze: true }).then((r) => {
@@ -519,6 +523,41 @@ frappe.ui.form.on("Cheque Batch", {
 		field.$wrapper.find(".treasury-copy-pe").on("click", () => {
 			frappe.utils.copy_to_clipboard(names.join(", "));
 		});
+	},
+});
+
+// ------------------------------------------------------------------------------------ installment cheques
+// Design 7g §5.2: a batch of installment cheques to the lender (Generate Installment Cheques on a drawdown).
+// Amounts, due dates, the lender and the bank follow the drawdown (mirrors facility_cheques.validate_batch).
+const CHEQUE_BATCH_FACILITY_FIELDS = ["party_type", "party", "bank_account", "allocation_method"];
+
+frappe.ui.form.on("Cheque Batch", {
+	refresh(frm) {
+		const facility = !!frm.doc.facility_drawdown;
+		CHEQUE_BATCH_FACILITY_FIELDS.forEach((fieldname) => {
+			if (facility || frm.doc.docstatus === 0) {
+				frm.set_df_property(fieldname, "read_only", facility ? 1 : 0);
+			}
+		});
+		const grid = frm.fields_dict.cheques && frm.fields_dict.cheques.grid;
+		if (grid && frm.doc.docstatus === 0) {
+			["amount", "due_date"].forEach((fieldname) =>
+				grid.update_docfield_property(fieldname, "read_only", facility ? 1 : 0)
+			);
+		}
+		if (!facility) {
+			return;
+		}
+		if (frm.doc.docstatus === 0) {
+			const esc = frappe.utils.escape_html;
+			frm.set_intro(
+				__(
+					"Installment cheques of {0} to {1}. Amounts and due dates follow the repayment schedule and cannot be changed.",
+					[cheque_batch_link("Facility Drawdown", frm.doc.facility_drawdown), esc(frm.doc.party_name || frm.doc.party || "")]
+				),
+				"blue"
+			);
+		}
 	},
 });
 

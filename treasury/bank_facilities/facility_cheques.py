@@ -57,6 +57,42 @@ def live_cheques(drawdown: str) -> dict[str, frappe._dict]:
 	return {r.row: frappe._dict(name=r.name, operational_status=r.operational_status) for r in rows}
 
 
+def installment_info(drawdown) -> dict:
+	"""What the drawdown form shows per installment (design 7g P11 / P14): the company's Auto Debit Posting, the
+	installment cheques of the schedule rows ({row name: {name, cheque_no, operational_status}}, any status) and,
+	in PDC to Lender mode, the default cheque book with its next free leaf."""
+	from treasury.bank_facilities import auto_debit
+
+	names = sorted({r.pdc_cheque for r in drawdown.repayment_schedule if r.pdc_cheque})
+	cheques = {
+		c.name: c
+		for c in frappe.get_all(
+			CHEQUE,
+			filters={"name": ["in", names or [""]]},
+			fields=["name", "cheque_no", "operational_status"],
+		)
+	}
+	info = {
+		"auto_debit_posting": auto_debit.posting_mode(drawdown.company) if drawdown.company else None,
+		"live_statuses": list(LIVE_STATUSES),
+		"cheques": {r.name: cheques[r.pdc_cheque] for r in drawdown.repayment_schedule if r.pdc_cheque in cheques},
+		"has_cheques": bool(
+			names or (drawdown.name and frappe.db.exists(CHEQUE, {"facility_drawdown": drawdown.name}))
+		),
+		"cheque_book": None,
+	}
+	if drawdown.docstatus == 1 and drawdown.repayment_mode == PDC_TO_LENDER:
+		from treasury.pdc import batch
+		from treasury.utils import source_documents
+
+		count = len(_open_rows(drawdown))
+		book = count and source_documents.default_cheque_book(drawdown.company, drawdown.bank_account, count)
+		if book:
+			leaves = batch.preview_leaves(book, 1)
+			info["cheque_book"] = {"name": book, "next_no": leaves[0] if leaves else None}
+	return info
+
+
 def unpaid_total(row) -> float:
 	return flt(repayment.unpaid_principal(row) + repayment.unpaid_interest(row), 2)
 

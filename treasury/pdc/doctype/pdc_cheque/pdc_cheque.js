@@ -696,12 +696,51 @@ frappe.ui.form.on("PDC Cheque", {
 		pdc_low_balance_log(frm);
 		pdc_print_indicator(frm);
 		pdc_payee_placeholder(frm);
+		pdc_installment_headline(frm);
 	},
 
 	party_name(frm) {
 		pdc_payee_placeholder(frm);
 	},
 });
+
+function pdc_installment_headline(frm) {
+	// design 7g §5.1: an installment cheque to the lender says which installment it pays, and that its party
+	// posting (on the cheque date) is the repayment (the Payment Entries line stays: it has the clearance too)
+	const doc = frm.doc;
+	if (frm.is_new() || !doc.facility_drawdown) {
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const info = (doc.__onload && doc.__onload.facility_installment) || {};
+	const link = (doctype, name, bold) => {
+		const label = `<bdi>${esc(name)}</bdi>`;
+		return `<a href="/app/${frappe.router.slug(doctype)}/${encodeURIComponent(name)}">${bold ? `<b>${label}</b>` : label}</a>`;
+	};
+	const drawdown = link("Facility Drawdown", doc.facility_drawdown);
+	let html;
+	if (!info.installment_no) {
+		html = __("Installment cheque of {0}", [drawdown]);
+	} else if (doc.facility_repayment) {
+		html = __("Installment {0} of {1} · repayment {2} · {3}", [
+			cint(info.installment_no),
+			drawdown,
+			link("Facility Repayment", doc.facility_repayment),
+			info.payment_entry ? link("Payment Entry", info.payment_entry, true) : "",
+		]);
+	} else {
+		html = __(
+			"Installment {0} of {1} to {2}. Posted on the cheque date {3} as the repayment; nothing is posted at delivery.",
+			[
+				cint(info.installment_no),
+				drawdown,
+				esc(info.lender_name || doc.party_name || doc.party || ""),
+				esc(frappe.datetime.str_to_user(doc.effective_due_date)),
+			]
+		);
+	}
+	frm.dashboard.set_headline(`<div>${html}</div>`, "blue");
+}
 
 // Events shown as a pill in the status log: the low-balance override (7e) and the prints (7f §5.2)
 const PDC_EVENT_PILLS = { "Low Balance Override": "orange", Printed: "blue", Reprinted: "orange" };

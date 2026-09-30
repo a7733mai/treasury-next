@@ -300,6 +300,14 @@ def get_other_fields() -> dict[str, list[dict]]:
 				"insert_after": "company",
 				"module": TREASURY_MODULE,
 				"description": "Treasury: counts against the facility's Invoice Discounting sub-limit.",
+				# design 7g P19: only the Active facilities of the document's company are offered (the
+				# server validates the sub-limit, treasury.bank_facilities.invoice_discounting)
+				"link_filters": json.dumps(
+					[
+						["Bank Facility", "company", "=", "eval:doc.company"],
+						["Bank Facility", "status", "=", "Active"],
+					]
+				),
 			}
 		]
 	}

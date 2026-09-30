@@ -22,6 +22,39 @@ def get_limit(facility: str):
 	return next((row for row in doc.limits if row.limit_type == LIMIT_TYPE), None)
 
 
+def limit_defaults(facility: str, limit=None) -> dict:
+	"""The defaults of "Finance by Trust Receipt" in the LC settle dialog (design 7g P18): the sub-limit's
+	tenor and rate, what is available on it today, and the facility's wording (Interest / Profit Rate)."""
+	from treasury.bank_facilities.utilisation import get_utilisation
+
+	limit = limit or get_limit(facility)
+	if not limit:
+		return {}
+	utilisation = get_utilisation(facility, LIMIT_TYPE)
+	return {
+		"default_tenor_months": cint(limit.default_tenor_months),
+		"interest_rate": flt(limit.interest_rate),
+		"available": flt(utilisation.limits[0].available) if utilisation.limits else 0,
+		"is_islamic": cint(frappe.db.get_value("Bank Facility", facility, "is_islamic")),
+	}
+
+
+def drawdown_summary(drawdown: str) -> dict | None:
+	"""The Trust Receipt drawdown of a settled LC as its form shows it: amount, bullet due date, status."""
+	doc = frappe.db.get_value(
+		DRAWDOWN, drawdown, ["name", "amount", "currency", "repayment_status", "docstatus"], as_dict=True
+	)
+	if not doc:
+		return None
+	doc.due_date = frappe.db.get_value(
+		"Facility Repayment Schedule",
+		{"parenttype": DRAWDOWN, "parent": drawdown, "is_prepayment": 0},
+		"due_date",
+		order_by="due_date desc",
+	)
+	return doc
+
+
 def validate_financing(lc, amount: float, tenor_months=None) -> tuple[float, int]:
 	"""(amount financed, tenor) of a settlement financed by Trust Receipt; throws when it cannot be."""
 	precision = lc.precision("amount")

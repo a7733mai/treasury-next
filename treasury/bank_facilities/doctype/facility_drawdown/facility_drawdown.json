@@ -9,24 +9,28 @@
  "field_order": [
   "naming_series",
   "facility",
+  "lender_name",
   "company",
   "bank",
   "lender_type",
-  "lender_name",
   "is_islamic",
   "limit_type",
   "drawdown_date",
+  "letter_of_credit",
   "column_break_main",
   "currency",
   "amount",
   "exchange_rate",
   "bank_account",
   "repayment_mode",
-  "disburse_to",
-  "disbursement_account",
   "liability_account",
   "repayment_status",
-  "letter_of_credit",
+  "disbursement_section",
+  "disburse_to",
+  "disbursement_account",
+  "column_break_disbursement",
+  "ijarah_asset",
+  "ownership_transfer",
   "terms_section",
   "rate_type",
   "interest_rate",
@@ -38,15 +42,13 @@
   "repayment_method",
   "first_repayment_date",
   "grace_months",
-  "ijarah_asset",
-  "ownership_transfer",
-  "stages_section",
-  "disbursement_stages",
-  "disbursed_amount",
   "fees_section",
   "upfront_fees",
   "column_break_fees",
   "fees_account",
+  "stages_section",
+  "disbursement_stages",
+  "disbursed_amount",
   "schedule_section",
   "repayment_schedule",
   "total_principal",
@@ -99,6 +101,7 @@
    "fetch_from": "facility.bank",
    "fieldname": "bank",
    "fieldtype": "Link",
+   "hidden": 1,
    "in_standard_filter": 1,
    "label": "Bank",
    "options": "Bank",
@@ -108,6 +111,7 @@
    "fetch_from": "facility.lender_type",
    "fieldname": "lender_type",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Lender Type",
    "read_only": 1
   },
@@ -123,6 +127,7 @@
    "fetch_from": "facility.is_islamic",
    "fieldname": "is_islamic",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Islamic Facility",
    "read_only": 1
   },
@@ -192,6 +197,12 @@
    "reqd": 1
   },
   {
+   "depends_on": "eval:['Ijarah',\"Istisna'a\"].includes(doc.limit_type)",
+   "fieldname": "disbursement_section",
+   "fieldtype": "Section Break",
+   "label": "Disbursement"
+  },
+  {
    "default": "Bank Account",
    "depends_on": "eval:['Ijarah',\"Istisna'a\"].includes(doc.limit_type)",
    "fieldname": "disburse_to",
@@ -207,6 +218,10 @@
    "label": "Disbursement Account",
    "mandatory_depends_on": "eval:doc.disburse_to=='Other Account'",
    "options": "Account"
+  },
+  {
+   "fieldname": "column_break_disbursement",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "liability_account",
@@ -227,6 +242,7 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.letter_of_credit",
    "description": "Trust Receipt created by the settlement of this Letter of Credit.",
    "fieldname": "letter_of_credit",
    "fieldtype": "Link",
@@ -310,7 +326,8 @@
    "depends_on": "eval:doc.limit_type=='Ijarah'",
    "fieldname": "ijarah_asset",
    "fieldtype": "Small Text",
-   "label": "Leased Asset"
+   "label": "Leased Asset",
+   "placeholder": "e.g. Toyota Hilux 2025, chassis no. …"
   },
   {
    "default": "0",
@@ -327,7 +344,7 @@
   },
   {
    "allow_on_submit": 1,
-   "description": "The financier pays the Istisna'a in stages (Disburse Stage); the stages add up to the amount.",
+   "description": "Add one row per disbursement stage; the amounts must add up to the contract amount. Each stage is posted with Disburse Stage.",
    "fieldname": "disbursement_stages",
    "fieldtype": "Table",
    "label": "Disbursement Stages",
@@ -492,7 +509,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-01 12:00:00.000000",
+ "modified": "2026-10-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Facility Drawdown",

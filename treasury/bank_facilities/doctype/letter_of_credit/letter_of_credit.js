@@ -42,6 +42,7 @@ frappe.ui.form.on("Letter of Credit", {
 		if (frm.is_new() || frm.doc.docstatus === 0) {
 			return;
 		}
+		lc_trust_receipt_headline(frm);
 		frm.page.set_indicator(__(frm.doc.status, null, "Letter of Credit"), LC_INDICATORS[frm.doc.status] || "blue");
 		if (frm.doc.docstatus !== 1 || frm.is_dirty() || !frappe.user.has_role("Treasury Manager")) {
 			return;
@@ -108,7 +109,7 @@ frappe.ui.form.on("Letter of Credit", {
 			(status === "Documents Received" && frm.doc.lc_type === "Sight") ||
 			(status === "Accepted" && frm.doc.lc_type === "Usance")
 		) {
-			lc_action(frm, "settle", __("Settle", null, "Letter of Credit"), [
+			const settle_fields = [
 				today("settlement_date", __("Settlement Date")),
 				money("amount", __("Amount", null, "Treasury"), { reqd: 1, default: frm.doc.documents_amount }),
 				rate,
@@ -126,9 +127,18 @@ frappe.ui.form.on("Letter of Credit", {
 						},
 					}),
 				},
-				...lc_trust_receipt_fields(frm),
 				remarks,
-			]);
+			];
+			if ((frm.doc.__onload || {}).has_trust_receipt_limit) {
+				// design 7g §6.1: one dialog with a live Trust Receipt preview
+				frm.add_custom_button(
+					__("Settle", null, "Letter of Credit"),
+					() => lc_settle_dialog(frm, settle_fields),
+					__("Actions")
+				);
+			} else {
+				lc_action(frm, "settle", __("Settle", null, "Letter of Credit"), settle_fields);
+			}
 		}
 		if (status === "Expired" && flt(frm.doc.margin_held) > 0) {
 			lc_action(frm, "release_margin", __("Release Margin"), [
@@ -140,36 +150,133 @@ frappe.ui.form.on("Letter of Credit", {
 	},
 });
 
-function lc_trust_receipt_fields(frm) {
-	// spec 7g §3.9: the bank finances the settlement less the margin held by a Trust Receipt drawdown
+function lc_trust_receipt_fields(frm, refresh) {
+	// spec 7g §3.9 / design §6.1: the bank finances the settlement less the margin held by a Trust Receipt
+	// drawdown; tenor and rate default to the sub-limit's (P18)
 	const onload = frm.doc.__onload || {};
-	if (!onload.has_trust_receipt_limit) {
-		return [];
-	}
+	const limit = onload.trust_receipt_limit || {};
 	const financed = "eval:doc.finance_by_trust_receipt";
 	return [
-		{ fieldname: "finance_by_trust_receipt", label: __("Finance by Trust Receipt"), fieldtype: "Check" },
+		{
+			fieldname: "finance_by_trust_receipt",
+			label: __("Finance by Trust Receipt"),
+			fieldtype: "Check",
+			onchange: refresh,
+		},
+		{ fieldname: "tr_preview", fieldtype: "HTML", depends_on: financed },
 		{
 			fieldname: "tr_tenor_months",
-			label: __("Tenor (Months)"),
+			label: __("Tenor (Months)", null, "Letter of Credit"),
 			fieldtype: "Int",
-			default: onload.trust_receipt_tenor || 0,
+			default: limit.default_tenor_months || onload.trust_receipt_tenor || 0,
 			depends_on: financed,
 		},
 		{
 			fieldname: "tr_first_repayment_date",
-			label: __("First Repayment Date"),
+			label: __("First Repayment Date", null, "Letter of Credit"),
 			fieldtype: "Date",
 			depends_on: financed,
+			description: __("Default: settlement date plus the tenor (one bullet repayment)."),
 		},
 		{
 			fieldname: "tr_interest_rate",
-			label: __("Interest / Profit Rate (% p.a.)"),
+			label: treasury.facility.terms(limit.is_islamic).interest_rate,
 			fieldtype: "Percent",
+			default: limit.interest_rate,
 			depends_on: financed,
 			description: __("Default: the rate of the Trust Receipt sub-limit."),
 		},
 	];
+}
+
+function lc_settle_dialog(frm, fields) {
+	// the settle action with "Finance by Trust Receipt" (design 7g §6.1): a live preview of the amount financed
+	const esc = frappe.utils.escape_html;
+	const limit = (frm.doc.__onload || {}).trust_receipt_limit || {};
+	const label = __("Settle", null, "Letter of Credit");
+	let dialog = null;
+	const refresh = () => {
+		if (!dialog) {
+			return;
+		}
+		const financed = cint(dialog.get_value("finance_by_trust_receipt"));
+		dialog.get_primary_btn().text(financed ? __("Settle and Create Trust Receipt") : label);
+		const amount = flt(dialog.get_value("amount"));
+		const margin = flt(frm.doc.margin_held);
+		const tr_amount = flt(amount - margin, precision("amount", frm.doc));
+		const money = (value) => format_currency(value, frm.doc.currency);
+		const html =
+			tr_amount > 0
+				? `<p class="text-muted">${esc(
+						__("Trust Receipt: {0} (settlement {1} − margin {2}) · available {3}", [
+							money(tr_amount),
+							money(amount),
+							money(margin),
+							money(limit.available),
+						])
+				  )}</p>`
+				: `<p style="color: var(--red-600)">${esc(
+						__("The cash margin covers the settlement: nothing to finance by Trust Receipt.")
+				  )}</p>`;
+		dialog.fields_dict.tr_preview.$wrapper.html(html);
+	};
+	const all = [...fields];
+	// before the remarks
+	all.splice(all.length - 1, 0, ...lc_trust_receipt_fields(frm, refresh));
+	const amount = all.find((df) => df.fieldname === "amount");
+	amount && (amount.onchange = refresh);
+	dialog = new frappe.ui.Dialog({
+		title: label,
+		fields: all,
+		primary_action_label: label,
+		primary_action(values) {
+			dialog.hide();
+			frm.call({ doc: frm.doc, method: "settle", args: values, freeze: true }).then((r) => {
+				const drawdown = r.message && r.message.trust_receipt_drawdown;
+				frm.reload_doc().then(() => {
+					const tr = (frm.doc.__onload || {}).trust_receipt;
+					if (drawdown && tr) {
+						frappe.show_alert(
+							{
+								message: __("Trust Receipt {0} created: {1} due {2}.", [
+									lc_link("Facility Drawdown", drawdown),
+									esc(format_currency(tr.amount, tr.currency)),
+									esc(tr.due_date ? frappe.datetime.str_to_user(tr.due_date) : ""),
+								]),
+								indicator: "green",
+							},
+							10
+						);
+					}
+				});
+			});
+		},
+	});
+	dialog.show();
+	refresh();
+}
+
+function lc_trust_receipt_headline(frm) {
+	// design 7g §6.2: the Trust Receipt that financed the settlement
+	const tr = (frm.doc.__onload || {}).trust_receipt;
+	if (!tr) {
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	frm.dashboard.set_headline(
+		`<div>${__("Financed by Trust Receipt {0} · {1} · due {2} · {3}.", [
+			lc_link("Facility Drawdown", tr.name),
+			esc(format_currency(tr.amount, tr.currency)),
+			esc(tr.due_date ? frappe.datetime.str_to_user(tr.due_date) : ""),
+			esc(__(tr.repayment_status || "Open", null, "Facility Drawdown")),
+		])}</div>`,
+		"blue"
+	);
+}
+
+function lc_link(doctype, name) {
+	const esc = frappe.utils.escape_html;
+	return `<a href="/app/${frappe.router.slug(doctype)}/${encodeURIComponent(name)}"><b><bdi>${esc(name)}</bdi></b></a>`;
 }
 
 function lc_setup_queries(frm) {
@@ -225,4 +332,30 @@ function lc_action(frm, method, label, fields) {
 		},
 		__("Actions")
 	);
+}
+
+// Design 7g §1: the Interest / Profit wording of a facility, shared by the facility forms (the same helper is
+// in each of them: there are no bundles; defined once by whichever loads first). The strings are those of
+// treasury.bank_facilities.lenders.terms().
+frappe.provide("treasury.facility");
+if (!treasury.facility.terms) {
+	treasury.facility.terms = function (is_islamic, limit_type) {
+		const islamic = !!cint(is_islamic);
+		const rental = islamic && limit_type === "Ijarah";
+		return {
+			interest: islamic ? __("Profit") : __("Interest"),
+			interest_rate: islamic ? __("Profit Rate (% p.a.)") : __("Interest Rate (% p.a.)"),
+			total_interest: islamic ? __("Total Profit") : __("Total Interest"),
+			interest_paid: islamic ? __("Profit Paid") : __("Interest Paid"),
+			paid_interest: islamic ? __("Paid Profit") : __("Paid Interest"),
+			accrued_interest: islamic ? __("Accrued Profit") : __("Accrued Interest"),
+			accrued_interest_account: islamic ? __("Accrued Profit Account") : __("Accrued Interest Account"),
+			interest_expense_account: islamic ? __("Profit Expense Account") : __("Interest Expense Account"),
+			accrued_interest_cleared: islamic ? __("Accrued Profit Cleared") : __("Accrued Interest Cleared"),
+			interest_expensed: islamic ? __("Profit Expensed") : __("Interest Expensed"),
+			installment: rental ? __("Rental") : __("Installment"),
+			total: rental ? __("Rental") : __("Total", null, "Treasury"),
+			penalty: islamic ? __("Late Payment Charge") : __("Penalty"),
+		};
+	};
 }

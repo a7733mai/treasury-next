@@ -16,13 +16,14 @@
   "paid_principal",
   "paid_interest",
   "is_prepayment",
+  "pdc_cheque",
   "payment_voucher_type",
   "payment_journal",
-  "repayment",
-  "pdc_cheque"
+  "repayment"
  ],
  "fields": [
   {
+   "columns": 1,
    "fieldname": "installment_no",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -30,6 +31,7 @@
    "read_only": 1
   },
   {
+   "columns": 1,
    "fieldname": "due_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -38,6 +40,7 @@
    "search_index": 1
   },
   {
+   "columns": 1,
    "fieldname": "principal",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -46,6 +49,7 @@
    "options": "currency"
   },
   {
+   "columns": 1,
    "fieldname": "interest",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -54,6 +58,8 @@
    "options": "currency"
   },
   {
+   "bold": 1,
+   "columns": 1,
    "fieldname": "total",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -64,7 +70,6 @@
   {
    "fieldname": "outstanding_after",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "label": "Outstanding After",
    "options": "currency",
    "read_only": 1
@@ -74,6 +79,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "columns": 1,
    "default": "Pending",
    "fieldname": "status",
    "fieldtype": "Select",
@@ -109,6 +115,16 @@
    "read_only": 1
   },
   {
+   "columns": 2,
+   "fieldname": "pdc_cheque",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Installment Cheque",
+   "no_copy": 1,
+   "options": "PDC Cheque",
+   "read_only": 1
+  },
+  {
    "fieldname": "payment_voucher_type",
    "fieldtype": "Link",
    "hidden": 1,
@@ -118,8 +134,10 @@
    "read_only": 1
   },
   {
+   "columns": 2,
    "fieldname": "payment_journal",
    "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
    "label": "Payment Voucher",
    "no_copy": 1,
    "options": "payment_voucher_type",
@@ -132,19 +150,11 @@
    "no_copy": 1,
    "options": "Facility Repayment",
    "read_only": 1
-  },
-  {
-   "fieldname": "pdc_cheque",
-   "fieldtype": "Link",
-   "label": "Installment Cheque",
-   "no_copy": 1,
-   "options": "PDC Cheque",
-   "read_only": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-09-29 18:00:00.000000",
+ "modified": "2026-10-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Facility Repayment Schedule",

@@ -93,6 +93,18 @@ class FacilityRepayment(Document):
 		if self.facility:
 			is_islamic = cint(frappe.db.get_value("Bank Facility", self.facility, "is_islamic"))
 			self.set_onload("terms", lenders.terms(is_islamic))
+		# design 7g §4.2: the "Settled By" indicator and headline, the draft intro of a cheque drawdown
+		self.set_onload(
+			"settlement_info",
+			{
+				"cheque_no": self.pdc_cheque
+				and frappe.db.get_value("PDC Cheque", self.pdc_cheque, "cheque_no"),
+				"transaction_date": self.bank_transaction
+				and frappe.db.get_value("Bank Transaction", self.bank_transaction, "date"),
+				"repayment_mode": self.drawdown
+				and frappe.db.get_value(DRAWDOWN, self.drawdown, "repayment_mode"),
+			},
+		)
 
 	def validate(self):
 		# on submit too: the submitted document comes from the client (it is recomputed in before_submit)

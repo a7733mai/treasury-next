@@ -3,7 +3,8 @@
 
 """Facility Utilisation (PLAN.md §8): limit, utilised, available and % used per facility and sub-limit.
 
-Tree: Bank or finance company lender (company currency totals) → Facility (its totals) → one row per sub-limit. Figures come from
+Tree: Lender, a bank or a finance company (company currency totals) → Facility (its totals) → one row per
+sub-limit; an Istisna'a row carries its undisbursed stages (`commitment`, the row's tooltip). Figures come from
 treasury.bank_facilities.utilisation.get_utilisation (the ledger up to As On), never from the stored display
 fields. Facility figures are in the facility currency, with company currency columns converted at the
 reports' today rate; the bank rows and the summary add the company currency columns.
@@ -15,6 +16,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, date_diff, flt, getdate
 
+from treasury.bank_facilities import istisna
 from treasury.bank_facilities.facility import CLOSED, DRAFT
 from treasury.bank_facilities.report_utils import FACILITY, CompanyConverter, get_facilities, report_today
 from treasury.bank_facilities.utilisation import get_utilisation
@@ -40,12 +42,12 @@ def execute(filters=None):
 	data, banks = [], {}
 	for facility in get_facilities(conditions):
 		utilisation = get_utilisation(facility.name, filters.limit_type or None, as_on)
-		# top level: the bank, or the lender of a finance company facility
-		lender = facility.bank or facility.lender_name
+		# top level (design 7g P22): the lender, a bank or a finance company
+		lender = facility.lender_name or facility.bank
 		bank = banks.get(lender)
 		if not bank:
 			bank = banks[lender] = frappe._dict(
-				row_id=f"bank-{lender}",
+				row_id=f"lender-{lender}",
 				indent=0,
 				label=lender,
 				bank=facility.bank,
@@ -92,6 +94,7 @@ def execute(filters=None):
 					utilised=limit.utilised,
 					available=limit.available,
 					percent_used=limit.percent_used,
+					commitment=_commitment(facility, limit.limit_type, as_on),
 					**common,
 				)
 			)
@@ -113,6 +116,13 @@ def execute(filters=None):
 		)
 		data += [bank, *bank.pop("children")]
 	return get_columns(), data, None, None, get_summary(list(banks.values()), converter.company_currency)
+
+
+def _commitment(facility, limit_type: str, as_on) -> float:
+	"""Design 7g P23: the undisbursed Istisna'a stages included in the utilised amount (the row's tooltip)."""
+	if limit_type != istisna.LIMIT_TYPE:
+		return 0.0
+	return flt(sum(flt(r["amount"]) for r in istisna.get_commitment_utilisation(facility, as_on)))
 
 
 def get_summary(banks: list, currency: str) -> list[dict]:
@@ -139,11 +149,11 @@ def get_columns() -> list[dict]:
 		return column(fieldname, label, "Currency", width, options=options)
 
 	return [
-		column("label", _("Bank / Facility / Limit Type"), width=240),
+		column("label", _("Lender / Facility / Limit Type"), width=240),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
 		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank", hidden=1),
-		column("lender_type", _("Lender Type"), width=110),
-		column("lender_name", _("Lender"), width=150),
+		column("lender_type", _("Lender Type"), width=100),
+		column("lender_name", _("Lender"), width=160),
 		column("limit_type", _("Limit Type"), width=130, hidden=1),
 		column("status", _("Status", context="Treasury"), width=90),
 		money("limit_amount", _("Limit", context="Treasury")),
@@ -159,4 +169,5 @@ def get_columns() -> list[dict]:
 		column(
 			"company_currency", _("Company Currency", context=CTX), "Link", 80, options="Currency", hidden=1
 		),
+		column("commitment", _("Undisbursed Stages"), "Currency", 130, options="currency", hidden=1),
 	]

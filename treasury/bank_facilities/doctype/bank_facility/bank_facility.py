@@ -96,6 +96,29 @@ class BankFacility(Document):
 	def before_insert(self):
 		lifecycle.log_creation(self)
 
+	def onload(self):
+		# design 7g P5: "{0} security cheque(s) · {1}" on the form
+		self.set_onload("security_summary", self.get_security_summary())
+
+	def get_security_summary(self) -> dict | None:
+		"""Count and total of the facility's security cheques not returned / encashed / lost / cancelled (the
+		cheques the user may read)."""
+		from treasury.security_cheques.lifecycle import FINAL_STATUSES
+
+		names = [row.security_cheque for row in self.security_cheques if row.security_cheque]
+		if not names:
+			return None
+		cheques = frappe.get_list(
+			"Security Cheque",
+			filters={"name": ["in", names], "status": ["not in", FINAL_STATUSES]},
+			fields=["amount", "currency"],
+		)
+		if not cheques:
+			return None
+		currency = cheques[0].currency or self.currency
+		total = sum(flt(c.amount) for c in cheques if (c.currency or currency) == currency)
+		return {"count": len(cheques), "total": flt(total, self.precision("total_limit")), "currency": currency}
+
 	def validate(self):
 		self.validate_protected_fields()
 		self.validate_dates()

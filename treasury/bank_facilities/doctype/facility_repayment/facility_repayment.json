@@ -251,7 +251,7 @@
   },
   {
    "depends_on": "eval:doc.penalty",
-   "description": "From the facility's Late Payment Penalty setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank).",
+   "description": "From the facility's Late Payment Mode setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank).",
    "fieldname": "penalty_treatment",
    "fieldtype": "Select",
    "label": "Penalty Treatment",

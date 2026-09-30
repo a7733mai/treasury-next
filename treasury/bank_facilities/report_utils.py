@@ -17,6 +17,29 @@ from treasury.pdc.report_utils import CTX, get_precision, report_today
 FACILITY = "Bank Facility"
 DRAWDOWN = "Facility Drawdown"
 SCHEDULE = "Facility Repayment Schedule"
+# Display states of an installment (design 7g §3.3 / P24), derived from its status, the drawdown's repayment
+# mode, the company's Auto Debit Posting and the installment cheque; the drawdown form shows the same.
+CHEQUE_ISSUED, CHEQUE_DUE = "Cheque Issued", "Cheque Due"
+AWAITING_STATEMENT, POSTING_TODAY = "Awaiting Statement", "Posting Today"
+LIVE_CHEQUE_STATUSES = ("Created", "Delivered")
+
+
+def display_status(row, as_of, auto_debit_posting: str | None) -> str:
+	"""The status an installment is shown with: a live cheque says "Cheque Issued" (or "Cheque Due" once its
+	date passed), an unpaid auto-debit installment due waits for the statement ("Awaiting Statement") or is
+	posted by today's job ("Posting Today") instead of a false Overdue."""
+	if row.status == PAID:
+		return PAID
+	due = getdate(row.due_date)
+	as_of = getdate(as_of)
+	if row.get("cheque_status") in LIVE_CHEQUE_STATUSES:
+		return CHEQUE_DUE if due < as_of else CHEQUE_ISSUED
+	if row.get("repayment_mode") == "Auto Debit" and due <= as_of:
+		if auto_debit_posting == "On Bank Statement Match":
+			return AWAITING_STATEMENT
+		if due == as_of:
+			return POSTING_TODAY
+	return row.status
 
 
 class CompanyConverter:
@@ -142,12 +165,14 @@ def get_installments(
 			fields=["name", "operational_status"],
 		)
 	}
+	auto_debit_posting = frappe.db.get_value("Treasury Company Settings", company, "auto_debit_posting")
 	for r in result:
 		r.cheque_status = cheque_status.get(r.pdc_cheque) if r.pdc_cheque else None
 		r.unpaid_principal = flt(max(flt(r.principal) - flt(r.paid_principal), 0), precision)
 		r.unpaid_interest = flt(max(flt(r.interest) - flt(r.paid_interest), 0), precision)
 		r.unpaid = flt(r.unpaid_principal + r.unpaid_interest, precision)
 		r.status = row_status(r, as_of)
+		r.display_status = display_status(r, as_of, auto_debit_posting or "On Due Date")
 		if unpaid_only and r.status == PAID:
 			continue
 		rows.append(r)

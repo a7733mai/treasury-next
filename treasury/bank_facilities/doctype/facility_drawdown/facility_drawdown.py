@@ -154,6 +154,17 @@ class FacilityDrawdown(Document):
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
 		# "Profit" / "Rental" wording of an Islamic facility (design 7g, the form relabels its fields)
 		self.set_onload("terms", lenders.terms(cint(self.is_islamic)))
+		if not self.is_new():
+			from treasury.bank_facilities import facility_cheques
+
+			# design 7g P11 / P14: derived installment states, cheque links and the cheque book of the preview
+			self.set_onload("installment_info", facility_cheques.installment_info(self))
+		if self.letter_of_credit:
+			# design 7g §3.4: "Trust Receipt financing the settlement of {0} on {1}."
+			self.set_onload(
+				"letter_of_credit_settlement",
+				frappe.db.get_value("Letter of Credit", self.letter_of_credit, "settlement_date"),
+			)
 		if self.docstatus == 1:
 			outstanding = get_drawdown_outstanding(
 				[{"name": self.name, "liability_account": self.liability_account}]

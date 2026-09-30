@@ -12,6 +12,15 @@ frappe.query_reports["Facility Utilisation"] = {
 			reqd: 1,
 		},
 		{
+			fieldname: "lender_type",
+			label: __("Lender Type"),
+			fieldtype: "Select",
+			options: ["", "Bank", "Finance Company"].map((value) => ({
+				value,
+				label: value ? __(value, null, "Bank Facility") : "",
+			})),
+		},
+		{
 			fieldname: "bank",
 			label: __("Bank", null, "Treasury"),
 			fieldtype: "Link",
@@ -46,15 +55,6 @@ frappe.query_reports["Facility Utilisation"] = {
 			].map((value) => ({ value, label: value ? __(value, null, "Bank Facility") : "" })),
 		},
 		{
-			fieldname: "lender_type",
-			label: __("Lender Type"),
-			fieldtype: "Select",
-			options: ["", "Bank", "Finance Company"].map((value) => ({
-				value,
-				label: value ? __(value, null, "Bank Facility") : "",
-			})),
-		},
-		{
 			fieldname: "as_on",
 			label: __("As On"),
 			fieldtype: "Date",
@@ -83,6 +83,14 @@ frappe.query_reports["Facility Utilisation"] = {
 		}
 		if (column.fieldname === "days_to_expiry" && data.indent === 1 && cint(value) <= 30) {
 			formatted = `<span style="color: var(--orange-600)">${formatted}</span>`;
+		}
+		if (column.fieldname === "lender_type") {
+			formatted = `<span class="text-muted">${formatted}</span>`;
+		}
+		if (column.fieldname === "utilised" && flt(data.commitment)) {
+			// design 7g P23: an Istisna'a sub-limit counts its undisbursed stages
+			const title = __("Includes {0} of undisbursed stages.", [format_currency(data.commitment, data.currency)]);
+			formatted = `<span title="${frappe.utils.escape_html(title)}">${formatted} *</span>`;
 		}
 		return formatted;
 	},

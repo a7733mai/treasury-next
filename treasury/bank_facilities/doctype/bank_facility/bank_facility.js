@@ -1,12 +1,47 @@
 // Copyright (c) 2026, Ahmed Abdelmageed and contributors
 // For license information, please see license.txt
 
-// Business rules live in treasury/bank_facilities/facility.py; the buttons below only mirror them.
+// Business rules live in treasury/bank_facilities/facility.py and bank_facility.py; the form only mirrors them.
+// Form scripts share the global scope: names are prefixed `BF_` / `bf_`.
+const BF_STATUS_COLORS = { Draft: "gray", Active: "green", Suspended: "orange", Expired: "red", Closed: "darkgrey" };
+// mirrors treasury.bank_facilities.lenders
+const BF_ISLAMIC_TYPES = ["Murabaha", "Tawarruq", "Ijarah", "Istisna'a"];
+const BF_FINANCE_COMPANY_TYPES = [
+	"Short Term Loan",
+	"Long Term Loan",
+	"Murabaha",
+	"Tawarruq",
+	"Ijarah",
+	"Istisna'a",
+	"Invoice Discounting",
+	"Other",
+];
+const BF_LIMIT_TYPES = [
+	"Overdraft",
+	"Short Term Loan",
+	"Long Term Loan",
+	"Letter of Guarantee",
+	"Letter of Credit",
+	"Trust Receipt",
+	"Cheque Discounting",
+	"Invoice Discounting",
+	"Murabaha",
+	"Tawarruq",
+	"Ijarah",
+	"Istisna'a",
+	"Other",
+];
+
 frappe.ui.form.on("Bank Facility", {
 	setup(frm) {
-		frm.set_query("default_bank_account", () => ({
-			filters: { company: frm.doc.company, is_company_account: 1, bank: frm.doc.bank },
-		}));
+		// a finance company's money may sit at any of the company's banks (design 7g §2.1)
+		frm.set_query("default_bank_account", () => {
+			const filters = { company: frm.doc.company, is_company_account: 1 };
+			if (frm.doc.lender_type !== "Finance Company") {
+				filters.bank = frm.doc.bank;
+			}
+			return { filters };
+		});
 		const account_query = (root_type, currency) => ({
 			filters: {
 				company: frm.doc.company,
@@ -54,31 +89,82 @@ frappe.ui.form.on("Bank Facility", {
 		frm.events.set_company_currency(frm);
 		frm.events.lock_fields(frm);
 		frm.events.translate_logs(frm);
+		frm.events.set_lender_fields(frm);
+		frm.events.set_terms(frm);
 		if (!frm.is_new()) {
 			frm.page.set_indicator(
 				__(frm.doc.status, null, "Bank Facility"),
-				{ Draft: "gray", Active: "green", Suspended: "orange", Expired: "red", Closed: "darkgrey" }[
-					frm.doc.status
-				] || "blue"
+				BF_STATUS_COLORS[frm.doc.status] || "blue"
 			);
+			frm.events.add_indicators(frm);
 			frm.events.add_actions(frm);
 		}
+	},
+
+	lender_type(frm) {
+		frm.events.set_lender_fields(frm);
+		frm.events.clear_unmatched_bank_account(frm);
+	},
+
+	bank(frm) {
+		frm.events.clear_unmatched_bank_account(frm);
+	},
+
+	is_islamic(frm) {
+		frm.events.set_terms(frm);
+		frm.events.lock_fields(frm);
 	},
 
 	lock_fields(frm) {
 		// mirrors BankFacility.validate_locked_fields: key terms move through Renew only once activated
 		const locked = !frm.is_new() && frm.doc.status !== "Draft";
-		[
-			"company",
-			"bank",
-			"currency",
-			"total_limit",
-			"start_date",
-			"expiry_date",
-			"lender_type",
+		// (an empty lender of a bank facility is filled by the server on first use, never by the form:
+		// lenders.get_lender_supplier)
+		["company", "bank", "currency", "total_limit", "start_date", "expiry_date", "lender_type", "lender"].forEach(
+			(fieldname) => frm.set_df_property(fieldname, "read_only", locked ? 1 : 0)
+		);
+		// mirrors validate_lender: an Islamic sub-limit makes the facility Islamic
+		frm.set_df_property("is_islamic", "read_only", locked || bf_has_islamic_limit(frm) ? 1 : 0);
+	},
+
+	set_lender_fields(frm) {
+		// design 7g §2.1: who lends decides the fields; a finance company has no bank (P4)
+		const finance = frm.doc.lender_type === "Finance Company";
+		frm.set_df_property(
 			"lender",
-			"is_islamic",
-		].forEach((fieldname) => frm.set_df_property(fieldname, "read_only", locked ? 1 : 0));
+			"description",
+			finance
+				? __("The financier as a Supplier (e.g. Al Jazeera Finance). For a bank, created from the Bank on first use.")
+				: __("Leave empty: the bank is added as a Supplier on its first Payment Entry.")
+		);
+		frm.toggle_display("lender_name", !frm.is_new() && !!frm.doc.lender_name);
+		// a finance company grants loans and Islamic financing only (lenders.FINANCE_COMPANY_TYPES)
+		const options = finance ? BF_FINANCE_COMPANY_TYPES : BF_LIMIT_TYPES;
+		const grid = frm.fields_dict.limits && frm.fields_dict.limits.grid;
+		grid && grid.update_docfield_property("limit_type", "options", options.join("\n"));
+	},
+
+	clear_unmatched_bank_account(frm) {
+		const account = frm.doc.default_bank_account;
+		if (!account || frm.doc.lender_type === "Finance Company") {
+			return;
+		}
+		frappe.db.get_value("Bank Account", account, "bank").then((r) => {
+			const bank = r.message && r.message.bank;
+			if (frm.doc.default_bank_account === account && bank !== frm.doc.bank) {
+				frm.set_value("default_bank_account", "");
+			}
+		});
+	},
+
+	set_terms(frm) {
+		// design 7g §1: one word per facility (Interest / Profit)
+		const terms = treasury.facility.terms(frm.doc.is_islamic);
+		frm.set_df_property("interest_expense_account", "label", terms.interest_expense_account);
+		frm.set_df_property("accrued_interest_account", "label", terms.accrued_interest_account);
+		const grid = frm.fields_dict.limits && frm.fields_dict.limits.grid;
+		grid && grid.update_docfield_property("interest_rate", "label", terms.interest_rate);
+		frm.refresh_field("limits");
 	},
 
 	translate_logs(frm) {
@@ -93,6 +179,32 @@ frappe.ui.form.on("Bank Facility", {
 			}
 		});
 		frm.refresh_field("status_log");
+	},
+
+	add_indicators(frm) {
+		// design 7g §2.3: who lends, the vocabulary in use (P1) and the collateral held by the lender (P5)
+		const esc = frappe.utils.escape_html;
+		const finance = frm.doc.lender_type === "Finance Company";
+		const lender = frm.doc.lender_name || frm.doc.bank || "";
+		frm.dashboard.add_indicator(
+			esc(finance ? __("Finance Company · {0}", [lender]) : __("Bank · {0}", [lender])),
+			finance ? "purple" : "blue"
+		);
+		if (cint(frm.doc.is_islamic)) {
+			frm.dashboard.add_indicator(esc(__("Islamic")), "cyan");
+		}
+		const security = frm.doc.__onload && frm.doc.__onload.security_summary;
+		if (security && security.count) {
+			frm.dashboard.add_indicator(
+				esc(
+					__("{0} security cheque(s) · {1}", [
+						security.count,
+						format_currency(security.total, security.currency || frm.doc.currency),
+					])
+				),
+				"gray"
+			);
+		}
 	},
 
 	add_actions(frm) {
@@ -110,6 +222,7 @@ frappe.ui.form.on("Bank Facility", {
 		});
 		const reason = { fieldname: "reason", label: __("Reason"), fieldtype: "Small Text", reqd: 1 };
 		const remarks = { fieldname: "remarks", label: __("Remarks", null, "Treasury"), fieldtype: "Small Text" };
+		const has_invoice_discounting = (frm.doc.limits || []).some((row) => row.limit_type === "Invoice Discounting");
 
 		frm.add_custom_button(__("Refresh Utilisation"), () => {
 			frm.call({ doc: frm.doc, method: "refresh_utilisation", freeze: true }).then(() => frm.reload_doc());
@@ -122,27 +235,10 @@ frappe.ui.form.on("Bank Facility", {
 			);
 		}
 		if (!["Draft", "Closed"].includes(status) && frappe.model.can_create("Security Cheque")) {
-			// our cheque to the lender as collateral (the 7c mapper pattern)
-			frm.add_custom_button(
-				__("Security Cheque"),
-				() =>
-					frappe
-						.xcall("treasury.security_cheques.api.make_security_cheque", {
-							source_doctype: frm.doc.doctype,
-							source_name: frm.doc.name,
-						})
-						.then((doc) => {
-							const synced = frappe.model.sync(doc)[0];
-							frappe.set_route("Form", synced.doctype, synced.name);
-						}),
-				__("Create")
-			);
+			// our cheque to the lender as collateral: everything is defaulted (the 7c mapper pattern, no dialog)
+			frm.add_custom_button(__("Security Cheque"), () => bf_make_security_cheque(frm), __("Create"));
 		}
-		if (
-			status === "Active" &&
-			(frm.doc.limits || []).some((row) => row.limit_type === "Invoice Discounting") &&
-			frappe.model.can_create("Invoice Discounting")
-		) {
+		if (status === "Active" && has_invoice_discounting && frappe.model.can_create("Invoice Discounting")) {
 			frm.add_custom_button(
 				__("Invoice Discounting"),
 				() =>
@@ -151,6 +247,14 @@ frappe.ui.form.on("Bank Facility", {
 						treasury_facility: frm.doc.name,
 					}),
 				__("Create")
+			);
+		}
+		if (has_invoice_discounting && frappe.model.can_read("Invoice Discounting")) {
+			// design 7g P8
+			frm.add_custom_button(
+				__("Invoice Discountings"),
+				() => frappe.set_route("List", "Invoice Discounting", { treasury_facility: frm.doc.name }),
+				__("View")
 			);
 		}
 		if (!is_manager) {
@@ -234,6 +338,77 @@ frappe.ui.form.on("Bank Facility", {
 	},
 });
 
+// ------------------------------------------------------------------------------------------ sub-limits
+frappe.ui.form.on("Bank Facility Limit", {
+	form_render(frm, cdt, cdn) {
+		bf_set_limit_hint(frm, cdn);
+	},
+
+	limit_type(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		bf_set_limit_hint(frm, cdn);
+		// mirrors validate_lender: an Islamic sub-limit makes the facility Islamic (the labels switch now)
+		if (BF_ISLAMIC_TYPES.includes(row.limit_type) && !cint(frm.doc.is_islamic)) {
+			frm.set_value("is_islamic", 1);
+			frappe.show_alert({
+				message: frappe.utils.escape_html(__("Islamic sub-limit: the facility uses Profit instead of Interest.")),
+				indicator: "blue",
+			});
+		}
+		frm.events.lock_fields(frm);
+	},
+
+	limits_remove(frm) {
+		frm.events.lock_fields(frm);
+	},
+});
+
+function bf_has_islamic_limit(frm) {
+	return (frm.doc.limits || []).some((row) => BF_ISLAMIC_TYPES.includes(row.limit_type));
+}
+
+function bf_set_limit_hint(frm, cdn) {
+	// design 7g §2.2: what each Islamic / trade sub-limit means, under the type in the row form
+	const row = locals["Bank Facility Limit"][cdn];
+	const hints = {
+		Ijarah: __("Leasing: the asset is financed; rentals repay principal and profit."),
+		"Istisna'a": __(
+			"Manufacturing / construction: the drawdown is disbursed in stages. Undisbursed stages still use the limit."
+		),
+		"Trust Receipt": __("Created automatically when a Letter of Credit is settled with Finance by Trust Receipt."),
+		"Invoice Discounting": __("Used by ERPNext Invoice Discounting documents linked to this facility."),
+	};
+	const grid_row = frm.fields_dict.limits.grid.grid_rows_by_docname[cdn];
+	const field = grid_row && grid_row.grid_form && grid_row.grid_form.fields_dict.limit_type;
+	if (field) {
+		// the help box directly: set_description() keeps an old text when the new one is empty
+		const hint = (row && hints[row.limit_type]) || "";
+		field.$wrapper.find(".help-box").html(frappe.utils.escape_html(hint)).toggleClass("hide", !hint);
+	}
+}
+
+function bf_make_security_cheque(frm) {
+	frappe
+		.xcall("treasury.security_cheques.api.make_security_cheque", {
+			source_doctype: frm.doc.doctype,
+			source_name: frm.doc.name,
+		})
+		.then((doc) => {
+			const synced = frappe.model.sync(doc)[0];
+			frappe.set_route("Form", synced.doctype, synced.name).then(() => {
+				frappe.show_alert({
+					message: frappe.utils.escape_html(
+						__("Security cheque to {0} for {1}. Enter the cheque number and save.", [
+							frm.doc.lender_name || frm.doc.bank || "",
+							frm.doc.facility_name || frm.doc.name,
+						])
+					),
+					indicator: "blue",
+				});
+			});
+		});
+}
+
 function facility_action(frm, method, label, fields) {
 	frm.add_custom_button(
 		label,
@@ -249,4 +424,30 @@ function facility_action(frm, method, label, fields) {
 		},
 		__("Actions")
 	);
+}
+
+// Design 7g §1: the Interest / Profit wording of a facility, shared by the facility forms (the same helper is
+// in each of them: there are no bundles; defined once by whichever loads first). The strings are those of
+// treasury.bank_facilities.lenders.terms().
+frappe.provide("treasury.facility");
+if (!treasury.facility.terms) {
+	treasury.facility.terms = function (is_islamic, limit_type) {
+		const islamic = !!cint(is_islamic);
+		const rental = islamic && limit_type === "Ijarah";
+		return {
+			interest: islamic ? __("Profit") : __("Interest"),
+			interest_rate: islamic ? __("Profit Rate (% p.a.)") : __("Interest Rate (% p.a.)"),
+			total_interest: islamic ? __("Total Profit") : __("Total Interest"),
+			interest_paid: islamic ? __("Profit Paid") : __("Interest Paid"),
+			paid_interest: islamic ? __("Paid Profit") : __("Paid Interest"),
+			accrued_interest: islamic ? __("Accrued Profit") : __("Accrued Interest"),
+			accrued_interest_account: islamic ? __("Accrued Profit Account") : __("Accrued Interest Account"),
+			interest_expense_account: islamic ? __("Profit Expense Account") : __("Interest Expense Account"),
+			accrued_interest_cleared: islamic ? __("Accrued Profit Cleared") : __("Accrued Interest Cleared"),
+			interest_expensed: islamic ? __("Profit Expensed") : __("Interest Expensed"),
+			installment: rental ? __("Rental") : __("Installment"),
+			total: rental ? __("Rental") : __("Total", null, "Treasury"),
+			penalty: islamic ? __("Late Payment Charge") : __("Penalty"),
+		};
+	};
 }

@@ -18,6 +18,7 @@ from treasury.bank_facilities.repayment import OVERDUE, PAID
 from treasury.bank_facilities.report_utils import (
 	DRAWDOWN,
 	FACILITY,
+	LIVE_CHEQUE_STATUSES,
 	CompanyConverter,
 	get_installments,
 	report_today,
@@ -57,7 +58,8 @@ def execute(filters=None):
 			continue
 		if filters.status and row.status != filters.status:
 			continue
-		row.status_label = _(row.status, context=CTX)
+		# design 7g P24: the same derived states as the drawdown form (Cheque Issued, Awaiting Statement ...)
+		row.status_label = _(row.display_status, context=CTX)
 		row.company_currency = converter.company_currency
 		row.unpaid_company = converter.convert(row.unpaid, row.currency)
 		row.limit_type_label = _(row.limit_type, context=FACILITY)
@@ -72,6 +74,7 @@ def get_summary(rows: list, currency: str) -> list[dict]:
 	precision = get_precision()
 	converter_rows = [r for r in rows if r.status != PAID]
 	overdue = [r for r in converter_rows if r.status == OVERDUE]
+	covered = [r for r in converter_rows if r.cheque_status in LIVE_CHEQUE_STATUSES]
 	return [
 		{
 			"label": _("Unpaid (Company Currency)"),
@@ -94,6 +97,14 @@ def get_summary(rows: list, currency: str) -> list[dict]:
 			"datatype": "Int",
 			"indicator": "Orange",
 		},
+		{
+			# design 7g §8.3: the unpaid installments an installment cheque to the lender will pay
+			"label": _("Covered by Cheques"),
+			"value": flt(sum(r.unpaid_company for r in covered), precision),
+			"datatype": "Currency",
+			"currency": currency,
+			"indicator": "Blue",
+		},
 	]
 
 
@@ -108,10 +119,12 @@ def get_columns(terms=None) -> list[dict]:
 		column("due_date", _("Due Date", context="Treasury"), "Date", 100),
 		column("drawdown", _("Facility Drawdown"), "Link", 150, options=DRAWDOWN),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
-		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank"),
-		column("lender_name", _("Lender"), width=140),
+		column("lender_name", _("Lender"), width=150),
+		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank", hidden=1),
 		column("limit_type_label", _("Limit Type"), width=120),
 		column("installment_no", _("Installment No"), "Int", 80),
+		column("repayment_mode_label", _("Repayment Mode"), width=110),
+		column("repayment_mode", _("Repayment Mode"), width=90, hidden=1),
 		money("principal", _("Principal")),
 		money("interest", terms.interest),
 		money("total", _("Total", context=CTX)),
@@ -120,13 +133,14 @@ def get_columns(terms=None) -> list[dict]:
 		money("unpaid_principal", _("Unpaid Principal")),
 		money("unpaid_interest", _("Unpaid {0}").format(terms.interest)),
 		money("unpaid", _("Unpaid")),
-		column("status_label", _("Status", context="Treasury"), width=100),
+		column("status_label", _("Status", context="Treasury"), width=110),
 		column("status", _("Status", context="Treasury"), width=90, hidden=1),
-		column("repayment_mode_label", _("Repayment Mode"), width=110),
-		column("pdc_cheque", _("Installment Cheque"), "Link", 150, options="PDC Cheque"),
+		column("display_status", _("Status", context="Treasury"), width=90, hidden=1),
+		column("pdc_cheque", _("Installment Cheque"), "Link", 140, options="PDC Cheque"),
 		column("cheque_status_label", _("Cheque Status"), width=100),
+		column("cheque_status", _("Cheque Status"), width=90, hidden=1),
 		column("payment_voucher_type", _("Voucher Type"), "Link", 110, options="DocType", hidden=1),
-		column("payment_journal", _("Payment Voucher"), "Dynamic Link", 160, options="payment_voucher_type"),
+		column("payment_journal", _("Payment Voucher"), "Dynamic Link", 170, options="payment_voucher_type"),
 		column("currency", _("Currency"), "Link", 70, options="Currency"),
 		money("unpaid_company", _("Unpaid (Company Currency)"), "company_currency", 150),
 		column("bank_account", _("Bank Account", context="Treasury"), "Link", 160, options="Bank Account"),

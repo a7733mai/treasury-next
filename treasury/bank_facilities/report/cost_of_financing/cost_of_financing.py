@@ -39,6 +39,16 @@ MONTHLY, QUARTERLY, YEARLY = "Monthly", "Quarterly", "Yearly"
 PERIOD_MONTHS = {MONTHLY: 1, QUARTERLY: 3, YEARLY: 12}
 CATEGORIES = ("interest", "profit", "ijarah", "commission", "fees", "penalty", "charity")
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
+# design 7g §8.1: summary card indicator and chart colour per category
+CATEGORY_STYLE = {
+	"interest": ("Red", "#E24C4C"),
+	"profit": ("Red", "#2E9E6A"),
+	"ijarah": ("Red", "#1F9AA6"),
+	"commission": ("Orange", "#F68B1F"),
+	"fees": ("Orange", "#ECAD4B"),
+	"penalty": ("Red", "#7B2D26"),
+	"charity": ("Grey", "#8D99A6"),
+}
 
 
 def execute(filters=None):
@@ -70,6 +80,7 @@ def execute(filters=None):
 				"name",
 				"facility_name",
 				"bank",
+				"lender_type",
 				"lender_name",
 				"currency",
 				"is_islamic",
@@ -82,6 +93,7 @@ def execute(filters=None):
 
 	precision = get_precision()
 	data, totals = [], dict.fromkeys(CATEGORIES, 0.0)
+	by_period_all: dict = {}  # the chart: {period start: {category: amount}} over the facilities shown
 	company_currency = frappe.get_cached_value("Company", company, "default_currency")
 	for name in sorted(facilities):
 		by_period: dict = {}
@@ -93,6 +105,7 @@ def execute(filters=None):
 			continue
 		facility = facilities[name]
 		lender = facility.lender_name or facility.bank
+		lender_type = _(facility.lender_type or "Bank", context=FACILITY)
 		parent = frappe._dict(
 			row_id=name,
 			indent=0,
@@ -100,6 +113,7 @@ def execute(filters=None):
 			facility=name,
 			bank=facility.bank,
 			lender_name=lender,
+			lender_type=lender_type,
 			currency=company_currency,
 			**dict.fromkeys(CATEGORIES, 0.0),
 		)
@@ -116,18 +130,69 @@ def execute(filters=None):
 				facility=name,
 				bank=facility.bank,
 				lender_name=lender,
+				lender_type=lender_type,
 				currency=company_currency,
 			)
+			chart_bucket = by_period_all.setdefault(start, dict.fromkeys(CATEGORIES, 0.0))
 			for category in CATEGORIES:
 				child[category] = flt(by_period[start][category], precision)
 				parent[category] = flt(parent[category] + child[category], precision)
+				chart_bucket[category] = flt(chart_bucket[category] + child[category], precision)
 			child.total = flt(sum(child[c] for c in CATEGORIES), precision)
 			children.append(child)
 		parent.total = flt(sum(parent[c] for c in CATEGORIES), precision)
 		for category in CATEGORIES:
 			totals[category] = flt(totals[category] + parent[category], precision)
 		data += [parent, *children]
-	return get_columns(), data, None, None, get_summary(totals, company_currency)
+	shown = shown_categories(data)
+	return (
+		get_columns(shown),
+		data,
+		None,
+		get_chart(by_period_all, shown, periodicity),
+		get_summary(totals, company_currency, shown),
+	)
+
+
+def shown_categories(data: list) -> tuple[str, ...]:
+	"""Design 7g P20: a category that is 0 on every row is left out (columns, cards and chart), so that a
+	conventional company never sees the Islamic columns and vice versa. Without any row: every category."""
+	used = {c for row in data for c in CATEGORIES if flt(row.get(c))}
+	return tuple(c for c in CATEGORIES if c in used) or CATEGORIES
+
+
+def category_labels() -> dict[str, str]:
+	return {
+		"interest": _("Interest"),
+		"profit": _("Profit"),
+		"ijarah": _("Ijarah Rentals (Profit)"),
+		"commission": _("Commission"),
+		"fees": _("Fees"),
+		"penalty": _("Penalties"),
+		"charity": _("Late Payment (Charity)"),
+	}
+
+
+def get_chart(by_period: dict, shown: tuple[str, ...], periodicity: str) -> dict | None:
+	"""Design 7g P21: one stacked bar per period, a dataset per category shown."""
+	if not by_period:
+		return None
+	labels = category_labels()
+	starts = sorted(by_period)
+	date_format = "MMM yyyy" if periodicity == MONTHLY else None
+	return {
+		"data": {
+			"labels": [formatdate(start, date_format) for start in starts],
+			"datasets": [
+				{"name": labels[c], "values": [flt(by_period[s][c]) for s in starts], "chartType": "bar"}
+				for c in shown
+			],
+		},
+		"type": "bar",
+		"barOptions": {"stacked": 1},
+		"colors": [CATEGORY_STYLE[c][1] for c in shown],
+		"fieldtype": "Currency",
+	}
 
 
 def period_start(date, periodicity: str):
@@ -255,8 +320,10 @@ def _category(row, facility, drawdown, repayments: dict) -> str:
 	return "interest"
 
 
-def get_summary(totals: dict, currency: str) -> list[dict]:
+def get_summary(totals: dict, currency: str, shown: tuple[str, ...] = CATEGORIES) -> list[dict]:
+	"""A card per category shown (design 7g §8.1, same order as the columns) and the total."""
 	precision = get_precision()
+	labels = category_labels()
 
 	def card(value, label, indicator):
 		return {
@@ -268,30 +335,25 @@ def get_summary(totals: dict, currency: str) -> list[dict]:
 		}
 
 	return [
-		card(totals["interest"] + totals["profit"] + totals["ijarah"], _("Interest / Profit"), "Red"),
-		card(totals["commission"], _("Commission"), "Orange"),
-		card(totals["fees"], _("Fees"), "Orange"),
-		card(totals["penalty"] + totals["charity"], _("Penalties"), "Red"),
+		*(card(totals[c], labels[c], CATEGORY_STYLE[c][0]) for c in shown),
 		card(sum(totals.values()), _("Total Cost of Financing"), "Blue"),
 	]
 
 
-def get_columns() -> list[dict]:
-	def money(fieldname, label, width=130):
+def get_columns(shown: tuple[str, ...] = CATEGORIES) -> list[dict]:
+	labels = category_labels()
+	widths = {"interest": 120, "profit": 120, "ijarah": 130, "charity": 130}
+
+	def money(fieldname, label, width=110):
 		return column(fieldname, label, "Currency", width, options="currency")
 
 	return [
 		column("label", _("Facility / Period"), width=240),
 		column("facility", _("Bank Facility"), "Link", 150, options=FACILITY),
-		column("lender_name", _("Lender"), width=150),
+		column("lender_name", _("Lender"), width=160),
+		column("lender_type", _("Lender Type"), width=110),
 		column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank", hidden=1),
-		money("interest", _("Interest")),
-		money("profit", _("Profit")),
-		money("ijarah", _("Ijarah Rentals (Profit)"), 150),
-		money("commission", _("Commission")),
-		money("fees", _("Fees")),
-		money("penalty", _("Penalties")),
-		money("charity", _("Late Payment (Charity)"), 150),
-		money("total", _("Total", context=CTX)),
+		*(money(c, labels[c], widths.get(c, 110)) for c in shown),
+		money("total", _("Total", context=CTX), 130),
 		column("currency", _("Currency"), "Link", 70, options="Currency", hidden=1),
 	]

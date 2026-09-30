@@ -10,10 +10,10 @@
   "naming_series",
   "facility_name",
   "lender_type",
+  "bank",
   "lender",
   "lender_name",
   "company",
-  "bank",
   "contract_no",
   "is_islamic",
   "column_break_main",
@@ -36,7 +36,9 @@
   "column_break_accounts",
   "commission_expense_account",
   "accrued_interest_account",
+  "late_payment_section",
   "late_payment_mode",
+  "column_break_late_payment",
   "late_payment_charity_account",
   "charity_payable_account",
   "collateral_section",
@@ -116,6 +118,7 @@
    "description": "Islamic terms: Profit instead of Interest. Set automatically for Murabaha, Tawarruq, Ijarah and Istisna'a sub-limits.",
    "fieldname": "is_islamic",
    "fieldtype": "Check",
+   "in_standard_filter": 1,
    "label": "Islamic Facility"
   },
   {
@@ -255,13 +258,24 @@
    "options": "Account"
   },
   {
+   "depends_on": "eval:doc.is_islamic",
+   "description": "Islamic facilities: late payment charges are not income of the lender. Choose whether the lender collects them (and gives them to charity) or the company pays them to charity itself.",
+   "fieldname": "late_payment_section",
+   "fieldtype": "Section Break",
+   "label": "Late Payment"
+  },
+  {
    "default": "Paid to Lender",
    "depends_on": "eval:doc.is_islamic",
    "description": "A late payment penalty of an Islamic facility: paid to the lender with the installment, or booked as payable to charity (not paid through the bank).",
    "fieldname": "late_payment_mode",
    "fieldtype": "Select",
-   "label": "Late Payment Penalty",
+   "label": "Late Payment Mode",
    "options": "Paid to Lender\nPayable to Charity"
+  },
+  {
+   "fieldname": "column_break_late_payment",
+   "fieldtype": "Column Break"
   },
   {
    "depends_on": "eval:doc.is_islamic",
@@ -282,6 +296,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:(doc.security_cheques||[]).length",
    "fieldname": "collateral_section",
    "fieldtype": "Section Break",
    "label": "Collateral"
@@ -313,7 +328,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-01 12:00:00.000000",
+ "modified": "2026-10-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bank Facilities",
  "name": "Bank Facility",

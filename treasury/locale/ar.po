@@ -11795,8 +11795,12 @@ msgid "Islamic Facility"
 msgstr "تسهيل إسلامي"
 
 msgctxt "Bank Facility"
-msgid "Late Payment Penalty"
-msgstr "غرامة التأخير"
+msgid "Late Payment Mode"
+msgstr "معالجة غرامة التأخير"
+
+msgctxt "Bank Facility"
+msgid "Late Payment"
+msgstr "التأخر في السداد"
 
 msgctxt "Bank Facility"
 msgid "Late Payment (Charity) Account"
@@ -12012,8 +12016,8 @@ msgstr "قيد الأعمال الخيرية"
 msgid "Bank: entered by a user. Auto Debit: debited by the bank (daily job or bank statement). PDC Cheque: the party posting of an installment cheque to the lender."
 msgstr "البنك: أدخله مستخدم. خصم تلقائي: خصمه البنك (المهمة اليومية أو كشف البنك). شيك آجل: قيد الطرف لشيك قسط للممول."
 
-msgid "From the facility's Late Payment Penalty setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank)."
-msgstr "من إعداد غرامة التأخير في التسهيل (التسهيلات الإسلامية): تُدفع للممول مع القسط، أو تُستحق للأعمال الخيرية (لا تُدفع من البنك)."
+msgid "From the facility's Late Payment Mode setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank)."
+msgstr "من إعداد معالجة غرامة التأخير في التسهيل (التسهيلات الإسلامية): تُدفع للممول مع القسط، أو تُستحق للأعمال الخيرية (لا تُدفع من البنك)."
 
 # Facility Repayment Schedule fields
 msgctxt "Facility Repayment Schedule"
@@ -12305,3 +12309,390 @@ msgstr "التمويل بإيصال أمانة"
 
 msgid "Default: the rate of the Trust Receipt sub-limit."
 msgstr "الافتراضي: سعر الحد الفرعي لإيصالات الأمانة."
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 7g-2 — facilities UX (design 7g)
+# ---------------------------------------------------------------------------------------------------------
+
+# Terminology (design §1, the shared client helper treasury.facility.terms)
+msgid "Islamic"
+msgstr "إسلامي"
+
+msgid "Total Profit"
+msgstr "إجمالي الربح"
+
+msgid "Total Interest"
+msgstr "إجمالي الفائدة"
+
+msgid "Paid Profit"
+msgstr "الربح المسدد"
+
+msgid "Paid Interest"
+msgstr "الفائدة المسددة"
+
+msgid "Accrued Profit Account"
+msgstr "حساب الأرباح المستحقة"
+
+msgid "Accrued Profit Cleared"
+msgstr "الأرباح المستحقة المسددة"
+
+msgid "Profit Expensed"
+msgstr "الربح المحمّل على المصروفات"
+
+msgid "Installment"
+msgstr "القسط"
+
+msgid "Late Payment Charge"
+msgstr "غرامة التأخير"
+
+# Bank Facility (design §2)
+msgctxt "Bank Facility"
+msgid "Profit Expense Account"
+msgstr "حساب مصروف الأرباح"
+
+msgctxt "Bank Facility"
+msgid "Accrued Profit Account"
+msgstr "حساب الأرباح المستحقة"
+
+msgid "Islamic facilities: late payment charges are not income of the lender. Choose whether the lender collects them (and gives them to charity) or the company pays them to charity itself."
+msgstr "في التسهيلات الإسلامية لا تُعد غرامات التأخير دخلاً للممول. اختر هل يحصّلها الممول (ويصرفها في وجوه الخير) أم تدفعها الشركة لصندوق الخيرات بنفسها."
+
+msgid "Leave empty: the bank is added as a Supplier on its first Payment Entry."
+msgstr "اتركه فارغاً: يُضاف البنك كمورد عند أول سند دفع."
+
+msgid "Islamic sub-limit: the facility uses Profit instead of Interest."
+msgstr "حد فرعي إسلامي: يستخدم التسهيل \"الربح\" بدلاً من \"الفائدة\"."
+
+msgid "Bank · {0}"
+msgstr "بنك · {0}"
+
+msgid "Finance Company · {0}"
+msgstr "شركة تمويل · {0}"
+
+msgid "{0} security cheque(s) · {1}"
+msgstr "{0} شيك ضمان · {1}"
+
+msgid "Leasing: the asset is financed; rentals repay principal and profit."
+msgstr "إجارة: يُموَّل الأصل، وتسدد أقساط الإجارة الأصل والربح."
+
+msgid "Manufacturing / construction: the drawdown is disbursed in stages. Undisbursed stages still use the limit."
+msgstr "استصناع (تصنيع / إنشاء): يُصرف التمويل على مراحل، والمراحل غير المصروفة تستهلك الحد أيضاً."
+
+msgid "Created automatically when a Letter of Credit is settled with Finance by Trust Receipt."
+msgstr "يُنشأ تلقائياً عند سداد اعتماد مستندي مع التمويل بإيصال أمانة."
+
+msgid "Used by ERPNext Invoice Discounting documents linked to this facility."
+msgstr "تستهلكه مستندات خصم الفواتير المرتبطة بهذا التسهيل."
+
+msgid "Security cheque to {0} for {1}. Enter the cheque number and save."
+msgstr "شيك ضمان لصالح {0} مقابل {1}. أدخل رقم الشيك واحفظ."
+
+msgid "Invoice Discountings"
+msgstr "مستندات خصم الفواتير"
+
+# Facility Drawdown (design §3)
+msgctxt "Facility Drawdown"
+msgid "Disbursement"
+msgstr "الصرف"
+
+msgid "e.g. Toyota Hilux 2025, chassis no. …"
+msgstr "مثال: تويوتا هايلكس 2025، رقم الشاسيه …"
+
+msgid "Add one row per disbursement stage; the amounts must add up to the contract amount. Each stage is posted with Disburse Stage."
+msgstr "أضف صفاً لكل مرحلة صرف؛ يجب أن يساوي مجموع المبالغ قيمة العقد. تُرحَّل كل مرحلة من \"صرف مرحلة\"."
+
+msgid "Financed Amount (Asset Cost)"
+msgstr "مبلغ التمويل (تكلفة الأصل)"
+
+msgid "Contract Amount"
+msgstr "قيمة العقد"
+
+msgid "Rental Schedule"
+msgstr "جدول أقساط الإجارة"
+
+msgid "Cheque Issued"
+msgstr "مغطى بشيك"
+
+msgid "Cheque Due"
+msgstr "شيك مستحق"
+
+msgid "Awaiting Statement"
+msgstr "بانتظار كشف البنك"
+
+msgid "Posting Today"
+msgstr "يُرحَّل اليوم"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Cheque Issued"
+msgstr "مغطى بشيك"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Cheque Due"
+msgstr "شيك مستحق"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Awaiting Statement"
+msgstr "بانتظار كشف البنك"
+
+msgctxt "Facility Repayment Schedule"
+msgid "Posting Today"
+msgstr "يُرحَّل اليوم"
+
+msgctxt "Treasury Report"
+msgid "Cheque Issued"
+msgstr "مغطى بشيك"
+
+msgctxt "Treasury Report"
+msgid "Cheque Due"
+msgstr "شيك مستحق"
+
+msgctxt "Treasury Report"
+msgid "Awaiting Statement"
+msgstr "بانتظار كشف البنك"
+
+msgctxt "Treasury Report"
+msgid "Posting Today"
+msgstr "يُرحَّل اليوم"
+
+msgid "Manual Repayment"
+msgstr "سداد يدوي"
+
+msgid "Auto Debit · On Due Date"
+msgstr "خصم تلقائي · في تاريخ الاستحقاق"
+
+msgid "Auto Debit · Statement Match"
+msgstr "خصم تلقائي · مطابقة الكشف"
+
+msgid "PDC to Lender · {0} of {1} cheques"
+msgstr "شيكات للممول · {0} من {1} شيك"
+
+msgid "Ijarah Muntahia Bittamleek"
+msgstr "إجارة منتهية بالتمليك"
+
+msgid "Trust Receipt financing the settlement of {0} on {1}."
+msgstr "إيصال أمانة لتمويل سداد {0} بتاريخ {1}."
+
+msgid "{0} of {1} disbursed · next stage {2} on {3}."
+msgstr "صُرف {0} من {1} · المرحلة التالية {2} بتاريخ {3}."
+
+msgid "installment"
+msgstr "القسط"
+
+msgid "rental"
+msgstr "قسط الإجارة"
+
+msgid "Next {0} #{1} · {2} due {3}"
+msgstr "{0} التالي رقم {1} · {2} مستحق في {3}"
+
+msgid "cheque {0} ({1})"
+msgstr "شيك {0} ({1})"
+
+msgid "no cheque yet"
+msgstr "لا يوجد شيك بعد"
+
+msgid "awaiting the bank statement"
+msgstr "بانتظار كشف البنك"
+
+msgid "posted automatically on the due date"
+msgstr "يُرحَّل تلقائياً في تاريخ الاستحقاق"
+
+msgid "Fully repaid · last voucher {0}."
+msgstr "سُدد بالكامل · آخر مستند {0}."
+
+msgid "{0} disbursed · {1} pending"
+msgstr "صُرف {0} · متبقٍ {1}"
+
+msgid "The bank debits each installment automatically. Treasury posts it on its due date as a repayment from {0}."
+msgstr "يخصم البنك كل قسط تلقائياً، وتُرحّله الخزينة في تاريخ استحقاقه كسداد من {0}."
+
+msgid "The bank debits each installment automatically. Import the bank statement and match it in PDC Bank Clearing to post the repayment."
+msgstr "يخصم البنك كل قسط تلقائياً. استورد كشف البنك وطابقه في تسوية الشيكات مع البنك لترحيل السداد."
+
+msgid "Open PDC Bank Clearing"
+msgstr "فتح تسوية الشيكات مع البنك"
+
+msgid "Each installment is paid by a post-dated cheque to {0}. The cheque is posted on its date as the repayment; nothing is posted at delivery."
+msgstr "يُسدَّد كل قسط بشيك آجل لصالح {0}، ويُرحَّل الشيك في تاريخه كسداد للقسط؛ ولا يُرحَّل شيء عند التسليم."
+
+msgid "{0} installment(s) have no cheque yet."
+msgstr "{0} قسط بدون شيك حتى الآن."
+
+msgid "Submitting books only the upfront fees. Each stage is posted when you use Disburse Stage."
+msgstr "الاعتماد يقيّد الرسوم المقدمة فقط، وتُرحَّل كل مرحلة عند استخدام \"صرف مرحلة\"."
+
+msgid "Installment Cheques · {0}"
+msgstr "شيكات الأقساط · {0}"
+
+msgctxt "Installment Cheques"
+msgid "To"
+msgstr "إلى"
+
+msgctxt "Installment Cheques"
+msgid "From"
+msgstr "من"
+
+msgctxt "Installment Cheques"
+msgid "Cheque"
+msgstr "الشيك"
+
+msgctxt "Installment Cheques"
+msgid "paid"
+msgstr "مسدد"
+
+msgid "Cheque book {0} (next {1})"
+msgstr "دفتر الشيكات {0} (التالي {1})"
+
+msgid "{0} cheques · {1} · {2} → {3}"
+msgstr "{0} شيك · {1} · {2} ← {3}"
+
+msgid "Skipped: {0}"
+msgstr "تم تخطي: {0}"
+
+msgid "already has cheque {0} ({1})"
+msgstr "له شيك بالفعل {0} ({1})"
+
+msgid "The cheques are posted on their dates as repayments of these installments. Amounts and dates follow the schedule and cannot be changed in the batch."
+msgstr "تُرحَّل الشيكات في تواريخها كسداد لهذه الأقساط. المبالغ والتواريخ من الجدول ولا يمكن تعديلها في السند."
+
+msgid "Create Cheque Batch"
+msgstr "إنشاء سند الشيكات"
+
+msgid "Every unpaid installment already has a cheque."
+msgstr "كل الأقساط غير المسددة لها شيكات بالفعل."
+
+msgid "Stage {0} · {1} · {2} · {3}"
+msgstr "المرحلة {0} · {1} · {2} · {3}"
+
+msgid "Credits {0}"
+msgstr "يُضاف إلى {0}"
+
+msgid "Debits {0} (paid by the financier directly)"
+msgstr "يُقيَّد على {0} (يدفعه الممول مباشرة)"
+
+msgid "Disbursed so far {0} of {1}"
+msgstr "المصروف حتى الآن {0} من {1}"
+
+msgid "The date on the bank advice or the contractor's certificate."
+msgstr "التاريخ الوارد في إشعار البنك أو مستخلص المقاول."
+
+msgid "Disburse"
+msgstr "صرف"
+
+msgid "Stage {0} disbursed: {1}."
+msgstr "تم صرف المرحلة {0}: {1}."
+
+msgid "Stages {0} of {1}"
+msgstr "المراحل {0} من {1}"
+
+msgid "Repayment mode changed. Generate the installment cheques now."
+msgstr "تم تغيير طريقة السداد. أنشئ شيكات الأقساط الآن."
+
+msgid "Repayments"
+msgstr "السدادات"
+
+msgid "Letters of Credit"
+msgstr "الاعتمادات المستندية"
+
+# Facility Repayment (design §4)
+msgid "Bank Payment"
+msgstr "سداد بنكي"
+
+msgid "Cheque {0}"
+msgstr "شيك {0}"
+
+msgid "Paid by installment cheque {0} ({1}) · {2}."
+msgstr "سُدد بشيك القسط {0} ({1}) · {2}."
+
+msgid "To undo, bounce, replace or cancel the cheque."
+msgstr "للتراجع: ارتد الشيك أو استبدله أو ألغِه."
+
+msgid "Auto debit matched with bank statement line {0} on {1} · {2}."
+msgstr "خصم تلقائي مطابق لحركة كشف البنك {0} بتاريخ {1} · {2}."
+
+msgid "Posted automatically on the due date · {0} · not yet matched with the bank statement."
+msgstr "رُحّل تلقائياً في تاريخ الاستحقاق · {0} · لم يُطابق مع كشف البنك بعد."
+
+msgid "Late payment charge {0} booked as payable to charity ({1})."
+msgstr "قُيدت غرامة التأخير {0} كمستحقة لصندوق الخيرات ({1})."
+
+msgid "Paid to the lender with this installment"
+msgstr "تُدفع للممول مع هذا القسط"
+
+msgid "Not paid now: booked as payable to charity"
+msgstr "لا تُدفع الآن: تُقيَّد مستحقة لصندوق الخيرات"
+
+msgid "Installments with a cheque are paid by the cheque. Oldest First skips them."
+msgstr "الأقساط التي لها شيكات تُسدَّد بالشيك، ويتخطاها \"الأقدم أولاً\"."
+
+# PDC Cheque, Cheque Batch, PDC Bank Clearing (design §5)
+msgid "Installment {0} of {1} to {2}. Posted on the cheque date {3} as the repayment; nothing is posted at delivery."
+msgstr "القسط {0} من {1} لصالح {2}. يُرحَّل في تاريخ الشيك {3} كسداد؛ ولا يُرحَّل شيء عند التسليم."
+
+msgid "Installment {0} of {1} · repayment {2} · {3}"
+msgstr "القسط {0} من {1} · السداد {2} · {3}"
+
+msgid "Installment cheque of {0}"
+msgstr "شيك قسط {0}"
+
+msgid "Installment cheques of {0} to {1}. Amounts and due dates follow the repayment schedule and cannot be changed."
+msgstr "شيكات أقساط {0} لصالح {1}. المبالغ وتواريخ الاستحقاق من جدول السداد ولا يمكن تعديلها."
+
+msgctxt "PDC Bank Clearing"
+msgid "Installment"
+msgstr "قسط"
+
+msgctxt "PDC Bank Clearing"
+msgid "Installments Only"
+msgstr "الأقساط فقط"
+
+msgid "Auto debit to post"
+msgstr "خصم تلقائي للترحيل"
+
+msgid "Auto debit to reconcile"
+msgstr "خصم تلقائي للمطابقة"
+
+msgid "· {0} installment(s)"
+msgstr "· {0} قسط"
+
+msgid "Clear {0} cheque(s), {1} bank transfer(s), {2} installment(s), reconcile {3} bank charge(s) and create {4} bank charge(s)?"
+msgstr "تسوية {0} شيك و{1} تحويل بنكي و{2} قسط، ومطابقة {3} مصروف بنكي وإنشاء {4} مصروف بنكي؟"
+
+# Letter of Credit: Trust Receipt (design §6)
+msgctxt "Letter of Credit"
+msgid "Tenor (Months)"
+msgstr "المدة (بالأشهر)"
+
+msgctxt "Letter of Credit"
+msgid "First Repayment Date"
+msgstr "تاريخ أول سداد"
+
+msgid "Default: settlement date plus the tenor (one bullet repayment)."
+msgstr "الافتراضي: تاريخ السداد مضافاً إليه المدة (سداد دفعة واحدة)."
+
+msgid "Trust Receipt: {0} (settlement {1} − margin {2}) · available {3}"
+msgstr "إيصال الأمانة: {0} (السداد {1} − التأمين النقدي {2}) · المتاح {3}"
+
+msgid "Settle and Create Trust Receipt"
+msgstr "سداد وإنشاء إيصال أمانة"
+
+msgid "Trust Receipt {0} created: {1} due {2}."
+msgstr "تم إنشاء إيصال الأمانة {0}: {1} مستحق في {2}."
+
+msgid "Financed by Trust Receipt {0} · {1} · due {2} · {3}."
+msgstr "مموَّل بإيصال أمانة {0} · {1} · يستحق {2} · {3}."
+
+# Reports and workspace (design §8, §9)
+msgid "Lender / Facility / Limit Type"
+msgstr "الممول / التسهيل / نوع الحد"
+
+msgid "Undisbursed Stages"
+msgstr "المراحل غير المصروفة"
+
+msgid "Includes {0} of undisbursed stages."
+msgstr "يشمل {0} لمراحل لم تُصرف."
+
+msgid "Covered by Cheques"
+msgstr "مغطى بشيكات"
+
+msgid "Auto Debits Awaiting Statement"
+msgstr "خصومات تلقائية بانتظار الكشف"

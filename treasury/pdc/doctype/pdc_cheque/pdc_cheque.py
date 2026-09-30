@@ -210,6 +210,30 @@ class PDCCheque(Document):
 			self.set_onload("batch_locked", self.is_batch_locked())
 			# {name, default_language, reprint_requires_manager}: the "Print Cheque" dialog (design 7f §6.2)
 			self.set_onload("cheque_layout", cheque_printing.layout_info(layout, self.company))
+			if self.facility_drawdown:
+				# design 7g P16: "Installment {0} of {1} ..." headline of an installment cheque
+				self.set_onload("facility_installment", self.get_facility_installment())
+
+	def get_facility_installment(self) -> dict:
+		"""The installment an installment cheque pays: its number, the drawdown's lender and the repayment /
+		Payment Entry of the current cycle."""
+		installment_no = (
+			frappe.db.get_value(
+				"Facility Repayment Schedule", self.facility_schedule_row, "installment_no"
+			)
+			if self.facility_schedule_row
+			else None
+		)
+		payment_entry = (
+			frappe.db.get_value("Facility Repayment", self.facility_repayment, "payment_entry")
+			if self.facility_repayment
+			else None
+		)
+		return {
+			"installment_no": installment_no,
+			"lender_name": frappe.db.get_value("Facility Drawdown", self.facility_drawdown, "lender_name"),
+			"payment_entry": payment_entry or self.party_payment_entry,
+		}
 
 	def get_cheque_print_format(self, layout=None) -> str | None:
 		"""The print format of the cheque leaf: an outgoing cheque's bank Cheque Layout ("Treasury Cheque"),

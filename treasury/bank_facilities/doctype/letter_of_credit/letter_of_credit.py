@@ -101,6 +101,12 @@ class LetterofCredit(Document):
 			limit = trust_receipt.get_limit(self.facility)
 			self.set_onload("has_trust_receipt_limit", bool(limit))
 			self.set_onload("trust_receipt_tenor", limit.default_tenor_months if limit else 0)
+			if limit and self.docstatus == 1 and self.status in ("Documents Received", "Accepted"):
+				# design 7g P18: the settle dialog's defaults and its live preview
+				self.set_onload("trust_receipt_limit", trust_receipt.limit_defaults(self.facility, limit))
+		if self.trust_receipt_drawdown:
+			# design 7g §6.2: "Financed by Trust Receipt {0} · {1} · due {2} · {3}."
+			self.set_onload("trust_receipt", trust_receipt.drawdown_summary(self.trust_receipt_drawdown))
 
 	def insert(self, *args, **kwargs):
 		# a new credit starts with an empty log, whatever the client sent (before_insert writes the first row)
