@@ -937,7 +937,8 @@ function tcs_render_setup_checklist(frm) {
 	});
 	field.$wrapper.find(".tcs-open-dashboard").on("click", (e) => {
 		e.preventDefault();
-		frappe.set_route("treasury-dashboard", { company: frm.doc.company });
+		frappe.route_options = { company: frm.doc.company };
+		frappe.set_route("treasury-dashboard");
 	});
 }
 
@@ -953,7 +954,11 @@ function tcs_fix(frm, item) {
 		action.route_options || {},
 		action.field ? { scroll_to: action.field } : {}
 	);
-	const go = () => frappe.set_route(...action.route, route_options);
+	// Frappe 16 drops or mis-parses a trailing options object on Form routes: use frappe.route_options
+	const go = () => {
+		frappe.route_options = route_options;
+		frappe.set_route(...action.route);
+	};
 	if (!frm.is_dirty()) {
 		go();
 		return;

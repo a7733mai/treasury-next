@@ -268,7 +268,12 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 
 	go(route, route_options) {
 		if (route && route.length) {
-			frappe.set_route(...route, route_options || {});
+			// Frappe 16 set_route() does not take route options as a trailing argument (an object
+			// becomes a "[object Object]" route segment): pass them through frappe.route_options.
+			if (route_options && Object.keys(route_options).length) {
+				frappe.route_options = route_options;
+			}
+			frappe.set_route(...route);
 		}
 	}
 
