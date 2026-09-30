@@ -17,6 +17,12 @@
   account, category or source, with a detail view.
 - Posting service: `create_bank_charge_payment`. Patch `set_bank_charge_defaults`. Bank Charge is an
   accounting dimension doctype.
+- UX: the charge form defaults everything from the category (account, cost center, description; the bank
+  account is remembered), explains what Submit will post, heads a submitted charge with its voucher number,
+  statement line and refunds, and offers *Record Refund* and *Reconcile with Statement Line*. PDC Bank
+  Clearing gets a *Document* column, bulk selection buttons, *Set Charge Category*, a selection counter and
+  a per-category confirmation. The category form previews its keywords; the report shows Top Category / Top
+  Source cards, source colours and a drill-down from every group.
 
 ### Bank Transfers (Phase 7b)
 - New module **Bank Transfers**: the submittable **Bank Transfer** (Party Payment / Party Receipt /

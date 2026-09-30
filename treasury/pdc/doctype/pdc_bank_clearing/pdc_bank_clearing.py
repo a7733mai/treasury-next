@@ -189,6 +189,11 @@ class PDCBankClearing(Document):
 				)
 			elif ambiguous:
 				result = _("Several categories match; choose one.")
+			elif not category.auto_select:
+				# design 7d P14: e.g. Transfer Fees, whose fee line may already be booked by its transfer
+				result = _(
+					"Not pre-selected (category setting). Check that the fee is not already booked by its transfer."
+				)
 			self.append(
 				"matches",
 				{

@@ -88,6 +88,7 @@ class BankCharge(Document):
 	def onload(self):
 		if not self.is_new():
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
+		self.set_onload("charge_settings", charge_settings(self.company))
 
 	def insert(self, *args, **kwargs):
 		# a new charge starts with an empty log, whatever the client sent (before_insert writes the first row)
@@ -314,6 +315,23 @@ def get_category_defaults(category: str, company: str) -> dict:
 		"expense_account": row.get("expense_account"),
 		"cost_center": row.get("cost_center"),
 		"default_description": description,
+	}
+
+
+def charge_settings(company: str | None) -> dict:
+	"""What the form's draft intro says Submit will do (design 7d §1.3): the company's voucher shape and
+	clearance setting, and its currency."""
+	settings = (
+		frappe.db.get_value(
+			"Treasury Company Settings", company, ["bank_charge_voucher", "bank_charge_clearance"], as_dict=True
+		)
+		if company
+		else None
+	) or frappe._dict()
+	return {
+		"bank_charge_voucher": settings.bank_charge_voucher or charges.PAYMENT_ENTRY,
+		"bank_charge_clearance": settings.bank_charge_clearance or charges.ON_POSTING,
+		"company_currency": erpnext.get_company_currency(company) if company else None,
 	}
 
 

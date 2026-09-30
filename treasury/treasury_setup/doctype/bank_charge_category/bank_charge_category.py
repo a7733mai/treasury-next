@@ -8,10 +8,12 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+from treasury.bank_transfers.charge_defaults import company_charge_accounts
 from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
 	validate_expense_account,
 )
 
+DOCTYPE = "Bank Charge Category"
 MIN_KEYWORD_LENGTH = 3
 
 
@@ -34,6 +36,7 @@ class BankChargeCategory(Document):
 		default_description: DF.SmallText | None
 		disabled: DF.Check
 		keywords: DF.SmallText | None
+		keywords_preview: DF.HTML | None
 	# end: auto-generated types
 
 	def validate(self):
@@ -89,6 +92,18 @@ def parse_keywords(text: str | None) -> list[str]:
 def normalise(text: str | None) -> str:
 	"""Lower-case text with single spaces (keywords and statement texts are compared in this form)."""
 	return " ".join((text or "").casefold().split())
+
+
+@frappe.whitelist(methods=["GET"])
+def get_company_charge_account(company: str) -> str | None:
+	"""The default Expense Account of a new account row (form script, design 7d P10): the company's Bank
+	Charges Account when its PDC Accounts rows have exactly one (the rule of the default categories)."""
+	if not (frappe.has_permission(DOCTYPE, "create") or frappe.has_permission(DOCTYPE, "write")):
+		frappe.throw(_("You are not permitted to change Bank Charge Categories."), frappe.PermissionError)
+	if not company:
+		return None
+	frappe.has_permission("Company", "read", doc=company, throw=True)
+	return company_charge_accounts().get(company)
 
 
 def get_account_row(category: str, company: str) -> frappe._dict | None:

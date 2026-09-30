@@ -17,13 +17,15 @@ their Bank Accounts.
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Sum
-from frappe.utils import flt, get_first_day, getdate
+from frappe.utils import flt, fmt_money, get_first_day, getdate
 
 from treasury.bank_transfers.charge_sources import SOURCES, event_sources
 from treasury.pdc.report_utils import CTX, column, report_today, validate_company, validate_date_range
 from treasury.utils.voucher_summary import event_label
 
 DOCTYPE = "Bank Charge"
+# translation context of the report's own labels: "Transfer Fees" is also a category name (design 7d §7)
+REPORT = "Bank Charges Analysis"
 TREASURY = "Treasury"
 BANK_CHARGES = "Bank Charges"
 VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
@@ -31,6 +33,17 @@ MONTH, BANK, BANK_ACCOUNT, CATEGORY, SOURCE = "Month", "Bank", "Bank Account", "
 GROUPS = (MONTH, BANK, BANK_ACCOUNT, CATEGORY, SOURCE)
 SUMMARY, DETAIL = "Summary", "Detail"
 CHUNK = 500
+# chart colour of each source (SOURCES order), stable whatever the sources present (design 7d §5.4)
+SOURCE_COLORS = {
+	"Bank Charges": "#f8814f",
+	"Transfer Fees": "#318ad8",
+	"Cheque Clearance Charges": "#9c4dd8",
+	"Bounce Charges Recovered": "#48bb74",
+	"LG Commissions": "#1fc1c3",
+	"LC Commissions and Charges": "#e5539b",
+	"Facility Fees": "#ecad4b",
+}
+NET_COLOR = SOURCE_COLORS["Bank Charges"]
 
 
 def execute(filters=None):
@@ -222,7 +235,7 @@ def bank_of(documents: dict) -> dict[str, str]:
 
 
 def source_label(source: str) -> str:
-	return _(source, context=DOCTYPE)
+	return _(source, context=REPORT)
 
 
 def group_key(row, group_by: str) -> tuple[str, str, str]:
@@ -324,12 +337,28 @@ def report_summary(rows: list, currency: str) -> list[dict]:
 	def money(label, value, indicator="Blue"):
 		return {"label": label, "value": value, "datatype": "Currency", "currency": currency, "indicator": indicator}
 
-	return [
-		money(_("Charges", context=DOCTYPE), charges),
-		money(_("Refunds and Recoveries", context=DOCTYPE), refunds, "Green"),
-		money(_("Net Charges", context=DOCTYPE), net, "Red" if net > 0 else "Blue"),
-		{"label": _("Vouchers", context=DOCTYPE), "value": len(rows), "datatype": "Int", "indicator": "Blue"},
+	summary = [
+		money(_("Charges", context=REPORT), charges, "Orange"),
+		money(_("Refunds and Recoveries", context=REPORT), refunds, "Green"),
+		money(_("Net Charges", context=REPORT), net, "Red" if net > 0 else "Green"),
+		{"label": _("Vouchers", context=REPORT), "value": len(rows), "datatype": "Int", "indicator": "Blue"},
 	]
+	# design 7d P18: the largest net by category (a source label for the other sources) and by source
+	tops = ((_("Top Category", context=REPORT), CATEGORY), (_("Top Source", context=REPORT), SOURCE))
+	for label, group_by in tops:
+		top = top_group(rows, group_by, currency, precision)
+		if top:
+			summary.append({"label": label, "value": top, "datatype": "Data", "indicator": "Blue"})
+	return summary
+
+
+def top_group(rows: list, group_by: str, currency: str, precision: int) -> str | None:
+	"""`Group · net (share %)` of the group with the largest net charges, if any charges."""
+	groups = group_rows(rows, group_by, currency)
+	if not groups or groups[0].net <= 0:
+		return None
+	top = groups[0]
+	return f"{top.group} · {fmt_money(top.net, precision)} ({flt(top.share, 1)}%)"
 
 
 def get_chart(rows: list, data: list, group_by: str, currency: str) -> dict | None:
@@ -351,15 +380,17 @@ def get_chart(rows: list, data: list, group_by: str, currency: str) -> dict | No
 			"data": {"labels": labels, "datasets": datasets},
 			"type": "bar",
 			"barOptions": {"stacked": 1},
+			"colors": [SOURCE_COLORS.get(source, NET_COLOR) for source in sources],
 			"fieldtype": "Currency",
 			"options": currency,
 		}
 	return {
 		"data": {
 			"labels": labels,
-			"datasets": [{"name": _("Net Charges", context=DOCTYPE), "values": [g.net for g in data]}],
+			"datasets": [{"name": _("Net Charges", context=REPORT), "values": [g.net for g in data]}],
 		},
 		"type": "bar",
+		"colors": [NET_COLOR],
 		"fieldtype": "Currency",
 		"options": currency,
 	}
@@ -375,12 +406,12 @@ def currency_column() -> dict:
 
 def summary_columns() -> list[dict]:
 	return [
-		column("group", _("Group", context=CTX), width=200),
-		column("vouchers", _("Vouchers", context=DOCTYPE), "Int", 90),
-		money_column("charges", _("Charges", context=DOCTYPE)),
-		money_column("refunds", _("Refunds and Recoveries", context=DOCTYPE), 170),
-		money_column("net", _("Net Charges", context=DOCTYPE)),
-		column("share", _("Share %", context=DOCTYPE), "Percent", 90),
+		column("group", _("Group", context=CTX), width=220),
+		column("vouchers", _("Vouchers", context=REPORT), "Int", 90),
+		money_column("charges", _("Charges", context=REPORT), 140),
+		money_column("refunds", _("Refunds and Recoveries", context=REPORT), 160),
+		money_column("net", _("Net", context=REPORT), 140),
+		column("share", _("Share %", context=REPORT), "Percent", 150),
 		column("group_value", _("Group", context=CTX), hidden=1),
 		column("group_filter", _("Group By", context=CTX), hidden=1),
 		currency_column(),
@@ -390,16 +421,16 @@ def summary_columns() -> list[dict]:
 def detail_columns() -> list[dict]:
 	return [
 		column("posting_date", _("Posting Date", context=TREASURY), "Date", 100),
-		column("source", _("Source", context=DOCTYPE), width=170),
-		column("category", _("Category", context=DOCTYPE), "Link", 150, options="Bank Charge Category"),
+		column("source", _("Source", context=REPORT), width=170),
+		column("category", _("Category", context=REPORT), "Link", 150, options="Bank Charge Category"),
 		column("bank", _("Bank", context=TREASURY), "Link", 130, options="Bank"),
 		column("bank_account", _("Bank Account", context=TREASURY), "Link", 170, options="Bank Account"),
 		column("voucher_type", _("Voucher Type"), "Link", 120, options="DocType", hidden=1),
 		column("voucher_no", _("Voucher", context=CTX), "Dynamic Link", 170, options="voucher_type"),
-		column("document_type", _("Document Type", context=DOCTYPE), "Link", 130, options="DocType", hidden=1),
-		column("document", _("Document", context=DOCTYPE), "Dynamic Link", 170, options="document_type"),
-		column("event", _("Event", context=DOCTYPE), width=160),
-		money_column("amount", _("Amount (Company Currency)", context=DOCTYPE)),
-		column("source_value", _("Source", context=DOCTYPE), hidden=1),
+		column("document_type", _("Document Type", context=REPORT), "Link", 130, options="DocType", hidden=1),
+		column("document", _("Document", context=REPORT), "Dynamic Link", 160, options="document_type"),
+		column("event", _("Event", context=REPORT), width=170),
+		money_column("amount", _("Amount", context=REPORT), 130),
+		column("source_value", _("Source", context=REPORT), hidden=1),
 		currency_column(),
 	]

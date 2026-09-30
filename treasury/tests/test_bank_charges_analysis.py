@@ -23,7 +23,10 @@ from frappe.utils import flt, getdate
 
 from treasury.accounting import posting
 from treasury.bank_transfers.charge_sources import SOURCES
-from treasury.bank_transfers.report.bank_charges_analysis.bank_charges_analysis import execute
+from treasury.bank_transfers.report.bank_charges_analysis.bank_charges_analysis import (
+	SOURCE_COLORS,
+	execute,
+)
 from treasury.tests.utils import (
 	BANK,
 	BANK_CHARGE_SETTINGS,
@@ -237,9 +240,27 @@ class TestBankChargesAnalysis(TreasuryTestMixin, IntegrationTestCase):
 			(flt(total.charges), flt(total.refunds), flt(total.net), total.vouchers), (3175, 145, 3030, 14)
 		)
 		self.assertEqual(flt(total.share), 100)
-		self.assertEqual([flt(s["value"]) for s in summary], [3175, 145, 3030, 14])
+		self.assertEqual([flt(s["value"]) for s in summary[:4]], [3175, 145, 3030, 14])
 		self.assertEqual(summary[2]["indicator"], "Red")
 		self.assertIn("company_currency", [c["fieldname"] for c in columns])
+
+	def test_top_category_and_source_cards(self):
+		"""Design 7d P18: the largest net by category (other sources under their label) and by source."""
+		summary = run(group_by="Month")[4]
+		cards = {card["label"]: card for card in summary[4:]}
+		self.assertEqual(set(cards), {"Top Category", "Top Source"})
+		for label, group_by in (("Top Category", "Category"), ("Top Source", "Source")):
+			with self.subTest(card=label):
+				top = run(group_by=group_by)[1][0]
+				self.assertEqual(cards[label]["datatype"], "Data")
+				self.assertTrue(cards[label]["value"].startswith(f"{top.group} · "), cards[label]["value"])
+				self.assertIn(f"({flt(top.share, 1)}%)", cards[label]["value"])
+		# the Month chart has one colour per source, in the SOURCES order
+		self.assertEqual(list(SOURCE_COLORS), list(SOURCES))
+		chart = run(group_by="Month")[3]
+		self.assertEqual(chart["colors"], [SOURCE_COLORS[s] for s in SOURCES if s in EXPECTED])
+		self.assertEqual(len(chart["colors"]), len(chart["data"]["datasets"]))
+		self.assertEqual(len(run(group_by="Bank")[3]["colors"]), 1)
 
 	def test_group_by_month_bank_account_category(self):
 		data = run(group_by="Category")[1]

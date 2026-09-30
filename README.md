@@ -568,7 +568,17 @@ shows its bank reference or name, weak by its posting date). A withdrawal left u
 or reference contains a category keyword (at least 3 characters, not case sensitive, the longest keyword
 wins) is proposed as a *Keyword* row; clearing it creates, submits and reconciles the charge in one step, row
 by row or in bulk. A tie between categories, or a category with *Pre-select Clearing Proposals* off, is
-proposed unselected; choose the category in the row.
+proposed unselected; choose the category in the row. The *Document* column shows the cheque, transfer or
+charge of each row (*+ New Bank Charge* for a proposal); the buttons above the grid select all rows, the strong
+matches only or the charge proposals, and *Set Charge Category* sets one category on every selected proposal.
+The grid description counts what *Clear Selected* will do, and its confirmation lists the charges to create per
+category.
+
+**On the form**: a saved draft says what Submit will post (voucher, date, bank debit or credit, expense
+account, clearance); a submitted charge heads with its Payment Entry (or Journal Entry) number, its clearance
+or statement line and its refunds. *Reconcile with Statement Line* (Actions) reconciles one Posted charge
+without the clearing tool. The list shows refunds with ↩ in green, the voucher of Journal Entry-mode
+companies, and the *Refunded* / *Partly Refunded* states.
 
 > **Warning**: a bank that shows a transfer's fee as its own statement line would get that fee proposed as a
 > new charge, although the transfer already booked it. The default *Transfer Fees* category is therefore

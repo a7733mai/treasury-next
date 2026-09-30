@@ -21,6 +21,7 @@ class TreasurySettings(Document):
 
 		allow_future_clearance_date: DF.Check
 		bank_suppliers: DF.Table[TreasuryBankSupplier]
+		bank_suppliers_hint: DF.HTML | None
 		default_alert_days: DF.Int
 		facility_alert_days: DF.Int
 		payee_supplier_group: DF.Link

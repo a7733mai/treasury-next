@@ -8,8 +8,16 @@
 // (a Journal Entry's cheques and transfers come from its Treasury buttons, treasury_payment_buttons.js).
 // (a property, not a `const`: the file runs once per doctype in the same global scope)
 frappe.treasury_voucher_no_make = {
-	"Payment Entry": ["PDC Cheque", "Bank Transfer", "Letter of Credit", "Letter of Guarantee", "Cheque Discounting"],
+	"Payment Entry": [
+		"PDC Cheque",
+		"Bank Transfer",
+		"Bank Charge",
+		"Letter of Credit",
+		"Letter of Guarantee",
+		"Cheque Discounting",
+	],
 	"Journal Entry": [
+		"Bank Charge",
 		"Letter of Credit",
 		"Letter of Guarantee",
 		"Cheque Discounting",
@@ -34,14 +42,18 @@ frappe.treasury_voucher_link_doctypes = frappe.treasury_voucher_link_doctypes ||
 			if (!source_doctype || !source_name) {
 				return;
 			}
-			frm.set_intro(
-				__("Managed by Treasury — cancel from the source document {0}.", [
-					`<a href="/app/${frappe.router.slug(source_doctype)}/${encodeURIComponent(source_name)}">${frappe.utils.escape_html(
-						source_name
-					)}</a>`,
-				]),
-				"blue"
-			);
+			let intro = __("Managed by Treasury — cancel from the source document {0}.", [
+				`<a href="/app/${frappe.router.slug(source_doctype)}/${encodeURIComponent(source_name)}">${frappe.utils.escape_html(
+					source_name
+				)}</a>`,
+			]);
+			if (doctype === "Payment Entry" && frm.doc.treasury_event === "bank_charge") {
+				// a Payment Entry "paid" to the bank's supplier without an invoice (design 7d P8)
+				intro += `<br><span class="text-muted">${frappe.utils.escape_html(
+					__("Bank charge booked as a deduction; the supplier balance is not affected.")
+				)}</span>`;
+			}
+			frm.set_intro(intro, "blue");
 			frm.add_custom_button(__("Open {0}", [__(source_doctype)]), () => {
 				frappe.set_route("Form", source_doctype, source_name);
 			});

@@ -374,6 +374,7 @@ class TestBankTransferLayout(IntegrationTestCase):
 		self.assert_grid(
 			"pdc",
 			"PDC Clearing Match",
+			# 7d P13: the "Document" column (cheque field) shows the cheque, transfer or charge of the row
 			{
 				"selected": 1,
 				"match_quality": 1,
@@ -381,7 +382,7 @@ class TestBankTransferLayout(IntegrationTestCase):
 				"amount": 1,
 				"cheque": 2,
 				"cheque_no": 1,
-				"bank_transfer": 2,
+				"bank_charge_category": 2,
 			},
 		)
 

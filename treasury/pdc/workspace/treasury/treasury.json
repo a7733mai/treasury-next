@@ -419,6 +419,17 @@
    "type": "Link"
   },
   {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bank Charge",
+   "link_count": 0,
+   "link_to": "Bank Charge",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
    "dependencies": "Bank Transfer",
    "hidden": 0,
    "is_query_report": 1,
@@ -441,13 +452,13 @@
    "type": "Link"
   },
   {
-   "dependencies": "",
+   "dependencies": "Bank Charge",
    "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bank Charge",
+   "is_query_report": 1,
+   "label": "Bank Charges Analysis",
    "link_count": 0,
-   "link_to": "Bank Charge",
-   "link_type": "DocType",
+   "link_to": "Bank Charges Analysis",
+   "link_type": "Report",
    "onboard": 0,
    "type": "Link"
   },
@@ -461,20 +472,9 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "dependencies": "Bank Charge",
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Bank Charges Analysis",
-   "link_count": 0,
-   "link_to": "Bank Charges Analysis",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-10-06 12:00:00.000000",
+ "modified": "2026-10-07 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",
@@ -632,10 +632,8 @@
   },
   {
    "color": "Orange",
-   "format": "{} to Reconcile",
    "label": "Bank Charge",
    "link_to": "Bank Charge",
-   "stats_filter": "[[\"Bank Charge\",\"status\",\"=\",\"Posted\",false],[\"Bank Charge\",\"docstatus\",\"=\",1,false]]",
    "type": "DocType"
   }
  ],

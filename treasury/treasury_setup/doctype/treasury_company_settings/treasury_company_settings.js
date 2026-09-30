@@ -111,6 +111,26 @@ frappe.ui.form.on("Treasury Company Settings", {
 		}
 	},
 
+	bank_charge_voucher(frm) {
+		if (frm.doc.bank_charge_voucher === "Journal Entry") {
+			frappe.show_alert({
+				message: __(
+					"New bank charges will be booked by Journal Entry (Bank Entry), without a Payment Entry number."
+				),
+				indicator: "orange",
+			});
+		}
+	},
+
+	bank_charge_clearance(frm) {
+		if (frm.doc.bank_charge_clearance === "On Bank Transaction") {
+			frappe.show_alert({
+				message: __("New bank charges stay uncleared until they are matched in PDC Bank Clearing."),
+				indicator: "orange",
+			});
+		}
+	},
+
 	render_transfer_fees_help(frm) {
 		const field = frm.get_field("transfer_fees_help");
 		if (!field) {

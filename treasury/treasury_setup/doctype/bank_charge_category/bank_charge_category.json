@@ -13,6 +13,8 @@
   "column_break_main",
   "default_description",
   "keywords",
+  "keywords_preview_section",
+  "keywords_preview",
   "accounts_section",
   "accounts"
  ],
@@ -38,6 +40,7 @@
    "description": "Statement lines matched by keyword are selected for creation in PDC Bank Clearing.",
    "fieldname": "auto_select_proposals",
    "fieldtype": "Check",
+   "in_list_view": 1,
    "label": "Pre-select Clearing Proposals"
   },
   {
@@ -57,6 +60,14 @@
    "label": "Keywords"
   },
   {
+   "fieldname": "keywords_preview_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "keywords_preview",
+   "fieldtype": "HTML"
+  },
+  {
    "fieldname": "accounts_section",
    "fieldtype": "Section Break",
    "label": "Accounts per Company"
@@ -69,7 +80,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-06 12:00:00.000000",
+ "modified": "2026-10-07 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Bank Charge Category",

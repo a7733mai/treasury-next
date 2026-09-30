@@ -13,7 +13,8 @@
   "payees_section",
   "payee_supplier_group",
   "bank_charges_section",
-  "bank_suppliers"
+  "bank_suppliers",
+  "bank_suppliers_hint"
  ],
  "fields": [
   {
@@ -80,11 +81,16 @@
    "fieldtype": "Table",
    "label": "Bank Suppliers",
    "options": "Treasury Bank Supplier"
+  },
+  {
+   "depends_on": "eval:!(doc.bank_suppliers||[]).length",
+   "fieldname": "bank_suppliers_hint",
+   "fieldtype": "HTML"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-06 12:00:00.000000",
+ "modified": "2026-10-07 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Settings",
