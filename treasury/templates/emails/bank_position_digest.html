@@ -1,46 +1,76 @@
-{%- set num_align = "left" if dir == "rtl" else "right" -%}
-<div dir="{{ dir }}" style="font-family: sans-serif; font-size: 13px;">
-	<p>
-		<strong>{{ _("Bank position for {0} on {1}").format(company | e, date) }}</strong><br>
-		{{ _("Horizon: {0} days · {1} critical · {2} warning").format(horizon, critical, warning) }}
+{#- Bank position digest (design 7e §3.1): inline styles only, table layout, every value escaped.
+    Built by treasury.balance_alerts.notify.render_digest; `start` / `end` follow the text direction. -#}
+{%- set cell = "padding: 6px 8px; border-bottom: 1px solid #E2E6E9;" -%}
+{%- set num = cell ~ " text-align: " ~ end ~ "; white-space: nowrap;" -%}
+<div dir="{{ dir }}" style="direction: {{ dir }}; text-align: {{ start }}; font-family: Tahoma, Arial, sans-serif; font-size: 13px; color: #1F272E; max-width: 680px;">
+	<h2 style="font-size: 18px; margin: 0 0 4px 0;">
+		{{ _("Bank position") }} —
+		<a href="{{ company_link | e }}" style="color: #1F272E; text-decoration: none;">{{ company | e }}</a>
+	</h2>
+	<p style="margin: 0 0 8px 0; color: #6C757D;">{{ date | e }} · {{ horizon_text | e }}</p>
+	<p style="margin: 0 0 16px 0;">
+		{%- for pill in pills %}
+		<span style="display: inline-block; padding: 2px 10px; margin: 0 4px 4px 0; border-radius: 10px; font-weight: bold; background: {{ pill.colours[0] }}; color: {{ pill.colours[1] }};">{{ pill.text | e }}</span>
+		{%- endfor %}
 	</p>
+
 	{% for bank in banks %}
-	<table class="treasury-bank" border="1" cellpadding="4" cellspacing="0"
-		style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
-		<thead>
-			<tr>
-				<th colspan="5" style="text-align: start; background: #F4F5F6;">
-					{{ bank.name | e }}{% if bank.merged %} ({{ bank.merged | e }}){% endif %} · {{ bank.currency | e }}
-					· {{ bank.level_label }}<br>
-					<span style="font-weight: normal;">
-						{{ _("Actual balance today (GL)") }}: <bdi>{{ bank.current_balance }}</bdi>
-						{% if bank.warning %} · {{ _("Warning Balance") }}: <bdi>{{ bank.warning }}</bdi>{% endif %}
-						{% if bank.minimum %} · {{ _("Minimum Balance") }}: <bdi>{{ bank.minimum }}</bdi>{% endif %}
-					</span>
-				</th>
-			</tr>
-			<tr>
-				<th>{{ _("Date", context="Treasury") }}</th>
-				<th>{{ _("In", context="Treasury Report") }}</th>
-				<th>{{ _("Out", context="Treasury Report") }}</th>
-				<th>{{ _("Projected Closing Balance") }}</th>
-				<th>{{ _("Status", context="Treasury") }}</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% for row in bank.rows %}
-			<tr class="treasury-day{% if row.level %} treasury-level-{{ row.level | lower | replace(' ', '-') }}{% endif %}"
-				{% if row.colours %}style="background: {{ row.colours[0] }}; color: {{ row.colours[1] }};"{% endif %}>
-				<td>{{ row.label }}</td>
-				<td style="text-align: {{ num_align }};"><bdi>{{ row.inflow }}</bdi></td>
-				<td style="text-align: {{ num_align }};"><bdi>{{ row.outflow }}</bdi></td>
-				<td style="text-align: {{ num_align }};"><bdi>{{ row.closing }}</bdi></td>
-				<td>{{ row.status }}</td>
-			</tr>
-			{% endfor %}
-		</tbody>
-	</table>
-	<p><a class="treasury-forecast-link" href="{{ bank.link | e }}">{{ _("Open in Bank Position Forecast") }}</a></p>
+	<div class="treasury-bank" style="margin: 0 0 20px 0; padding-{{ start }}: 10px; border-{{ start }}: 4px solid {{ bank.style.text }};">
+		<p style="margin: 0 0 2px 0;">
+			<strong><bdi>{{ bank.name | e }}</bdi></strong>
+			{% if bank.merged %}<span style="color: #6C757D;">({{ bank.merged | e }})</span>{% endif %}
+			<span style="display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; background: {{ bank.style.pill[0] }}; color: {{ bank.style.pill[1] }};">{{ bank.level_label | e }}</span>
+		</p>
+		{% if bank.compact %}
+		<p style="margin: 0 0 4px 0;">{{ bank.currency | e }} · <bdi dir="ltr">{{ bank.compact_text | e }}</bdi></p>
+		{% else %}
+		<p style="margin: 0 0 2px 0; color: #6C757D;">
+			{{ bank.currency | e }} · {{ _("Actual balance today (GL)") }}: <bdi dir="ltr" style="color: #1F272E;">{{ bank.current_balance | e }}</bdi>
+			{% if bank.warning %} · {{ _("Warning Balance") }} <bdi dir="ltr">{{ bank.warning | e }}</bdi>{% endif %}
+			{% if bank.minimum %} · {{ _("Minimum Balance") }} <bdi dir="ltr">{{ bank.minimum | e }}</bdi>{% endif %}
+		</p>
+		<p style="margin: 0 0 6px 0; font-weight: bold;{% if bank.lowest_colour %} color: {{ bank.lowest_colour }};{% endif %}">{{ bank.lowest | e }}</p>
+		<table cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+			<thead>
+				<tr style="background: #F4F5F6;">
+					<th style="{{ cell }} text-align: {{ start }}; white-space: nowrap;">{{ _("Date", context="Treasury") }}</th>
+					<th style="{{ num }}">{{ _("In", context="Treasury Report") }}</th>
+					<th style="{{ num }}">{{ _("Out", context="Treasury Report") }}</th>
+					<th style="{{ num }}">{{ _("Projected Closing") }}</th>
+					<th style="{{ cell }} text-align: {{ start }};">{{ _("Status", context="Treasury") }}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for row in bank.rows %}
+				{% if row.overdue %}
+				<tr class="treasury-overdue" style="background: #F4F5F6; color: #6C757D; font-style: italic;">
+					<td style="{{ cell }} white-space: nowrap;">{{ row.label | e }}</td>
+					<td style="{{ num }}"><bdi dir="ltr">{{ row.inflow | e }}</bdi></td>
+					<td style="{{ num }}"><bdi dir="ltr">{{ row.outflow | e }}</bdi></td>
+					<td style="{{ cell }}"></td>
+					<td style="{{ cell }}"></td>
+				</tr>
+				{% else %}
+				<tr class="treasury-day{% if row.level %} treasury-level-{{ row.level | lower | replace(' ', '-') }}{% endif %}"
+					{% if row.colours %}style="background: {{ row.colours[0] }}; color: {{ row.colours[1] }};"{% endif %}>
+					<td style="{{ cell }} white-space: nowrap;">{{ row.label | e }}</td>
+					<td style="{{ num }}"><bdi dir="ltr">{{ row.inflow | e }}</bdi></td>
+					<td style="{{ num }}"><bdi dir="ltr">{{ row.outflow | e }}</bdi></td>
+					<td style="{{ num }}{% if row.colours %} font-weight: bold;{% endif %}"><bdi dir="ltr">{{ row.closing | e }}</bdi></td>
+					<td style="{{ cell }}{% if row.colours %} font-weight: bold;{% endif %}">{{ row.status | e }}</td>
+				</tr>
+				{% endif %}
+				{% endfor %}
+			</tbody>
+		</table>
+		{% endif %}
+		<p style="margin: 6px 0 0 0;"><a class="treasury-forecast-link" href="{{ bank.link | e }}" style="color: #2490EF;">{{ _("Open in Bank Position Forecast") }} {{ arrow }}</a></p>
+	</div>
 	{% endfor %}
-	{% if unassigned %}<p style="color: #6C7680;">{{ unassigned }}</p>{% endif %}
+
+	<hr style="border: 0; border-top: 1px solid #E2E6E9; margin: 16px 0 8px 0;">
+	{% if unassigned %}<p style="margin: 0 0 4px 0; color: #6C757D;">{{ unassigned | e }}</p>{% endif %}
+	<p style="margin: 0; color: #6C757D; font-size: 12px;">
+		{{ thresholds_hint | e }}{% if receive_as %} · {{ receive_as | e }}{% endif %}
+	</p>
 </div>

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import fmt_money
 
 from treasury.balance_alerts import dashboard
 from treasury.pdc.report.bank_balance_outlook.bank_balance_outlook import execute
@@ -93,13 +94,30 @@ class TestBankBalanceOutlook(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual((egp.level, egp.lowest_balance, egp.closing_balance), ("OK", 70000, 80000))
 
 	def test_chart_and_summary(self):
-		_columns, data, _message, chart, summary = self.run_report()
+		columns, data, _message, chart, summary = self.run_report()
+		# worst first (design 7e §6.2): the Critical bank, then the one without thresholds
+		self.assertEqual([r.bank_account for r in data], self.banks)
+		self.assertEqual(
+			[c["fieldname"] for c in columns[:3]], ["bank_account", "level_label", "current_balance"]
+		)
 		self.assertEqual(chart["data"]["labels"], [r.bank_account for r in data])
-		self.assertEqual(chart["data"]["datasets"][0]["values"], [r.lowest_company_currency for r in data])
-		self.assertEqual((chart["type"], chart["options"]), ("bar", "EGP"))
+		lowest, minimum = chart["data"]["datasets"]
+		self.assertEqual(lowest["values"], [r.lowest_company_currency for r in data])
+		# design 7e P19: bars and the minimum line (none without thresholds)
+		self.assertEqual((lowest["chartType"], minimum["chartType"]), ("bar", "line"))
+		self.assertEqual(minimum["values"], [20000, None])
+		self.assertEqual((chart["type"], chart["options"]), ("axis-mixed", "EGP"))
 		values = [card["value"] for card in summary]
-		self.assertEqual(values, [1, 0, 100000 + 1000 * USD_RATE])
+		self.assertEqual(values[:3], [1, 0, 100000 + 1000 * USD_RATE])
 		self.assertEqual(summary[0]["indicator"], "Red")
+		# design 7e P20: the largest shortfall, in the bank's currency
+		self.assertEqual(
+			(summary[3]["value"], summary[3]["indicator"]),
+			(f"{self.e1.bank_account} · {fmt_money(30020, currency='EGP')}", "Red"),
+		)
+		# no shortfall: no card
+		_columns, _data, _message, _chart, summary = self.run_report(horizon_days=3)
+		self.assertEqual(len(summary), 3)
 
 	def test_user_permission_on_bank_account(self):
 		add_user_permission(USD_ONLY_USER, "Bank Account", self.usd.bank_account)
@@ -137,3 +155,9 @@ class TestBankBalanceOutlook(BalanceAlertTestMixin, IntegrationTestCase):
 		links = [link.link_to for link in workspace.links]
 		self.assertIn("Bank Balance Outlook", links)
 		self.assertIn("Treasury Alert Log", links)
+		# design 7e §7: the card first, the red shortcut to the report (P21)
+		self.assertEqual(workspace.number_cards[0].number_card_name, "Banks Below Minimum (7 days)")
+		shortcut = next(s for s in workspace.shortcuts if s.label == "Bank Balance Outlook")
+		self.assertEqual(
+			(shortcut.type, shortcut.link_to, shortcut.color), ("Report", "Bank Balance Outlook", "Red")
+		)

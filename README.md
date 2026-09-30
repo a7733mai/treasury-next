@@ -625,6 +625,14 @@ per bank) and warns before a bank runs short. It posts nothing.
   Log Settings). Report **Bank Balance Outlook** lists every bank's current and lowest projected balance,
   level, first breach and shortfall; number card *Banks Below Minimum (7 days)* and chart *Lowest Projected
   Balance per Bank* are on the workspace.
+- **Manager tools.** Treasury Settings, Treasury Company Settings and the Bank Balance Outlook menu offer
+  *Preview Digest* (exactly what a user would receive: their banks, their language; nothing is sent),
+  *Send Test to Me* (the digest e-mailed to yourself, subject "[Test]"; the day's real digest still goes out)
+  and *Run Alerts Now* (queues the alert check; alerts already sent today are not repeated). *Add All Bank
+  Accounts* on the thresholds grid adds one row per company bank account: type only the minimums.
+- **Block dialog.** A blocked entry shows the bank, the day, the balance before and after and the minimum; a
+  Treasury Manager gets *Override and Continue* (actions) or *Override and Submit* (documents), recorded in
+  the status log or timeline, the Treasury Alert Log and a line on the document.
 
 #### Pay or receive from any screen
 

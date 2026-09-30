@@ -15,12 +15,10 @@ Alert (company, bank account, projected date, level, alert_date).
 import frappe
 from frappe import _
 from frappe.query_builder import Order
-from frappe.utils import cint, flt, get_datetime, now_datetime, strip_html, today
+from frappe.utils import cint, flt, get_datetime, now_datetime, today
 
 from treasury.balance_alerts import notify, recipients
 from treasury.balance_alerts.positions import (
-	CRITICAL,
-	WARNING,
 	alert_settings,
 	epsilon,
 	evaluate,
@@ -163,14 +161,8 @@ def send_digest_if_due(company: str, positions: list, now) -> list[str]:
 			continue
 		visible = [p for p in positions if p.bank_account in banks]
 
-		def render(visible=visible):
-			critical = sum(1 for p in visible if p.level == CRITICAL)
-			warning = sum(1 for p in visible if p.level == WARNING)
-			return (
-				notify.digest_subject(company, alert_date, critical, warning),
-				notify.render_digest(company, visible, alert_date, days, zero_days),
-				notify.digest_summary(notify.sort_for_digest(visible)),
-			)
+		def render(visible=visible, user=user):
+			return notify.digest_message(company, visible, alert_date, days, zero_days, user)
 
 		outcome = notify.deliver(
 			user, render, None, link, _("Bank position digest e-mail could not be sent")
@@ -185,7 +177,7 @@ def send_digest_if_due(company: str, positions: list, now) -> list[str]:
 			notified=cint(outcome.notified),
 			emailed=cint(outcome.emailed),
 			subject=outcome.subject,
-			message=strip_html(notify.digest_summary(visible).replace("<br>", "\n")),
+			message="\n".join(notify.digest_lines(visible)),
 		)
 		sent.append(user)
 	return sent
@@ -214,7 +206,8 @@ def due_breaches(company: str, position, alert_date) -> list[frappe._dict]:
 		if not last:
 			due.append(frappe._dict(breach, is_escalation=0))
 		elif flt(breach.closing) < flt(last[0].balance) - eps:
-			due.append(frappe._dict(breach, is_escalation=1))
+			# `previous`: the balance of the last alert ("was ..." in the e-mail)
+			due.append(frappe._dict(breach, is_escalation=1, previous=flt(last[0].balance)))
 	return due
 
 
@@ -241,8 +234,11 @@ def send_balance_alerts(company: str, positions: list, now) -> list[str]:
 		link = notify.forecast_route(company, alert_date, days, position.bank_account)
 
 		def render(position=position, due=due, escalation=escalation):
-			subject = notify.alert_subject(position, due, escalation)
-			return subject, notify.render_alert(company, position, due, alert_date, days), None
+			return (
+				notify.alert_subject(position, due, escalation),
+				notify.render_alert(company, position, due, alert_date, days, escalation),
+				notify.alert_summary(position, due),
+			)
 
 		notified, emailed, reached = False, False, []
 		for user in users:

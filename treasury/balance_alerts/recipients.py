@@ -6,6 +6,7 @@ reports) and their User Permissions on Company and Bank Account.
 """
 
 import frappe
+from frappe import _
 
 from treasury.pdc import scheduler as pdc_scheduler
 from treasury.pdc.report_utils import DOCTYPE, is_permitted_value
@@ -35,6 +36,32 @@ def get_recipients() -> list[str]:
 	if named:
 		users.update(frappe.get_all("User", filters={"name": ["in", named], "enabled": 1}, pluck="name"))
 	return sorted(users)
+
+
+def recipient_reason(user: str) -> str:
+	"""Why `user` receives the digest (its footer): the roles of the Role rows they hold, else their name."""
+	rows = _rows()
+	roles = set(frappe.get_roles(user))
+	held = [r.role for r in rows if r.recipient_type == ROLE and r.role in roles]
+	if held:
+		return ", ".join(_(role) for role in dict.fromkeys(held))
+	return frappe.utils.get_fullname(user)
+
+
+PREVIEW_NAMES = 8
+
+
+@frappe.whitelist()
+def preview_recipients() -> dict:
+	"""Treasury Manager (read only, design 7e P7): the users the Recipients table resolves to today, as
+	{count, names (the first PREVIEW_NAMES full names), more}."""
+	frappe.only_for(("Treasury Manager", "System Manager"))
+	users = get_recipients()
+	return {
+		"count": len(users),
+		"names": [frappe.utils.get_fullname(u) for u in users[:PREVIEW_NAMES]],
+		"more": max(len(users) - PREVIEW_NAMES, 0),
+	}
 
 
 def visible_banks(user: str, company: str, bank_accounts: list[str]) -> list[str]:

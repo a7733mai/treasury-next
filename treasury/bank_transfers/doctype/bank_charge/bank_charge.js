@@ -658,7 +658,8 @@ function bch_translate_log(frm) {
 	frm.refresh_field("status_log");
 }
 
-// Low balance guard: the override is offered to Treasury Managers only (the server checks the role)
+// ------------------------------------------------------------------------------------ low balance guard
+// The override is offered to Treasury Managers only (the server checks the role and logs the override).
 frappe.ui.form.on("Bank Charge", {
 	refresh(frm) {
 		frm.toggle_display(
@@ -667,5 +668,108 @@ frappe.ui.form.on("Bank Charge", {
 				frm.doc.entry_type === BCH_CHARGE &&
 				frappe.user.has_role(["Treasury Manager", "System Manager"])
 		);
+		bch_low_balance_refresh(frm);
+	},
+
+	allow_low_balance(frm) {
+		bch_low_balance_ticked(frm);
 	},
 });
+
+function bch_low_balance_ticked(frm) {
+	// design 7e §4.4 / P16: a ticked override is never hidden in a collapsed section
+	if (!frm.doc.allow_low_balance || frm.doc.docstatus !== 0) {
+		return;
+	}
+	const field = frm.get_field("allow_low_balance");
+	const section = field && field.section;
+	section && section.is_collapsed && section.is_collapsed() && section.collapse(false);
+	if (frm._bch_low_balance_alerted !== frm.doc.name) {
+		frm._bch_low_balance_alerted = frm.doc.name;
+		frappe.show_alert({
+			message: bch_esc(
+				__(
+					"The block is overridden only if this entry takes a bank below its minimum. Each override is logged."
+				)
+			),
+			indicator: "orange",
+		});
+	}
+}
+
+function bch_low_balance_refresh(frm) {
+	// the override event is an orange pill in the status log, and the latest one a line on the dashboard
+	const event = "Low Balance Override";
+	for (const name of [null, frm.doc.name]) {
+		const df = frappe.meta.get_docfield(BCH_LOG_CTX, "event", name);
+		if (df && !(df.formatter && df.formatter.treasury_low_balance)) {
+			const base = df.formatter;
+			df.formatter = (value, ...rest) => {
+				if (value === event) {
+					return `<span class="indicator-pill orange">${bch_esc(__(value, null, BCH_LOG_CTX))}</span>`;
+				}
+				return base ? base(value, ...rest) : bch_esc(value ? __(value, null, BCH_LOG_CTX) : "");
+			};
+			df.formatter.treasury_low_balance = true;
+		}
+	}
+	frm.refresh_field("status_log");
+	if (frm.doc.docstatus === 0 && frm.doc.allow_low_balance) {
+		bch_low_balance_ticked(frm);
+	}
+	const row = (frm.doc.status_log || []).filter((r) => r.event === event).pop();
+	if (row) {
+		frm.dashboard.set_headline(
+			`<div>${bch_esc(
+				__("Submitted with a low-balance override by {0} on {1}.", [
+					frappe.user.full_name(row.user) || row.user,
+					frappe.datetime.str_to_user(row.datetime),
+				])
+			)}</div>`,
+			"orange"
+		);
+	}
+}
+
+// Design 7e §4.3: one dialog for the LowBalanceError of every guarded action and submit form, registered once by
+// whichever guarded form loads first (the same code is in each guarded form script: there are no bundles).
+// Frappe shows no message of its own when a handler exists, so the dialog renders the server message (built
+// and escaped by treasury.balance_alerts.guard). A manager gets one red button: the action helpers set
+// `treasury.low_balance.retry` just before their call; a draft with `allow_low_balance` is submitted again.
+frappe.provide("treasury.low_balance");
+if (!treasury.low_balance.show) {
+	treasury.low_balance.show = function (r) {
+		const retry = treasury.low_balance.retry;
+		treasury.low_balance.retry = null;
+		let html = "";
+		try {
+			html = JSON.parse(r._server_messages || "[]")
+				.map((m) => JSON.parse(m).message || "")
+				.join("");
+		} catch (e) {
+			html = "";
+		}
+		const frm = window.cur_frm;
+		const can_override = frappe.user.has_role(["Treasury Manager", "System Manager"]);
+		const submit_form = !retry && frm && frm.doc && frm.doc.docstatus === 0 && frm.fields_dict.allow_low_balance;
+		const dialog = new frappe.ui.Dialog({
+			title: __("Low Projected Balance"),
+			indicator: "red",
+			fields: [{ fieldname: "message", fieldtype: "HTML", options: html }],
+		});
+		if (can_override && (retry || submit_form)) {
+			dialog.set_primary_action(retry ? __("Override and Continue") : __("Override and Submit"), () => {
+				dialog.hide();
+				// the red button is the confirmation: no second "Permanently Submit?" prompt
+				retry ? retry() : frm.set_value("allow_low_balance", 1).then(() => frm.save("Submit"));
+			});
+			dialog.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
+			dialog.set_secondary_action(() => dialog.hide());
+			dialog.set_secondary_action_label(__("Cancel"));
+		} else {
+			dialog.set_primary_action(__("Close"), () => dialog.hide());
+		}
+		dialog.show();
+	};
+	frappe.request.on_error("LowBalanceError", (r) => treasury.low_balance.show(r));
+}

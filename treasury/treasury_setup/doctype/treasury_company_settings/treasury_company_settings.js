@@ -21,6 +21,9 @@ const TCS_FEE_RULE = "Bank Transfer Fee Rule";
 const TCS_LIMIT = "Bank Transfer Limit";
 const TCS_BT_CTX = "Bank Transfer";
 const TCS_SCOPE_COLORS = { "Same Bank": "green", "Other Bank": "blue", International: "purple" };
+const TCS_THRESHOLD = "Treasury Balance Threshold";
+const TCS_ALERT_ROLES = ["Treasury Manager", "System Manager"];
+const TCS_ALERTS_METHOD = "treasury.balance_alerts.notify.";
 
 frappe.ui.form.on("Treasury Company Settings", {
 	setup(frm) {
@@ -88,6 +91,10 @@ frappe.ui.form.on("Treasury Company Settings", {
 		frm.events.format_transfer_grids(frm);
 		frm.events.add_transfer_buttons(frm);
 		frm.events.render_balance_alerts_help(frm);
+		tcs_format_thresholds(frm);
+		tcs_threshold_buttons(frm);
+		tcs_thresholds_headline(frm);
+		tcs_add_alert_buttons(frm);
 	},
 
 	render_balance_alerts_help(frm) {
@@ -95,11 +102,26 @@ frappe.ui.form.on("Treasury Company Settings", {
 		if (!field) {
 			return;
 		}
-		field.$wrapper.html(`<div class="text-muted small">${frappe.utils.escape_html(
-			__(
-				"Each day of the horizon (Treasury Settings) is projected per bank: below the Warning Balance the day is Warning, below the Minimum Balance it is Critical and alerted; entries that lower a day below the minimum are checked."
-			)
+		const esc = frappe.utils.escape_html;
+		const bold = (label) => `<b>${esc(label)}</b>`;
+		// the labels are escaped; the sentence is our own translation
+		field.$wrapper.html(`<div class="text-muted small"><b>${esc(__("How it works:"))}</b> ${__(
+			"Each bank's balance is projected day by day for the horizon (Treasury Settings), from its GL balance plus expected cheques, transfers and installments. Below the {0} the day turns orange; below the {1} it turns red and entries that would cause it are checked. Amounts are in the bank account currency. Warning = Minimum means one level only.",
+			[bold(__("Warning Balance", null, TCS_THRESHOLD)), bold(__("Minimum Balance", null, TCS_THRESHOLD))]
 		)}</div>`);
+	},
+
+	on_low_balance(frm) {
+		const messages = {
+			Block: __(
+				"Entries that would take a bank below its minimum balance will be refused. Only a Treasury Manager can override."
+			),
+			Ignore: __("Entries are not checked. The daily digest and alerts still run."),
+		};
+		const message = messages[frm.doc.on_low_balance];
+		if (message) {
+			frappe.show_alert({ message: frappe.utils.escape_html(message), indicator: "orange" });
+		}
 	},
 
 	auto_select_cheque_book(frm) {
@@ -615,3 +637,229 @@ frappe.ui.form.on(TCS_LIMIT, {
 		}
 	},
 });
+
+// ------------------------------------------------------------------------------ Bank Balance Alerts
+// Levels, thresholds and checks are server rules (treasury/balance_alerts); the grid only helps typing:
+// one row per bank, usually just the minimum.
+
+frappe.ui.form.on(TCS_THRESHOLD, {
+	balance_thresholds_add(frm, cdt, cdn) {
+		frappe.model.set_value(cdt, cdn, { warning_balance: 0, minimum_balance: 0 });
+	},
+
+	bank_account(frm, cdt, cdn) {
+		// a preview only: the server sets the currency of the GL account on save
+		const row = locals[cdt][cdn];
+		if (!row.bank_account || frm.is_new()) {
+			return;
+		}
+		tcs_threshold_banks(frm).then((banks) => {
+			const bank = banks.find((b) => b.bank_account === row.bank_account);
+			bank && bank.currency && frappe.model.set_value(cdt, cdn, "currency", bank.currency);
+		});
+	},
+
+	minimum_balance(frm, cdt, cdn) {
+		// the user usually types only the minimum: the warning follows until it is raised
+		const row = locals[cdt][cdn];
+		if (!flt(row.warning_balance) || flt(row.warning_balance) < flt(row.minimum_balance)) {
+			frappe.model.set_value(cdt, cdn, "warning_balance", flt(row.minimum_balance));
+		}
+	},
+});
+
+function tcs_threshold_banks(frm) {
+	// the company's bank accounts with their currency, read once per form load (Treasury users need not
+	// read Bank Account or Account)
+	if (!frm._tcs_threshold_banks || frm._tcs_threshold_company !== frm.doc.company) {
+		frm._tcs_threshold_company = frm.doc.company;
+		frm._tcs_threshold_banks = frm.call({ doc: frm.doc, method: "get_threshold_banks" }).then((r) => r.message || []);
+	}
+	return frm._tcs_threshold_banks;
+}
+
+function tcs_format_thresholds(frm) {
+	const esc = frappe.utils.escape_html;
+	const amount = (value, row) => {
+		const text = `<bdi>${esc(format_currency(value, row && row.currency))}</bdi>`;
+		return flt(value) < 0 ? `<span title="${esc(__("Overdraft"))}">${text}</span>` : text;
+	};
+	const formatters = {
+		currency: (value) => `<bdi>${esc(value || "")}</bdi>`,
+		minimum_balance: (value, df, options, row) => amount(value, row),
+		warning_balance: (value, df, options, row) =>
+			row && flt(value) === flt(row.minimum_balance)
+				? `<span class="text-muted" title="${esc(__("No separate warning level"))}">${esc(
+						__("= minimum")
+				  )}</span>`
+				: amount(value, row),
+	};
+	Object.entries(formatters).forEach(([fieldname, formatter]) => {
+		for (const name of [null, frm.doc.name]) {
+			const df = frappe.meta.get_docfield(TCS_THRESHOLD, fieldname, name);
+			if (df) {
+				df.formatter = formatter;
+			}
+		}
+	});
+	frm.refresh_field("balance_thresholds");
+}
+
+function tcs_threshold_buttons(frm) {
+	const grid = frm.fields_dict.balance_thresholds && frm.fields_dict.balance_thresholds.grid;
+	if (!grid) {
+		return;
+	}
+	// the grid keeps its buttons (by label) across refreshes: show or hide them
+	const can_write = !!(frm.perm[0] && frm.perm[0].write);
+	grid.add_custom_button(__("Add All Bank Accounts"), () => tcs_add_all_banks(frm), "top").toggleClass(
+		"hidden",
+		frm.is_new() || !can_write
+	);
+	grid.add_custom_button(
+		__("Open Bank Balance Outlook"),
+		() => frappe.set_route("query-report", "Bank Balance Outlook", { company: frm.doc.company }),
+		"top"
+	).toggleClass("hidden", frm.is_new() || frm.is_dirty());
+}
+
+function tcs_add_all_banks(frm) {
+	// design 7e P3: one row (0 / 0) per company bank account that has none yet
+	tcs_threshold_banks(frm).then((banks) => {
+		const present = new Set((frm.doc.balance_thresholds || []).map((row) => row.bank_account));
+		const missing = banks.filter((b) => !present.has(b.bank_account));
+		if (!missing.length) {
+			frappe.show_alert({ message: __("Every bank account already has a row."), indicator: "blue" });
+			return;
+		}
+		missing.forEach((bank) => {
+			const row = frm.add_child("balance_thresholds");
+			Object.assign(row, {
+				bank_account: bank.bank_account,
+				currency: bank.currency,
+				warning_balance: 0,
+				minimum_balance: 0,
+			});
+		});
+		frm.refresh_field("balance_thresholds");
+		frm.dirty();
+		frappe.show_alert({
+			message: __("{0} bank account(s) added. Enter their minimum balances.", [missing.length]),
+			indicator: "green",
+		});
+	});
+}
+
+function tcs_thresholds_headline(frm) {
+	// design 7e P8: after an upgrade nothing is alerted until thresholds exist
+	if (frm.is_new() || frm.is_dirty() || (frm.doc.balance_thresholds || []).length) {
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const can_write = !!(frm.perm[0] && frm.perm[0].write);
+	const add = can_write ? ` <a class="treasury-add-thresholds">${esc(__("Add All Bank Accounts"))} →</a>` : "";
+	const $headline = frm.dashboard.set_headline(
+		`<div>${esc(
+			__("No balance thresholds yet: banks are listed in the digest but never alerted or checked.")
+		)}${add}</div>`,
+		"blue"
+	);
+	$headline &&
+		$headline.find(".treasury-add-thresholds").on("click", () => {
+			frm.scroll_to_field("balance_thresholds");
+			tcs_add_all_banks(frm);
+		});
+}
+
+function tcs_add_alert_buttons(frm) {
+	// design 7e P1, for this company: see what a user gets, send it to yourself, check the alerts now
+	if (frm.is_new() || frm.is_dirty() || !frappe.user.has_role(TCS_ALERT_ROLES)) {
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const company = frm.doc.company;
+	const group = __("Bank Balance Alerts", null, TCS_CTX);
+	frm.add_custom_button(
+		__("Preview Digest"),
+		() => {
+			const dialog = new frappe.ui.Dialog({
+				title: __("Preview Digest"),
+				fields: [
+					{
+						fieldname: "user",
+						label: __("User"),
+						fieldtype: "Link",
+						options: "User",
+						reqd: 1,
+						default: frappe.session.user,
+						get_query: () => ({ filters: { enabled: 1, user_type: "System User" } }),
+						description: __(
+							"Shows exactly what this user would receive: only the banks they may see, in their language."
+						),
+					},
+				],
+				primary_action_label: __("Preview Digest"),
+				primary_action(values) {
+					dialog.hide();
+					tcs_show_digest(company, values.user);
+				},
+			});
+			dialog.show();
+		},
+		group
+	);
+	frm.add_custom_button(
+		__("Send Test to Me"),
+		() =>
+			frappe.xcall(TCS_ALERTS_METHOD + "send_test_digest", { company }).then((r) => {
+				if (r.sent) {
+					frappe.show_alert({ message: esc(r.message), indicator: "green" });
+				} else {
+					frappe.msgprint({ message: esc(r.message || ""), indicator: "orange" });
+				}
+			}),
+		group
+	);
+	frm.add_custom_button(
+		__("Run Alerts Now"),
+		() =>
+			frappe.confirm(
+				esc(
+					__(
+						"Evaluates the thresholds now and sends any new critical or warning alert. Alerts already sent today are not repeated."
+					)
+				),
+				() =>
+					frappe.xcall(TCS_ALERTS_METHOD + "run_alerts_now", { company }).then((r) => {
+						frappe.show_alert({ message: esc(r.message), indicator: "blue" });
+					})
+			),
+		group
+	);
+}
+
+function tcs_show_digest(company, user) {
+	const esc = frappe.utils.escape_html;
+	frappe.xcall(TCS_ALERTS_METHOD + "preview_digest", { company, user }).then((r) => {
+		if (!r.html) {
+			frappe.msgprint({ message: esc(r.message || ""), indicator: "orange" });
+			return;
+		}
+		const dialog = new frappe.ui.Dialog({
+			title: __("Digest preview for {0} ({1})", [esc(r.user), esc(company)]),
+			size: "extra-large",
+			fields: [{ fieldname: "preview", fieldtype: "HTML" }],
+		});
+		// a sandboxed frame: the e-mail's inline styles stay out of the desk, its links open a new tab
+		const $frame = $(
+			'<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" style="width: 100%; height: 70vh; border: 0;"></iframe>'
+		);
+		$frame.attr("srcdoc", `<base target="_blank">${r.html}`);
+		dialog
+			.get_field("preview")
+			.$wrapper.empty()
+			.append(`<p class="text-muted small"><b>${esc(r.subject || "")}</b></p>`)
+			.append($frame);
+		dialog.show();
+	});
+}

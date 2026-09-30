@@ -10309,3 +10309,258 @@ msgstr "بنوك تحت الحد الأدنى"
 
 msgid "Banks Below Warning"
 msgstr "بنوك تحت حد التحذير"
+
+msgid "Largest Shortfall"
+msgstr "أكبر عجز"
+
+msgid "Thresholds"
+msgstr "الحدود"
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 7e-2: bank position alerts UX
+# ---------------------------------------------------------------------------------------------------------
+
+# Levels (report, e-mails, list indicators)
+msgctxt "Bank Balance Outlook"
+msgid "Critical"
+msgstr "حرج"
+
+msgctxt "Bank Balance Outlook"
+msgid "Warning"
+msgstr "تحذير"
+
+msgctxt "Bank Balance Outlook"
+msgid "OK"
+msgstr "سليم"
+
+msgctxt "Bank Balance Outlook"
+msgid "No Threshold"
+msgstr "بدون حد"
+
+msgctxt "Bank Balance Outlook"
+msgid "Worse: Critical"
+msgstr "تفاقم: حرج"
+
+# Status log event, per status log
+msgctxt "PDC Status Log"
+msgid "Low Balance Override"
+msgstr "تجاوز انخفاض الرصيد"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Low Balance Override"
+msgstr "تجاوز انخفاض الرصيد"
+
+msgctxt "Bank Charge Status Log"
+msgid "Low Balance Override"
+msgstr "تجاوز انخفاض الرصيد"
+
+# Treasury Alert Log sections
+msgctxt "Treasury Alert Log"
+msgid "Alert"
+msgstr "التنبيه"
+
+msgctxt "Treasury Alert Log"
+msgid "Amounts"
+msgstr "المبالغ"
+
+msgctxt "Treasury Alert Log"
+msgid "Reference"
+msgstr "المرجع"
+
+# Treasury Settings form
+msgid "today {0}"
+msgstr "اليوم {0}"
+
+msgid "tomorrow {0}"
+msgstr "غداً {0}"
+
+msgid "Hour of day (0–23, system time zone) after which the daily digest is sent. Next digest: {0}."
+msgstr "ساعة اليوم (0–23، بتوقيت النظام) التي يُرسل بعدها الملخص اليومي. الملخص التالي: {0}."
+
+msgid "Today counts as day 1: 7 = today and the next 6 days."
+msgstr "اليوم هو اليوم الأول: 7 = اليوم و6 أيام تالية."
+
+msgid "Both channels are off: no digest or alert is sent."
+msgstr "القناتان معطلتان: لن يُرسل أي ملخص أو تنبيه."
+
+msgid "The daily digest and critical alerts are both off."
+msgstr "الملخص اليومي والتنبيهات الحرجة معطلان."
+
+msgid "No default outgoing e-mail account: only in-system notifications are sent."
+msgstr "لا يوجد حساب بريد صادر افتراضي: تُرسل الإشعارات داخل النظام فقط."
+
+msgid "No recipients: nobody receives the digest or alerts."
+msgstr "لا يوجد مستلمون: لن يستلم أحد الملخص أو التنبيهات."
+
+msgid "Resolves to {0} users: {1}"
+msgstr "يشمل {0} مستخدم: {1}"
+
+msgid "Preview Digest"
+msgstr "معاينة الملخص"
+
+msgid "Send Test to Me"
+msgstr "إرسال نسخة تجريبية لي"
+
+msgid "Run Alerts Now"
+msgstr "فحص التنبيهات الآن"
+
+msgid "Shows exactly what this user would receive: only the banks they may see, in their language."
+msgstr "يعرض ما سيستلمه هذا المستخدم بالضبط: البنوك المسموح له برؤيتها فقط وبلغته."
+
+msgid "Digest preview for {0} ({1})"
+msgstr "معاينة الملخص لـ {0} ({1})"
+
+msgid "{0} may not see any bank of {1}."
+msgstr "لا يملك {0} صلاحية رؤية أي بنك في {1}."
+
+msgid "Test digest sent to {0}."
+msgstr "تم إرسال الملخص التجريبي إلى {0}."
+
+msgid "No default outgoing e-mail account."
+msgstr "لا يوجد حساب بريد صادر افتراضي."
+
+msgid "Evaluates the thresholds now and sends any new critical or warning alert. Alerts already sent today are not repeated."
+msgstr "يفحص الحدود الآن ويرسل أي تنبيه حرج أو تحذير جديد. لا تتكرر التنبيهات المرسلة اليوم."
+
+msgid "Alert check queued for {0}."
+msgstr "تمت جدولة فحص التنبيهات لـ {0}."
+
+msgid "[Test]"
+msgstr "[تجريبي]"
+
+# Treasury Company Settings form
+msgid "How it works:"
+msgstr "طريقة العمل:"
+
+msgid "Each bank's balance is projected day by day for the horizon (Treasury Settings), from its GL balance plus expected cheques, transfers and installments. Below the {0} the day turns orange; below the {1} it turns red and entries that would cause it are checked. Amounts are in the bank account currency. Warning = Minimum means one level only."
+msgstr "يُحسب رصيد كل بنك متوقعاً يوماً بيوم خلال فترة التوقع (إعدادات الخزينة)، من رصيده في دفتر الأستاذ مضافاً إليه الشيكات والتحويلات والأقساط المتوقعة. تحت {0} يصبح اليوم برتقالياً، وتحت {1} يصبح أحمر وتُفحص القيود المسببة له. المبالغ بعملة الحساب البنكي. تساوي الحدين يعني مستوى واحداً فقط."
+
+msgid "Entries that would take a bank below its minimum balance will be refused. Only a Treasury Manager can override."
+msgstr "سيتم رفض القيود التي تنزل برصيد بنك عن حده الأدنى. لا يتجاوز ذلك إلا مدير الخزينة."
+
+msgid "Entries are not checked. The daily digest and alerts still run."
+msgstr "لن تُفحص القيود. يستمر إرسال الملخص اليومي والتنبيهات."
+
+msgid "= minimum"
+msgstr "= الحد الأدنى"
+
+msgid "No separate warning level"
+msgstr "لا يوجد مستوى تنبيه منفصل"
+
+msgid "Add All Bank Accounts"
+msgstr "إضافة كل الحسابات البنكية"
+
+msgid "{0} bank account(s) added. Enter their minimum balances."
+msgstr "تمت إضافة {0} حساب بنكي. أدخل الحد الأدنى لأرصدتها."
+
+msgid "Every bank account already has a row."
+msgstr "لكل حساب بنكي صف بالفعل."
+
+msgid "Open Bank Balance Outlook"
+msgstr "فتح توقعات أرصدة البنوك"
+
+msgid "No balance thresholds yet: banks are listed in the digest but never alerted or checked."
+msgstr "لا توجد حدود أرصدة بعد: تظهر البنوك في الملخص لكن دون تنبيه أو فحص."
+
+# Digest e-mail and Notification Log
+msgid "Bank position for {0} on {1}: all banks above their thresholds"
+msgstr "مركز البنوك لـ {0} في {1}: كل البنوك فوق حدودها"
+
+msgid "Bank position"
+msgstr "مركز البنوك"
+
+msgid "next {0} days"
+msgstr "الأيام الـ {0} القادمة"
+
+msgid "{0} Critical"
+msgstr "{0} حرج"
+
+msgid "{0} Warning"
+msgstr "{0} تحذير"
+
+msgid "{0} OK"
+msgstr "{0} سليم"
+
+msgid "{0} No Threshold"
+msgstr "{0} بدون حد"
+
+msgid "also: {0}"
+msgstr "وكذلك: {0}"
+
+msgid "Lowest: {0} on {1}"
+msgstr "الأدنى: {0} في {1}"
+
+msgid "Today {0} · lowest {1} on {2}"
+msgstr "اليوم {0} · الأدنى {1} في {2}"
+
+msgid "Projected Closing"
+msgstr "الرصيد المتوقع"
+
+msgid "Thresholds: Treasury Company Settings → Bank Balance Alerts"
+msgstr "الحدود: إعدادات الخزينة للشركة ← تنبيهات أرصدة البنوك"
+
+msgid "You receive this as {0}."
+msgstr "تستلم هذه الرسالة بصفتك {0}."
+
+# Balance alert e-mail and Notification Log
+msgid "Low projected balance"
+msgstr "انخفاض الرصيد المتوقع"
+
+msgid "{0}: projected {1}, minimum {2}"
+msgstr "{0}: الرصيد المتوقع {1}، الحد الأدنى {2}"
+
+msgid "{0}: projected {1}, warning {2}"
+msgstr "{0}: الرصيد المتوقع {1}، حد التنبيه {2}"
+
+msgid "Shortfall {0}"
+msgstr "العجز {0}"
+
+msgid "Days below the threshold"
+msgstr "الأيام تحت الحد"
+
+msgid "was {0}"
+msgstr "كان {0}"
+
+msgid "Largest payments up to {0}"
+msgstr "أكبر المدفوعات حتى {0}"
+
+msgid "PE {0}"
+msgstr "سند الدفع {0}"
+
+msgid "Largest payment: {0} {1}"
+msgstr "أكبر دفعة: {0} {1}"
+
+msgid "{0}: {1} ({2}, threshold {3})"
+msgstr "{0}: {1} ({2}، الحد {3})"
+
+msgid "You receive this because you can see this bank account. Alerts repeat only when a day gets worse."
+msgstr "تستلم هذه الرسالة لأن لديك صلاحية على هذا الحساب البنكي. لا تتكرر التنبيهات إلا إذا ساء رصيد يوم ما."
+
+# Entry-time guard: messages and dialogs
+msgid "+{0} more day(s)"
+msgstr "+{0} يوم آخر"
+
+msgid "Low balance override recorded: {0}"
+msgstr "تم تسجيل تجاوز انخفاض الرصيد: {0}"
+
+msgid "Override and Continue"
+msgstr "تجاوز ومتابعة"
+
+msgid "Override and Submit"
+msgstr "تجاوز واعتماد"
+
+msgid "The block is overridden only if this entry takes a bank below its minimum. Each override is logged."
+msgstr "يُتجاوز المنع فقط إذا نزل هذا القيد برصيد بنك عن حده الأدنى. يُسجَّل كل تجاوز."
+
+msgid "Submitted with a low-balance override by {0} on {1}."
+msgstr "اعتُمد بتجاوز انخفاض الرصيد بواسطة {0} في {1}."
+
+# Treasury Alert Log form
+msgid "{0}: projected {1} on {2}, minimum {3}."
+msgstr "{0}: الرصيد المتوقع {1} في {2}، الحد الأدنى {3}."
+
+msgid "{0}: projected {1} on {2}, warning {3}."
+msgstr "{0}: الرصيد المتوقع {1} في {2}، حد التنبيه {3}."
+
+msgid "Override by {0} on {1}."
+msgstr "تجاوز بواسطة {0} على {1}."

@@ -11,14 +11,15 @@
   "column_break_alerts",
   "allow_future_clearance_date",
   "balance_alerts_section",
-  "balance_alert_horizon",
-  "balance_digest_hour",
   "send_balance_digest",
+  "balance_digest_hour",
   "send_balance_alerts",
+  "balance_alert_horizon",
   "column_break_balance_alerts",
   "balance_alert_notification",
   "balance_alert_email",
   "digest_zero_days",
+  "balance_alert_recipients_section",
   "balance_alert_recipients",
   "payees_section",
   "payee_supplier_group",
@@ -80,6 +81,7 @@
   },
   {
    "default": "7",
+   "depends_on": "eval:doc.send_balance_digest",
    "description": "Hour of day (0–23, system time zone) after which the daily digest is sent.",
    "fieldname": "balance_digest_hour",
    "fieldtype": "Int",
@@ -116,9 +118,14 @@
   },
   {
    "default": "1",
+   "depends_on": "eval:doc.send_balance_digest",
    "fieldname": "digest_zero_days",
    "fieldtype": "Check",
    "label": "Include Days Without Movements"
+  },
+  {
+   "fieldname": "balance_alert_recipients_section",
+   "fieldtype": "Section Break"
   },
   {
    "description": "Roles and / or users. Each recipient only gets the companies and bank accounts they may see.",
@@ -161,7 +168,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-10 12:00:00.000000",
+ "modified": "2026-10-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Settings",

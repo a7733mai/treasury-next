@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
+from treasury.balance_alerts import guard
 from treasury.pdc import batch, lifecycle
 
 # "CHQB" (cheque batch), distinct from the "CHB-" series of Cheque Book
@@ -84,6 +85,8 @@ class ChequeBatch(Document):
 	def onload(self):
 		if not self.is_new() and self.docstatus > 0:
 			self.set_onload("cheques", batch.get_dashboard(self))
+			# design 7e P17: "Submitted with a low-balance override by ..." on the form
+			self.set_onload("low_balance_override", guard.latest_override(self.doctype, self.name))
 
 	def before_insert(self):
 		self.naming_series = NAMING_SERIES.get(self.direction, NAMING_SERIES["Outgoing"])

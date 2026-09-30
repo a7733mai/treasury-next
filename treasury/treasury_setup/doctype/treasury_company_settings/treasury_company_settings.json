@@ -52,6 +52,7 @@
   "on_low_balance",
   "column_break_balance_alerts",
   "balance_alerts_help",
+  "balance_thresholds_section",
   "balance_thresholds",
   "documents_section",
   "default_outgoing_cheque_bank_account",
@@ -372,6 +373,10 @@
    "fieldtype": "HTML"
   },
   {
+   "fieldname": "balance_thresholds_section",
+   "fieldtype": "Section Break"
+  },
+  {
    "description": "Amounts in the bank account currency. Banks without a row are listed in the digest but raise no alert and are never checked.",
    "fieldname": "balance_thresholds",
    "fieldtype": "Table",
@@ -454,7 +459,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-10 12:00:00.000000",
+ "modified": "2026-10-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

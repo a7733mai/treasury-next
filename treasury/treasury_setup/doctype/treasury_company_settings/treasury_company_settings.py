@@ -381,6 +381,30 @@ class TreasuryCompanySettings(Document):
 			frappe.msgprint(_("All series are already Payment Entry series."))
 		return added
 
+	@frappe.whitelist()
+	def get_threshold_banks(self) -> list[dict]:
+		"""Read only (design 7e P3): the company's enabled bank accounts with a GL account, each with the
+		currency of its GL account ([{bank_account, currency}], name order), for "Add All Bank Accounts" and
+		the currency preview of the thresholds grid. Treasury users need not read Bank Account or Account."""
+		doc = frappe.get_doc(self.doctype, self.name)
+		doc.check_permission("read")
+		banks = frappe.get_all(
+			"Bank Account",
+			filters={"company": doc.company, "is_company_account": 1, "disabled": 0, "account": ["is", "set"]},
+			fields=["name", "account"],
+			order_by="name asc",
+		)
+		currencies = {}
+		if banks:
+			accounts = frappe.get_all(
+				"Account",
+				filters={"name": ["in", [b.account for b in banks]]},
+				fields=["name", "account_currency"],
+				as_list=True,
+			)
+			currencies = dict(accounts)
+		return [{"bank_account": b.name, "currency": currencies.get(b.account)} for b in banks]
+
 	def saved_for_write(self) -> "TreasuryCompanySettings":
 		"""The saved settings of this company, after checking the user's write permission on them."""
 		doc = frappe.get_doc(self.doctype, self.name)

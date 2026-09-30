@@ -18,6 +18,12 @@
 - New **Treasury Alert Log** (digests, alerts, overrides; Log Settings clears it after 180 days), report
   **Bank Balance Outlook**, number card *Banks Below Minimum (7 days)*, chart *Lowest Projected Balance per
   Bank*. Patch `set_balance_alert_defaults`. No accounting is posted.
+- Alerts UX (7e-2): Arabic / RTL digest and alert e-mails with level colours and words, weekday dates, the
+  lowest balance per bank, "was …" on worse days and the party Payment Entry of cheque payments; *Preview
+  Digest*, *Send Test to Me* and *Run Alerts Now* for Treasury Managers; *Add All Bank Accounts* and hints
+  in the settings; one red *Low Projected Balance* dialog with *Override and Continue / Submit* on every
+  guarded form; report colours, a minimum line on its chart, a *Largest Shortfall* card and a workspace
+  shortcut.
 
 ### Bank Charges (Phase 7d)
 - New submittable **Bank Charge** (Charge / Refund) in Bank Transfers and the master **Bank Charge

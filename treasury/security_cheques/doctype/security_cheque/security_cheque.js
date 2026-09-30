@@ -434,23 +434,16 @@ function sec_encash_prompt(frm, bank_accounts) {
 	);
 }
 
-// Low balance guard (Block mode) of an outgoing encashment: a Treasury Manager may confirm the override and
-// call again; the server checks the role and logs it.
-const SEC_OVERRIDE_ROLES = ["Treasury Manager", "System Manager"];
-
+// Low balance guard (Block mode) of an outgoing encashment: the shared dialog (below) offers a Treasury
+// Manager "Override and Continue", which calls again with the override; the server checks the role and logs it.
 function sec_call_encash(frm, args, override) {
+	treasury.low_balance.retry = override ? null : () => sec_call_encash(frm, args, true);
 	frm.call({
 		doc: frm.doc,
 		method: "encash",
 		args: Object.assign({}, args, override ? { allow_low_balance: 1 } : {}),
 		freeze: true,
-		error: (r) => {
-			if (!override && r && r.exc_type === "LowBalanceError" && frappe.user.has_role(SEC_OVERRIDE_ROLES)) {
-				frappe.confirm(__("Override the low balance block and continue?"), () =>
-					sec_call_encash(frm, args, true)
-				);
-			}
-		},
+		always: () => (treasury.low_balance.retry = null),
 	}).then((r) => {
 		if (r.message && r.message.pdc_cheque) {
 			frappe.set_route("Form", "PDC Cheque", r.message.pdc_cheque);
@@ -458,4 +451,47 @@ function sec_call_encash(frm, args, override) {
 			frm.reload_doc();
 		}
 	});
+}
+
+// Design 7e §4.3: one dialog for the LowBalanceError of every guarded action and submit form, registered once by
+// whichever guarded form loads first (the same code is in each guarded form script: there are no bundles).
+// Frappe shows no message of its own when a handler exists, so the dialog renders the server message (built
+// and escaped by treasury.balance_alerts.guard). A manager gets one red button: the action helpers set
+// `treasury.low_balance.retry` just before their call; a draft with `allow_low_balance` is submitted again.
+frappe.provide("treasury.low_balance");
+if (!treasury.low_balance.show) {
+	treasury.low_balance.show = function (r) {
+		const retry = treasury.low_balance.retry;
+		treasury.low_balance.retry = null;
+		let html = "";
+		try {
+			html = JSON.parse(r._server_messages || "[]")
+				.map((m) => JSON.parse(m).message || "")
+				.join("");
+		} catch (e) {
+			html = "";
+		}
+		const frm = window.cur_frm;
+		const can_override = frappe.user.has_role(["Treasury Manager", "System Manager"]);
+		const submit_form = !retry && frm && frm.doc && frm.doc.docstatus === 0 && frm.fields_dict.allow_low_balance;
+		const dialog = new frappe.ui.Dialog({
+			title: __("Low Projected Balance"),
+			indicator: "red",
+			fields: [{ fieldname: "message", fieldtype: "HTML", options: html }],
+		});
+		if (can_override && (retry || submit_form)) {
+			dialog.set_primary_action(retry ? __("Override and Continue") : __("Override and Submit"), () => {
+				dialog.hide();
+				// the red button is the confirmation: no second "Permanently Submit?" prompt
+				retry ? retry() : frm.set_value("allow_low_balance", 1).then(() => frm.save("Submit"));
+			});
+			dialog.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
+			dialog.set_secondary_action(() => dialog.hide());
+			dialog.set_secondary_action_label(__("Cancel"));
+		} else {
+			dialog.set_primary_action(__("Close"), () => dialog.hide());
+		}
+		dialog.show();
+	};
+	frappe.request.on_error("LowBalanceError", (r) => treasury.low_balance.show(r));
 }

@@ -611,24 +611,99 @@ function pdc_action(frm, method, label, fields) {
 	);
 }
 
-// Low balance guard (Block mode): a Treasury Manager may confirm the override and call again. The server is
-// authoritative: it checks the role and logs the override.
-const PDC_OVERRIDE_ROLES = ["Treasury Manager", "System Manager"];
-
+// Low balance guard (Block mode): the shared dialog (below) offers a Treasury Manager "Override and Continue",
+// which calls again with the override. The server is authoritative: it checks the role and logs the override.
 function pdc_call_with_override(frm, method, args, override) {
+	treasury.low_balance.retry = override ? null : () => pdc_call_with_override(frm, method, args, true);
 	frm.call({
 		doc: frm.doc,
 		method,
 		args: Object.assign({}, args, override ? { allow_low_balance: 1 } : {}),
 		freeze: true,
-		error: (r) => {
-			if (!override && r && r.exc_type === "LowBalanceError" && frappe.user.has_role(PDC_OVERRIDE_ROLES)) {
-				frappe.confirm(__("Override the low balance block and continue?"), () =>
-					pdc_call_with_override(frm, method, args, true)
-				);
-			}
-		},
+		always: () => (treasury.low_balance.retry = null),
 	}).then(() => frm.reload_doc());
+}
+
+// ------------------------------------------------------------------------------------ low balance guard
+// Design 7e §4.3: one dialog for the LowBalanceError of every guarded action and submit form, registered once by
+// whichever guarded form loads first (the same code is in each guarded form script: there are no bundles).
+// Frappe shows no message of its own when a handler exists, so the dialog renders the server message (built
+// and escaped by treasury.balance_alerts.guard). A manager gets one red button: the action helpers set
+// `treasury.low_balance.retry` just before their call; a draft with `allow_low_balance` is submitted again.
+frappe.provide("treasury.low_balance");
+if (!treasury.low_balance.show) {
+	treasury.low_balance.show = function (r) {
+		const retry = treasury.low_balance.retry;
+		treasury.low_balance.retry = null;
+		let html = "";
+		try {
+			html = JSON.parse(r._server_messages || "[]")
+				.map((m) => JSON.parse(m).message || "")
+				.join("");
+		} catch (e) {
+			html = "";
+		}
+		const frm = window.cur_frm;
+		const can_override = frappe.user.has_role(["Treasury Manager", "System Manager"]);
+		const submit_form = !retry && frm && frm.doc && frm.doc.docstatus === 0 && frm.fields_dict.allow_low_balance;
+		const dialog = new frappe.ui.Dialog({
+			title: __("Low Projected Balance"),
+			indicator: "red",
+			fields: [{ fieldname: "message", fieldtype: "HTML", options: html }],
+		});
+		if (can_override && (retry || submit_form)) {
+			dialog.set_primary_action(retry ? __("Override and Continue") : __("Override and Submit"), () => {
+				dialog.hide();
+				// the red button is the confirmation: no second "Permanently Submit?" prompt
+				retry ? retry() : frm.set_value("allow_low_balance", 1).then(() => frm.save("Submit"));
+			});
+			dialog.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
+			dialog.set_secondary_action(() => dialog.hide());
+			dialog.set_secondary_action_label(__("Cancel"));
+		} else {
+			dialog.set_primary_action(__("Close"), () => dialog.hide());
+		}
+		dialog.show();
+	};
+	frappe.request.on_error("LowBalanceError", (r) => treasury.low_balance.show(r));
+}
+
+frappe.ui.form.on("PDC Cheque", {
+	refresh(frm) {
+		pdc_low_balance_log(frm);
+	},
+});
+
+function pdc_low_balance_log(frm) {
+	// the override event is an orange pill in the status log, and the latest one a line on the dashboard
+	const esc = frappe.utils.escape_html;
+	const event = "Low Balance Override";
+	for (const name of [null, frm.doc.name]) {
+		const df = frappe.meta.get_docfield("PDC Status Log", "event", name);
+		if (df && !(df.formatter && df.formatter.treasury_low_balance)) {
+			const base = df.formatter;
+			df.formatter = (value, ...rest) => {
+				if (value === event) {
+					return `<span class="indicator-pill orange">${esc(__(value, null, "PDC Status Log"))}</span>`;
+				}
+				return base ? base(value, ...rest) : esc(value ? __(value, null, "PDC Status Log") : "");
+			};
+			df.formatter.treasury_low_balance = true;
+		}
+	}
+	frm.refresh_field("status_log");
+	const row = (frm.doc.status_log || []).filter((r) => r.event === event).pop();
+	if (row) {
+		frm.dashboard.set_headline(
+			`<div>${esc(
+				__("Submitted with a low-balance override by {0} on {1}.", [
+					frappe.user.full_name(row.user) || row.user,
+					frappe.datetime.str_to_user(row.datetime),
+				])
+			)}</div>`,
+			"orange"
+		);
+	}
 }
 
 function pdc_replace(frm) {

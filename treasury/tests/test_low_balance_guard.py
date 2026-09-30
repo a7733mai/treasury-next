@@ -10,9 +10,9 @@ from unittest.mock import patch
 import frappe
 from frappe import _
 from frappe.tests import IntegrationTestCase
-from frappe.utils import fmt_money, formatdate
+from frappe.utils import escape_html, fmt_money, formatdate, strip_html
 
-from treasury.balance_alerts import guard
+from treasury.balance_alerts import guard, notify
 from treasury.bank_transfers import fees
 from treasury.bank_transfers.scheduler import post_scheduled_transfers
 from treasury.pdc.report.bank_position_forecast import bank_position_forecast
@@ -100,10 +100,30 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertIn(fmt_money(20000, currency="EGP"), message)
 		# T+5 / T+6 are lowered too (below the minimum already, but lower now)
 		self.assertIn(formatdate(self.day(5)), message)
-		self.assertIn(_("Low projected balance after {0} {1}:").format(_("PDC Cheque"), c3.name), message)
+		text = strip_html(message)
+		self.assertIn(_("Low projected balance after {0} {1}:").format(_("PDC Cheque"), c3.name), text)
 		indicators = [m.get("indicator") for m in frappe.local.message_log if m.get("message") == message]
 		self.assertEqual(indicators, ["orange"])
 		self.assertFalse(alert_logs(alert_type="Override"))
+
+	def test_message_html(self):
+		"""Design 7e §4.1: names and amounts in <bdi>, at most 3 lines per bank then "+n more day(s)", and a
+		link to the bank's forecast."""
+		self.mode("Warn")
+		# T+1 .. T+6 all fall below the minimum and are all lowered: 6 days
+		cheque = self.cheque(100000, 1)
+		cheque.deliver(handover_date=self.today)
+		(message,) = self.warnings()
+		self.assertIn(f"<bdi>{self.bank}</bdi>", message)
+		self.assertIn(f"<bdi>{cheque.name}</bdi>", message)
+		self.assertEqual(message.count("<li>"), 3)
+		self.assertIn(f'<li class="text-muted">{_("+{0} more day(s)").format(3)}</li>', message)
+		route = notify.forecast_route(COMPANY, self.today, 7, self.bank)
+		self.assertIn(f'href="{escape_html(route)}"', message)
+		self.assertIn(_("Open in Bank Position Forecast"), message)
+		# the plain text (the override remarks): the same lines without markup
+		expected = f"{self.bank}: {formatdate(self.day(1))} projected {fmt_money(-30000, currency='EGP')}"
+		self.assertIn(expected, strip_html(message))
 
 	def test_block_user(self):
 		self.mode("Block")
@@ -140,6 +160,8 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual((log.projected_date, log.balance, log.threshold), (self.day(4), 14980, 20000))
 		self.assertEqual(len(self.balance_jobs()), 1)
+		recorded = _("Low balance override recorded: {0}").format(f"{_('PDC Cheque')} {c3.name}")
+		self.assertTrue(any(recorded in strip_html(m) for m in self.warnings()))
 
 	def test_override_flag_by_user(self):
 		self.mode("Block")
@@ -275,8 +297,9 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 			to_bank_account=target.bank_account,
 		)
 		(message,) = self.warnings()
-		self.assertIn(f"{self.bank}: {formatdate(self.day(1))}", message)
-		self.assertNotIn(f"{target.bank_account}:", message)
+		text = strip_html(message)
+		self.assertIn(f"{self.bank}: {formatdate(self.day(1))}", text)
+		self.assertNotIn(f"{target.bank_account}:", text)
 
 	def test_lock_order(self):
 		self.mode("Warn")
@@ -352,6 +375,10 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual(
 			(log.reference_doctype, log.balance, log.threshold), ("Facility Repayment", 60000, 70000)
 		)
+		# design 7e P17: the form shows who overrode (user and time only)
+		doc = frappe.get_doc("Facility Repayment", repayment.name)
+		doc.run_method("onload")
+		self.assertEqual(doc.get_onload().low_balance_override.user, TREASURY_MANAGER)
 
 	# ------------------------------------------------------------------ Bank Charge
 
@@ -444,6 +471,11 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual(len(info_comments("Cheque Batch", batch.name)), 1)
 		(log,) = alert_logs(alert_type="Override", reference_name=batch.name)
 		self.assertEqual((log.reference_doctype, log.user), ("Cheque Batch", TREASURY_MANAGER))
+		# design 7e P17: the form shows who overrode (user and time only)
+		doc = frappe.get_doc("Cheque Batch", batch.name)
+		doc.run_method("onload")
+		self.assertEqual(doc.get_onload().low_balance_override.user, TREASURY_MANAGER)
+		self.assertIsNone(guard.latest_override("Cheque Batch", "no such batch"))
 
 	def test_batch_submit_with_handover(self):
 		self.mode("Block")

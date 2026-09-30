@@ -12,14 +12,16 @@ in the bank account currency; "Lowest (Company Currency)" converts the lowest ba
 import erpnext
 import frappe
 from frappe import _
-from frappe.utils import cint, flt
+from frappe.utils import cint, flt, fmt_money
 
 from treasury.accounting import posting
-from treasury.balance_alerts.positions import LEVELS, evaluate, horizon
+from treasury.balance_alerts.positions import LEVELS, evaluate, horizon, level_order
 from treasury.pdc.report_utils import as_list, column, get_precision, report_today, validate_company
 
 MAX_HORIZON_DAYS = 31
 CTX = "Treasury Alert Log"
+# the levels are shown with the report's context (design 7e §8)
+LEVEL_CTX = "Bank Balance Outlook"
 
 
 def execute(filters=None):
@@ -53,7 +55,11 @@ class BankBalanceOutlook:
 		positions = evaluate(self.company, self.banks or None, horizon_days=self.horizon)
 		if self.level:
 			positions = [p for p in positions if p.level == self.level]
-		data = [self.row(p) for p in positions]
+		# worst first: Critical → Warning → OK → No Threshold, then the largest shortfall
+		data = sorted(
+			(self.row(p) for p in positions),
+			key=lambda r: (level_order(r.level), -flt(r.shortfall), r.bank_account),
+		)
 		return self.get_columns(), data, None, self.get_chart(data), self.get_summary(data)
 
 	def row(self, position) -> frappe._dict:
@@ -73,32 +79,35 @@ class BankBalanceOutlook:
 			warning_balance=position.warning,
 			minimum_balance=minimum,
 			level=position.level,
-			level_label=_(position.level, context=CTX),
+			level_label=_(position.level, context=LEVEL_CTX),
 			first_breach=position.first_breach,
 			shortfall=flt(shortfall, self.precision),
 			lowest_company_currency=flt(flt(lowest.closing) * rate, self.precision),
+			minimum_company_currency=flt(flt(minimum) * rate, self.precision) if minimum is not None else None,
 			current_company_currency=flt(flt(position.current_balance) * rate, self.precision),
 			company_currency=self.company_currency,
 		)
 
 	def get_columns(self) -> list[dict]:
-		def amount(fieldname, label, options="currency", width=130):
+		"""Which bank, how bad, how much today first (design 7e §6.2); Bank and Currency at the end."""
+
+		def amount(fieldname, label, options="currency", width=140):
 			return column(fieldname, label, "Currency", width, options=options)
 
 		return [
-			column("bank_account", _("Bank Account", context="Treasury"), "Link", 180, options="Bank Account"),
-			column("bank", _("Bank", context="Treasury"), "Link", 130, options="Bank"),
-			column("currency", _("Currency"), "Link", 70, options="Currency"),
+			column("bank_account", _("Bank Account", context="Treasury"), "Link", 200, options="Bank Account"),
+			column("level_label", _("Level", context=CTX), "Data", 110),
 			amount("current_balance", _("Current Balance")),
 			amount("lowest_balance", _("Lowest Projected")),
 			column("lowest_date", _("Lowest On"), "Date", 100),
-			amount("closing_balance", _("Closing at Horizon")),
-			amount("warning_balance", _("Warning Balance")),
-			amount("minimum_balance", _("Minimum Balance")),
-			column("level_label", _("Level", context=CTX), "Data", 100),
 			column("first_breach", _("First Breach"), "Date", 100),
-			amount("shortfall", _("Shortfall")),
-			amount("lowest_company_currency", _("Lowest (Company Currency)"), "company_currency", 160),
+			amount("shortfall", _("Shortfall"), width=120),
+			amount("closing_balance", _("Closing at Horizon")),
+			amount("warning_balance", _("Warning Balance"), width=120),
+			amount("minimum_balance", _("Minimum Balance"), width=120),
+			amount("lowest_company_currency", _("Lowest (Company Currency)"), "company_currency", 150),
+			column("bank", _("Bank", context="Treasury"), "Link", 120, options="Bank"),
+			column("currency", _("Currency"), "Link", 70, options="Currency"),
 			column("level", _("Level", context=CTX), "Data", 80, hidden=1),
 			column(
 				"company_currency",
@@ -111,15 +120,26 @@ class BankBalanceOutlook:
 		]
 
 	def get_chart(self, data) -> dict:
+		"""Bars: the lowest projected balance; line: the minimum balance (company currency). A bar below the
+		line is a bank in breach, readable without colour (design 7e P19). No threshold: no point."""
 		return {
 			"data": {
 				"labels": [r.bank_account for r in data],
 				"datasets": [
-					{"name": _("Lowest Projected Balance"), "values": [r.lowest_company_currency for r in data]}
+					{
+						"name": _("Lowest Projected Balance"),
+						"chartType": "bar",
+						"values": [r.lowest_company_currency for r in data],
+					},
+					{
+						"name": _("Minimum Balance"),
+						"chartType": "line",
+						"values": [r.minimum_company_currency for r in data],
+					},
 				],
 			},
-			"type": "bar",
-			"colors": ["#E24C4C"],
+			"type": "axis-mixed",
+			"colors": ["#5E64FF", "#E24C4C"],
 			"fieldtype": "Currency",
 			"options": self.company_currency,
 		}
@@ -128,7 +148,7 @@ class BankBalanceOutlook:
 		below_minimum = sum(1 for r in data if r.level == LEVELS[0])
 		below_warning = sum(1 for r in data if r.level == LEVELS[1])
 		total = flt(sum(r.current_company_currency for r in data), self.precision)
-		return [
+		cards = [
 			{
 				"value": below_minimum,
 				"label": _("Banks Below Minimum"),
@@ -149,3 +169,15 @@ class BankBalanceOutlook:
 				"indicator": "Blue",
 			},
 		]
+		# design 7e P20: the worst bank at a glance (in its own currency); hidden without a shortfall
+		worst = max(data, key=lambda r: flt(r.shortfall) * self.rate(r.currency), default=None)
+		if worst and flt(worst.shortfall) > 0:
+			cards.append(
+				{
+					"value": f"{worst.bank_account} · {fmt_money(worst.shortfall, currency=worst.currency)}",
+					"label": _("Largest Shortfall"),
+					"datatype": "Data",
+					"indicator": "Red",
+				}
+			)
+		return cards

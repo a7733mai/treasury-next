@@ -24,7 +24,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, fmt_money, formatdate, getdate, strip_html, today
 
-from treasury.balance_alerts.positions import epsilon, evaluate, get_thresholds
+from treasury.balance_alerts.positions import epsilon, evaluate, get_thresholds, horizon
 from treasury.bank_transfers import fees
 from treasury.pdc.report_utils import get_precision, report_today
 from treasury.utils.context import elevated, real_user
@@ -61,6 +61,12 @@ def _scheduler():
 	from treasury.balance_alerts import scheduler
 
 	return scheduler
+
+
+def _notify():
+	from treasury.balance_alerts import notify
+
+	return notify
 
 
 def _with_siblings(company: str, banks: list[str]) -> list[str]:
@@ -121,26 +127,81 @@ def breaches(pre: list, post: list) -> list[frappe._dict]:
 	return found
 
 
-def message_lines(doctype: str, name: str, found: list) -> list[str]:
-	lines = [_("Low projected balance after {0} {1}:").format(_(doctype), name)]
-	per_bank: dict[str, int] = {}
+def _grouped(found: list) -> list[tuple[list, int]]:
+	"""The breaches per bank, at most LINES_PER_BANK each: [(shown, number not shown)] in bank order."""
+	groups: dict[str, list] = {}
 	for item in found:
-		position, day = item.position, item.day
-		count = per_bank.get(position.bank_account, 0)
-		per_bank[position.bank_account] = count + 1
-		if count >= LINES_PER_BANK:
-			continue
-		currency = position.currency
-		lines.append(
-			_("{0}: {1} projected {2} (before: {3}), minimum {4}.").format(
-				position.bank_account,
-				formatdate(day.date),
-				fmt_money(day.closing, currency=currency),
-				fmt_money(item.pre_closing, currency=currency) if item.pre_closing is not None else "-",
-				fmt_money(position.minimum, currency=currency),
+		groups.setdefault(item.position.bank_account, []).append(item)
+	return [(items[:LINES_PER_BANK], max(len(items) - LINES_PER_BANK, 0)) for items in groups.values()]
+
+
+def _line_values(item, wrap) -> tuple:
+	position, day, currency = item.position, item.day, item.position.currency
+	pre = fmt_money(item.pre_closing, currency=currency) if item.pre_closing is not None else "-"
+	return (
+		wrap(position.bank_account, bold=True),
+		formatdate(day.date),
+		wrap(fmt_money(day.closing, currency=currency), bold=True),
+		wrap(pre),
+		wrap(fmt_money(position.minimum, currency=currency)),
+	)
+
+
+def message_lines(doctype: str, name: str, found: list) -> list[str]:
+	"""The plain text of the message (the override remarks): a head line, then up to LINES_PER_BANK lines per
+	bank `{bank}: {date} projected {post} (before: {pre}), minimum {min}.` and `+{n} more day(s)`."""
+	lines = [_("Low projected balance after {0} {1}:").format(_(doctype), name)]
+	for shown, more in _grouped(found):
+		for item in shown:
+			lines.append(
+				_("{0}: {1} projected {2} (before: {3}), minimum {4}.").format(
+					*_line_values(item, lambda value, bold=False: value)
+				)
 			)
-		)
+		if more:
+			lines.append(_("+{0} more day(s)").format(more))
 	return lines
+
+
+def message_html(doctype: str, name: str, found: list, snapshot) -> str:
+	"""The message shown to the user (design 7e §4.1): escaped, every name and amount in <bdi>, and a link to
+	the forecast of the first breached bank."""
+	esc = frappe.utils.escape_html
+
+	def wrap(value, bold=False):
+		text = f"<bdi>{esc(value)}</bdi>"
+		return f"<b>{text}</b>" if bold else text
+
+	head = _("Low projected balance after {0} {1}:").format(
+		f"<b>{esc(_(doctype))}", f"<bdi>{esc(name)}</bdi></b>"
+	)
+	items = []
+	for shown, more in _grouped(found):
+		for item in shown:
+			items.append(
+				"<li>{}</li>".format(
+					_("{0}: {1} projected {2} (before: {3}), minimum {4}.").format(*_line_values(item, wrap))
+				)
+			)
+		if more:
+			items.append(f'<li class="text-muted">{esc(_("+{0} more day(s)").format(more))}</li>')
+	bank = found[0].position.bank_account
+	route = _notify().forecast_route(snapshot.company, snapshot.today, horizon(), bank)
+	link = f'<p><a href="{esc(route)}">{esc(_("Open in Bank Position Forecast"))}</a></p>'
+	return f"<p>{head}</p><ul>{''.join(items)}</ul>{link}"
+
+
+def latest_override(doctype: str, name: str) -> frappe._dict | None:
+	"""{user, creation} of the latest low balance override of a document (the form's audit line, design 7e
+	P17); read without permission checks, only the user and the time are returned."""
+	rows = frappe.get_all(
+		"Treasury Alert Log",
+		filters={"alert_type": "Override", "reference_doctype": doctype, "reference_name": name},
+		fields=["user", "creation"],
+		order_by="creation desc",
+		limit=1,
+	)
+	return rows[0] if rows else None
 
 
 def finish(
@@ -155,16 +216,17 @@ def finish(
 	found = breaches(snapshot.pre, post)
 	text = None
 	if found:
-		lines = message_lines(doctype, name, found)
-		message = "<br>".join(lines)
+		message = message_html(doctype, name, found, snapshot)
 		title = _("Low Projected Balance")
 		if snapshot.mode != BLOCK or block_as_warn:
 			frappe.msgprint(message, title=title, indicator="orange")
 		elif cint(allow_override) and has_override_role():
-			text = strip_html("\n".join(lines))
+			# the remarks are prose in the acting user's language (design 7e §4.5)
+			text = strip_html("\n".join(message_lines(doctype, name, found)))
 			_record_override(snapshot, doctype, name, found[0], text)
+			recorded = _("Low balance override recorded: {0}").format(f"{_(doctype)} {name}")
 			frappe.msgprint(
-				_("Low balance override recorded.") + "<br>" + message, title=title, indicator="orange"
+				f"<p><b>{frappe.utils.escape_html(recorded)}</b></p>{message}", title=title, indicator="orange"
 			)
 		else:
 			hint = (
@@ -172,7 +234,8 @@ def finish(
 				if has_override_role()
 				else _("A Treasury Manager can override this block.")
 			)
-			frappe.throw(message + "<br><br>" + hint, LowBalanceError, title=title)
+			hint = f'<p class="text-muted">{frappe.utils.escape_html(hint)}</p>'
+			frappe.throw(message + hint, LowBalanceError, title=title)
 	_scheduler().enqueue_evaluation(snapshot.company)
 	return text
 

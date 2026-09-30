@@ -75,6 +75,8 @@ class FacilityRepayment(Document):
 	def onload(self):
 		if not self.is_new():
 			self.set_onload("voucher_summary", voucher_summary.render(self.doctype, [self.name]))
+			# design 7e P17: "Submitted with a low-balance override by ..." on the form
+			self.set_onload("low_balance_override", guard.latest_override(self.doctype, self.name))
 
 	def validate(self):
 		# on submit too: the submitted document comes from the client (it is recomputed in before_submit)
