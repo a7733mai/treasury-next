@@ -23,13 +23,9 @@ FILTERS_START = re.compile(r"\bfilters:\s*\[")
 FIELDNAME = re.compile(r"""\bfieldname:\s*["'](\w+)["']""")
 REQD = re.compile(r"\breqd:\s*(?:1|true)\b")
 DEFAULT = re.compile(r"\bdefault:\s*\S")
-COMPANY_DEFAULT = re.compile(
-	r"""\bdefault:\s*frappe\.defaults\.get_user_default\(\s*["']Company["']\s*\)"""
-)
+COMPANY_DEFAULT = re.compile(r"""\bdefault:\s*frappe\.defaults\.get_user_default\(\s*["']Company["']\s*\)""")
 COMPANY_REQUIRED = re.compile(r"validate_company\(\s*filters\.company")
-TOP_LEVEL_NAME = re.compile(
-	r"^(?:const|let|var|class|function|async function)\s+([A-Za-z_$][\w$]*)", re.M
-)
+TOP_LEVEL_NAME = re.compile(r"^(?:const|let|var|class|function|async function)\s+([A-Za-z_$][\w$]*)", re.M)
 # frappe.datetime.<x>(true) returns a JS Date, not a moment
 AS_DATE = re.compile(r"frappe\.datetime\.(?:now_datetime|now_time|system_datetime|now_date)\(\s*true\s*\)")
 MOMENT_CALL = r"\.(?:hours|minutes|seconds|format|add|subtract|diff|isBefore|isAfter)\("
