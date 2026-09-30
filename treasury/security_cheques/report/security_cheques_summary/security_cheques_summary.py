@@ -12,6 +12,8 @@ cancelled) are listed only when selected, in Closed Amount (a column shown only 
 status (Created) is counted, not summed. Held from others and given to others are never added together.
 """
 
+from itertools import pairwise
+
 import frappe
 from frappe import _
 from frappe.utils import cint, date_diff, flt, getdate
@@ -102,7 +104,7 @@ def parse_ranges(value) -> list[int]:
 	if not 1 <= len(parts) <= MAX_RANGES or not all(p.isdigit() for p in parts):
 		frappe.throw(error)
 	ranges = [int(p) for p in parts]
-	if ranges[0] <= 0 or any(b <= a for a, b in zip(ranges, ranges[1:], strict=False)):
+	if ranges[0] <= 0 or any(b <= a for a, b in pairwise(ranges)):
 		frappe.throw(error)
 	return ranges
 

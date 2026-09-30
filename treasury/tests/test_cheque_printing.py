@@ -50,7 +50,7 @@ CHEQUE = "PDC Cheque"
 BATCH = "Cheque Batch"
 LAYOUT = "Cheque Layout"
 ARABIC = re.compile(r"[؀-ۿ]")
-ARABIC_INDIC = re.compile(r"[٠-٩]")
+ARABIC_INDIC = re.compile(r"[٠-٩]")  # noqa: RUF001 (Arabic-Indic digits on purpose)
 WESTERN = re.compile(r"[0-9]")
 LAYOUT_VALUES = {
 	"nudge_x_mm": 1.5,

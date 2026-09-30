@@ -305,7 +305,7 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(fieldnames[0], "leaf_no")
 		self.assertFalse({"cheque_book", "bank_account", "book_no"} & set(fieldnames))
 		self.assertEqual(chart["type"], "percentage")
-		# unused, used – payment, used – security, cancelled, void
+		# unused, used - payment, used - security, cancelled, void
 		self.assertEqual(chart["data"]["datasets"][0]["values"], [7, 1, 1, 0, 1])
 		self.assertEqual(cards[-1]["indicator"], "Green")  # 7 left
 		self.assertEqual(
