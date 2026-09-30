@@ -419,6 +419,10 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		self.assertEqual(map_security("Employee", employee, company=OTHER_COMPANY)["company"], COMPANY)
 
 		# disabled / inactive masters get nothing (the buttons are hidden; the server refuses too)
+		# restore explicitly: the rollback does not reset the cached documents other tests read
+		status = frappe.db.get_value("Employee", employee, "status")
+		self.addCleanup(frappe.db.set_value, "Employee", employee, "status", status)
+		self.addCleanup(frappe.db.set_value, "Supplier", SUPPLIER, "disabled", 0)
 		frappe.db.set_value("Supplier", SUPPLIER, "disabled", 1)
 		frappe.db.set_value("Employee", employee, "status", "Left")
 		for mapper, doctype, name, status in (

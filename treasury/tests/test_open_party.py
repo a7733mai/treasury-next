@@ -211,6 +211,7 @@ class TestOpenParty(TreasuryTestMixin, IntegrationTestCase):
 		self.use_payee_group(group)
 		disabled = ensure_supplier(f"_Test Treasury Disabled Payee {self.tag}")
 		frappe.db.set_value("Supplier", disabled, "disabled", 1)
+		self.addCleanup(frappe.db.set_value, "Supplier", disabled, "disabled", 0)
 
 		for value in ("", "   ", "x" * 141, disabled):
 			with self.subTest(value=value[:20]):
