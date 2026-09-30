@@ -42,6 +42,13 @@
 			<td class="pdc-label">{{ _(doc.party_type) }}</td>
 			<td>{{ (doc.party_name or doc.party) | e }}</td>
 		</tr>
+		{#- the document the batch was created from and settles ("Created From") -#}
+		{% if doc.source_doctype and doc.source_name %}
+		<tr>
+			<td class="pdc-label">{{ _("Against", context="Cheque Batch") }}</td>
+			<td class="pdc-source">{{ _(doc.source_doctype) | e }} <bdi>{{ doc.source_name | e }}</bdi></td>
+		</tr>
+		{% endif %}
 		{% if doc.purpose %}
 		<tr>
 			<td class="pdc-label">{{ _("Purpose", context="Cheque Batch") }}</td>

@@ -26,7 +26,8 @@ frappe.ui.form.on("Security Cheque", {
 	onload(frm) {
 		if (frm.is_new() && !frm.doc.company) {
 			frm.set_value("company", frappe.defaults.get_user_default("Company"));
-		} else if (frm.is_new()) {
+		} else if (frm.is_new() && !(frm.doc.__treasury_from && frm.doc.currency)) {
+			// (a cheque opened by a Treasury button keeps its currency, e.g. the supplier quotation's)
 			// replace the user / site default currency Frappe puts in every new `currency` field
 			frm.events.set_currency(frm);
 		}
@@ -62,6 +63,7 @@ frappe.ui.form.on("Security Cheque", {
 		frm.events.lock_identity_fields(frm);
 		frm.events.translate_logs(frm);
 		frm.events.set_indicator(frm);
+		sec_set_source_intro(frm);
 		if (!frm.is_new()) {
 			frm.events.add_actions(frm);
 			frm.add_custom_button(__("Print Receipt"), () => {
@@ -257,6 +259,50 @@ frappe.ui.form.on("Security Cheque", {
 		}
 	},
 });
+
+function sec_set_source_intro(frm) {
+	// what is left to type on a new security cheque opened from a quotation, order or party (Treasury buttons
+	// of the ERPNext forms; `__treasury_from` / `__tender_bond` are client only and never saved)
+	const doc = frm.doc;
+	const from =
+		doc.__treasury_from ||
+		(doc.reference_doctype && doc.reference_name
+			? { doctype: doc.reference_doctype, name: doc.reference_name }
+			: null);
+	if (!frm.is_new() || !from || !from.doctype) {
+		frm.set_intro();
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const bond = doc.__tender_bond;
+	let text;
+	if (flt(doc.amount) && bond) {
+		const args = [
+			esc(String(flt(bond.percent))),
+			`<bdi>${esc(format_currency(bond.base, bond.currency))}</bdi>`,
+			`<bdi>${esc(format_currency(doc.amount, doc.currency))}</bdi>`,
+		];
+		// the supplier gives us the cheque: its number is on the paper; ours comes from the cheque book
+		text =
+			doc.direction === "Incoming"
+				? __("Tender bond {0}% of {1}: {2}. Type the cheque number and save.", args)
+				: __("Tender bond {0}% of {1}: {2}. Check and save.", args);
+	} else {
+		text = esc(__("Type the amount of the security cheque and save."));
+		if (["Quotation", "Supplier Quotation"].includes(from.doctype)) {
+			text += ` ${esc(__("Tip: set Tender Bond % in Treasury Company Settings."))}`;
+		}
+	}
+	if (from.doctype === "Sales Order" && doc.direction === "Outgoing") {
+		text += `<br><span class="text-muted">${esc(
+			__(
+				"Outgoing: we give this cheque to the customer as a performance bond. If the customer gives you a cheque, change Direction to Incoming."
+			)
+		)}</span>`;
+	}
+	// the values are escaped above; the sentences are our own translations
+	frm.set_intro(text, "blue");
+}
 
 function sec_action(frm, method, label, fields) {
 	frm.add_custom_button(

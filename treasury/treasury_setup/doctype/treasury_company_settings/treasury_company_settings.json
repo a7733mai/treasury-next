@@ -310,6 +310,9 @@
    "options": "Bank Transfer Limit"
   },
   {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.default_outgoing_cheque_bank_account",
+   "description": "Defaults for the Treasury buttons on invoices, orders, quotations, journal entries, expense claims and parties.",
    "fieldname": "documents_section",
    "fieldtype": "Section Break",
    "label": "Pay / Receive from Documents"
@@ -348,6 +351,7 @@
   },
   {
    "default": "Monthly",
+   "description": "Used for Installment Cheques created from documents.",
    "fieldname": "default_installment_frequency",
    "fieldtype": "Select",
    "label": "Default Installment Frequency",
@@ -374,7 +378,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-01 12:00:00.000000",
+ "modified": "2026-10-02 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

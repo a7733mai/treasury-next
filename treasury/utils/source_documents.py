@@ -8,6 +8,8 @@ covered by open cheques or scheduled transfers, and the defaults (bank, cheque b
 details) a new document gets from it. Nothing here writes.
 """
 
+from contextlib import contextmanager
+
 import erpnext
 import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
@@ -44,6 +46,29 @@ DEFAULT_CHEQUE_BANK_FIELDS = {
 	OUTGOING: "default_outgoing_cheque_bank_account",
 	INCOMING: "default_incoming_cheque_bank_account",
 }
+
+
+class TreasuryPartyAccountError(frappe.ValidationError):
+	"""The source is booked on another account than the party's default one (F12). The Treasury buttons
+	(public/js/treasury_payment_buttons.js) recognise it by its name (`exc_type`) to point to ERPNext's own
+	payment button."""
+
+
+@contextmanager
+def treasury_refusals():
+	"""The refusals of a mapper carry the title "Treasury" (not Frappe's default "Message"), so the user sees
+	at once who refused. Messages with a title of their own ("Not Permitted" ...) keep it."""
+	start = len(frappe.local.message_log)
+	try:
+		yield
+	except frappe.ValidationError:
+		default = _("Message", context="Default title of the message dialog")
+		for message in frappe.local.message_log[start:]:
+			if not isinstance(message, dict) or not message.get("raise_exception"):
+				continue
+			if message.get("title") in (None, default):
+				message["title"] = _("Treasury")
+		raise
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +247,8 @@ def _check_party_account(source, info: frappe._dict):
 				_(info.party_type),
 				frappe.bold(info.party),
 				frappe.bold(default_account or "-"),
-			)
+			),
+			TreasuryPartyAccountError,
 		)
 
 

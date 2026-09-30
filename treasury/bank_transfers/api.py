@@ -63,6 +63,11 @@ def make_bank_transfer(
 	hrms document, or for a party master (no amount). `company`: for a party master (default: the user's
 	default company); a document's own company always wins. `party_type` / `party`: the party row of a
 	Journal Entry with several open parties."""
+	with sd.treasury_refusals():
+		return _make_bank_transfer(source_doctype, source_name, method, company, party_type, party)
+
+
+def _make_bank_transfer(source_doctype, source_name, method, company, party_type, party) -> dict:
 	frappe.has_permission(DOCTYPE, "create", throw=True)
 	if source_doctype not in SOURCES:
 		frappe.throw(_("Bank Transfer cannot be created from {0}.").format(_(source_doctype or "-")))

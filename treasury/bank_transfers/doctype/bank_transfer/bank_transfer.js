@@ -79,6 +79,8 @@ const bt_handlers = {
 		bt_render_vouchers(frm);
 		bt_headline(frm, null);
 		frm.set_intro();
+		// vouchers are created by posting only: no "+" beside them in Connections
+		frm.can_make_methods = { "Payment Entry": () => false, "Journal Entry": () => false };
 		if (frm.doc.docstatus === 0) {
 			frm._bt_result = null;
 			bt_render_all(frm);
@@ -370,7 +372,8 @@ function bt_company_currency(frm) {
 function bt_apply_defaults(frm, is_new) {
 	// minimum entry: method, bank and charge bearer from Treasury Company Settings
 	const settings = frm._bt_settings || {};
-	const untouched = is_new && !frm.doc.bank_account;
+	// a transfer opened by a Treasury button keeps the method the user clicked (e.g. Fawran)
+	const untouched = is_new && !frm.doc.bank_account && !frm.doc.__treasury_from;
 	const values = {};
 	if (untouched && settings.default_transfer_method && frm.doc.method !== settings.default_transfer_method) {
 		values.method = settings.default_transfer_method;
@@ -861,9 +864,38 @@ function bt_set_draft_headline(frm) {
 	bt_headline(frm, blocks.length ? blocks.join("") : null, color);
 }
 
+function bt_set_source_intro(frm) {
+	// a new transfer opened from a document or a party (Treasury buttons of the ERPNext forms,
+	// public/js/treasury_payment_buttons.js; `__treasury_from` is client only and never saved)
+	const doc = frm.doc;
+	const ref = (doc.references || [])[0];
+	const from =
+		doc.__treasury_from ||
+		(ref && ref.reference_doctype && ref.reference_name
+			? { doctype: ref.reference_doctype, name: ref.reference_name }
+			: null);
+	if (!from || !from.doctype || !from.name) {
+		frm.set_intro();
+		return;
+	}
+	const route = `/app/${frappe.router.slug(from.doctype)}/${encodeURIComponent(from.name)}`;
+	const link = `<a href="${route}">${bt_esc(__(from.doctype))} <b><bdi>${bt_esc(from.name)}</bdi></b></a>`;
+	// the values are escaped; the sentences are our own translations
+	if (!ref && !flt(doc.amount)) {
+		frm.set_intro(__("For {0}: type the amount, then save.", [link]), "blue");
+		return;
+	}
+	const amount = bt_money(doc.amount, doc.currency);
+	frm.set_intro(__("From {0}: {1}. Check and save; Submit sends it.", [link, amount]), "blue");
+}
+
 function bt_set_intro(frm) {
 	// what Submit will do, on a saved and unchanged draft
 	const doc = frm.doc;
+	if (frm.is_new() && doc.docstatus === 0) {
+		bt_set_source_intro(frm);
+		return;
+	}
 	if (frm.is_new() || frm.is_dirty() || doc.docstatus !== 0 || !flt(doc.amount) || !doc.execution_date) {
 		frm.set_intro();
 		return;

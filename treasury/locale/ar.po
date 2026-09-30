@@ -8762,7 +8762,7 @@ msgstr "نوع المستند المصدر"
 
 msgctxt "Cheque Batch"
 msgid "Created From"
-msgstr "أُنشئت من"
+msgstr "أُنشئ من"
 
 msgid "Generate Cheques allocates the cheques to this document."
 msgstr "يخصص زر إنشاء الشيكات الشيكات لهذا المستند."
@@ -8850,10 +8850,10 @@ msgid "Facility"
 msgstr "التسهيل"
 
 msgid "Pay by Cheque"
-msgstr "الدفع بشيك"
+msgstr "سداد بشيك"
 
 msgid "Receive by Cheque"
-msgstr "التحصيل بشيك"
+msgstr "تحصيل بشيك"
 
 msgctxt "Treasury"
 msgid "Cheque"
@@ -8879,3 +8879,119 @@ msgstr "تم التخصيص إلى {0}: {1}"
 
 msgid "You have unsaved changes in this form. Please save before you continue."
 msgstr "لديك تغييرات غير محفوظة في هذا النموذج. يرجى الحفظ قبل المتابعة."
+
+# Phase 7c UX — Treasury buttons, "what to type" intros, tender bonds, Cheque Batch source, settings
+msgid "Preparing {0}…"
+msgstr "جارٍ تجهيز {0}…"
+
+msgid "Security Cheque (Performance Bond)"
+msgstr "شيك ضمان (حسن تنفيذ)"
+
+msgid "Security Cheque (Received)"
+msgstr "شيك ضمان (وارد)"
+
+msgid "Security Cheque (Custody)"
+msgstr "شيك ضمان (عهدة)"
+
+msgctxt "Treasury"
+msgid "Continue"
+msgstr "متابعة"
+
+msgid "Not listed (settle from ERPNext): {0}"
+msgstr "غير مدرج (تتم تسويته من ERPNext): {0}"
+
+msgid "Use Create ▸ Payment on this form."
+msgstr "استخدم إنشاء ◂ دفعة في هذا النموذج."
+
+msgid "Tender bond: {0} · {1} · {2} · expires {3}"
+msgstr "تأمين ابتدائي: {0} · {1} · {2} · ينتهي في {3}"
+
+msgid "Tender bond: {0} · {1} · {2}"
+msgstr "تأمين ابتدائي: {0} · {1} · {2}"
+
+msgid "+{0} more"
+msgstr "و{0} أخرى"
+
+msgid "Outgoing cheques created from documents will need a cheque book chosen by hand."
+msgstr "الشيكات الصادرة المنشأة من المستندات ستحتاج إلى اختيار دفتر الشيكات يدوياً."
+
+msgid "Defaults for the Treasury buttons on invoices, orders, quotations, journal entries, expense claims and parties."
+msgstr "القيم الافتراضية لأزرار الخزينة في الفواتير والأوامر وعروض الأسعار وقيود اليومية ومطالبات المصروفات والأطراف."
+
+msgid "Used for Installment Cheques created from documents."
+msgstr "تُستخدم لشيكات الأقساط المنشأة من المستندات."
+
+msgctxt "Treasury Company Settings"
+msgid "Every 2 Months"
+msgstr "كل شهرين"
+
+msgctxt "Treasury Company Settings"
+msgid "Semi-Annually"
+msgstr "نصف سنوي"
+
+msgid "Created From {0}"
+msgstr "أُنشئ من {0}"
+
+msgid "Created from {0}"
+msgstr "أُنشئ من {0}"
+
+msgid "Created from {0}. Generate Cheques allocates the cheques to it in due-date order; cheques beyond its outstanding stay advances."
+msgstr "أُنشئ من {0}. يخصص \"توليد الشيكات\" الشيكات له حسب ترتيب الاستحقاق، وما زاد عن المستحق يبقى دفعة مقدمة."
+
+msgid "From {0}: {1} cheques generated and allocated to it. Check the rows and save."
+msgstr "من {0}: تم توليد {1} شيك وتخصيصها له. راجع الصفوف واحفظ."
+
+msgid "From {0}: type the First Cheque No, then click Generate Cheques."
+msgstr "من {0}: أدخل رقم أول شيك ثم اضغط \"توليد الشيكات\"."
+
+msgid "For {0}: type the Total Amount to Split, then click Generate Cheques."
+msgstr "لـ {0}: أدخل الإجمالي المطلوب تقسيمه ثم اضغط \"توليد الشيكات\"."
+
+msgid "For {0}: type the Total Amount to Split and the First Cheque No, then click Generate Cheques."
+msgstr "لـ {0}: أدخل الإجمالي المطلوب تقسيمه ورقم أول شيك ثم اضغط \"توليد الشيكات\"."
+
+msgid "The batch is no longer linked to {0}."
+msgstr "لم يعد السند مرتبطاً بـ {0}."
+
+msgctxt "Cheque Batch"
+msgid "Against"
+msgstr "مقابل"
+
+msgid "From {0}: {1}. Check the due date and save; the cheque number is taken from cheque book {2}."
+msgstr "من {0}: {1}. راجع تاريخ الاستحقاق واحفظ؛ يؤخذ رقم الشيك من دفتر الشيكات {2}."
+
+msgid "From {0}: {1}. Type the cheque number and save."
+msgstr "من {0}: {1}. أدخل رقم الشيك واحفظ."
+
+msgid "From {0}: {1}. Choose the bank account and type the cheque number."
+msgstr "من {0}: {1}. اختر الحساب البنكي وأدخل رقم الشيك."
+
+msgid "Tip: set \"Default Bank (Outgoing Cheques)\" in Treasury Company Settings."
+msgstr "تلميح: حدد \"البنك الافتراضي (الشيكات الصادرة)\" في إعدادات الخزينة للشركة."
+
+msgid "From {0}: {1}. Type the cheque number (and the due date if it differs), then save."
+msgstr "من {0}: {1}. أدخل رقم الشيك (وتاريخ الاستحقاق إن اختلف) ثم احفظ."
+
+msgid "For {0}: type the amount and the cheque number, then save. The cheque is an advance (not allocated)."
+msgstr "لـ {0}: أدخل المبلغ ورقم الشيك ثم احفظ. الشيك دفعة مقدمة (غير مخصص)."
+
+msgid "From {0}: {1}. Check and save; Submit sends it."
+msgstr "من {0}: {1}. راجع واحفظ؛ الاعتماد يرسل التحويل."
+
+msgid "For {0}: type the amount, then save."
+msgstr "لـ {0}: أدخل المبلغ ثم احفظ."
+
+msgid "Tender bond {0}% of {1}: {2}. Check and save."
+msgstr "تأمين ابتدائي {0}% من {1}: {2}. راجع واحفظ."
+
+msgid "Tender bond {0}% of {1}: {2}. Type the cheque number and save."
+msgstr "تأمين ابتدائي {0}% من {1}: {2}. أدخل رقم الشيك واحفظ."
+
+msgid "Type the amount of the security cheque and save."
+msgstr "أدخل مبلغ شيك الضمان واحفظ."
+
+msgid "Tip: set Tender Bond % in Treasury Company Settings."
+msgstr "تلميح: حدد \"نسبة التأمين الابتدائي %\" في إعدادات الخزينة للشركة."
+
+msgid "Outgoing: we give this cheque to the customer as a performance bond. If the customer gives you a cheque, change Direction to Incoming."
+msgstr "صادر: نسلّم هذا الشيك للعميل كضمان حسن تنفيذ. إذا كان العميل هو من يسلّمك الشيك فغيّر الاتجاه إلى وارد."

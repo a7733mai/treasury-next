@@ -38,6 +38,11 @@ def make_pdc_cheque(
 	"""A new PDC Cheque (not inserted) settling the rest of an invoice / order / Journal Entry / hrms document,
 	or for a party master (no amount). `company`: for a party master (default: the user's default company).
 	`party_type` / `party`: the party row of a Journal Entry with several open parties."""
+	with sd.treasury_refusals():
+		return _make_pdc_cheque(source_doctype, source_name, company, party_type, party)
+
+
+def _make_pdc_cheque(source_doctype, source_name, company, party_type, party) -> dict:
 	source, info, party_currency = _prepare(CHEQUE, source_doctype, source_name, company, party_type, party)
 	doc = frappe.new_doc(CHEQUE)
 	doc.naming_series = CHEQUE_NAMING_SERIES[info.direction]
@@ -73,6 +78,11 @@ def make_cheque_batch(
 	remembers its source ("Created From") and Generate Cheques allocates the cheques to it. An outgoing batch
 	drawn on a cheque book gets its rows right away; otherwise the user types the first cheque number and
 	clicks Generate Cheques."""
+	with sd.treasury_refusals():
+		return _make_cheque_batch(source_doctype, source_name, company, party_type, party)
+
+
+def _make_cheque_batch(source_doctype, source_name, company, party_type, party) -> dict:
 	source, info, party_currency = _prepare(BATCH, source_doctype, source_name, company, party_type, party)
 	settings = posting.get_company_settings(info.company)
 	count = min(cint(settings.get("default_installment_count")) or DEFAULT_INSTALLMENTS, batch.MAX_ROWS)

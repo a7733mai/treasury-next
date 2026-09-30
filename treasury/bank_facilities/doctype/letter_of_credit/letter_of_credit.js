@@ -34,6 +34,8 @@ frappe.ui.form.on("Letter of Credit", {
 	},
 
 	refresh(frm) {
+		// vouchers are created by posting only: no "+" beside them in Connections
+		frm.can_make_methods = { "Payment Entry": () => false, "Journal Entry": () => false };
 		// server-rendered, escaped summary (treasury.utils.voucher_summary)
 		frm.get_field("vouchers_html").$wrapper.html((frm.doc.__onload && frm.doc.__onload.voucher_summary) || "");
 		lc_translate_log(frm);

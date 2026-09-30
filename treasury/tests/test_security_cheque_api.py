@@ -68,6 +68,9 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 			("Outgoing", "Tender", "Customer", CUSTOMER),
 		)
 		self.assertEqual((flt(values["amount"]), flt(values["required_amount"])), (5000, 5000))
+		# how the amount was computed, for the intro of the form (client only, never saved)
+		bond = values["__tender_bond"]
+		self.assertEqual((flt(bond["percent"]), flt(bond["base"]), bond["currency"]), (5, 100000, "EGP"))
 		self.assertEqual(getdate(values["expiry_date"]), getdate(quotation.valid_till))
 		self.assertEqual((values["reference_doctype"], values["reference_name"]), ("Quotation", quotation.name))
 		self.assertEqual(
@@ -113,6 +116,7 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 				self.assertEqual(values["company"], COMPANY)
 				# tender_bond_percent = 0: the user enters the amount
 				self.assertFalse(flt(values.get("amount")))
+				self.assertNotIn("__tender_bond", values)
 				master = doctype in ("Customer", "Supplier", "Employee")
 				self.assertEqual(values.get("reference_name"), None if master else name)
 				if direction == "Incoming":
@@ -122,8 +126,11 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 	def test_cancelled_and_permissions(self):
 		quotation = make_quotation(1000, submit=True)
 		quotation.cancel()
+		frappe.local.message_log = []
 		with self.assertRaisesRegex(frappe.ValidationError, "is cancelled"):
 			map_security("Quotation", quotation.name)
+		# the refusal dialog says Treasury refused (not Frappe's default "Message" title)
+		self.assertEqual(frappe.local.message_log[-1].get("title"), frappe._("Treasury"))
 		with self.assertRaisesRegex(frappe.ValidationError, "cannot be created from"):
 			map_security("Sales Invoice", "X")
 

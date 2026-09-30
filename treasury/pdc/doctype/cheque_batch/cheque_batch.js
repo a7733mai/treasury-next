@@ -88,6 +88,8 @@ frappe.ui.form.on("Cheque Batch", {
 	refresh(frm) {
 		frm.events.set_labels(frm);
 		frm.events.set_party_label(frm);
+		frm.events.set_source_label(frm);
+		frm.events.set_source_intro(frm);
 		frm.events.render_dashboard(frm);
 		frm.events.render_payment_entries(frm);
 		cheque_batch_toggle_new_payee(frm);
@@ -123,6 +125,7 @@ frappe.ui.form.on("Cheque Batch", {
 	},
 
 	company(frm) {
+		cheque_batch_unlink_source(frm);
 		frm.events.fetch_posting_mode(frm);
 	},
 
@@ -136,7 +139,53 @@ frappe.ui.form.on("Cheque Batch", {
 		// the server defaults them again for the new party on save
 		frm.set_value("party_bank_account", "");
 		frm.set_value("contact_person", "");
+		cheque_batch_unlink_source(frm);
 		cheque_batch_toggle_new_payee(frm);
+	},
+
+	set_source_label(frm) {
+		// one readable row: "Created From Purchase Invoice" (the type field itself is hidden)
+		const label = frm.doc.source_doctype
+			? __("Created From {0}", [__(frm.doc.source_doctype)])
+			: __("Created From", null, CHEQUE_BATCH_CTX);
+		frm.set_df_property("source_name", "label", frappe.utils.escape_html(label));
+	},
+
+	set_source_intro(frm) {
+		// what is left to type on a batch opened from a document (Treasury buttons) or created from one
+		const doc = frm.doc;
+		const from = cheque_batch_from(frm);
+		if (doc.docstatus !== 0 || !from) {
+			frm.set_intro();
+			return;
+		}
+		const rows = (doc.cheques || []).length;
+		const link = cheque_batch_link(from.doctype, from.name);
+		let text;
+		if (!frm.is_new()) {
+			if (rows || !doc.source_name) {
+				frm.set_intro();
+				return;
+			}
+			text = __(
+				"Created from {0}. Generate Cheques allocates the cheques to it in due-date order; cheques beyond its outstanding stay advances.",
+				[link]
+			);
+		} else if (!doc.source_name) {
+			// a party master: an on-account batch, the amounts are the user's
+			text =
+				doc.direction === "Outgoing" && doc.cheque_book
+					? __("For {0}: type the Total Amount to Split, then click Generate Cheques.", [link])
+					: __("For {0}: type the Total Amount to Split and the First Cheque No, then click Generate Cheques.", [
+							link,
+					  ]);
+		} else if (rows) {
+			text = __("From {0}: {1} cheques generated and allocated to it. Check the rows and save.", [link, rows]);
+		} else {
+			text = __("From {0}: type the First Cheque No, then click Generate Cheques.", [link]);
+		}
+		// the link is escaped (cheque_batch_link); the sentences are our own translations
+		frm.set_intro(text, "blue");
 	},
 
 	set_party_label(frm) {
@@ -189,15 +238,19 @@ frappe.ui.form.on("Cheque Batch", {
 							indicator: "blue",
 						});
 					}
-					if (r.message && r.message.allocated !== undefined && frm.doc.source_name) {
-						frappe.show_alert({
-							message: __("Allocated to {0}: {1}", [
-								frm.doc.source_name,
-								format_currency(r.message.allocated, frm.doc.currency),
-							]),
-							indicator: r.message.allocated ? "green" : "orange",
-						});
+					// nothing allocated (other currency): the server's own message says why
+					const allocated = flt(r.message && r.message.allocated);
+					if (allocated > 0 && frm.doc.source_name) {
+						const esc = frappe.utils.escape_html;
+						const money = (value) => esc(format_currency(value, frm.doc.currency));
+						const unallocated = flt(flt(r.message.total_amount) - allocated, precision("total_amount", frm.doc));
+						let message = __("Allocated to {0}: {1}", [esc(frm.doc.source_name), money(allocated)]);
+						if (unallocated > 0) {
+							message += ` · ${esc(__("Unallocated (advance)"))}: ${money(unallocated)}`;
+						}
+						frappe.show_alert({ message, indicator: unallocated > 0 ? "blue" : "green" });
 					}
+					frm.events.set_source_intro(frm);
 				});
 			if ((frm.doc.cheques || []).length) {
 				frappe.confirm(__("Replace the {0} existing rows?", [frm.doc.cheques.length]), generate);
@@ -388,18 +441,23 @@ frappe.ui.form.on("Cheque Batch", {
 		const cheques = ((frm.doc.__onload && frm.doc.__onload.cheques) || []).filter(
 			(c) => !CHEQUE_BATCH_RELEASED.includes(c.operational_status)
 		);
+		const esc = frappe.utils.escape_html;
+		// "Created from <document>": built from escaped parts so that the link survives
+		const source =
+			frm.doc.source_doctype && frm.doc.source_name
+				? __("Created from {0}", [cheque_batch_link(frm.doc.source_doctype, frm.doc.source_name)])
+				: "";
 		if (!cheques.length) {
 			field.$wrapper.html("");
+			source && frm.dashboard.set_headline(source, "blue");
 			return;
 		}
-		const esc = frappe.utils.escape_html;
 		const posted = cheques.filter((c) => c.party_payment_entry);
+		const posted_text = esc(
+			__("Payment Entries: {0}", [__("{0} of {1} cheques posted", [posted.length, cheques.length])])
+		);
 		frm.dashboard.set_headline(
-			esc(
-				__("Payment Entries: {0}", [
-					__("{0} of {1} cheques posted", [posted.length, cheques.length]),
-				])
-			),
+			source ? `${source} · ${posted_text}` : posted_text,
 			posted.length === cheques.length ? "green" : "blue"
 		);
 		const pe_link = (name) =>
@@ -444,6 +502,45 @@ frappe.ui.form.on("Cheque Batch", {
 		});
 	},
 });
+
+function cheque_batch_link(doctype, name) {
+	// "<Purchase Invoice> <ACC-PINV-...>" as a link to the document (escaped)
+	const esc = frappe.utils.escape_html;
+	const route = `/app/${frappe.router.slug(doctype)}/${encodeURIComponent(name)}`;
+	return `<a href="${route}">${esc(__(doctype))} <b><bdi>${esc(name)}</bdi></b></a>`;
+}
+
+function cheque_batch_from(frm) {
+	// the document the batch comes from: its source, or the party master a Treasury button was clicked on
+	// (`__treasury_from`: set on the unsaved document by public/js/treasury_payment_buttons.js, never saved)
+	const doc = frm.doc;
+	if (doc.source_doctype && doc.source_name) {
+		return { doctype: doc.source_doctype, name: doc.source_name };
+	}
+	const from = frm.is_new() && doc.__treasury_from;
+	return from && from.doctype && from.name ? from : null;
+}
+
+function cheque_batch_unlink_source(frm) {
+	// a draft whose party or company changes no longer settles its source: say so now, not on save
+	const doc = frm.doc;
+	if (doc.__treasury_from) {
+		delete doc.__treasury_from;
+		frm.events.set_source_intro(frm);
+	}
+	if (doc.docstatus !== 0 || !doc.source_name) {
+		return;
+	}
+	const label = `${__(doc.source_doctype || "")} ${doc.source_name}`.trim();
+	frm.set_value({ source_doctype: "", source_name: "" }).then(() => {
+		frm.events.set_source_label(frm);
+		frm.events.set_source_intro(frm);
+	});
+	frappe.show_alert({
+		message: __("The batch is no longer linked to {0}.", [frappe.utils.escape_html(label)]),
+		indicator: "orange",
+	});
+}
 
 function cheque_batch_toggle_new_payee(frm) {
 	// "+ New Payee" under the party field of a draft batch (treasury.utils.party.create_payee)

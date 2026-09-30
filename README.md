@@ -561,6 +561,15 @@ only (the server checks the permissions and the document again).
   Employee Advance booked on another account (e.g. an employee advance account) is refused ("Settle it from
   ERPNext"). With *Book Advance Payments in Separate Party Account*, order advances are posted as in 1.0 (on
   the default party account).
+- **On screen**: the labels say the direction (*Pay by Cheque* / *Receive by Cheque*; on a Journal Entry
+  they follow its open parties, and the group is hidden when nothing is left to settle) and the kind of bond
+  (*Security Cheque (Tender Bond / Performance Bond / Received / Custody)*). The opened document shows in a
+  blue intro what is left to type (the cheque number, the amount of an advance, the First Cheque No of a
+  batch ...). A quotation lists its tender bonds under its dashboard. Refusals come in a dialog titled
+  *Treasury*. The "+" of the Treasury connections runs the same buttons; there is none beside vouchers or
+  facility instruments (they are only created by posting). A batch's *Created From* shows as one row, is
+  printed as *Against* on the Cheque Batch Receipt, and is dropped (with an alert) when the draft's party or
+  company changes.
 
 **Connections**: those documents (and Payment Entry, Journal Entry, Bank Account) show a *Treasury* group in
 their Connections with the cheques, batches, transfers, security cheques (and on a Bank Account the facility

@@ -58,15 +58,17 @@ frappe.ui.form.on("Treasury Company Settings", {
 		["default_normal_bank_account", "default_fawran_bank_account", "default_swift_bank_account"].forEach(
 			(fieldname) => frm.set_query(fieldname, company_bank)
 		);
-		// Pay / receive from documents: banks with a PDC Accounts row
+		// Pay / receive from documents: banks with a PDC Accounts row (mirrors validate_document_settings);
+		// without any row, every company bank is offered and the server message explains the rule
 		["default_outgoing_cheque_bank_account", "default_incoming_cheque_bank_account"].forEach((fieldname) =>
-			frm.set_query(fieldname, () => ({
-				filters: {
-					company: frm.doc.company,
-					is_company_account: 1,
-					name: ["in", (frm.doc.pdc_accounts || []).map((row) => row.bank_account).filter(Boolean)],
-				},
-			}))
+			frm.set_query(fieldname, () => {
+				const filters = { company: frm.doc.company, is_company_account: 1 };
+				const mapped = (frm.doc.pdc_accounts || []).map((row) => row.bank_account).filter(Boolean);
+				if (mapped.length) {
+					filters.name = ["in", mapped];
+				}
+				return { filters };
+			})
 		);
 		frm.set_query("bank_account", "transfer_fee_rules", company_bank);
 		frm.set_query("bank_account", "transfer_limits", company_bank);
@@ -83,6 +85,15 @@ frappe.ui.form.on("Treasury Company Settings", {
 		frm.events.render_transfer_fees_help(frm);
 		frm.events.format_transfer_grids(frm);
 		frm.events.add_transfer_buttons(frm);
+	},
+
+	auto_select_cheque_book(frm) {
+		if (!frm.doc.auto_select_cheque_book) {
+			frappe.show_alert({
+				message: __("Outgoing cheques created from documents will need a cheque book chosen by hand."),
+				indicator: "blue",
+			});
+		}
 	},
 
 	transfer_completion(frm) {

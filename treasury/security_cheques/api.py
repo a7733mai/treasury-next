@@ -33,7 +33,15 @@ QUOTATIONS = ("Quotation", "Supplier Quotation")
 @frappe.whitelist()
 def make_security_cheque(source_doctype: str, source_name: str, company: str | None = None) -> dict:
 	"""A new Security Cheque (not inserted) guaranteeing a quotation / order, or held for a party master.
-	`company`: for a party master (default: the user's default company); a document's own company wins."""
+	`company`: for a party master (default: the user's default company); a document's own company wins.
+
+	When the amount is the Tender Bond % of the source's grand total, the result also carries
+	`__tender_bond` = {percent, base, currency}: the form explains the amount with it (client only)."""
+	with sd.treasury_refusals():
+		return _make_security_cheque(source_doctype, source_name, company)
+
+
+def _make_security_cheque(source_doctype: str, source_name: str, company: str | None) -> dict:
 	frappe.has_permission(DOCTYPE, "create", throw=True)
 	if source_doctype not in SOURCES:
 		frappe.throw(_("{0} cannot be created from {1}.").format(_(DOCTYPE), _(source_doctype or "-")))
@@ -71,12 +79,16 @@ def make_security_cheque(source_doctype: str, source_name: str, company: str | N
 		doc.currency = source.get("currency") if source.meta.has_field("grand_total") else None
 		doc.currency = doc.currency or company_currency
 
+	tender_bond = None
 	if source_doctype not in sd.PARTY_MASTERS:
 		doc.reference_doctype, doc.reference_name = source_doctype, source_name
 		label = _("Tender bond for {0} {1}") if purpose == TENDER else _("Guarantee for {0} {1}")
 		doc.remarks = label.format(_(source_doctype), source_name)
-		_set_amount(doc, source, flt(settings.get("tender_bond_percent")), company_currency)
-	return sd.mark_new(doc)
+		tender_bond = _set_amount(doc, source, flt(settings.get("tender_bond_percent")), company_currency)
+	values = sd.mark_new(doc)
+	if tender_bond:
+		values["__tender_bond"] = tender_bond
+	return values
 
 
 def _set_party(doc, source):
@@ -90,16 +102,19 @@ def _set_party(doc, source):
 	doc.party = source.get(party_field) if party_field else source.name
 
 
-def _set_amount(doc, source, percent: float, company_currency: str):
-	"""`percent` of the source's grand total, in the cheque currency (none when it cannot be expressed)."""
+def _set_amount(doc, source, percent: float, company_currency: str) -> dict | None:
+	"""`percent` of the source's grand total, in the cheque currency (none when it cannot be expressed).
+	Returns {percent, base, currency} when the amount was set."""
 	if percent <= 0 or not source.meta.has_field("grand_total"):
-		return
+		return None
 	if doc.currency == source.get("currency"):
 		base = flt(source.grand_total)
 	elif doc.currency == company_currency:
 		base = flt(source.get("base_grand_total"))
 	else:
-		return
+		return None
 	amount = flt(base * percent / 100, frappe.get_precision(DOCTYPE, "amount") or 2)
-	if amount > 0:
-		doc.amount = doc.required_amount = amount
+	if amount <= 0:
+		return None
+	doc.amount = doc.required_amount = amount
+	return {"percent": percent, "base": base, "currency": doc.currency}

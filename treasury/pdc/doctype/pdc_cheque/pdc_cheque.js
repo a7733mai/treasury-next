@@ -62,7 +62,10 @@ frappe.ui.form.on("PDC Cheque", {
 		frm.events.render_vouchers(frm);
 		frm.events.set_payment_entry_headline(frm);
 		frm.events.set_indicator(frm);
+		pdc_set_source_intro(frm);
 		pdc_toggle_new_payee(frm);
+		// vouchers are created by posting only: no "+" beside them in Connections
+		frm.can_make_methods = { "Payment Entry": () => false, "Journal Entry": () => false };
 		if (!frm.is_new()) {
 			frm.events.add_actions(frm);
 			frm.events.add_print_buttons(frm);
@@ -153,10 +156,12 @@ frappe.ui.form.on("PDC Cheque", {
 
 	bank_account(frm) {
 		frm.set_value("cheque_book", "");
+		pdc_set_source_intro(frm);
 	},
 
 	cheque_book(frm) {
 		frm.events.set_labels(frm);
+		pdc_set_source_intro(frm);
 	},
 
 	set_labels(frm) {
@@ -446,6 +451,70 @@ function pdc_dimension_fields(frm) {
 		}
 	}
 	return fieldnames;
+}
+
+const PDC_PARTY_MASTERS = ["Customer", "Supplier", "Employee"];
+
+function pdc_source_link(doctype, name) {
+	// "<Purchase Invoice> <ACC-PINV-...>" as a link to the document (escaped)
+	const esc = frappe.utils.escape_html;
+	const route = `/app/${frappe.router.slug(doctype)}/${encodeURIComponent(name)}`;
+	return `<a href="${route}">${esc(__(doctype))} <b><bdi>${esc(name)}</bdi></b></a>`;
+}
+
+function pdc_set_source_intro(frm) {
+	// what is left to type on a new cheque opened from a document or a party (Treasury buttons of the ERPNext
+	// forms, public/js/treasury_payment_buttons.js; `__treasury_from` is client only and never saved)
+	const doc = frm.doc;
+	const ref = (doc.references || [])[0];
+	const from =
+		doc.__treasury_from ||
+		(ref && ref.reference_doctype && ref.reference_name
+			? { doctype: ref.reference_doctype, name: ref.reference_name }
+			: null);
+	if (!frm.is_new() || !from || !from.doctype || !from.name) {
+		frm.set_intro();
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const link = pdc_source_link(from.doctype, from.name);
+	if (PDC_PARTY_MASTERS.includes(from.doctype) && !ref) {
+		frm.set_intro(
+			__("For {0}: type the amount and the cheque number, then save. The cheque is an advance (not allocated).", [
+				link,
+			]),
+			"blue"
+		);
+		return;
+	}
+	const amount = `<bdi>${esc(
+		flt(doc.amount) ? format_currency(doc.amount, doc.currency) : format_currency(ref ? ref.allocated_amount : 0)
+	)}</bdi>`;
+	// the values are escaped above; the sentences are our own translations
+	if (doc.direction === "Incoming") {
+		frm.set_intro(
+			__("From {0}: {1}. Type the cheque number (and the due date if it differs), then save.", [link, amount]),
+			"blue"
+		);
+	} else if (!doc.bank_account) {
+		frm.set_intro(
+			`${__("From {0}: {1}. Choose the bank account and type the cheque number.", [link, amount])} ${esc(
+				__('Tip: set "Default Bank (Outgoing Cheques)" in Treasury Company Settings.')
+			)}`,
+			"orange"
+		);
+	} else if (doc.cheque_book) {
+		frm.set_intro(
+			__("From {0}: {1}. Check the due date and save; the cheque number is taken from cheque book {2}.", [
+				link,
+				amount,
+				`<b><bdi>${esc(doc.cheque_book)}</bdi></b>`,
+			]),
+			"blue"
+		);
+	} else {
+		frm.set_intro(__("From {0}: {1}. Type the cheque number and save.", [link, amount]), "blue");
+	}
 }
 
 function pdc_toggle_new_payee(frm) {
