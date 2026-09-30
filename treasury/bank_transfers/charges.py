@@ -290,7 +290,12 @@ def update_refunds(charge_name: str, refund_doc, event: str):
 
 def validate_bank_transaction(doc, bank_transaction: str, submitted: bool = False) -> frappe._dict:
 	"""The statement line of a charge: an open transaction of its bank account, on its side (a charge is a
-	withdrawal, a refund a deposit) with its open amount, and not used by another charge. Returns it."""
+	withdrawal, a refund a deposit) with its open amount, and not used by another charge. Returns it.
+
+	`submitted`: the charge is being posted or reconciled; the statement line row is locked first, so two
+	charges submitted or reconciled at the same time on one line cannot both pass the checks."""
+	if submitted and bank_transaction:
+		frappe.db.get_value(BANK_TRANSACTION, bank_transaction, "name", for_update=True)
 	bt = frappe.db.get_value(
 		BANK_TRANSACTION,
 		bank_transaction,

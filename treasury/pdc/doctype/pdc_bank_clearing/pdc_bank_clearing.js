@@ -220,6 +220,8 @@ function pbc_set_formatters(frm) {
 			return name;
 		},
 		reference_doctype: (value) => esc(value ? __(value, null, PBC_MATCH) : ""),
+		// plain text from the server (an error message may repeat client-sent values): never markup
+		result: (value) => esc(value || ""),
 	};
 	Object.entries(formatters).forEach(([fieldname, formatter]) => {
 		for (const name of [null, frm.doc.name]) {

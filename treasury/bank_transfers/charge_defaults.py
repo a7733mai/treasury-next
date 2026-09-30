@@ -6,6 +6,10 @@ account row for every company whose PDC Accounts mapping has exactly one distinc
 
 import frappe
 
+from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
+	validate_expense_account,
+)
+
 DEFAULTS_CREATED_KEY = "treasury_bank_charge_categories_created"
 DEFAULT_CATEGORIES = [
 	{
@@ -31,7 +35,7 @@ def ensure_default_categories() -> list[str]:
 	"""Create the missing default categories once; returns the names created."""
 	if frappe.db.get_global(DEFAULTS_CREATED_KEY):
 		return []
-	accounts = company_charge_accounts()
+	accounts = valid_charge_accounts()
 	created = []
 	for values in DEFAULT_CATEGORIES:
 		name = values["category_name"]
@@ -65,10 +69,22 @@ def company_charge_accounts() -> dict[str, str]:
 	accounts: dict[str, set] = {}
 	for row in rows:
 		accounts.setdefault(row.parent, set()).add(row.bank_charges_account)
+	# a Treasury Company Settings is named after its company (autoname field:company)
+	return {company: next(iter(found)) for company, found in accounts.items() if len(found) == 1}
+
+
+def valid_charge_accounts() -> dict[str, str]:
+	"""`company_charge_accounts` without the accounts a category row would reject (disabled, moved to
+	another company, no longer an Expense ledger in the company currency): install / migrate must not fail
+	on one company's settings, whose categories then simply get no account row."""
 	result = {}
-	for settings, found in accounts.items():
-		if len(found) != 1:
+	for company, account in company_charge_accounts().items():
+		if frappe.db.get_value("Account", account, "disabled"):
 			continue
-		company = frappe.db.get_value("Treasury Company Settings", settings, "company") or settings
-		result[company] = next(iter(found))
+		try:
+			validate_expense_account(company, account, "Bank Charges Account")
+		except frappe.ValidationError:
+			frappe.clear_last_message()
+			continue
+		result[company] = account
 	return result

@@ -319,8 +319,11 @@ def make_refund(source_name: str) -> dict:
 
 @frappe.whitelist(methods=["GET"])
 def get_category_defaults(category: str, company: str) -> dict:
-	"""The expense account, cost center and default description of a category for a company (form script)."""
-	if not (frappe.has_permission(DOCTYPE, "create") or frappe.has_permission(DOCTYPE, "write")):
+	"""The expense account, cost center and default description of a category for a company (form script).
+	The user needs create or write permission on a Bank Charge of that company (User Permissions apply)."""
+	probe = frappe.new_doc(DOCTYPE)
+	probe.company = company
+	if not any(frappe.has_permission(DOCTYPE, ptype, doc=probe) for ptype in ("create", "write")):
 		frappe.throw(_("You are not permitted to create or change Bank Charges."), frappe.PermissionError)
 	row = get_account_row(category, company) or frappe._dict()
 	description = (

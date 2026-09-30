@@ -304,50 +304,22 @@ def create_payment_entry(
 	else:
 		party_cap = flt(principal * amounts.bank_rate, amounts.precision)
 
-	pe = frappe.new_doc("Payment Entry")
-	pe.payment_type = payment_type
-	pe.company = company
-	pe.posting_date = getdate(posting_date)
-	pe.party_type = party_type
-	pe.party = party
-	pe.reference_no = reference_no
-	pe.reference_date = getdate(reference_date)
-
-	bank_side = {
-		"account": bank_account_head,
-		"currency": amounts.bank_currency,
-		"type": frappe.get_cached_value("Account", bank_account_head, "account_type"),
-		"amount": amounts.bank_amount,
-		"rate": amounts.bank_rate,
-	}
-	party_side = {
-		"account": amounts.party_account,
-		"currency": amounts.party_currency,
-		"type": frappe.get_cached_value("Account", amounts.party_account, "account_type"),
-		"amount": amounts.party_amount,
-		"rate": amounts.party_rate,
-	}
-	source, target = (bank_side, party_side) if payment_type == "Pay" else (party_side, bank_side)
-
-	pe.paid_from = source["account"]
-	pe.paid_from_account_currency = source["currency"]
-	pe.paid_from_account_type = source["type"]
-	pe.paid_amount = source["amount"]
-	pe.source_exchange_rate = source["rate"]
-	pe.paid_to = target["account"]
-	pe.paid_to_account_currency = target["currency"]
-	pe.paid_to_account_type = target["type"]
-	pe.received_amount = target["amount"]
-	pe.target_exchange_rate = target["rate"]
-
+	pe = _new_payment_entry(
+		payment_type=payment_type,
+		company=company,
+		posting_date=posting_date,
+		party_type=party_type,
+		party=party,
+		reference_no=reference_no,
+		reference_date=reference_date,
+		bank_account_head=bank_account_head,
+		amounts=amounts,
+		remarks=remarks,
+	)
 	for ref in _allocate_references(
 		references, party_type, party, amounts.party_currency, party_cap, amounts.precision
 	):
 		pe.append("references", ref)
-
-	if remarks:
-		pe.custom_remarks = 1
-		pe.remarks = remarks
 
 	if charges:
 		pe.append("deductions", _charges_row(company, charges_account, charges * amounts.bank_rate, details))
@@ -421,6 +393,55 @@ def create_bank_charge_payment(
 		exchange_rate=exchange_rate,
 	)
 
+	pe = _new_payment_entry(
+		payment_type=payment_type,
+		company=company,
+		posting_date=posting_date,
+		party_type=party_type,
+		party=party,
+		reference_no=reference_no,
+		reference_date=reference_date,
+		bank_account_head=bank_account_head,
+		amounts=amounts,
+		remarks=remarks,
+	)
+	sign = 1 if payment_type == "Pay" else -1
+	pe.append(
+		"deductions",
+		_charges_row(company, expense_account, sign * amounts.bank_amount * amounts.bank_rate, details),
+	)
+	_apply_details(pe, details)
+	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
+	pe.flags.ignore_permissions = True  # see module docstring
+	pe.insert()
+	if flt(pe.difference_amount) or flt(pe.unallocated_amount):
+		frappe.throw(
+			_("The Payment Entry {0} is not balanced (difference {1}).").format(
+				pe.name, flt(pe.difference_amount) or flt(pe.unallocated_amount)
+			)
+		)
+	pe.submit()
+	if clearance_date:
+		_set_clearance_date(pe.name, clearance_date, "Payment Entry")
+	_stamp_user("Payment Entry", pe.name, owner=True)
+	return pe.name
+
+
+def _new_payment_entry(
+	*,
+	payment_type: str,
+	company: str,
+	posting_date,
+	party_type: str,
+	party: str,
+	reference_no: str,
+	reference_date,
+	bank_account_head: str,
+	amounts: frappe._dict,
+	remarks: str | None,
+) -> Document:
+	"""An unsaved Pay / Receive Payment Entry between `bank_account_head` and the party account of `amounts`
+	(`_get_payment_amounts`): Pay goes from the bank to the party, Receive from the party to the bank."""
 	pe = frappe.new_doc("Payment Entry")
 	pe.payment_type = payment_type
 	pe.company = company
@@ -459,27 +480,7 @@ def create_bank_charge_payment(
 	if remarks:
 		pe.custom_remarks = 1
 		pe.remarks = remarks
-
-	sign = 1 if payment_type == "Pay" else -1
-	pe.append(
-		"deductions",
-		_charges_row(company, expense_account, sign * amounts.bank_amount * amounts.bank_rate, details),
-	)
-	_apply_details(pe, details)
-	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
-	pe.flags.ignore_permissions = True  # see module docstring
-	pe.insert()
-	if flt(pe.difference_amount) or flt(pe.unallocated_amount):
-		frappe.throw(
-			_("The Payment Entry {0} is not balanced (difference {1}).").format(
-				pe.name, flt(pe.difference_amount) or flt(pe.unallocated_amount)
-			)
-		)
-	pe.submit()
-	if clearance_date:
-		_set_clearance_date(pe.name, clearance_date, "Payment Entry")
-	_stamp_user("Payment Entry", pe.name, owner=True)
-	return pe.name
+	return pe
 
 
 def _validate_charges(

@@ -6,7 +6,7 @@ Cheque discounting charges and facility interest / penalties are financing costs
 not bank charges.
 """
 
-REVERSAL_SUFFIX = "_reversal"
+from treasury.utils.voucher_summary import REVERSAL_SUFFIX
 
 SOURCES = {
 	"Bank Charges": ("Bank Charge", ("bank_charge",)),

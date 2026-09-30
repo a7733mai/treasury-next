@@ -1,6 +1,8 @@
 """Phase 7d: Bank Charge validation, protected fields, cancel / amend, refunds and reconciliation (spec 7d §3.3,
 §3.4, §7 B)."""
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, getdate
@@ -183,6 +185,8 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		charge = make_bank_charge()
 		charge.cancel()
 		amended = frappe.copy_doc(get_charge(charge.name), ignore_no_copy=False)  # like the desk "Amend"
+		# frappe.copy_doc keeps the docstatus under tests (frappe.in_test); the desk "Amend" starts at 0
+		amended.docstatus = 0
 		amended.amended_from = charge.name
 		amended.insert()
 		self.assertEqual((amended.status, amended.accounting_status), ("Draft", "Not Posted"))
@@ -302,4 +306,32 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 			make_bank_charge,
 			submit=False,
 			bank_transaction=open_bt.name,
+		)
+
+	def test_bank_transaction_locked_on_post_and_reconcile(self):
+		"""Posting and reconciling lock the statement line row before checking it (review 7d #2): two charges
+		submitted or reconciled at the same time on one line cannot both pass."""
+		get_value = frappe.db.get_value
+
+		def locks_of(action) -> list[str]:
+			calls = []
+
+			def recording(doctype, *args, **kwargs):
+				if doctype == "Bank Transaction" and kwargs.get("for_update"):
+					calls.append(args[0] if args else kwargs.get("filters"))
+				return get_value(doctype, *args, **kwargs)
+
+			with patch.object(frappe.db, "get_value", side_effect=recording):
+				action()
+			return calls
+
+		bt = make_bank_transaction(bank_account_name("EGP"), day(-3), withdrawal=150)
+		draft = make_bank_charge(submit=False, bank_transaction=bt.name)
+		self.assertIn(bt.name, locks_of(draft.submit))
+
+		self.use_company_settings(bank_charge_clearance="On Bank Transaction")
+		charge = make_bank_charge()
+		other = make_bank_transaction(bank_account_name("EGP"), day(-3), withdrawal=150)
+		self.assertIn(
+			other.name, locks_of(lambda: get_charge(charge.name).reconcile_bank_transaction(other.name))
 		)

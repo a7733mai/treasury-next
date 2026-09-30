@@ -7,6 +7,7 @@ the class rolls back."""
 from unittest.mock import patch
 
 import frappe
+from frappe.permissions import reset_perms, update_permission_property
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, getdate
 
@@ -19,6 +20,7 @@ from treasury.tests.utils import (
 	assert_gl_entries,
 	day,
 	ensure_charge_category,
+	ensure_user,
 	make_bank_charge,
 	make_bank_transaction,
 	make_bank_transfer,
@@ -28,6 +30,7 @@ from treasury.tests.utils import (
 
 TOOL = "PDC Bank Clearing"
 DOCTYPE = "Bank Charge"
+NO_CREATE_USER = "treasury-bank-charge-no-create@example.com"
 
 
 def charges_of(bank_transaction: str) -> list[str]:
@@ -37,6 +40,11 @@ def charges_of(bank_transaction: str) -> list[str]:
 
 
 class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		ensure_user(NO_CREATE_USER, ["Treasury User", "Accounts User"])
+
 	def setUp(self):
 		super().setUp()
 		self.use_company_settings(**BANK_CHARGE_SETTINGS)
@@ -297,3 +305,37 @@ class TestBankChargeClearing(TreasuryTestMixin, IntegrationTestCase):
 		tool = self.tool()
 		tool.get_suggestions()
 		self.assertEqual(len(self.rows_for(tool, bt)), 1)
+
+	def test_permissions_real_user(self):
+		"""The same through the real DocPerm resolution: a Treasury User whose role has lost Bank Charge create
+		(Custom DocPerm, as an administrator would set in Role Permissions Manager)."""
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+		update_permission_property(DOCTYPE, "Treasury User", 0, "create", 0)
+		self.addCleanup(frappe.clear_cache, doctype=DOCTYPE)
+		self.addCleanup(reset_perms, DOCTYPE)
+		frappe.clear_cache(doctype=DOCTYPE)
+		bt = make_bank_transaction(
+			self.data.egp.bank_account, day(-4), withdrawal=281.5, description="ACCT MAINT FEE"
+		)
+
+		tool = self.tool()
+		with self.set_user(NO_CREATE_USER):
+			self.assertFalse(frappe.has_permission(DOCTYPE, "create"))
+			tool.get_suggestions()
+			self.assertEqual(self.rows_for(tool, bt), [])
+			tool.append(
+				"matches",
+				{
+					"selected": 1,
+					"match_quality": "Keyword",
+					"reference_doctype": DOCTYPE,
+					"bank_transaction": bt.name,
+					"bank_charge_category": self.category,
+					"amount": 281.5,
+				},
+			)
+			self.select_only(tool, bt)
+			result = tool.clear_selected()
+		self.assertEqual(result["created"], [])
+		self.assertEqual([d["document"] for d in result["skipped"]], [bt.name])
+		self.assertEqual(charges_of(bt.name), [])

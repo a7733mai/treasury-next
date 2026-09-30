@@ -117,7 +117,8 @@ frappe.query_reports[BCA_REPORT] = {
 					? `${data.group_value.slice(5)}-${data.group_value.slice(0, 4)}`
 					: value;
 			const html = `<bdi>${esc(text == null ? "" : text)}</bdi>`;
-			if (!data.group_filter) {
+			// "-": vouchers without a bank / bank account, which no filter selects
+			if (!data.group_filter || data.group_value === "-") {
 				return html;
 			}
 			return `<a class="bca-drill" data-filter="${esc(data.group_filter)}" data-value="${esc(
@@ -179,9 +180,11 @@ function bca_drill_down(report, fieldname, value) {
 	// spec 7d §3.7-11: the Detail view of the group's vouchers
 	const filters = Object.assign({}, report.get_values(), { view: "Detail" });
 	if (fieldname === "month") {
+		// the month within the report's own dates (a range may start or end mid-month)
 		const start = `${value}-01`;
-		filters.from_date = start;
-		filters.to_date = frappe.datetime.month_end(start);
+		const end = frappe.datetime.month_end(start);
+		filters.from_date = filters.from_date && filters.from_date > start ? filters.from_date : start;
+		filters.to_date = filters.to_date && filters.to_date < end ? filters.to_date : end;
 	} else if (fieldname === "category") {
 		// a Bank Charge category (the server sends the other sources of this grouping as "source")
 		filters.category = value;

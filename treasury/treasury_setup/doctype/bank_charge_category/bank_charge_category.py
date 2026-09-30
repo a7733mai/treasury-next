@@ -9,6 +9,7 @@ from frappe import _
 from frappe.model.document import Document
 
 from treasury.bank_transfers.charge_defaults import company_charge_accounts
+from treasury.pdc.report_utils import is_permitted_value
 from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_settings import (
 	validate_expense_account,
 )
@@ -106,7 +107,15 @@ def get_company_charge_account(company: str) -> str | None:
 		frappe.throw(_("You are not permitted to change Bank Charge Categories."), frappe.PermissionError)
 	if not company:
 		return None
-	frappe.has_permission("Company", "read", doc=company, throw=True)
+	# the Treasury roles hold no permission on Company: only the user's User Permissions on it are checked
+	if not is_permitted_value("Company", company, DOCTYPE):
+		frappe.throw(
+			_("You are not permitted to set Bank Charge accounts of company {0}.").format(
+				frappe.bold(company)
+			),
+			frappe.PermissionError,
+			title=_("Not Permitted"),
+		)
 	return company_charge_accounts().get(company)
 
 

@@ -169,13 +169,18 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 	def test_refund_pe(self):
 		egp = self.data.egp
 		charge = make_bank_charge()
-		refund = make_bank_charge(entry_type="Refund", against_bank_charge=charge.name, amount=50)
+		refund = make_bank_charge(
+			entry_type="Refund", against_bank_charge=charge.name, amount=50, posting_date=day(-2)
+		)
 		pe = get_pe(refund.payment_entry)
 		self.assertEqual((pe.payment_type, pe.party), ("Receive", self.bank_supplier()))
 		self.assertEqual((pe.paid_from, pe.paid_to), (self.data.payable, egp.bank_gl))
 		assert_deductions(self, pe, [(self.charges_account, -50, 0)])
 		assert_gl_entries(
-			self, "Payment Entry", pe.name, [(egp.bank_gl, 50, 0, None), (self.charges_account, 0, 50, None)]
+			self,
+			"Payment Entry",
+			pe.name,
+			[(egp.bank_gl, 50, 0, None, day(-2)), (self.charges_account, 0, 50, None, day(-2))],
 		)
 		self.assertEqual(ple_count(pe.name), 0)
 
@@ -190,9 +195,14 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 		self.use_company_settings(bank_charge_voucher="Journal Entry")
 		egp = self.data.egp
 		charge = make_bank_charge()
-		refund = make_bank_charge(entry_type="Refund", against_bank_charge=charge.name, amount=50)
+		refund = make_bank_charge(
+			entry_type="Refund", against_bank_charge=charge.name, amount=50, posting_date=day(-2)
+		)
 		assert_gl_entries(
-			self, "Journal Entry", refund.journal_entry, [(egp.bank_gl, 50, 0), (self.charges_account, 0, 50)]
+			self,
+			"Journal Entry",
+			refund.journal_entry,
+			[(egp.bank_gl, 50, 0, None, day(-2)), (self.charges_account, 0, 50, None, day(-2))],
 		)
 		self.assertEqual(flt(get_charge(charge.name).refunded_amount), 50)
 
@@ -252,6 +262,47 @@ class TestBankChargePosting(TreasuryTestMixin, IntegrationTestCase):
 		self.use_company_settings(bank_charge_voucher="Journal Entry")
 		charge = make_bank_charge(bank_account=no_bank, amount=154)
 		self.assertTrue(charge.journal_entry)
+
+	def test_bank_supplier_mapping_ignores_other_rows(self):
+		"""Mapping a new bank writes its own row only: another bank's disabled supplier, or an empty Payee
+		Supplier Group when the supplier is reused by name, does not block the charge (review 7d #1)."""
+		disabled = ensure_supplier(f"_Test BC Disabled {frappe.generate_hash(length=5)}")
+		frappe.db.set_value("Supplier", disabled, "disabled", 1)
+		self.addCleanup(frappe.db.set_value, "Supplier", disabled, "disabled", 0)
+		set_bank_suppliers(self, [{"bank": BANK, "supplier": disabled}])
+
+		new_bank = f"_Test BC Bank {frappe.generate_hash(length=5)}"
+		charge = make_bank_charge(bank_account=own_bank_account(new_bank))
+		supplier = get_pe(charge.payment_entry).party
+		self.assertEqual(frappe.db.get_value("Supplier", supplier, "supplier_name"), new_bank)
+		rows = frappe.get_all(
+			"Treasury Bank Supplier",
+			filters={"parenttype": "Treasury Settings", "parent": "Treasury Settings"},
+			fields=["bank", "supplier", "idx"],
+			order_by="idx asc",
+		)
+		self.assertEqual(
+			[(r.bank, r.supplier, r.idx) for r in rows], [(BANK, disabled, 1), (new_bank, supplier, 2)]
+		)
+		self.assertEqual(
+			[(r.bank, r.supplier) for r in frappe.get_single("Treasury Settings").bank_suppliers],
+			[(BANK, disabled), (new_bank, supplier)],
+		)
+
+		# no Payee Supplier Group: a Supplier named after the bank is still reused ...
+		previous = frappe.db.get_single_value("Treasury Settings", "payee_supplier_group")
+		frappe.db.set_single_value("Treasury Settings", "payee_supplier_group", None)
+		self.addCleanup(frappe.db.set_single_value, "Treasury Settings", "payee_supplier_group", previous)
+		reused_bank = f"_Test BC Bank {frappe.generate_hash(length=5)}"
+		existing = ensure_supplier(reused_bank)
+		charge = make_bank_charge(bank_account=own_bank_account(reused_bank))
+		self.assertEqual(get_pe(charge.payment_entry).party, existing)
+
+		# ... and a new one cannot be created
+		draft = make_bank_charge(
+			submit=False, bank_account=own_bank_account(f"_Test BC Bank {frappe.generate_hash(length=5)}")
+		)
+		self.assertRaisesRegex(frappe.ValidationError, "Payee Supplier Group", draft.submit)
 
 	# ------------------------------------------------------------------ modes, series, accounting details
 

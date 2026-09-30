@@ -93,6 +93,8 @@ def before_uninstall():
 	delete_dimension_fields()
 	remove_legacy_permissions()  # a site never migrated since the legacy grants
 	report_kept_series()
+	# the categories are deleted with the app's doctypes: a reinstall creates the defaults again
+	frappe.db.set_global(charge_defaults.DEFAULTS_CREATED_KEY, None)
 
 
 def setup():

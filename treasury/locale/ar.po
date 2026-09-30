@@ -9572,6 +9572,9 @@ msgstr "غير مسموح لك بإنشاء المصاريف البنكية أو
 msgid "You are not permitted to change Bank Charge Categories."
 msgstr "غير مسموح لك بتعديل تصنيفات المصاريف البنكية."
 
+msgid "You are not permitted to set Bank Charge accounts of company {0}."
+msgstr "غير مسموح لك بتحديد حسابات المصاريف البنكية للشركة {0}."
+
 # Report Bank Charges Analysis
 msgctxt "Treasury Report"
 msgid "Category"

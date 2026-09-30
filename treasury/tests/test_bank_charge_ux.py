@@ -17,10 +17,14 @@ from frappe.tests import IntegrationTestCase
 from treasury.tests.utils import (
 	BANK_CHARGE_SETTINGS,
 	COMPANY,
+	OTHER_ABBR,
+	OTHER_COMPANY,
 	TreasuryTestMixin,
 	acc,
+	add_user_permission,
 	day,
 	ensure_charge_category,
+	ensure_company,
 	ensure_second_egp_bank,
 	ensure_user,
 	make_bank_charge,
@@ -34,6 +38,7 @@ from treasury.treasury_setup.doctype.bank_charge_category.bank_charge_category i
 APP_PATH = Path(frappe.get_app_path("treasury"))
 TREASURY_USER = "treasury-bch-ux-user@example.com"
 MANAGER = "treasury-bch-ux-manager@example.com"
+MANAGER_ONLY = "treasury-bch-ux-manager-only@example.com"
 DOCTYPE = "Bank Charge"
 NOT_PRESELECTED = "Not pre-selected (category setting)"
 
@@ -50,6 +55,7 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		super().setUpClass()
 		ensure_user(TREASURY_USER, ["Treasury User", "Accounts User"])
 		ensure_user(MANAGER, ["Treasury Manager", "Accounts User"])
+		ensure_user(MANAGER_ONLY, ["Treasury Manager"])
 
 	def setUp(self):
 		super().setUp()
@@ -91,6 +97,14 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 			self.assertRaises(frappe.PermissionError, get_company_charge_account, COMPANY)
 		with self.set_user(MANAGER):
 			self.assertEqual(get_company_charge_account(COMPANY), acc("Treasury Bank Charges"))
+		# a Treasury Manager without any Company permission (security review 7d #3) ...
+		with self.set_user(MANAGER_ONLY):
+			self.assertEqual(get_company_charge_account(COMPANY), acc("Treasury Bank Charges"))
+		# ... but restricted to another company by a User Permission
+		ensure_company(OTHER_COMPANY, OTHER_ABBR)
+		add_user_permission(MANAGER_ONLY, "Company", OTHER_COMPANY)
+		with self.set_user(MANAGER_ONLY):
+			self.assertRaises(frappe.PermissionError, get_company_charge_account, COMPANY)
 
 		# two distinct accounts: no default
 		second = ensure_second_egp_bank()
