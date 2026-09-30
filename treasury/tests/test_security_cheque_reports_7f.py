@@ -157,6 +157,27 @@ class TestSecurityChequeReports7f(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual([r.purpose for r in data if r.indent == 1], [FIXTURE_PURPOSE, FIXTURE_PURPOSE])
 		self.assertRaises(frappe.ValidationError, self.run_summary, status=["Somewhere"])
 
+	def test_summary_amount_is_bucket_sum(self):
+		"""Review Minor 5: Amount holds the live cheques only (the sum of the buckets): a Created cheque is
+		counted, not summed; Closed Amount is a column only when a final status is selected."""
+		customer = "_Test Treasury Summary Created"
+		ensure_customer(customer)
+		make_security_cheque(amount=900, party=customer, purpose="Rent", expiry_date=add_days(self.today, 20))
+		filters = {"party_type": "Customer", "party": customer, "purpose": "Rent"}
+		columns, data, *_rest = summary_report(
+			{"company": COMPANY, "status": ["Created", "Received"], **filters}
+		)
+		held = self.headers(data)["Incoming"]
+		buckets = [c["fieldname"] for c in columns if c["fieldname"].startswith(("range_", "expired", "no_"))]
+		self.assertEqual((held.fixed_count, held.amount), (1, 0))
+		self.assertEqual(sum(held[f] for f in buckets), held.amount)
+		self.assertNotIn("closed_amount", [c["fieldname"] for c in columns])
+
+		columns, *_rest = self.run_summary()
+		self.assertNotIn("closed_amount", [c["fieldname"] for c in columns])
+		columns, *_rest = self.run_summary(status=["Received", "Returned"])
+		self.assertIn("closed_amount", [c["fieldname"] for c in columns])
+
 	def test_summary_cards_chart(self):
 		_columns, _data, _message, chart, cards = self.run_summary()
 		values = {card["label"]: card["value"] for card in cards}

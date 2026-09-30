@@ -13,6 +13,8 @@ from frappe.utils import cint, flt
 # Translation context of the pieces below (msgctxt in ar.po), so that they never override the Frappe /
 # ERPNext translation of the same words elsewhere.
 CONTEXT = "Amount in words"
+# Fraction units of a currency whose master has none (cheque_printing.currency_decimals: 2 decimals).
+DEFAULT_FRACTION_UNITS = 100
 
 # Display names of common currencies (the Currency DocType only holds the code); translated in ar.po.
 CURRENCY_NAMES = {
@@ -56,6 +58,8 @@ def treasury_amount_in_words(
 		values = frappe.get_cached_value("Currency", currency, ["fraction", "fraction_units"], as_dict=True)
 		if values:
 			default_fraction, fraction_units = values.fraction, cint(values.fraction_units)
+	# a currency without fraction units still has cents: its fraction is worded, never dropped
+	fraction_units = fraction_units or DEFAULT_FRACTION_UNITS
 
 	main = int(amount)
 	fraction = round((amount - main) * fraction_units) if fraction_units else 0

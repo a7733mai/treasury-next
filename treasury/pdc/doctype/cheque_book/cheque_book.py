@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, getdate, now_datetime, today
+from frappe.utils import cint, escape_html, getdate, now_datetime, today
 
 from treasury.utils.context import real_user
 from treasury.utils.protected_fields import changed_tables
@@ -15,6 +15,8 @@ SCAN_CHUNK = 500
 KIND_CANCELLED = "Cancelled"
 KIND_VOID = "Void"
 VOID_REASON_TYPES = ("Damaged", "Misprinted", "Lost", "Stolen", "Other")
+# Reason type of the rows recorded by a cheque's cancellation (record_cancelled_leaf) only.
+CHEQUE_CANCELLED = "Cheque Cancelled"
 # Leaves voided in one action at most (one row each).
 MAX_VOID_RANGE = 100
 
@@ -125,16 +127,35 @@ class ChequeBook(Document):
 			number = self.parse_leaf(row.cheque_no)
 			if number in seen:
 				frappe.throw(
-					_("Row #{0}: Cheque No {1} is cancelled more than once.").format(row.idx, row.cheque_no)
+					_("Row #{0}: Cheque No {1} is cancelled more than once.").format(
+						row.idx, escape_html(str(row.cheque_no))
+					)
 				)
 			seen.add(number)
 			if row.name and row.name in saved:
 				continue  # recorded before: kept exactly as it is
+			if not self.flags.treasury_leaf_action:
+				self.set_manual_row_provenance(row)
 			row.cheque_no = self.format_leaf(number)
 			row.date = row.date or today()
 			row.kind = row.kind or KIND_CANCELLED
 			row.user = real_user()
 			row.datetime = now_datetime()
+
+	def set_manual_row_provenance(self, row):
+		"""A row typed into a new book (not recorded by a leaf action) is a plain cancelled leaf: its kind and
+		source are server-set, so no one can forge a void leaf or a "Cheque Cancelled" row pointing at a cheque
+		(e.g. of another company)."""
+		if row.reason_type == CHEQUE_CANCELLED:
+			frappe.throw(
+				_("Row #{0}: the reason type {1} is recorded only when a cheque is cancelled.").format(
+					row.idx, _(CHEQUE_CANCELLED, context="Cheque Book Cancelled Leaf")
+				),
+				title=_("Not Allowed"),
+			)
+		row.kind = KIND_CANCELLED
+		row.source_doctype = None
+		row.source_name = None
 
 	def update_status(self):
 		if self.status == "Closed":
@@ -150,12 +171,15 @@ class ChequeBook(Document):
 		"""Leaf number of `cheque_no`, which must be a whole number inside the book range."""
 		value = str(cheque_no or "").strip()
 		if not value.isdigit():
-			frappe.throw(_("Cheque No {0} is not a valid leaf number.").format(frappe.bold(cheque_no)))
+			# the value may be anything the client sent: escaped in the message
+			frappe.throw(
+				_("Cheque No {0} is not a valid leaf number.").format(frappe.bold(escape_html(str(cheque_no))))
+			)
 		number = int(value)
 		if not cint(self.start_no) <= number <= cint(self.end_no):
 			frappe.throw(
 				_("Cheque No {0} is outside the range {1} - {2} of Cheque Book {3}.").format(
-					frappe.bold(cheque_no), self.start_no, self.end_no, frappe.bold(self.name)
+					frappe.bold(value), self.start_no, self.end_no, frappe.bold(self.name)
 				)
 			)
 		return number
@@ -282,7 +306,7 @@ def record_cancelled_leaf(
 	value = str(cheque_no or "").strip()
 	if not value.isdigit() or not cint(book.start_no) <= int(value) <= cint(book.end_no):
 		return
-	book.add_cancelled_leaf(int(value), reason, date, reason_type="Cheque Cancelled", source=source)
+	book.add_cancelled_leaf(int(value), reason, date, reason_type=CHEQUE_CANCELLED, source=source)
 	book.flags.ignore_permissions = True  # the caller checked permission on the PDC Cheque
 	book.flags.treasury_leaf_action = True
 	book.save()
@@ -354,5 +378,27 @@ def void_leaf(
 
 	leaves = [book.format_leaf(n) for n in numbers]
 	range_text = leaves[0] if len(leaves) == 1 else f"{leaves[0]} - {leaves[-1]}"
-	book.add_comment("Info", _("Leaves {0} voided ({1}): {2}").format(range_text, _(reason_type), reason))
+	reason_label = _(reason_type, context="Cheque Book Cancelled Leaf")
+	book.add_comment("Info", _("Leaves {0} voided ({1}): {2}").format(range_text, reason_label, reason))
 	return leaves
+
+
+def lock_covering_books(bank_account: str | None, cheque_no: str | None) -> list[str]:
+	"""Lock the cheque books of `bank_account` whose range covers `cheque_no` (a hand-typed number), in name
+	order, and return them: a concurrent Void Leaf / Cancel Leaf (which lock the book) and this cheque's save
+	are then serialised, so a leaf never ends up both void and used. Callers lock books before the bank
+	account row, as the number allocation does (no deadlock)."""
+	value = str(cheque_no or "").strip()
+	if not bank_account or not value.isdigit():
+		return []
+	book = frappe.qb.DocType("Cheque Book")
+	return (
+		frappe.qb.from_(book)
+		.select(book.name)
+		.where(
+			(book.bank_account == bank_account) & (book.start_no <= int(value)) & (book.end_no >= int(value))
+		)
+		.orderby(book.name)
+		.for_update()
+		.run(pluck=True)
+	)

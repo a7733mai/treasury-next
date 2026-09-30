@@ -27,7 +27,7 @@ from treasury.bank_facilities import accounting
 from treasury.bank_facilities.facility import ACTIVE
 from treasury.bank_facilities.utilisation import get_utilisation, refresh_utilisation
 from treasury.utils.context import real_user
-from treasury.utils.protected_fields import changed_fields, changed_tables
+from treasury.utils.protected_fields import changed_fields, changed_tables, insert_log_row
 
 FACILITY = "Bank Facility"
 MANAGER = "Treasury Manager"
@@ -286,7 +286,7 @@ def log_now(doc, event: str, status=None, event_date=None, voucher=None, remarks
 	"""`log` for the submit / cancel hooks, where the document itself is not saved again: the row is inserted
 	and the status (and `values`) written directly."""
 	row = log(doc, event, status, event_date, voucher, remarks)
-	row.db_insert()
+	insert_log_row(row)
 	doc.db_set({"status": doc.status, **(values or {})})
 
 

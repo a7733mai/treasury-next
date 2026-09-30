@@ -267,6 +267,76 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual(row.user, "Administrator")
 
+	def test_new_book_rows_provenance(self):
+		"""Security Minor 9: rows typed into a new book are plain cancelled leaves; their kind, source and user
+		are server-set (no forged void leaf or "Cheque Cancelled" row pointing at a cheque)."""
+		other = make_pdc_cheque()
+		start = unique_leaf_start(5)
+		book = make_cheque_book(
+			start,
+			start + 4,
+			leaf_digits=8,
+			cancelled_leaves=[
+				{
+					"cheque_no": str(start),
+					"kind": "Void",
+					"reason_type": "Damaged",
+					"reason": "Torn",
+					"source_doctype": "PDC Cheque",
+					"source_name": other.name,
+					"user": "Guest",
+				}
+			],
+		)
+		row = book.cancelled_leaves[0]
+		self.assertEqual(
+			(row.kind, row.reason_type, row.source_doctype, row.source_name, row.user),
+			("Cancelled", "Damaged", None, None, "Administrator"),
+		)
+		start = unique_leaf_start(5)
+		self.assert_error(
+			"is recorded only when a cheque is cancelled",
+			make_cheque_book,
+			start,
+			start + 4,
+			leaf_digits=8,
+			cancelled_leaves=[{"cheque_no": str(start), "reason_type": "Cheque Cancelled", "reason": "x"}],
+		)
+
+	def test_hand_typed_number_of_void_leaf(self):
+		"""Security Minor 11: a hand-typed number (no book) locks the covering book and may not take a void
+		leaf; a leaf taken that way cannot be voided."""
+		book = self.book(size=5)
+		void_leaf(book.name, self.leaf(book, 1), reason_type="Lost", reason="Lost")
+		self.assert_error(
+			"is a cancelled leaf of Cheque Book", make_pdc_cheque, cheque_no=self.leaf(book, 1)
+		)
+		make_pdc_cheque(cheque_no=self.leaf(book, 2))
+		self.assert_error(
+			"is used by a PDC Cheque",
+			void_leaf,
+			book.name,
+			self.leaf(book, 2),
+			reason_type="Lost",
+			reason="Lost",
+		)
+
+	def test_void_comment_translated(self):
+		"""Review Minor 4: the reason type in the book's comment is translated with its context."""
+		book = self.book()
+		previous = frappe.local.lang
+		self.addCleanup(setattr, frappe.local, "lang", previous)
+		frappe.local.lang = "ar"
+		void_leaf(book.name, self.leaf(book, 0), reason_type="Misprinted", reason="Test")
+		expected = frappe._("Misprinted", lang="ar", context="Cheque Book Cancelled Leaf")
+		self.assertNotEqual(expected, "Misprinted")
+		comments = frappe.get_all(
+			"Comment",
+			filters={"reference_doctype": "Cheque Book", "reference_name": book.name, "comment_type": "Info"},
+			pluck="content",
+		)
+		self.assertTrue(any(expected in (c or "") for c in comments), comments)
+
 	def test_no_vouchers(self):
 		book = self.book(size=10)
 		cheque = make_pdc_cheque(cheque_book=book.name)

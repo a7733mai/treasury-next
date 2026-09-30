@@ -1,12 +1,15 @@
 """Phase 7f: cheque printing on bank Cheque Layouts, print registration and reprints (spec 7f §7.4)."""
 
 import re
+from contextlib import contextmanager
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, fmt_money, getdate
+from frappe.www.printview import get_html_and_style
 
 from treasury.pdc.cheque_printing import (
+	DEFAULT_FONT_FAMILY,
 	FORMAT_BATCH,
 	FORMAT_CHEQUE,
 	FORMAT_TEST,
@@ -17,19 +20,25 @@ from treasury.pdc.cheque_printing import (
 	format_cheque_date,
 	get_cheque_text,
 	preview_layout,
+	printed_fingerprint,
 	render_leaf,
 	split_words,
 )
+from treasury.utils.amount_in_words import treasury_amount_in_words
 from treasury.tests.utils import (
 	COMPANY,
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
+	OTHER_ABBR,
+	OTHER_COMPANY,
 	SUPPLIER,
 	TreasuryTestMixin,
 	add_user_permission,
 	bank_account_name,
 	day,
+	ensure_company,
 	ensure_currency,
+	ensure_other_company_bank,
 	ensure_user,
 	get_voucher_count,
 	make_cheque_layout,
@@ -57,6 +66,10 @@ ACCOUNTS_USER = "treasury-print-accounts@example.com"
 NO_ACCESS_USER = "treasury-print-noaccess@example.com"
 # restricted by a User Permission to one cheque (test_batch_all_or_nothing only)
 BATCH_MANAGER = "treasury-print-batch-manager@example.com"
+# restricted by User Permissions (for Cheque Layout) to another company / another bank account
+OTHER_COMPANY_MANAGER = "treasury-print-othercompany@example.com"
+OTHER_BANK_MANAGER = "treasury-print-otherbank@example.com"
+FORGED_JOB = "0123456789abcdef0123"
 BOXES = (
 	"tcl-date",
 	"tcl-payee",
@@ -100,8 +113,29 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 			lang=lang,
 		)
 
-	def render(self, doctype: str, name: str, print_format: str) -> str:
-		return frappe.get_print(doctype, name, print_format=print_format)
+	@contextmanager
+	def url_job(self, job: str | None):
+		"""The printview URL's `print_job` argument (the registration it prints)."""
+		form_dict = frappe.local.form_dict
+		had_job, previous = "print_job" in form_dict, form_dict.get("print_job")
+		form_dict["print_job"] = job
+		try:
+			yield
+		finally:
+			if had_job:
+				form_dict["print_job"] = previous
+			else:
+				form_dict.pop("print_job", None)
+
+	def render(self, doctype: str, name: str, print_format: str, job: str | None = None) -> str:
+		"""The print as printview renders it for a URL with `print_job=job`."""
+		with self.url_job(job):
+			return frappe.get_print(doctype, name, print_format=print_format)
+
+	def print_leaf(self, cheque, language="en", **kwargs) -> str:
+		"""Register a print of `cheque` and render it as the form opens it (with the returned job)."""
+		result = cheque.print_cheque(language=language, **kwargs)
+		return self.render(CHEQUE, cheque.name, FORMAT_CHEQUE, result["print_job"])
 
 	@staticmethod
 	def words_line(html: str) -> str:
@@ -253,11 +287,13 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 	def test_print_cheque_counter(self):
 		before = self.state(self.cheque)
 		result = self.cheque.print_cheque(language="ar")
+		job = result.pop("print_job")
 		self.assertEqual(
 			result,
 			{"name": self.cheque.name, "print_count": 1, "print_format": FORMAT_CHEQUE, "language": "ar"},
 		)
 		self.assertEqual(self.state(self.cheque), before)
+		self.assertEqual(self.cheque.last_print_job, job)
 		self.assertEqual((self.cheque.print_count, self.cheque.last_printed_by), (1, "Administrator"))
 		self.assertTrue(self.cheque.last_printed_on)
 		log = self.cheque.status_log[-1]
@@ -267,12 +303,12 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		)  # no status change
 
 		self.set_lang("ar")
-		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job)
 		self.assertIn("tcl-figures", html)
 		self.assertIn('dir="rtl"', html)
 		self.assertTrue(ARABIC.search(self.words_line(html)), self.words_line(html))
 		self.set_lang("en")
-		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job)
 		self.assertIn("One Thousand", self.words_line(html))
 		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 1)  # a view never counts
 
@@ -331,10 +367,10 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		# a delivered cheque prints; the leaf of a cheque that became unprintable is refused by the format
 		delivered = make_pdc_cheque(issue_date=day(-20), due_date=day(-5))
 		delivered.deliver(handover_date=day(-19))
-		delivered.print_cheque(language="en")
-		self.assertIn("tcl-figures", self.render(CHEQUE, delivered.name, FORMAT_CHEQUE))
+		job = delivered.print_cheque(language="en")["print_job"]
+		self.assertIn("tcl-figures", self.render(CHEQUE, delivered.name, FORMAT_CHEQUE, job))
 		delivered.clear(clearance_date=day(-4))
-		html = self.render(CHEQUE, delivered.name, FORMAT_CHEQUE)
+		html = self.render(CHEQUE, delivered.name, FORMAT_CHEQUE, job)
 		self.assertNotIn("tcl-figures", html)
 		self.assertIn("treasury-cheque-notice", html)
 
@@ -388,9 +424,171 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		doc = frappe.get_doc(CHEQUE, self.cheque.name)
 		doc.payee_on_cheque = "ACME Trading Co. W.L.L."
 		doc.save()
+		self.assertIn("ACME Trading Co. W.L.L.", self.print_leaf(self.cheque))
+		for fieldname in ("last_print_job", "printed_fingerprint"):
+			doc = frappe.get_doc(CHEQUE, self.cheque.name)
+			doc.set(fieldname, FORGED_JOB)
+			self.assertRaises(frappe.ValidationError, doc.save)
+
+	# ------------------------------------------------------------------ fix round 2: registered prints only
+
+	def test_leaf_renders_only_for_its_registration(self):
+		"""The leaf renders for the print job of the URL, for the user who registered it; not without a job,
+		with another job, or for another Treasury user."""
+		job = self.cheque.print_cheque(language="en")["print_job"]
+		self.assertIn("tcl-figures", self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job))
+		for other_job in (None, FORGED_JOB, "<script>"):
+			html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, other_job)
+			self.assertNotIn("tcl-figures", html)
+			self.assertIn("treasury-cheque-notice", html)
+		with self.set_user(TREASURY_USER):
+			self.assertNotIn("tcl-figures", self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job))
+
+		# a new registration replaces the job: the previous URL no longer prints
+		new_job = self.cheque.print_cheque(language="en", reprint=1, reason="Jammed")["print_job"]
+		self.assertNotEqual(new_job, job)
+		self.assertNotIn("tcl-figures", self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job))
+		self.assertIn("tcl-figures", self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, new_job))
+
+	def test_render_requires_print_role(self):
+		"""Review Major 1: a role that may not register a print (Accounts User, with print permission) gets no
+		leaf from the print format either."""
+		job = self.cheque.print_cheque(language="en")["print_job"]
+		with self.set_user(ACCOUNTS_USER):
+			html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job)
+		self.assertNotIn("tcl-figures", html)
+		self.assertIn("treasury-cheque-notice", html)
+		self.assertIn("This action requires one of the roles", html)
+
+	def test_forged_document_not_rendered(self):
+		"""Security Major 4: printview renders a client-sent document (`doc=` JSON); the leaf comes from the
+		saved cheque only."""
+		job = self.cheque.print_cheque(language="en")["print_job"]
+		self.cheque.reload()
+
+		def render_json(values) -> str:
+			with self.url_job(job):
+				return get_html_and_style(doc=frappe.as_json(values), print_format=FORMAT_CHEQUE)["html"]
+
+		# the registered cheque with other content: refused
+		forged = {**self.cheque.as_dict(), "amount": 999999, "payee_on_cheque": "Mallory Trading"}
+		html = render_json(forged)
+		self.assertNotIn("tcl-figures", html)
+		self.assertNotIn("Mallory", html)
+		self.assertIn("treasury-cheque-notice", html)
+		# the same content as saved prints the saved cheque
+		self.assertIn("tcl-figures", render_json(self.cheque.as_dict()))
+
+		# an unregistered cheque with a forged counter, job and fingerprint: refused (the database says 0)
+		other = make_pdc_cheque(amount=777, issue_date=day(-20), due_date=day(-5))
+		forged = {
+			**other.as_dict(),
+			"print_count": 3,
+			"last_print_job": job,
+			"last_printed_by": "Administrator",
+			"printed_fingerprint": printed_fingerprint(other),
+		}
+		html = render_json(forged)
+		self.assertNotIn("tcl-figures", html)
+		self.assertIn("treasury-cheque-notice", html)
+
+	def test_printed_content_locked(self):
+		"""Security Major 2: once printed, what the leaf shows cannot change by a save; a lifecycle change (a
+		postponed date) stops the leaf until a reprint is registered, which counts."""
+		job = self.cheque.print_cheque(language="en")["print_job"]
+		for fieldname, value in (
+			("payee_on_cheque", "Someone Else"),
+			("amount", 999),
+			("original_due_date", day(30)),
+			("cheque_no", unique_cheque_no()),
+		):
+			doc = frappe.get_doc(CHEQUE, self.cheque.name)
+			doc.set(fieldname, value)
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				doc.save()
+			self.assertIn("after the cheque was printed", str(ctx.exception))
+		doc = frappe.get_doc(CHEQUE, self.cheque.name)
+		doc.remarks = "Not on the leaf"
+		doc.save()  # other fields stay editable
+		self.assertIn("tcl-figures", self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job))
+
+		self.cheque.postpone(new_due_date=day(30), reason="The supplier asked")
+		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE, job)
+		self.assertNotIn("tcl-figures", html)
+		self.assertIn("changed after it was printed", html)
+
+		html = self.print_leaf(self.cheque, reprint=1, reason="New date")  # a Treasury Manager (setting on)
+		due = getdate(day(30))
+		self.assertIn(f"{due.day:02d}/{due.month:02d}/{due.year}", html)
+		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 2)
+
+	def test_reprint_reason_sanitised(self):
+		"""Security Major 3: the status log row inserted in place is sanitised like a save."""
 		self.cheque.print_cheque(language="en")
-		html = self.render(CHEQUE, self.cheque.name, FORMAT_CHEQUE)
-		self.assertIn("ACME Trading Co. W.L.L.", html)
+		self.cheque.print_cheque(language="en", reprint=1, reason='<img src=x onerror="alert(1)">Jammed')
+		remarks = frappe.db.get_value(
+			"PDC Status Log", {"parent": self.cheque.name, "event": "Reprinted"}, "remarks"
+		)
+		self.assertNotIn("onerror", remarks)
+		self.assertIn("Jammed", remarks)
+
+	def test_font_family_validated(self):
+		"""Security Minor 7: the font family is written into a style attribute: font names only."""
+		for bad in ("Arial;background:url(//x)", "Arial</style>", 'Arial"', "a" * 101):
+			layout = frappe.get_doc(LAYOUT, self.layout.name)
+			layout.font_family = bad
+			self.assertRaises(frappe.ValidationError, layout.save)
+		layout = frappe.get_doc(LAYOUT, self.layout.name)
+		layout.font_family = "\"Noto Naskh Arabic\", 'Traditional Arabic', Tahoma, sans-serif"
+		layout.save()
+		# a value saved before the check never reaches the page
+		layout = frappe.copy_doc(self.layout)
+		layout.font_family = "Arial;background:url(//x)"
+		self.assertEqual(self.leaf("en", layout).font_family, DEFAULT_FONT_FAMILY)
+
+	def test_layout_company_and_bank_access(self):
+		"""Security Major 5 / Minor 8, review Minor 9: a user restricted to another company (or bank account)
+		can neither create nor move a layout of this bank account, nor preview its company and currency."""
+		ensure_company(OTHER_COMPANY, OTHER_ABBR)
+		ensure_user(OTHER_COMPANY_MANAGER, ["Treasury Manager"])
+		add_user_permission(OTHER_COMPANY_MANAGER, "Company", OTHER_COMPANY, applicable_for=LAYOUT)
+		values = {
+			"doctype": LAYOUT,
+			"layout_name": "Foreign",
+			"bank_account": bank_account_name("EGP"),
+			"company": OTHER_COMPANY,  # sent by the client; the bank account says otherwise
+			"is_default": 1,
+		}
+		with self.set_user(OTHER_COMPANY_MANAGER):
+			self.assertRaises(frappe.PermissionError, frappe.get_doc(values).insert)
+			self.assertRaises(frappe.PermissionError, preview_layout, values, "en")
+		self.assertEqual(frappe.db.get_value(LAYOUT, self.layout.name, "is_default"), 1)
+
+		other_bank = ensure_other_company_bank().bank_account
+		ensure_user(OTHER_BANK_MANAGER, ["Treasury Manager"])
+		add_user_permission(OTHER_BANK_MANAGER, "Bank Account", other_bank, applicable_for=LAYOUT)
+		with self.set_user(OTHER_BANK_MANAGER):
+			# moving this bank's layout to the permitted bank account still needs write on the saved layout
+			layout = frappe.get_doc(LAYOUT, self.layout.name)
+			layout.bank_account = other_bank
+			self.assertRaises(frappe.PermissionError, layout.save)
+			self.assertRaises(frappe.PermissionError, preview_layout, values, "en")
+			preview = preview_layout({**values, "bank_account": other_bank}, "en")
+			self.assertIn("tcl-grid", preview)
+		self.assertEqual(frappe.db.get_value(LAYOUT, self.layout.name, "bank_account"), bank_account_name("EGP"))
+
+	def test_currency_fractions(self):
+		"""Review Minor 7: decimals only from a power of 10; a currency without fraction units still words its
+		fraction."""
+		ensure_currency("TQF", "Fifth", 5)
+		ensure_currency("TQT", "Tenth", 10)
+		self.assertEqual((currency_decimals("TQF"), currency_decimals("TQT")), (2, 1))
+		if not frappe.db.exists("Currency", "TQZ"):
+			frappe.get_doc(
+				{"doctype": "Currency", "currency_name": "TQZ", "fraction_units": 0, "enabled": 1}
+			).insert(ignore_permissions=True)
+		self.assertEqual(currency_decimals("TQZ"), 2)
+		self.assertIn("Fifty", treasury_amount_in_words(10.50, "TQZ", "en"))
 
 	# ------------------------------------------------------------------ batches
 
@@ -428,7 +626,7 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 			(result["print_format"], result["printed"], result["skipped"], result["language"]),
 			(FORMAT_BATCH, [second, third], [], "en"),
 		)
-		html = self.render(BATCH, batch.name, FORMAT_BATCH)
+		html = self.render(BATCH, batch.name, FORMAT_BATCH, result["print_job"])
 		self.assertEqual(html.count('class="treasury-cheque-page"'), 2)
 		figures = [fmt_money(amount, precision=2) for amount in (2000, 3000)]
 		self.assertLess(html.index(figures[0]), html.index(figures[1]))  # batch row order
@@ -436,12 +634,24 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		self.assertRaises(ChequeAlreadyPrintedError, batch.print_cheques, language="en")
 		result = batch.print_cheques(language="en", only_unprinted=1)
 		self.assertEqual((result["printed"], sorted(result["skipped"])), ([], sorted([second, third])))
+		self.assertIsNone(result["print_job"])
 
 		replaced = frappe.get_doc(CHEQUE, second).replace(
 			{"cheque_no": unique_cheque_no(), "replacement_date": day(-5), "reason": "Wrong date"}
 		)
 		result = batch.print_cheques(language="en", only_unprinted=1)
 		self.assertEqual((result["printed"], result["skipped"]), ([replaced["replaced_by"]], [third]))
+		# security Major 1: "Print Unprinted Only" prints the leaf it registered, never the skipped cheque
+		html = self.render(BATCH, batch.name, FORMAT_BATCH, result["print_job"])
+		self.assertEqual(html.count('class="treasury-cheque-page"'), 1)
+		self.assertEqual(html.count("tcl-figures"), 1)
+		self.assertIn(fmt_money(2000, precision=2), html)  # the replacement of the 2000 cheque
+		self.assertNotIn(fmt_money(3000, precision=2), html)  # the skipped, already printed cheque
+		# no job, a made-up job: nothing prints
+		for job in (None, FORGED_JOB):
+			html = self.render(BATCH, batch.name, FORMAT_BATCH, job)
+			self.assertNotIn("tcl-figures", html)
+			self.assertIn("treasury-cheque-notice", html)
 
 		result = batch.print_cheques(language="ar", reprint=1, reason="Printer jam")
 		self.assertEqual(sorted(result["printed"]), sorted([third, replaced["replaced_by"]]))

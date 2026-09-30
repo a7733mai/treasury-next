@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt
 
+from treasury.pdc import cheque_printing
+
 # Leaf size limits (mm) and the A4 sheet a carrier layout is printed on.
 MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT = 50, 300, 30, 150
 A4_WIDTH, A4_HEIGHT = 210, 297
@@ -108,6 +110,8 @@ class ChequeLayout(Document):
 
 	def validate(self):
 		self.validate_bank_account()
+		self.validate_access()
+		self.validate_font_family()
 		self.validate_leaf_size()
 		self.validate_boxes()
 		self.validate_fonts()
@@ -137,6 +141,25 @@ class ChequeLayout(Document):
 				)
 			)
 		self.company = values.company
+
+	def validate_access(self):
+		"""Frappe checked the create / write permission on the values the client sent, before `company` was
+		derived from the bank account: check again on the real company and bank account, and on the saved
+		layout being changed, or a user limited to company A could re-position company B's cheques (and take
+		the default from B's layouts in `on_update`)."""
+		if self.flags.ignore_permissions:
+			return
+		cheque_printing.check_bank_access(self.bank_account)
+		self.check_permission("create" if self.is_new() else "write")
+		before = None if self.is_new() else self.get_doc_before_save()
+		if before and before.bank_account != self.bank_account:
+			cheque_printing.check_bank_access(before.bank_account)
+			before.check_permission("write")
+
+	def validate_font_family(self):
+		self.font_family = (self.font_family or "").strip() or cheque_printing.DEFAULT_FONT_FAMILY
+		if not cheque_printing.is_valid_font_family(self.font_family):
+			frappe.throw(_("Font Family may contain only font names, spaces, commas, hyphens and quotes."))
 
 	def validate_leaf_size(self):
 		width, height = flt(self.leaf_width_mm), flt(self.leaf_height_mm)

@@ -15,9 +15,10 @@ belongs to the book of the same bank account whose range covers the number: a bo
 then the newest (overlapping ranges exist only between a closed book and a newer one).
 
 Statuses are read with `frappe.get_all`: leaf consumption must be truthful for whoever manages the books (the
-Cheque Book Usage report counts the same way). Party, amount, dates, document and Payment Entry are shown only
-for the documents the user may read (`frappe.get_list`); the other used leaves keep their status and usage
-with blank details and `restricted = 1`.
+Cheque Book Usage report counts with this engine). Party, amount, dates, document and Payment Entry are shown
+only for the documents the user may read (`frappe.get_list`); the other used leaves keep their status and
+usage with blank details (the cancel reason and user of a cancelled cheque too) and `restricted = 1`. Their
+activity date (the issue date) is still set, so a period filter treats every leaf alike.
 
 A fixed number of queries per call, whatever the number of leaves or cheques.
 """
@@ -274,9 +275,18 @@ def _load(books: list[frappe._dict], details: bool) -> frappe._dict:
 		fields=["name", "bank_account", "start_no", "end_no", "status", "creation"],
 	)
 	filters = {"bank_account": ["in", banks], "direction": OUTGOING}
-	pdc_rows = frappe.get_all(PDC, filters=filters, fields=PDC_FIELDS, order_by="creation asc, name asc")
+	# only the documents that can sit on these books' leaves: of these books, or of no book (a hand-typed
+	# number, the PDC Cheque of a security cheque's encashment), not those of the bank's other books
+	or_filters = [["cheque_book", "in", book_names], ["cheque_book", "is", "not set"]]
+	pdc_rows = frappe.get_all(
+		PDC, filters=filters, or_filters=or_filters, fields=PDC_FIELDS, order_by="creation asc, name asc"
+	)
 	security_rows = frappe.get_all(
-		SECURITY, filters=filters, fields=SECURITY_FIELDS, order_by="creation asc, name asc"
+		SECURITY,
+		filters=filters,
+		or_filters=or_filters,
+		fields=SECURITY_FIELDS,
+		order_by="creation asc, name asc",
 	)
 	cancelled = get_cancelled_rows(book_names)
 
@@ -306,7 +316,7 @@ def _load(books: list[frappe._dict], details: bool) -> frappe._dict:
 		payment_entries={},
 	)
 	if details:
-		_load_details(context, filters)
+		_load_details(context, filters, or_filters)
 	return context
 
 
@@ -319,12 +329,16 @@ def _covering_book(books, number: int) -> str | None:
 	return candidates[0].name
 
 
-def _load_details(context: frappe._dict, filters: dict):
+def _load_details(context: frappe._dict, filters: dict, or_filters: list):
 	"""The documents the user may read, and the Payment Entries of the readable PDC Cheques on the leaves."""
 	if frappe.has_permission(PDC, "read"):
-		context.readable_pdc = set(frappe.get_list(PDC, filters=filters, pluck="name"))
+		context.readable_pdc = set(
+			frappe.get_list(PDC, filters=filters, or_filters=or_filters, pluck="name")
+		)
 	if frappe.has_permission(SECURITY, "read"):
-		context.readable_security = set(frappe.get_list(SECURITY, filters=filters, pluck="name"))
+		context.readable_security = set(
+			frappe.get_list(SECURITY, filters=filters, or_filters=or_filters, pluck="name")
+		)
 	on_leaves = {row.name for leaves in context.pdc.values() for rows in leaves.values() for row in rows}
 	on_leaves |= {
 		row.converted_pdc_cheque
@@ -425,14 +439,19 @@ def _leaf_row(context: frappe._dict, book, number: int) -> frappe._dict:
 			cancelled_on=cancelled.date,
 			cancelled_by=cancelled.user,
 		)
+		source = None
 		if cancelled.source_doctype and cancelled.source_name:
 			source = (
 				context.pdc_by_name.get(cancelled.source_name) if cancelled.source_doctype == PDC else None
 			)
 			_set_document(context, row, cancelled.source_doctype, cancelled.source_name, source)
 		elif pdc:
+			source = pdc
 			_set_document(context, row, PDC, pdc.name, pdc)
-		row.activity_date = row.issue_date or cancelled.date
+		if row.restricted:
+			# the reason of a cheque's cancellation often names its party: hidden with the cheque's details
+			row.update(cancel_reason=None, cancelled_by=None)
+		row.activity_date = (source.issue_date if source else None) or cancelled.date
 	elif security:
 		_set_document(context, row, SECURITY, security.name, security)
 		if pdc and pdc.name in context.readable_pdc:
@@ -442,10 +461,10 @@ def _leaf_row(context: frappe._dict, book, number: int) -> frappe._dict:
 				clearance_date=pdc.actual_clearance_date,
 				payment_entry=context.payment_entries.get(pdc.name, ""),
 			)
-		row.activity_date = row.issue_date
+		row.activity_date = security.issue_date
 	elif pdc:
 		_set_document(context, row, PDC, pdc.name, pdc)
-		row.activity_date = row.issue_date
+		row.activity_date = pdc.issue_date
 	return row
 
 

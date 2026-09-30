@@ -84,6 +84,8 @@
   "print_count",
   "last_printed_on",
   "last_printed_by",
+  "last_print_job",
+  "printed_fingerprint",
   "more_info_section",
   "remarks",
   "column_break_more",
@@ -647,6 +649,24 @@
    "label": "Last Printed By",
    "no_copy": 1,
    "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "The registration of the last print: the leaf renders only for it.",
+   "fieldname": "last_print_job",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Last Print Job",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The printed payee, amount, currency and date at the last print: the leaf renders only while they are unchanged.",
+   "fieldname": "printed_fingerprint",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Printed Content Fingerprint",
+   "no_copy": 1,
    "read_only": 1
   },
   {

@@ -31,6 +31,7 @@ from treasury.balance_alerts import guard
 from treasury.bank_facilities import instruments
 from treasury.bank_transfers import fees
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
+from treasury.utils.protected_fields import insert_log_row
 
 DOCTYPE = "Bank Transfer"
 EVENT_TRANSFER = "bt_transfer"
@@ -124,7 +125,7 @@ def _write_in_place(doc, first_new_row: int, fields: tuple[str, ...] = ()):
 	"""Submit / cancel hooks, where the document is not saved again: insert the new log rows and write the
 	statuses (and `fields`) directly."""
 	for row in doc.status_log[first_new_row:]:
-		row.db_insert()
+		insert_log_row(row)
 	values = {"status": doc.status, "accounting_status": doc.accounting_status}
 	values.update({f: doc.get(f) for f in fields})
 	doc.db_set(values)
@@ -375,7 +376,7 @@ def _finish_action_guard(doc, snapshot, allow_low_balance=0):
 	"""Post-state of the guard of an action on a saved transfer: an override row is inserted in place."""
 	row = finish_balance_guard(doc, snapshot, allow_low_balance)
 	if row:
-		row.db_insert()
+		insert_log_row(row)
 
 
 def send_now(name: str, execution_date=None, remarks=None, allow_low_balance=0) -> dict:

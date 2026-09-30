@@ -12,7 +12,7 @@ from frappe.utils import cint, flt, getdate, money_in_words
 
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import cheque_printing, lifecycle
-from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no
+from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no, lock_covering_books
 from treasury.utils import references, voucher_summary
 from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils.protected_fields import changed_fields, changed_tables
@@ -80,7 +80,12 @@ PROTECTED_FIELDS = (
 	"print_count",
 	"last_printed_on",
 	"last_printed_by",
+	"last_print_job",
+	"printed_fingerprint",
 )
+# What the leaf of a printed cheque shows (cheque_printing.PRINTED_FIELDS): a form / REST save cannot change it
+# once the cheque was printed; the leaf is then replaced or cancelled (design 7f fix round 2).
+PRINTED_LOCKED_FIELDS = cheque_printing.PRINTED_FIELDS
 # Append-only history tables, appended to only by the lifecycle.
 PROTECTED_TABLES = ("status_log", "postponements")
 # A cheque number may be reused on a bank account only by cheques in these statuses.
@@ -134,6 +139,7 @@ class PDCCheque(Document):
 		handover_date: DF.Date | None
 		is_postponed: DF.Check
 		issue_date: DF.Date
+		last_print_job: DF.Data | None
 		last_printed_by: DF.Link | None
 		last_printed_on: DF.Datetime | None
 		mode_of_payment: DF.Link | None
@@ -162,6 +168,7 @@ class PDCCheque(Document):
 		postponement_count: DF.Int
 		postponements: DF.Table[PDCPostponement]
 		print_count: DF.Int
+		printed_fingerprint: DF.Data | None
 		project: DF.Link | None
 		references: DF.Table[PDCChequeReference]
 		remarks: DF.SmallText | None
@@ -185,21 +192,22 @@ class PDCCheque(Document):
 			self.set_onload(
 				"payment_entries", voucher_summary.payment_entries(self.doctype, [self.name], cycle=cycle)
 			)
-			self.set_onload("cheque_print_format", self.get_cheque_print_format())
-			self.set_onload("batch_locked", self.is_batch_locked())
 			layout = (
 				cheque_printing.get_layout(self.bank_account) if self.direction == lifecycle.OUTGOING else None
 			)
+			self.set_onload("cheque_print_format", self.get_cheque_print_format(layout))
+			self.set_onload("batch_locked", self.is_batch_locked())
 			# {name, default_language, reprint_requires_manager}: the "Print Cheque" dialog (design 7f §6.2)
 			self.set_onload("cheque_layout", cheque_printing.layout_info(layout, self.company))
 
-	def get_cheque_print_format(self) -> str | None:
+	def get_cheque_print_format(self, layout=None) -> str | None:
 		"""The print format of the cheque leaf: an outgoing cheque's bank Cheque Layout ("Treasury Cheque"),
-		else the Cheque Print Format of the bank's PDC Account Mapping row, else "PDC Cheque Print"."""
+		else the Cheque Print Format of the bank's PDC Account Mapping row, else "PDC Cheque Print".
+		`layout`: the bank's layout when the caller already loaded it (one lookup per form load)."""
 		if not self.bank_account:
 			return None
 		if self.direction == lifecycle.OUTGOING:
-			return cheque_printing.resolve_print_format(self.company, self.bank_account)
+			return cheque_printing.resolve_print_format(self.company, self.bank_account, layout)
 		return (
 			cheque_printing.mapping_print_format(self.company, self.bank_account)
 			or cheque_printing.LEGACY_FORMAT
@@ -499,10 +507,15 @@ class PDCCheque(Document):
 		if not self.flags.treasury_batch_validation and (
 			self.has_value_changed("cheque_no") or self.has_value_changed("bank_account")
 		):
+			# The books covering the number first (as the allocation does: book, then bank account), so a
+			# concurrent Void Leaf / Cancel Leaf of that leaf waits for this save, and the other way round.
+			books = lock_covering_books(self.bank_account, self.cheque_no)
 			# Serialise concurrent saves of cheque numbers on this bank account until commit, so two
 			# transactions cannot both pass the duplicate check below with the same hand-typed number.
 			# (Not for the never-inserted cheques a draft Cheque Batch validates its rows with.)
 			frappe.db.get_value("Bank Account", self.bank_account, "name", for_update=True)
+			if not self.cheque_book:
+				self._validate_not_cancelled_leaf(books)
 		duplicate = frappe.db.exists(
 			"PDC Cheque",
 			{
@@ -539,6 +552,29 @@ class PDCCheque(Document):
 				)
 			)
 
+	def _validate_not_cancelled_leaf(self, books: list[str]):
+		"""A hand-typed number (no cheque book) must not be a cancelled / void leaf of a book in use covering it
+		(the same rule as `validate_cheque_book` for a cheque of a book)."""
+		if not books:
+			return
+		open_books = frappe.get_all(
+			"Cheque Book", filters={"name": ["in", books], "status": ["!=", "Closed"]}, pluck="name"
+		)
+		if not open_books:
+			return
+		number = cint(self.cheque_no)
+		for row in frappe.get_all(
+			"Cheque Book Cancelled Leaf",
+			filters={"parenttype": "Cheque Book", "parent": ["in", open_books]},
+			fields=["parent", "cheque_no"],
+		):
+			if str(row.cheque_no or "").strip().isdigit() and cint(row.cheque_no) == number:
+				frappe.throw(
+					_("Cheque No {0} is a cancelled leaf of Cheque Book {1}.").format(
+						frappe.bold(self.cheque_no), frappe.bold(row.parent)
+					)
+				)
+
 	def validate_dates(self):
 		if getdate(self.original_due_date) < getdate(self.issue_date):
 			frappe.throw(_("The Original Due Date cannot be before the Issue Date."))
@@ -561,6 +597,7 @@ class PDCCheque(Document):
 		if not before:
 			return
 
+		self._validate_printed_fields(before)
 		self._validate_batch_locked_fields(before)
 		if before.operational_status != "Created":
 			changed = [f for f in LOCKED_DATE_FIELDS if getdate(before.get(f)) != getdate(self.get(f))]
@@ -626,6 +663,20 @@ class PDCCheque(Document):
 				).format(
 					", ".join(_(self.meta.get_label(f)) for f in changed), frappe.bold(self.cheque_batch)
 				),
+				title=_("Not Allowed"),
+			)
+
+	def _validate_printed_fields(self, before):
+		"""A printed leaf is what it is: its payee, amount, currency, date, bank and number cannot change by a
+		form / REST save, or a later print would show other content than the registered one."""
+		if self.flags.treasury_lifecycle or not cint(before.print_count):
+			return
+		changed = changed_fields(self, before, PRINTED_LOCKED_FIELDS)
+		if changed:
+			frappe.throw(
+				_(
+					"{0} cannot be changed after the cheque was printed. Replace or cancel the cheque instead."
+				).format(", ".join(_(self.meta.get_label(f)) for f in changed)),
 				title=_("Not Allowed"),
 			)
 

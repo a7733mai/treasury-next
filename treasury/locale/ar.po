@@ -11617,3 +11617,31 @@ msgstr "تغييرات الحالة"
 
 msgid "Custody Moves"
 msgstr "حركات الحفظ"
+
+# Phase 7f fix round 2 — cheque printing: registered prints only, locked printed content
+msgid "Last Print Job"
+msgstr "آخر عملية طباعة"
+
+msgid "The registration of the last print: the leaf renders only for it."
+msgstr "تسجيل آخر طباعة: لا تُعرض ورقة الشيك إلا لها."
+
+msgid "Printed Content Fingerprint"
+msgstr "بصمة المحتوى المطبوع"
+
+msgid "The printed payee, amount, currency and date at the last print: the leaf renders only while they are unchanged."
+msgstr "المستفيد والمبلغ والعملة والتاريخ عند آخر طباعة: لا تُعرض ورقة الشيك إلا ما دامت دون تغيير."
+
+msgid "{0} cannot be changed after the cheque was printed. Replace or cancel the cheque instead."
+msgstr "لا يمكن تغيير {0} بعد طباعة الشيك. استبدل الشيك أو ألغه بدلاً من ذلك."
+
+msgid "Cheque {0} changed after it was printed. Print it again with \"Print Cheque\" (a reprint)."
+msgstr "تغيّر الشيك {0} بعد طباعته. اطبعه مرة أخرى من \"طباعة الشيك\" (إعادة طباعة)."
+
+msgid "Save the cheque before printing it."
+msgstr "احفظ الشيك قبل طباعته."
+
+msgid "Font Family may contain only font names, spaces, commas, hyphens and quotes."
+msgstr "لا يجوز أن تحتوي عائلة الخط إلا على أسماء خطوط ومسافات وفواصل وشرطات وعلامات تنصيص."
+
+msgid "Row #{0}: the reason type {1} is recorded only when a cheque is cancelled."
+msgstr "الصف #{0}: نوع السبب {1} لا يُسجَّل إلا عند إلغاء شيك."

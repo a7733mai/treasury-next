@@ -248,9 +248,13 @@ any party can be encashed (not one of an *Other* party).
   Cheque* replaces the party name on the leaf. A Cheque Batch prints all its printable cheques at once
   (*Cheque Batch Leaves*, all or nothing, *Print Unprinted Only* / *Reprint All*). Printing never posts
   anything. Without a layout, the bank keeps the Cheque Print Format of its PDC Account Mapping row or
-  *PDC Cheque Print* (no counter). A printview URL opened again later is not counted (a page view cannot
-  write); the format renders only cheques registered at least once. Security cheques and incoming cheques
-  are not printed on layouts.
+  *PDC Cheque Print* (no counter). A leaf renders only for a registered print: from the saved cheque (never
+  from a document sent by the browser), for a user with a Treasury role, for the print job of the URL
+  registered by that same user, and while the payee, amount, currency, date, bank and number are the
+  registered ones. Once printed, those fields cannot be edited (replace or cancel the cheque); a postponed
+  date stops the leaf until a reprint is registered. *Print Unprinted Only* prints exactly the leaves it
+  registered. The same printview URL opened again by the same user before any new print is not counted (a
+  page view cannot write). Security cheques and incoming cheques are not printed on layouts.
 - **PDC Bank Clearing** tool: suggests matches between open Bank Transactions and cheques (cheque no /
   amount, date tolerance), clears the selected cheques with the bank transaction date and reconciles the
   Bank Transaction against the bank Journal Entry — the engine of *On Bank Transaction Date*. It only

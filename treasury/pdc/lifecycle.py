@@ -34,6 +34,7 @@ from treasury.pdc import cheque_printing
 from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
+from treasury.utils.protected_fields import insert_log_row
 
 DOCTYPE = "PDC Cheque"
 OUTGOING = "Outgoing"
@@ -133,7 +134,7 @@ def after_insert(doc):
 	doc.db_update()
 	for row in doc.status_log:
 		if not row.name or not frappe.db.exists("PDC Status Log", row.name):
-			row.db_insert()
+			insert_log_row(row)
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +162,7 @@ def deliver(name: str, handover_date=None, remarks: str | None = None, allow_low
 	if text:
 		# the cheque was just saved: the override row is inserted in place
 		_log(doc, "Low Balance Override", remarks=text)
-		doc.status_log[-1].db_insert()
+		insert_log_row(doc.status_log[-1])
 		# the result was built before the override row: it says so too
 		result["low_balance_override"] = text
 	return result
@@ -617,10 +618,16 @@ def check_reprint(doc, reason: str | None):
 		)
 
 
-def record_print(name: str, language: str | None, reprint=0, reason: str | None = None) -> dict:
+def record_print(
+	name: str, language: str | None, reprint=0, reason: str | None = None, job: str | None = None
+) -> dict:
 	"""Register the print of an outgoing cheque on its bank's Cheque Layout: the counter, the last printed on /
-	by and a "Printed" / "Reprinted" status log row. A printed cheque is printed again only with `reprint`
-	and a reason (ChequeAlreadyPrintedError otherwise). Returns what the form needs to open the print."""
+	by, a "Printed" / "Reprinted" status log row, the print job and the fingerprint of the printed content. A
+	printed cheque is printed again only with `reprint` and a reason (ChequeAlreadyPrintedError otherwise).
+
+	The leaf then renders only for this job, for the user who registered it, while the printed content is
+	unchanged (cheque_printing.leaf_refusal). `job`: one id for all the cheques of a batch print (register_prints).
+	Returns what the form needs to open the print."""
 	doc = begin_print(name)
 	layout = check_printable(doc)
 	code = cheque_printing.lang_code(language, layout)
@@ -643,16 +650,24 @@ def record_print(name: str, language: str | None, reprint=0, reason: str | None 
 		remarks += ": " + reason.strip()
 	_log(doc, "Reprinted" if count else "Printed", remarks=remarks)
 	# the status log is append-only and nothing else changes: the row is inserted in place (like the low
-	# balance override), the counter written directly
-	doc.status_log[-1].db_insert()
+	# balance override, sanitised: the reason is user text), the counter written directly
+	insert_log_row(doc.status_log[-1])
+	job = job or cheque_printing.new_print_job()
 	doc.db_set(
-		{"print_count": count + 1, "last_printed_on": now_datetime(), "last_printed_by": real_user()}
+		{
+			"print_count": count + 1,
+			"last_printed_on": now_datetime(),
+			"last_printed_by": real_user(),
+			"last_print_job": job,
+			"printed_fingerprint": cheque_printing.printed_fingerprint(doc),
+		}
 	)
 	return {
 		"name": doc.name,
 		"print_count": count + 1,
 		"print_format": cheque_printing.FORMAT_CHEQUE,
 		"language": code,
+		"print_job": job,
 	}
 
 

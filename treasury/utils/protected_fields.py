@@ -7,6 +7,9 @@ before the save (PDCCheque / SecurityCheque.validate_protected_fields).
 import frappe
 from frappe.model import no_value_fields
 from frappe.utils import cint, flt, get_datetime, getdate
+from frappe.utils.html_utils import sanitize_html
+
+TEXT_FIELDTYPES = ("Data", "Small Text", "Text", "Long Text")
 
 
 def normalize(value, fieldtype: str):
@@ -39,6 +42,17 @@ def table_key(doc, table: str) -> list[tuple]:
 		if df.fieldtype not in no_value_fields
 	]
 	return [tuple(normalize(row.get(df.fieldname), df.fieldtype) for df in fields) for row in doc.get(table)]
+
+
+def insert_log_row(row):
+	"""Insert an appended history row in place (the document is not saved again). `db_insert` skips the
+	sanitising a save does, so user text (remarks, reasons) would be stored as raw HTML and run in the form:
+	the text fields are sanitised here, whatever the docstatus (a save skips submitted rows)."""
+	for df in row.meta.get("fields"):
+		value = row.get(df.fieldname)
+		if df.fieldtype in TEXT_FIELDTYPES and isinstance(value, str) and ("<" in value or ">" in value):
+			row.set(df.fieldname, sanitize_html(value))
+	row.db_insert()
 
 
 def changed_tables(doc, before, tables, lifecycle_save: bool) -> list[str]:

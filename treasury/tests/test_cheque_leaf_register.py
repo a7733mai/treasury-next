@@ -362,6 +362,47 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 			self.assertEqual(self.rows(book, party_type="Supplier", party=OTHER_SUPPLIER), {})
 		self.assertEqual(self.row(book, 1).document, hidden.name)
 
+	def test_restricted_cancelled_and_period(self):
+		"""Security Minor 10: an unreadable cancelled cheque's reason and user are hidden. Review Minor 3: a
+		restricted leaf keeps its activity date, so a period filter treats it like any other leaf."""
+		book = self.book(size=5)
+		dates = {"issue_date": day(-10), "due_date": day(-1)}
+		hidden = make_pdc_cheque(cheque_book=book.name, party=OTHER_SUPPLIER, **dates)
+		hidden.cancel_cheque(reason=f"{OTHER_SUPPLIER} refused it")
+		make_pdc_cheque(cheque_book=book.name, party=OTHER_SUPPLIER, **dates)
+		allowed = make_pdc_cheque(cheque_book=book.name)
+		ensure_user(RESTRICTED_USER, ["Treasury User", "Accounts User"])
+		add_user_permission(RESTRICTED_USER, "PDC Cheque", allowed.name)
+
+		with self.set_user(RESTRICTED_USER):
+			cancelled = self.rows(book)[book.start_no]
+			self.assertEqual(
+				(cancelled.status, cancelled.restricted, cancelled.cancel_reason, cancelled.cancelled_by),
+				("Cancelled Leaf", 1, None, None),
+			)
+			self.assertEqual(cancelled.cancel_reason_type, "Cheque Cancelled")
+			rows = self.rows(book, from_date=day(-10), to_date=day(-10))
+			self.assertEqual(set(rows), {book.start_no, book.start_no + 1})
+			self.assertEqual(rows[book.start_no + 1].restricted, 1)
+		cancelled = self.row(book, 0)
+		self.assertEqual(
+			(cancelled.cancel_reason, cancelled.cancelled_by), (f"{OTHER_SUPPLIER} refused it", "Administrator")
+		)
+
+	def test_usage_agrees_on_cancelled_cheque_without_book(self):
+		"""Review Minor 2: a cancelled cheque with a hand-typed number and no book is a cancelled leaf in the
+		register and in Cheque Book Usage alike."""
+		book = self.book(size=10)
+		cheque = make_pdc_cheque(cheque_no=self.leaf(book, 3))
+		cheque.cancel_cheque(reason="Wrong payee")
+		self.assertEqual(self.row(book, 3).status, "Cancelled Leaf")
+		header, _summary = self.header(book)
+		_columns, data = cheque_book_usage({"company": COMPANY, "bank_account": book.bank_account})
+		usage = next(r for r in data if r.cheque_book == book.name)
+		fields = ("used_leaves", "cancelled_leaves", "void_leaves", "remaining_leaves")
+		self.assertEqual(tuple(usage[f] for f in fields), (0, 1, 0, 9))
+		self.assertEqual(tuple(usage[f] for f in fields), tuple(header[f] for f in fields))
+
 	def test_company_permission(self):
 		ensure_user(NO_ACCESS_USER, [])
 		with self.set_user(NO_ACCESS_USER):

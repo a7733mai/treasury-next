@@ -700,12 +700,14 @@ function cheque_batch_run_print(frm, args) {
 			frappe.msgprint({ message: __("All cheques of this batch are already printed."), indicator: "blue" });
 			return;
 		}
+		// print_job: the leaves registered by this call only (a skipped, already printed cheque never prints)
 		const params = new URLSearchParams({
 			doctype: info.doctype,
 			name: info.name,
 			format: info.print_format,
 			no_letterhead: 1,
 			trigger_print: 1,
+			print_job: info.print_job || "",
 			_lang: info.language || CHEQUE_BATCH_LANGUAGES[args.language] || "",
 		});
 		win.go(`/printview?${params.toString()}`);

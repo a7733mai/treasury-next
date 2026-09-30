@@ -206,13 +206,21 @@ frappe.ui.form.on("PDC Cheque", {
 			"issue_date",
 			"original_due_date",
 		];
+		// mirrors PDCCheque._validate_printed_fields: what the printed leaf shows (cheque_printing.PRINTED_FIELDS)
+		const printed = !frm.is_new() && cint(frm.doc.print_count) > 0;
+		const unprinted_fieldnames = ["direction", "exchange_rate", "issue_date"];
 		fieldnames.forEach((fieldname) =>
 			frm.set_df_property(
 				fieldname,
 				"read_only",
-				locked || (batch_locked && fieldname !== "exchange_rate") ? 1 : 0
+				locked ||
+					(batch_locked && fieldname !== "exchange_rate") ||
+					(printed && !unprinted_fieldnames.includes(fieldname))
+					? 1
+					: 0
 			)
 		);
+		frm.set_df_property("payee_on_cheque", "read_only", printed ? 1 : 0);
 		// mirrors the server lock: the vouchers carry the accounting details and dimensions
 		const posted = !frm.is_new() && frm.doc.accounting_status !== "Not Posted";
 		[...PDC_ACCOUNTING_FIELDS, ...pdc_dimension_fields(frm)].forEach((fieldname) =>
@@ -939,6 +947,8 @@ function pdc_register_print(frm, layout, dialog, values, reprint) {
 			format: result.print_format || "Treasury Cheque",
 			no_letterhead: 1,
 			trigger_print: 1,
+			// the leaf renders only for this registration (cheque_printing.leaf_refusal)
+			print_job: result.print_job || "",
 			_lang: result.language || PDC_LANGUAGES[values.language] || "",
 		});
 		win.go(`/printview?${params.toString()}`);

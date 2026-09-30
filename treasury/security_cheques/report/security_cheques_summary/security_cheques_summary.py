@@ -6,9 +6,10 @@ status, with the amounts of the live cheques aged by their expiry date.
 
 Amounts are in the company currency (report_utils.AmountConverter at the As On date) and only for Fixed
 cheques; an Open / Blank cheque is counted, never summed. The ageing buckets hold the live cheques (held /
-given) by days from As On to the expiry date: Expired (< 0), the ranges, beyond the last range and No Expiry.
-Cheques in a final status (returned, encashed, lost, cancelled) are listed only when selected, in Closed
-Amount. Held from others and given to others are never added together.
+given) by days from As On to the expiry date: Expired (< 0), the ranges, beyond the last range and No Expiry;
+Amount is the live exposure, the sum of the buckets. Cheques in a final status (returned, encashed, lost,
+cancelled) are listed only when selected, in Closed Amount (a column shown only then); a cheque in any other
+status (Created) is counted, not summed. Held from others and given to others are never added together.
 """
 
 import frappe
@@ -82,8 +83,10 @@ def execute(filters=None):
 			row.direction = direction
 		data.append(header_row(direction, label, rows, buckets, converter.company_currency))
 		data += rows
+	# Closed Amount only when a final status is selected (design 7f §9.2)
+	show_closed = bool(set(statuses) & set(FINAL_STATUSES))
 	return (
-		get_columns(buckets),
+		get_columns(buckets, show_closed),
 		data,
 		None,
 		get_chart(data, buckets),
@@ -171,11 +174,12 @@ def group_row(key, group_by, cheques, converter, as_on, ranges, buckets) -> frap
 		amount = converter.company_amount(cheque)
 		if cheque.status in FINAL_STATUSES:
 			row.closed_amount = flt(row.closed_amount + amount, precision)
-			continue
-		row.amount = flt(row.amount + amount, precision)
-		if cheque.status in LIVE_STATUSES:
+		elif cheque.status in LIVE_STATUSES:
+			# Amount is the live exposure: always the sum of its buckets
 			bucket = bucket_of(cheque, as_on, ranges)
 			row[bucket] = flt(row[bucket] + amount, precision)
+			row.amount = flt(row.amount + amount, precision)
+		# any other status (Created: not held / given yet) is counted only
 	return row
 
 
@@ -248,9 +252,15 @@ def get_summary(cheques: list, data: list, converter: AmountConverter, as_on) ->
 	]
 
 
-def get_columns(buckets) -> list[dict]:
+def get_columns(buckets, show_closed: bool = False) -> list[dict]:
 	"""`group_label` first (the tree toggle and a readable label: Held from / Given to Others, the party, the
-	purpose or the status); the keys stay as hidden columns for export (design 7f P18)."""
+	purpose or the status); the keys stay as hidden columns for export (design 7f P18). Closed Amount only
+	with `show_closed` (a final status selected)."""
+	closed = (
+		[column("closed_amount", _("Closed Amount"), "Currency", 120, options="company_currency")]
+		if show_closed
+		else []
+	)
 	return [
 		column("group_label", _("Group", context="Security Cheques Summary"), width=240),
 		column("fixed_count", _("Fixed", context="Security Cheques Summary"), "Int", 70),
@@ -260,7 +270,7 @@ def get_columns(buckets) -> list[dict]:
 			column(f, label, "Currency", 120 if f == "expired" else 110, options="company_currency")
 			for f, label in buckets
 		],
-		column("closed_amount", _("Closed Amount"), "Currency", 120, options="company_currency"),
+		*closed,
 		column("exposure", _("Security", context="Cheque Leaf"), width=140, hidden=1),
 		column("direction", _("Direction"), width=90, hidden=1),
 		column("party_type", _("Party Type"), width=90, hidden=1),
