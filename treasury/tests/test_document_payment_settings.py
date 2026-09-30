@@ -83,7 +83,11 @@ class TestDocumentPaymentSettings(TreasuryTestMixin, IntegrationTestCase):
 			as_dict=True,
 		)
 		self.assertEqual(
-			(values.default_installment_count, values.default_installment_frequency, values.auto_select_cheque_book),
+			(
+				values.default_installment_count,
+				values.default_installment_frequency,
+				values.auto_select_cheque_book,
+			),
 			(12, "Monthly", 1),
 		)
 
@@ -91,6 +95,8 @@ class TestDocumentPaymentSettings(TreasuryTestMixin, IntegrationTestCase):
 		self.use_company_settings(default_installment_count=6, default_installment_frequency="Quarterly")
 		set_document_payment_defaults.execute()
 		self.assertEqual(
-			frappe.db.get_value(DOCTYPE, COMPANY, ["default_installment_count", "default_installment_frequency"]),
+			frappe.db.get_value(
+				DOCTYPE, COMPANY, ["default_installment_count", "default_installment_frequency"]
+			),
 			(6, "Quarterly"),
 		)

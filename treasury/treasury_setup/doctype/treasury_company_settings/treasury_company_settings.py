@@ -22,7 +22,10 @@ TRANSFER_DEFAULT_BANK_FIELDS = {
 SWIFT = "SWIFT"
 INTERNATIONAL = "International"
 # Pay / receive from documents: the default bank of the cheques created from ERPNext documents.
-DOCUMENT_DEFAULT_BANK_FIELDS = ("default_outgoing_cheque_bank_account", "default_incoming_cheque_bank_account")
+DOCUMENT_DEFAULT_BANK_FIELDS = (
+	"default_outgoing_cheque_bank_account",
+	"default_incoming_cheque_bank_account",
+)
 
 # PDC accounts must be of type "Bank" so that Payment Entry accepts them as the bank side,
 # and must sit on the correct side of the balance sheet.

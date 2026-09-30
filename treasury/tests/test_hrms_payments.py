@@ -85,7 +85,10 @@ class TestHRMSPayments(TreasuryTestMixin, IntegrationTestCase):
 			("Outgoing", "Employee", employee, 1500),
 		)
 		self.assertEqual(
-			[(r["reference_doctype"], r["reference_name"], r["allocated_amount"]) for r in values["references"]],
+			[
+				(r["reference_doctype"], r["reference_name"], r["allocated_amount"])
+				for r in values["references"]
+			],
 			[("Expense Claim", claim.name, 1500)],
 		)
 		values["cheque_no"] = unique_cheque_no()

@@ -71,11 +71,14 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 		# how the amount was computed, for the intro of the form (client only, never saved)
 		bond = values["__bond"]
 		self.assertEqual(
-			(bond["kind"], flt(bond["percent"]), flt(bond["base"]), bond["currency"]), ("tender", 5, 100000, "EGP")
+			(bond["kind"], flt(bond["percent"]), flt(bond["base"]), bond["currency"]),
+			("tender", 5, 100000, "EGP"),
 		)
 		self.assertEqual(values["remarks"], f"Tender bond for Quotation {quotation.name}")
 		self.assertEqual(getdate(values["expiry_date"]), getdate(quotation.valid_till))
-		self.assertEqual((values["reference_doctype"], values["reference_name"]), ("Quotation", quotation.name))
+		self.assertEqual(
+			(values["reference_doctype"], values["reference_name"]), ("Quotation", quotation.name)
+		)
 		self.assertEqual(
 			(values["bank_account"], values["cheque_book"], values["currency"]),
 			(self.data.egp.bank_account, book.name, "EGP"),
@@ -102,9 +105,30 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 	def test_supplier_quotation_order_and_masters(self):
 		employee = ensure_employee()
 		cases = (
-			("Supplier Quotation", make_supplier_quotation(2000).name, "Incoming", "Tender", "Supplier", SUPPLIER),
-			("Sales Order", make_sales_order(3000).name, "Outgoing", "Contract Performance", "Customer", CUSTOMER),
-			("Purchase Order", make_purchase_order(4000).name, "Incoming", "Contract Performance", "Supplier", SUPPLIER),
+			(
+				"Supplier Quotation",
+				make_supplier_quotation(2000).name,
+				"Incoming",
+				"Tender",
+				"Supplier",
+				SUPPLIER,
+			),
+			(
+				"Sales Order",
+				make_sales_order(3000).name,
+				"Outgoing",
+				"Contract Performance",
+				"Customer",
+				CUSTOMER,
+			),
+			(
+				"Purchase Order",
+				make_purchase_order(4000).name,
+				"Incoming",
+				"Contract Performance",
+				"Supplier",
+				SUPPLIER,
+			),
 			("Customer", CUSTOMER, "Incoming", "Other", "Customer", CUSTOMER),
 			("Supplier", SUPPLIER, "Incoming", "Other", "Supplier", SUPPLIER),
 			("Employee", employee, "Incoming", "Employee Custody", "Employee", employee),
@@ -136,7 +160,9 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 		):
 			with self.subTest(doctype=doctype):
 				values = map_security(doctype, order.name)
-				self.assertEqual((values["direction"], values["purpose"]), (direction, "Contract Performance"))
+				self.assertEqual(
+					(values["direction"], values["purpose"]), (direction, "Contract Performance")
+				)
 				self.assertEqual((flt(values["amount"]), flt(values["required_amount"])), (amount, amount))
 				bond = values["__bond"]
 				self.assertEqual((bond["kind"], flt(bond["percent"])), ("performance", 10))

@@ -19,7 +19,11 @@ BANK_FACILITIES = "Bank Facilities"
 
 # invoice / order -> the Treasury documents allocating to it (child reference rows, or the Security Cheque's
 # own Dynamic Link)
-INVOICE_ITEMS = {"PDC Cheque": "reference_name", "Cheque Batch": "reference_name", "Bank Transfer": "reference_name"}
+INVOICE_ITEMS = {
+	"PDC Cheque": "reference_name",
+	"Cheque Batch": "reference_name",
+	"Bank Transfer": "reference_name",
+}
 ORDER_ITEMS = {**INVOICE_ITEMS, "Security Cheque": "reference_name"}
 QUOTATION_ITEMS = {"Security Cheque": "reference_name"}
 # voucher -> the Treasury documents whose status log names it
@@ -114,7 +118,9 @@ def purchase_order(data):
 
 
 def quotation(data):
-	return _extend(data, QUOTATION_ITEMS, dynamic_links={"reference_name": ["Quotation", "reference_doctype"]})
+	return _extend(
+		data, QUOTATION_ITEMS, dynamic_links={"reference_name": ["Quotation", "reference_doctype"]}
+	)
 
 
 def supplier_quotation(data):

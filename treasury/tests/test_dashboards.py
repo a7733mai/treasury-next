@@ -141,7 +141,9 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 				data = frappe.get_meta(doctype).get_dashboard_data()
 				self.assertIsNotNone(group(data, frappe._("Treasury")))
 
-		bank_account = frappe._dict(dashboards.bank_account(copy.deepcopy(original_dashboard("Bank Account"))))
+		bank_account = frappe._dict(
+			dashboards.bank_account(copy.deepcopy(original_dashboard("Bank Account")))
+		)
 		self.assertEqual(
 			group(bank_account, frappe._("Bank Facilities"))["items"],
 			[
@@ -182,13 +184,13 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 		cheque_batch.submit()  # its cheques exist from the submit on
 		make_bank_transfer(
 			amount=3000,
-			references=[{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 3000}],
+			references=[
+				{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 3000}
+			],
 		)
 
 		counts = self.counts("Purchase Invoice", pi.name)
-		self.assertEqual(
-			(counts["PDC Cheque"], counts["Cheque Batch"], counts["Bank Transfer"]), (3, 1, 1)
-		)
+		self.assertEqual((counts["PDC Cheque"], counts["Cheque Batch"], counts["Bank Transfer"]), (3, 1, 1))
 		payment_entries = frappe.get_all(
 			"Payment Entry Reference",
 			filters={"reference_doctype": "Purchase Invoice", "reference_name": pi.name},
@@ -216,7 +218,12 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 		make_security_cheque(party_type="Customer", party=customer)
 		counts = self.counts("Customer", customer)
 		self.assertEqual(
-			(counts["PDC Cheque"], counts["Security Cheque"], counts["Cheque Batch"], counts["Bank Transfer"]),
+			(
+				counts["PDC Cheque"],
+				counts["Security Cheque"],
+				counts["Cheque Batch"],
+				counts["Bank Transfer"],
+			),
 			(2, 1, 0, 0),
 		)
 		# a Supplier with the same name: the party type filter keeps the customer's cheques out
@@ -229,7 +236,13 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 		# a bank account of its own: one cheque book and one outgoing security cheque
 		own = make_own_bank()
 		frappe.get_doc(
-			{"doctype": "Cheque Book", "company": COMPANY, "bank_account": own.bank_account, "start_no": 1, "end_no": 50}
+			{
+				"doctype": "Cheque Book",
+				"company": COMPANY,
+				"bank_account": own.bank_account,
+				"start_no": 1,
+				"end_no": 50,
+			}
 		).insert()
 		make_security_cheque(direction="Outgoing", party_type="Supplier", bank_account=own.bank_account)
 		counts = self.counts("Bank Account", own.bank_account)
@@ -274,7 +287,9 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 				"party": SUPPLIER,
 				"bank_account": self.data.egp.bank_account,
 				"issue_date": today(),
-				"cheques": [{"due_date": add_days(today(), 30), "amount": 1500, "cheque_no": unique_cheque_no()}],
+				"cheques": [
+					{"due_date": add_days(today(), 30), "amount": 1500, "cheque_no": unique_cheque_no()}
+				],
 			}
 		).insert()
 		cheque_batch.submit()
@@ -299,7 +314,9 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 			("Cheque Discounting", {"facility": facility.name}),
 		):
 			# the connection only needs the link fields: saved without the document's own validation
-			frappe.get_doc({"doctype": doctype, "name": frappe.generate_hash(length=12), **values}).db_insert()
+			frappe.get_doc(
+				{"doctype": doctype, "name": frappe.generate_hash(length=12), **values}
+			).db_insert()
 		frappe.get_doc(
 			{
 				"doctype": "Bank Facility Security Cheque",

@@ -57,9 +57,9 @@ def check_supported(doctype: str):
 		frappe.throw(_("{0} needs the HRMS app.").format(_(doctype)))
 	if doctype not in employee_reference_doctypes():
 		frappe.throw(
-			_(
-				"This HRMS version does not accept {0} as a Payment Entry reference; pay it from HRMS."
-			).format(_(doctype))
+			_("This HRMS version does not accept {0} as a Payment Entry reference; pay it from HRMS.").format(
+				_(doctype)
+			)
 		)
 
 

@@ -1146,7 +1146,9 @@ def isolate_cheque_books(testcase, bank_account: str):
 	)
 	for name in books:
 		frappe.db.set_value("Cheque Book", name, "status", "Closed", update_modified=False)
-		testcase.addCleanup(frappe.db.set_value, "Cheque Book", name, "status", "Active", update_modified=False)
+		testcase.addCleanup(
+			frappe.db.set_value, "Cheque Book", name, "status", "Active", update_modified=False
+		)
 
 
 # ---------------------------------------------------------------------------

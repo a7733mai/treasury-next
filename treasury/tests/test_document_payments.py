@@ -121,12 +121,16 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		values = map_cheque("Purchase Invoice", pi.name)
 
 		self.assertEqual(self.count("PDC Cheque"), before)
-		self.assertEqual((values["doctype"], values.get("__islocal"), values.get("name")), ("PDC Cheque", 1, None))
+		self.assertEqual(
+			(values["doctype"], values.get("__islocal"), values.get("name")), ("PDC Cheque", 1, None)
+		)
 		self.assertEqual(
 			(values["direction"], values["naming_series"], values["party_type"], values["party"]),
 			("Outgoing", "PDC-OUT-.YYYY.-.#####", "Supplier", SUPPLIER),
 		)
-		self.assertEqual((flt(values["amount"]), values["currency"], flt(values["exchange_rate"])), (20000, "EGP", 1))
+		self.assertEqual(
+			(flt(values["amount"]), values["currency"], flt(values["exchange_rate"])), (20000, "EGP", 1)
+		)
 		self.assertEqual(getdate(values["issue_date"]), getdate(today()))
 		self.assertEqual(getdate(values["original_due_date"]), max(getdate(pi.due_date), getdate(today())))
 		self.assertEqual((values["bank_account"], values["cheque_book"]), (egp.bank_account, book.name))
@@ -141,9 +145,7 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		self.assertEqual(cheque.cheque_no, book.format_leaf(book.start_no))
 		cheque.deliver(handover_date=today())
 		cheque.reload()
-		self.assertEqual(
-			(cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted")
-		)
+		self.assertEqual((cheque.operational_status, cheque.accounting_status), ("Delivered", "Party Posted"))
 		assert_gl_entries(
 			self,
 			"Payment Entry",
@@ -153,7 +155,9 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 				(egp.pdc_payable, 0, 20000, None, today()),
 			],
 		)
-		self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "mode_of_payment"), mode)
+		self.assertEqual(
+			frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "mode_of_payment"), mode
+		)
 		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 0)
 
 	def test_cheque_from_sales_invoice_and_order(self):
@@ -240,7 +244,9 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		values = map_cheque("Purchase Invoice", usd_pi.name)
 		self.assertEqual((values["bank_account"], values["currency"]), (usd.bank_account, "USD"))
 		self.assertEqual(flt(values["exchange_rate"]), 50)
-		self.assertEqual((flt(values["amount"]), refs(values)), (1000, [("Purchase Invoice", usd_pi.name, 1000)]))
+		self.assertEqual(
+			(flt(values["amount"]), refs(values)), (1000, [("Purchase Invoice", usd_pi.name, 1000)])
+		)
 
 		# an EGP supplier and a USD default bank: the amount in USD, the allocation in EGP
 		self.use_company_settings(default_outgoing_cheque_bank_account=usd.bank_account)
@@ -264,7 +270,9 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		transfer = make_bank_transfer(
 			amount=4000,
 			execution_date=add_days(today(), 5),
-			references=[{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 4000}],
+			references=[
+				{"reference_doctype": "Purchase Invoice", "reference_name": pi.name, "allocated_amount": 4000}
+			],
 		)
 		self.assertEqual(transfer.status, "Scheduled")
 		for mapper in (map_cheque, map_batch):
@@ -334,7 +342,10 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		}
 		self.assertEqual(
 			parties,
-			{("Customer", CUSTOMER): ("Incoming", 3000, True), ("Supplier", SUPPLIER): ("Outgoing", 3000, True)},
+			{
+				("Customer", CUSTOMER): ("Incoming", 3000, True),
+				("Supplier", SUPPLIER): ("Outgoing", 3000, True),
+			},
 		)
 
 		# a party row on another payable account than the party's default one
@@ -392,7 +403,9 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 			(build_transfer, {}),
 		):
 			with self.subTest(mapper=mapper.__name__, **kwargs):
-				with self.assertRaisesRegex(source_documents.TreasuryPartyAccountError, "uses account") as caught:
+				with self.assertRaisesRegex(
+					source_documents.TreasuryPartyAccountError, "uses account"
+				) as caught:
 					mapper("Journal Entry", je.name, **kwargs)
 				self.assertIn(other_payable, str(caught.exception))
 
@@ -515,17 +528,26 @@ class TestBatchMapper(DocumentPaymentsTestCase):
 		)
 		self.assertEqual((values["source_doctype"], values["source_name"]), ("Purchase Invoice", pi.name))
 		self.assertEqual(
-			(values["gen_count"], values["gen_frequency"], values["gen_amount_mode"], flt(values["gen_total"])),
+			(
+				values["gen_count"],
+				values["gen_frequency"],
+				values["gen_amount_mode"],
+				flt(values["gen_total"]),
+			),
 			(3, "Monthly", "Split Total", 12000),
 		)
 		first = max(getdate(pi.due_date), getdate(today()))
 		self.assertEqual(getdate(values["gen_first_due_date"]), first)
 		dates = batch.schedule_dates(first, 3, "Monthly", 0, values["gen_month_end"])
 		self.assertEqual(
-			[(getdate(r["due_date"]), flt(r["amount"])) for r in values["cheques"]], [(d, 4000) for d in dates]
+			[(getdate(r["due_date"]), flt(r["amount"])) for r in values["cheques"]],
+			[(d, 4000) for d in dates],
 		)
 		self.assertEqual(
-			[(r["reference_doctype"], r["reference_name"], flt(r["allocated_amount"])) for r in values["cheques"]],
+			[
+				(r["reference_doctype"], r["reference_name"], flt(r["allocated_amount"]))
+				for r in values["cheques"]
+			],
 			[("Purchase Invoice", pi.name, 4000)] * 3,
 		)
 
@@ -708,13 +730,18 @@ class TestBatchMapper(DocumentPaymentsTestCase):
 		self.assertTrue(all(not r.reference_name and not flt(r.allocated_amount) for r in doc.cheques))
 		messages = [m for m in frappe.local.message_log if isinstance(m, dict)]
 		self.assertTrue(
-			any("already covered" in str(m.get("message")) and m.get("indicator") == "orange" for m in messages)
+			any(
+				"already covered" in str(m.get("message")) and m.get("indicator") == "orange"
+				for m in messages
+			)
 		)
 
 	def test_batch_split_currency_no_allocation(self):
 		usd = self.data.usd
 		isolate_cheque_books(self, usd.bank_account)
-		self.use_company_settings(default_outgoing_cheque_bank_account=usd.bank_account, default_installment_count=2)
+		self.use_company_settings(
+			default_outgoing_cheque_bank_account=usd.bank_account, default_installment_count=2
+		)
 		pi = make_purchase_invoice(12000)
 		values = map_batch("Purchase Invoice", pi.name)
 		self.assertEqual((values["currency"], flt(values["gen_total"]), values["cheques"]), ("USD", 240, []))

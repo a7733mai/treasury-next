@@ -346,7 +346,12 @@ class TestLegacyPermissionCleanup(IntegrationTestCase):
 				{
 					"grants": [
 						{"doctype": "Bank", "role": "Treasury Manager", "ptype": "read", "created_row": True},
-						{"doctype": "Bank", "role": "Treasury Manager", "ptype": "select", "created_row": True},
+						{
+							"doctype": "Bank",
+							"role": "Treasury Manager",
+							"ptype": "select",
+							"created_row": True,
+						},
 						{"doctype": "Bank", "role": "Treasury User", "ptype": "read", "created_row": False},
 					],
 					"copied": [],

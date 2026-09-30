@@ -143,7 +143,9 @@ def _choose_journal_party(je, party_type: str | None, party: str | None) -> dict
 	if not parties:
 		frappe.throw(_("Journal Entry {0} has no open party to settle.").format(frappe.bold(je.name)))
 	if len(parties) > 1:
-		frappe.throw(_("Journal Entry {0} has several open parties: choose one.").format(frappe.bold(je.name)))
+		frappe.throw(
+			_("Journal Entry {0} has several open parties: choose one.").format(frappe.bold(je.name))
+		)
 	return parties[0]
 
 
@@ -156,12 +158,18 @@ def source_party(source_doctype: str, source_name: str, party_type: str | None, 
 		return bool(
 			frappe.db.exists(
 				"Journal Entry Account",
-				{"parenttype": "Journal Entry", "parent": source_name, "party_type": party_type, "party": party},
+				{
+					"parenttype": "Journal Entry",
+					"parent": source_name,
+					"party_type": party_type,
+					"party": party,
+				},
 			)
 		)
-	return party_type == source_party_type and frappe.db.get_value(
-		source_doctype, source_name, party_field
-	) == party
+	return (
+		party_type == source_party_type
+		and frappe.db.get_value(source_doctype, source_name, party_field) == party
+	)
 
 
 @frappe.whitelist()
@@ -366,7 +374,11 @@ def copy_accounting(source, target):
 	for fieldname in ("cost_center", "project"):
 		if source.meta.has_field(fieldname) and source.get(fieldname) and target.meta.has_field(fieldname):
 			target.set(fieldname, source.get(fieldname))
-	if source.doctype in ITEM_PROJECT_DOCTYPES and not target.get("project") and target.meta.has_field("project"):
+	if (
+		source.doctype in ITEM_PROJECT_DOCTYPES
+		and not target.get("project")
+		and target.meta.has_field("project")
+	):
 		project = next((row.project for row in source.get("items") or [] if row.get("project")), None)
 		if project:
 			target.project = project
@@ -430,7 +442,9 @@ def check_create_permission(doctype: str, company: str | None):
 	probe.company = company
 	if not frappe.has_permission(doctype, "create", doc=probe):
 		frappe.throw(
-			_("You are not permitted to create {0} for company {1}.").format(_(doctype), frappe.bold(company)),
+			_("You are not permitted to create {0} for company {1}.").format(
+				_(doctype), frappe.bold(company)
+			),
 			frappe.PermissionError,
 			title=_("Not Permitted"),
 		)

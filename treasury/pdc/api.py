@@ -122,7 +122,9 @@ def _prepare(target: str, source_doctype, source_name, company, party_type, part
 	posting.get_company_settings(info.company)
 	party_account = posting.get_party_account(info.party_type, info.party, info.company)
 	if not party_account:
-		frappe.throw(_("No party account found for {0} {1}.").format(_(info.party_type), frappe.bold(info.party)))
+		frappe.throw(
+			_("No party account found for {0} {1}.").format(_(info.party_type), frappe.bold(info.party))
+		)
 	return source, info, get_account_currency(party_account)
 
 
