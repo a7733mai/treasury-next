@@ -6,6 +6,8 @@
  "engine": "InnoDB",
  "field_order": [
   "company",
+  "setup_checklist_section",
+  "setup_checklist",
   "outgoing_section",
   "outgoing_party_posting",
   "column_break_outgoing",
@@ -68,7 +70,9 @@
   "accrue_facility_interest",
   "column_break_facilities",
   "facility_voucher",
-  "auto_debit_posting"
+  "auto_debit_posting",
+  "naming_series_section",
+  "naming_series_help"
  ],
  "fields": [
   {
@@ -80,6 +84,17 @@
    "options": "Company",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.__onload && doc.__onload.setup_complete",
+   "fieldname": "setup_checklist_section",
+   "fieldtype": "Section Break",
+   "label": "Setup Checklist"
+  },
+  {
+   "fieldname": "setup_checklist",
+   "fieldtype": "HTML"
   },
   {
    "fieldname": "outgoing_section",
@@ -489,10 +504,20 @@
    "label": "Auto Debit Posting",
    "options": "On Due Date\nOn Bank Statement Match",
    "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "naming_series_section",
+   "fieldtype": "Section Break",
+   "label": "Naming Series"
+  },
+  {
+   "fieldname": "naming_series_help",
+   "fieldtype": "HTML"
   }
  ],
  "links": [],
- "modified": "2026-10-12 12:00:00.000000",
+ "modified": "2026-10-25 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

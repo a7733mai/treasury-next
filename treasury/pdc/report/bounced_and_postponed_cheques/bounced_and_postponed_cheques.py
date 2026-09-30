@@ -54,6 +54,8 @@ def execute(filters=None):
 		conditions["party_type"] = filters.party_type
 	if filters.party:
 		conditions["party"] = filters.party
+	if filters.bank_account:
+		conditions["bank_account"] = filters.bank_account
 
 	if view == BOUNCED:
 		rows = get_bounced_rows(conditions, from_date, to_date)

@@ -55,6 +55,15 @@ frappe.query_reports["Bounced and Postponed Cheques"] = {
 			},
 		},
 		{
+			fieldname: "bank_account",
+			label: __("Bank Account", null, "Treasury"),
+			fieldtype: "Link",
+			options: "Bank Account",
+			get_query: () => ({
+				filters: { company: frappe.query_report.get_filter_value("company"), is_company_account: 1 },
+			}),
+		},
+		{
 			fieldname: "from_date",
 			label: __("From Date", null, "Treasury Report"),
 			fieldtype: "Date",

@@ -966,6 +966,13 @@ class TestDashboardCards(ReportTestCase):
 		self.assertEqual(result["route_options"]["to_date"], str(day(7)))
 		self.assertEqual(flt(total("Outgoing", "outstanding")["value"] - outstanding_before, 2), 1050)
 		self.assertEqual(flt(total("Incoming", "outstanding")["value"] - receivable_before, 2), 900)
+		# Phase 7h: the card delegates to open_cheque_totals (one query for both directions and scopes)
+		totals = dashboard.open_cheque_totals(COMPANY)
+		for direction in ("Outgoing", "Incoming"):
+			for scope in ("due_7_days", "outstanding"):
+				card = total(direction, scope)
+				self.assertEqual(card["value"], totals[direction][scope].amount)
+				self.assertEqual(card["route_options"], totals[direction][scope].route_options)
 
 		self.assertRaises(frappe.ValidationError, total, "Sideways", "outstanding")
 		self.assertRaises(frappe.ValidationError, total, "Outgoing", "forever")

@@ -139,27 +139,138 @@ class TestInstall(IntegrationTestCase):
 			frappe.db.get_value("Treasury Company Settings", COMPANY, "bank_charge_voucher"), "Journal Entry"
 		)
 
-	def test_uninstall_keeps_series_modes_and_payees(self):
-		"""`before_uninstall` deletes only custom fields: the Payment Entry series (Property Setters), the Modes
-		of Payment and the payee group are left, and the series are reported. Nothing is really deleted here:
-		the deletions are recorded (a real uninstall would drop the persistent test fixtures)."""
-		previous = frappe.db.get_global(payment_modes.SERIES_ADDED_KEY)
-		self.addCleanup(frappe.db.set_global, payment_modes.SERIES_ADDED_KEY, previous)
-		frappe.db.set_global(payment_modes.SERIES_ADDED_KEY, json.dumps(["PE-TTC-KEPT-.YYYY.-"]))
+	def record_uninstall(self) -> tuple[list[tuple[str, str]], str]:
+		"""Run `before_uninstall` with its deletions recorded as (doctype, name), not run (a real uninstall
+		would drop the persistent test fixtures); the core custom fields and the legacy cleanup are skipped."""
 		deleted = []
 		output = io.StringIO()
 		with (
 			patch.object(install, "delete_custom_fields"),
 			patch.object(install, "remove_legacy_permissions"),
-			patch.object(install.frappe, "delete_doc", side_effect=lambda dt, name, **kw: deleted.append(dt)),
+			patch.object(
+				install.frappe, "delete_doc", side_effect=lambda dt, name, **kw: deleted.append((dt, name))
+			),
 			redirect_stdout(output),
 		):
 			install.before_uninstall()
+		return deleted, output.getvalue()
 
-		self.assertEqual(set(deleted), {"Custom Field"})
-		self.assertEqual(len(deleted), len(dimensions.dimension_custom_fields()))
-		self.assertIn("PE-TTC-KEPT-.YYYY.-", output.getvalue())
+	def test_uninstall_keeps_series_modes_and_payees(self):
+		"""`before_uninstall` deletes only the customisations of the app's own doctypes (spec 7h §3.6) besides
+		the core custom fields: the Payment Entry series (Property Setters on Payment Entry), the Modes of
+		Payment and the payee group are left, and the series are reported."""
+		previous = frappe.db.get_global(payment_modes.SERIES_ADDED_KEY)
+		self.addCleanup(frappe.db.set_global, payment_modes.SERIES_ADDED_KEY, previous)
+		frappe.db.set_global(payment_modes.SERIES_ADDED_KEY, json.dumps(["PE-TTC-KEPT-.YYYY.-"]))
+		deleted, output = self.record_uninstall()
+
+		expected = [
+			(doctype, name) for doctype, names in install.app_doctype_customisations().items() for name in names
+		]
+		self.assertEqual(deleted, expected)
+		self.assertLessEqual(
+			{dt for dt, _name in deleted}, {"Custom Field", "Property Setter", "Document Naming Rule"}
+		)
+		self.assertNotIn("Mode of Payment", {dt for dt, _name in deleted})
+		self.assertIn("PE-TTC-KEPT-.YYYY.-", output)
 		self.assertEqual(payment_modes.get_added_series(), ["PE-TTC-KEPT-.YYYY.-"])
+
+	def test_uninstall_deletes_app_doctype_customisations(self):
+		"""Spec 7h §3.6: a Property Setter on Bank Transfer.naming_series, a Document Naming Rule on PDC Cheque
+		and a Custom Field on Cheque Book without a module are deleted; the Payment Entry series Property
+		Setter and the Modes of Payment are not. The records are written without DDL or cache effects."""
+		setup_treasury_test_data()
+		setter = frappe.get_doc(
+			{
+				"doctype": "Property Setter",
+				"name": f"_ttc_ps_{frappe.generate_hash(length=6)}",
+				"doctype_or_field": "DocField",
+				"doc_type": "Bank Transfer",
+				"field_name": "naming_series",
+				"property": "options",
+				"property_type": "Text",
+				"value": "BTX-.YYYY.-.#####\nBT-.YYYY.-.#####",
+			}
+		)
+		setter.db_insert()
+		pe_setter = frappe.get_doc(
+			{
+				"doctype": "Property Setter",
+				"name": f"_ttc_pe_{frappe.generate_hash(length=6)}",
+				"doctype_or_field": "DocField",
+				"doc_type": "Payment Entry",
+				"field_name": "naming_series",
+				"property": "options",
+				"property_type": "Text",
+				"value": "ACC-PAY-.YYYY.-",
+			}
+		)
+		pe_setter.db_insert()
+		rule = frappe.get_doc(
+			{
+				"doctype": "Document Naming Rule",
+				"name": f"_ttc_rule_{frappe.generate_hash(length=6)}",
+				"document_type": "PDC Cheque",
+				"prefix": "TTC-RULE-",
+				"prefix_digits": 4,
+			}
+		)
+		rule.db_insert()
+		field = frappe.get_doc(
+			{
+				"doctype": "Custom Field",
+				"name": f"Cheque Book-_ttc_{frappe.generate_hash(length=6)}",
+				"dt": "Cheque Book",
+				"fieldname": "_ttc_note",
+				"fieldtype": "Data",
+				"label": "Note",
+			}
+		)
+		field.db_insert()
+
+		deleted, _output = self.record_uninstall()
+		self.assertIn(("Property Setter", setter.name), deleted)
+		self.assertIn(("Document Naming Rule", rule.name), deleted)
+		self.assertIn(("Custom Field", field.name), deleted)
+		self.assertNotIn(("Property Setter", pe_setter.name), deleted)
+		self.assertFalse([name for dt, name in deleted if dt == "Mode of Payment"])
+		recorded_fields = {
+			tuple(frappe.db.get_value("Custom Field", name, ["dt", "fieldname"]))
+			for dt, name in deleted
+			if dt == "Custom Field"
+		}
+		self.assertLessEqual(set(dimensions.dimension_custom_fields()), recorded_fields)
+		self.assertIn("Cheque Book", install.app_doctypes())
+		self.assertNotIn("Payment Entry", install.app_doctypes())
+
+	def test_every_customisation_is_listed(self):
+		"""Every Treasury customisation of a core doctype is removed by `delete_custom_fields`; the app's own
+		doctypes are covered by `app_doctype_customisations`."""
+		modules = frappe.get_all("Module Def", filters={"app_name": "treasury"}, pluck="name")
+		app_doctypes = set(install.app_doctypes())
+		to_delete = set(install.custom_fields_to_delete())
+		missing = [
+			(row.dt, row.fieldname)
+			for row in frappe.get_all("Custom Field", fields=["dt", "fieldname", "module"])
+			if row.dt not in app_doctypes
+			and (row.module in modules or (row.fieldname or "").startswith("treasury_"))
+			and (row.dt, row.fieldname) not in to_delete
+		]
+		self.assertEqual(missing, [])
+		setters = frappe.get_all(
+			"Property Setter", fields=["doc_type", "field_name", "property", "value", "module"]
+		)
+		self.assertEqual(
+			[s.doc_type for s in setters if s.module in modules and s.doc_type not in app_doctypes], []
+		)
+		mentions = [
+			(s.doc_type, s.field_name, s.property)
+			for s in setters
+			if s.doc_type not in app_doctypes
+			and not (s.doc_type == "Payment Entry" and s.field_name == "naming_series")
+			and ((s.field_name or "").startswith("treasury_") or "treasury_" in (s.value or ""))
+		]
+		self.assertEqual(mentions, [])
 
 	def test_uninstall_deletes_exactly_the_created_custom_fields(self):
 		created = {

@@ -37,6 +37,18 @@ def get_bank_positions(
 	"""Positions sorted by `bank_account`: {bank_account, bank_accounts, account, currency, bank, disabled,
 	opening, current_balance, overdue_in, overdue_out, unassigned_flows, days: [{date, actual_in, actual_out,
 	expected_in, expected_out, net, closing, flows}]} for today .. today + horizon_days - 1."""
+	return collect_positions(company, horizon_days, bank_accounts, today)[0]
+
+
+def collect_positions(
+	company: str, horizon_days: int, bank_accounts: list[str] | None = None, today=None
+) -> tuple[list[frappe._dict], list[frappe._dict]]:
+	"""(positions, flows): the positions of `get_bank_positions` and every expected flow of the engine dated up
+	to today + horizon_days - 1 (overdue ones and flows without a bank account included).
+
+	Positions are horizon-independent (spec 7h F9): day d's closing never depends on the horizon (flows after
+	To Date are dropped, the days before are identical), so one 30-day call holds the 7- and 14-day positions
+	in its first days (the Treasury Dashboard)."""
 	today = getdate(today or report_today())
 	to_date = getdate(add_days(today, max(cint(horizon_days), 1) - 1))
 	engine = BankPositionForecast(
@@ -60,7 +72,7 @@ def get_bank_positions(
 		if bank.account:
 			groups.setdefault(bank.account, []).append(bank)
 	if not groups:
-		return []
+		return [], flows
 	accounts = sorted(groups)
 	balances_prev = get_gl_balances_by_account(company, accounts, add_days(today, -1))
 	balances_today = get_gl_balances_by_account(company, accounts, today)
@@ -103,7 +115,7 @@ def get_bank_positions(
 		)
 		_build_days(position, flows_by_account[account], moves, today, to_date, precision)
 		positions.append(position)
-	return sorted(positions, key=lambda p: p.bank_account)
+	return sorted(positions, key=lambda p: p.bank_account), flows
 
 
 def _sums(flows) -> tuple[float, float]:

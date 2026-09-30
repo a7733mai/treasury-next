@@ -8,7 +8,7 @@ hold cheques in several currencies), so they come from `get_cheque_total`, which
 import erpnext
 import frappe
 from frappe import _
-from frappe.utils import add_days
+from frappe.utils import add_days, flt, getdate
 
 from treasury.pdc.report_utils import (
 	BANK_POSTED,
@@ -52,31 +52,68 @@ def get_cheque_total(filters: str | dict | None = None) -> dict:
 		return {"value": 0, "fieldtype": "Currency"}
 	company = validate_company(company)
 
-	statuses = list(CARD_STATUSES[filters.direction])
+	totals = open_cheque_totals(company)
+	card = totals[filters.direction][filters.scope]
+	return {
+		"value": card.amount,
+		"fieldtype": "Currency",
+		"options": totals.company_currency,
+		"route": ["query-report", "PDC Register"],
+		"route_options": card.route_options,
+	}
+
+
+def open_cheque_totals(
+	company: str, bank_accounts: list[str] | None = None, today=None, converter: AmountConverter | None = None
+) -> frappe._dict:
+	"""The number-card figures of both directions from one `get_cheques` query (the caller has validated the
+	company): {"Outgoing": {"due_7_days": {count, amount, route_options}, "outstanding": {...}}, "Incoming":
+	{...}, "company_currency"}. Amounts in the company currency (`converter`, default an AmountConverter at
+	`today`); `bank_accounts` narrows to those banks (the route options then carry the bank only when there is
+	exactly one)."""
+	today = getdate(today or report_today())
+	window = [today, getdate(add_days(today, DUE_WINDOW_DAYS))]
 	conditions = {
 		"company": company,
-		"direction": filters.direction,
-		"operational_status": ["in", statuses],
+		"operational_status": ["in", [s for statuses in CARD_STATUSES.values() for s in statuses]],
 		"accounting_status": ["!=", BANK_POSTED],
 	}
-	route_options = {
-		"company": company,
-		"direction": filters.direction,
-		"operational_status": statuses,
-		"date_based_on": "Effective Due Date",
-	}
-	if filters.scope == DUE_7_DAYS:
-		today = report_today()
-		window = [today, add_days(today, DUE_WINDOW_DAYS)]
-		conditions["effective_due_date"] = ["between", window]
-		route_options.update(from_date=str(window[0]), to_date=str(window[1]))
-
-	converter = AmountConverter(company)
-	total = sum(converter.company_amount(c) for c in get_cheques(conditions))
-	return {
-		"value": total,
-		"fieldtype": "Currency",
-		"options": converter.company_currency,
-		"route": ["query-report", "PDC Register"],
-		"route_options": route_options,
-	}
+	if bank_accounts:
+		conditions["bank_account"] = ["in", list(bank_accounts)]
+	converter = converter or AmountConverter(company, today)
+	result = frappe._dict(company_currency=converter.company_currency)
+	for direction, statuses in CARD_STATUSES.items():
+		route_options = {
+			"company": company,
+			"direction": direction,
+			"operational_status": list(statuses),
+			"date_based_on": "Effective Due Date",
+		}
+		if bank_accounts and len(bank_accounts) == 1:
+			route_options["bank_account"] = bank_accounts[0]
+		result[direction] = frappe._dict(
+			{
+				DUE_7_DAYS: frappe._dict(
+					count=0,
+					amount=0.0,
+					route_options={**route_options, "from_date": str(window[0]), "to_date": str(window[1])},
+				),
+				OUTSTANDING: frappe._dict(count=0, amount=0.0, route_options=route_options),
+			}
+		)
+	for cheque in get_cheques(conditions):
+		if cheque.operational_status not in CARD_STATUSES.get(cheque.direction, ()):
+			continue
+		amount = converter.company_amount(cheque)
+		cards = result[cheque.direction]
+		scopes = [OUTSTANDING]
+		if window[0] <= getdate(cheque.effective_due_date) <= window[1]:
+			scopes.append(DUE_7_DAYS)
+		for scope in scopes:
+			cards[scope].count += 1
+			cards[scope].amount += amount
+	precision = converter.precision
+	for direction in CARD_STATUSES:
+		for card in result[direction].values():
+			card.amount = flt(card.amount, precision)
+	return result

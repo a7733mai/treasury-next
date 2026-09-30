@@ -179,7 +179,7 @@ class TestBankChargeCategory(TreasuryTestMixin, IntegrationTestCase):
 		frappe.db.set_global(charge_defaults.DEFAULTS_CREATED_KEY, "1")
 		with (
 			patch.object(install, "delete_custom_fields"),
-			patch.object(install, "delete_dimension_fields"),
+			patch.object(install, "delete_app_doctype_customisations"),
 			patch.object(install, "remove_legacy_permissions"),
 			patch.object(install, "report_kept_series"),
 		):

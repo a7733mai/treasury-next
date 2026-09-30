@@ -12726,3 +12726,280 @@ msgstr "لم يعد الشيك {0} صالحاً لسداد القسط {1} من �
 
 msgid "The Original Due Date of an installment cheque must be its installment's due date {0}."
 msgstr "يجب أن يكون تاريخ الاستحقاق الأصلي لشيك القسط هو تاريخ استحقاق القسط {0}."
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 7h: Treasury Dashboard, Setup Checklist, Naming Series
+# ---------------------------------------------------------------------------------------------------------
+
+# Page and service (treasury.pdc.overview)
+msgid "Treasury Dashboard"
+msgstr "لوحة الخزينة"
+
+msgid "Horizon must be 7, 14 or 30 days."
+msgstr "يجب أن تكون المدة 7 أو 14 أو 30 يوماً."
+
+msgid "You are not permitted to view the Treasury Dashboard of company {0}."
+msgstr "غير مسموح لك بعرض لوحة الخزينة للشركة {0}."
+
+msgid "Inflows"
+msgstr "التدفقات الداخلة"
+
+msgid "Outflows"
+msgstr "التدفقات الخارجة"
+
+msgctxt "Treasury Dashboard"
+msgid "Cheques In"
+msgstr "شيكات واردة"
+
+msgctxt "Treasury Dashboard"
+msgid "Cheques Out"
+msgstr "شيكات صادرة"
+
+msgctxt "Treasury Dashboard"
+msgid "Installments"
+msgstr "الأقساط"
+
+msgctxt "Treasury Dashboard"
+msgid "Transfers"
+msgstr "التحويلات"
+
+msgctxt "Treasury Dashboard"
+msgid "Letters of Credit"
+msgstr "الاعتمادات المستندية"
+
+msgctxt "Treasury Dashboard"
+msgid "Other"
+msgstr "أخرى"
+
+msgctxt "Treasury Dashboard"
+msgid "{0} days"
+msgstr "{0} يوم"
+
+msgctxt "Treasury Dashboard"
+msgid "Horizon"
+msgstr "المدة"
+
+msgctxt "Treasury Dashboard"
+msgid "Select a company."
+msgstr "اختر شركة."
+
+msgid "Updated {0}"
+msgstr "آخر تحديث {0}"
+
+msgid "All bank accounts of the company"
+msgstr "كل الحسابات البنكية للشركة"
+
+msgid "Nothing to show."
+msgstr "لا يوجد ما يُعرض."
+
+msgid "Setup Checklist"
+msgstr "قائمة مراجعة الإعداد"
+
+msgid "{0} setup items need attention."
+msgstr "{0} من بنود الإعداد تحتاج إلى استكمال."
+
+msgid "Treasury Company Settings are missing for this company."
+msgstr "إعدادات الخزينة غير موجودة لهذه الشركة."
+
+msgctxt "Treasury Dashboard"
+msgid "Bank Positions"
+msgstr "مراكز البنوك"
+
+msgid "No company bank account with a GL account."
+msgstr "لا يوجد حساب بنكي للشركة مرتبط بحساب في دليل الحسابات."
+
+msgid "Cash Today"
+msgstr "النقدية اليوم"
+
+msgid "Projected in 7 Days"
+msgstr "المتوقع بعد 7 أيام"
+
+msgid "{0} expected flows have no bank account."
+msgstr "{0} من التدفقات المتوقعة بدون حساب بنكي."
+
+msgid "Due This Week"
+msgstr "مستحق هذا الأسبوع"
+
+msgid "Post-dated Issued"
+msgstr "شيكات آجلة صادرة"
+
+msgid "Post-dated in Hand"
+msgstr "شيكات آجلة بالخزينة"
+
+msgid "Bounced This Month"
+msgstr "المرتدة هذا الشهر"
+
+msgctxt "Treasury Dashboard"
+msgid "PDC Cheques"
+msgstr "الشيكات الآجلة"
+
+msgid "Transfers Awaiting Confirmation"
+msgstr "تحويلات في انتظار التأكيد"
+
+msgctxt "Treasury Dashboard"
+msgid "Bank Transfers"
+msgstr "التحويلات البنكية"
+
+msgid "Bank Charges This Month"
+msgstr "مصاريف البنك هذا الشهر"
+
+msgctxt "Treasury Dashboard"
+msgid "Bank Charges"
+msgstr "مصاريف البنوك"
+
+msgid "and {0} more"
+msgstr "و{0} أخرى"
+
+msgctxt "Treasury Dashboard"
+msgid "Due in 30 Days"
+msgstr "مستحق خلال 30 يوم"
+
+msgid "Next Installments"
+msgstr "الأقساط القادمة"
+
+msgid "Expiring Letters of Guarantee"
+msgstr "خطابات ضمان قاربت على الانتهاء"
+
+msgid "Expiring Letters of Credit"
+msgstr "اعتمادات قاربت على الانتهاء"
+
+msgctxt "Treasury Dashboard"
+msgid "Letters of Guarantee and Credit"
+msgstr "خطابات الضمان والاعتمادات المستندية"
+
+msgid "Maturities (30 Days)"
+msgstr "الاستحقاقات (30 يوم)"
+
+# Treasury Company Settings: labels
+msgctxt "Treasury Company Settings"
+msgid "Setup Checklist"
+msgstr "قائمة مراجعة الإعداد"
+
+msgctxt "Treasury Company Settings"
+msgid "Naming Series"
+msgstr "مسلسلات الترقيم"
+
+# Setup Checklist (treasury.treasury_setup.checklist)
+msgctxt "Treasury Company Settings"
+msgid "Default Banks"
+msgstr "البنوك الافتراضية"
+
+msgctxt "Treasury Company Settings"
+msgid "Cheque Layouts"
+msgstr "تخطيطات الشيكات"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Charge Categories"
+msgstr "فئات مصاريف البنوك"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Suppliers"
+msgstr "موردو البنوك"
+
+msgid "No company bank account with a GL account of type Bank."
+msgstr "لا يوجد حساب بنكي للشركة مرتبط بحساب من نوع بنك في دليل الحسابات."
+
+msgid "Every company bank account needs its PDC accounts (payable, receivable, under collection)."
+msgstr "كل حساب بنكي للشركة يحتاج حسابات الشيكات الآجلة الخاصة به (أوراق الدفع، أوراق القبض، تحت التحصيل)."
+
+msgid "Series not registered for Payment Entry yet: {0}"
+msgstr "مسلسلات غير مسجلة في سند الدفع بعد: {0}"
+
+msgid "A Mode of Payment per bank and method gives every voucher its mode and Payment Entry series."
+msgstr "طريقة دفع لكل بنك وطريقة تعطي كل سند طريقة الدفع ومسلسل سند الدفع الخاص به."
+
+msgid "The banks proposed for new cheques and transfers."
+msgstr "البنوك المقترحة للشيكات والتحويلات الجديدة."
+
+msgid "No default transfer bank to check."
+msgstr "لا يوجد بنك تحويل افتراضي للفحص."
+
+msgid "Without a fee rule, a transfer from the default bank is booked without its fee."
+msgstr "بدون قاعدة رسوم، يُقيَّد التحويل من البنك الافتراضي بدون رسومه."
+
+msgid "A bank without thresholds raises no low balance alert."
+msgstr "البنك بدون حدود رصيد لا يُصدر أي تنبيه بانخفاض الرصيد."
+
+msgid "A default Cheque Layout per bank prints the cheque leaves."
+msgstr "تخطيط شيك افتراضي لكل بنك لطباعة أوراق الشيكات."
+
+msgid "No enabled Bank Charge Category."
+msgstr "لا توجد فئة مصاريف بنكية مفعّلة."
+
+msgid "Every enabled category needs an expense account for the company."
+msgstr "كل فئة مفعّلة تحتاج حساب مصروف للشركة."
+
+msgid "Created automatically on the first bank charge; map an existing Supplier here to avoid a duplicate."
+msgstr "يُنشأ تلقائياً مع أول مصروف بنكي؛ اربط هنا مورداً موجوداً لتجنب التكرار."
+
+# Treasury Company Settings form (Setup Checklist, Naming Series)
+msgid "Save the settings to see the Setup Checklist."
+msgstr "احفظ الإعدادات لعرض قائمة مراجعة الإعداد."
+
+msgctxt "Treasury Company Settings"
+msgid "Fix"
+msgstr "إصلاح"
+
+msgid "Use {0}"
+msgstr "استخدام {0}"
+
+msgid "Setup is incomplete: {0}."
+msgstr "الإعداد غير مكتمل: {0}."
+
+msgctxt "Treasury Company Settings"
+msgid "Required"
+msgstr "مطلوب"
+
+msgctxt "Treasury Company Settings"
+msgid "Recommended"
+msgstr "موصى به"
+
+msgctxt "Treasury Company Settings"
+msgid "OK"
+msgstr "مكتمل"
+
+msgctxt "Treasury Company Settings"
+msgid "Missing"
+msgstr "ناقص"
+
+msgctxt "Treasury Company Settings"
+msgid "Warning"
+msgstr "تنبيه"
+
+msgctxt "Treasury Company Settings"
+msgid "By direction (fixed)"
+msgstr "حسب الاتجاه (ثابت)"
+
+msgctxt "Treasury Company Settings"
+msgid "First option (Document Naming Settings)"
+msgstr "الخيار الأول (إعدادات تسمية المستندات)"
+
+msgctxt "Treasury Company Settings"
+msgid "Document Naming Settings"
+msgstr "إعدادات تسمية المستندات"
+
+msgid "Add Rule per Bank"
+msgstr "إضافة قاعدة لكل بنك"
+
+msgid "A Document Naming Rule overrides the series. Rules are matched highest priority first, and the counter of a rule does not restart each year. Payment Entry series are set per bank and method in Modes of Payment."
+msgstr "قاعدة تسمية المستند تتقدم على المسلسل. تُطبق القواعد بالأعلى أولوية أولاً، وعدّاد القاعدة لا يبدأ من جديد كل سنة. مسلسلات سند الدفع تُضبط لكل بنك وطريقة في طرق الدفع."
+
+msgctxt "Treasury Company Settings"
+msgid "Document Type"
+msgstr "نوع المستند"
+
+msgctxt "Treasury Company Settings"
+msgid "Options"
+msgstr "الخيارات"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Series"
+msgstr "المسلسل الافتراضي"
+
+msgctxt "Treasury Company Settings"
+msgid "How the series is chosen"
+msgstr "طريقة اختيار المسلسل"
+
+msgctxt "Treasury Company Settings"
+msgid "Rule condition field"
+msgstr "حقل شرط القاعدة"

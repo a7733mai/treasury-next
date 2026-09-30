@@ -165,34 +165,47 @@ def set_shortfall(row: frappe._dict):
 		row.coverage = _("Shortfall") if shortfall else _("Covered")
 
 
-def get_summary(rows: list[frappe._dict], currency: str) -> list[dict]:
+def get_totals(rows: list[frappe._dict]) -> frappe._dict:
+	"""{held, given} (company currency) and {open_held, open_given} (Open / Blank counts) of the report rows
+	(also the Treasury Dashboard's security section)."""
+
 	def total(direction, field):
 		return flt(sum(r.get(field) or 0 for r in rows if r.direction == direction), get_precision())
 
+	return frappe._dict(
+		held=total(INCOMING, "amount"),
+		given=total(OUTGOING, "amount"),
+		open_held=int(total(INCOMING, "open_count")),
+		open_given=int(total(OUTGOING, "open_count")),
+	)
+
+
+def get_summary(rows: list[frappe._dict], currency: str) -> list[dict]:
+	totals = get_totals(rows)
 	summary = [
 		{
 			"label": _("Held from Others"),
-			"value": total(INCOMING, "amount"),
+			"value": totals.held,
 			"datatype": "Currency",
 			"currency": currency,
 			"indicator": "Green",
 		},
 		{
 			"label": _("Given to Others"),
-			"value": total(OUTGOING, "amount"),
+			"value": totals.given,
 			"datatype": "Currency",
 			"currency": currency,
 			"indicator": "Red",
 		},
 		{
 			"label": _("Open / Blank Held"),
-			"value": int(total(INCOMING, "open_count")),
+			"value": totals.open_held,
 			"datatype": "Int",
 			"indicator": "Blue",
 		},
 		{
 			"label": _("Open / Blank Given"),
-			"value": int(total(OUTGOING, "open_count")),
+			"value": totals.open_given,
 			"datatype": "Int",
 			"indicator": "Orange",
 		},

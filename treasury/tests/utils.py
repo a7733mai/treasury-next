@@ -2045,6 +2045,50 @@ def leaf_rows(filters: dict) -> dict[int, frappe._dict]:
 
 
 # ---------------------------------------------------------------------------
+# Phase 7h: dashboard helpers
+# ---------------------------------------------------------------------------
+
+
+def count_queries(fn, *args, **kwargs):
+	"""(result of `fn(*args, **kwargs)`, number of `frappe.db.sql` calls it made), counted like
+	`IntegrationTestCase.assertQueryCount` (spec 7h F8)."""
+	calls = []
+	db_class = frappe.db.__class__
+	original = db_class.sql
+
+	def counting_sql(*a, **kw):
+		calls.append(1)
+		return original(*a, **kw)
+
+	db_class.sql = counting_sql
+	try:
+		result = fn(*args, **kwargs)
+	finally:
+		db_class.sql = original
+	return result, len(calls)
+
+
+def run_report(name: str, filters: dict):
+	"""The result of the script report `name` (its module's `execute`) for `filters`."""
+	module = frappe.get_cached_value("Report", name, "module")
+	scrubbed = frappe.scrub(name)
+	path = f"treasury.{frappe.scrub(module)}.report.{scrubbed}.{scrubbed}"
+	return frappe.get_attr(f"{path}.execute")(frappe._dict(filters))
+
+
+def report_total(data: list, field: str) -> float:
+	"""Σ `field` of the report rows that are neither group headers nor total rows."""
+	return flt(
+		sum(
+			flt(row.get(field))
+			for row in data
+			if not row.get("is_group") and not row.get("is_total") and not row.get("bold")
+		),
+		2,
+	)
+
+
+# ---------------------------------------------------------------------------
 # Assertions / queries
 # ---------------------------------------------------------------------------
 

@@ -551,3 +551,9 @@ class TestTranslations(IntegrationTestCase):
 		found = {(msgid, context) for msgid, context, _line in template_messages(html)}
 		self.assertIn(("Debit", "Treasury Report"), found)  # microtemplate `__(msg, null, context)`
 		self.assertIn(("Date", TREASURY_CONTEXT), found)
+
+		# Phase 7h: the page scripts are scanned too
+		js = APP_DIR / "pdc" / "page" / "treasury_dashboard" / "treasury_dashboard.js"
+		found = {(msgid, context) for msgid, context, _line in js_messages(js)}
+		self.assertIn(("Treasury Dashboard", None), found)
+		self.assertIn(js, source_files(".js"))

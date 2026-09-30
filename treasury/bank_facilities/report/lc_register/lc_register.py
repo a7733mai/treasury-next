@@ -4,14 +4,15 @@
 """LC Register: the submitted Letters of Credit with their status, amounts (current, open, documents, settled),
 the cash margin held and the maturity of accepted usance credits. "Open Only" (default) shows the credits the
 bank is still committed to (Opened / Amended / Documents Received / Accepted) and the expired ones whose
-margin is still held. Company currency columns at the reports' today rate.
+margin is still held; "Expiring Within (Days)" narrows to the Opened / Amended credits expiring by today + that
+many days. Company currency columns at the reports' today rate.
 
 Credits are read with `frappe.get_list` (permissions and User Permissions apply).
 """
 
 import frappe
 from frappe import _
-from frappe.utils import cint, date_diff, flt
+from frappe.utils import add_days, cint, date_diff, flt
 
 from treasury.bank_facilities import lc
 from treasury.bank_facilities.report_utils import CompanyConverter, report_today
@@ -54,6 +55,9 @@ def execute(filters=None):
 	for fieldname in ("facility", "bank", "supplier", "lc_type", "status"):
 		if filters.get(fieldname):
 			conditions[fieldname] = filters.get(fieldname)
+	expiring_within = cint(filters.expiring_within)
+	if expiring_within:
+		conditions["effective_expiry_date"] = ["<=", add_days(today, expiring_within)]
 	rows = frappe.get_list(lc.DOCTYPE, filters=conditions, fields=FIELDS, order_by="issue_date asc, name asc")
 	# the settlement Payment Entry, while submitted (the paper-filing number)
 	submitted = set(
@@ -72,6 +76,9 @@ def execute(filters=None):
 		row.payment_entry = row.payment_entry if row.payment_entry in submitted else ""
 		is_open = row.status in lc.OPEN_STATUSES
 		if cint(filters.open_only) and not (is_open or (row.status == lc.EXPIRED and flt(row.margin_held))):
+			continue
+		# only an Opened / Amended credit expires (documents received or accepted: the bank is committed)
+		if expiring_within and row.status not in lc.AMENDABLE_STATUSES:
 			continue
 		rate = converter.rate(row.currency)
 		row.update(

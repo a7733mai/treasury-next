@@ -89,9 +89,14 @@ def before_uninstall():
 	reinstall finds the users' assignments intact. An administrator can delete them in Role.
 
 	Kept on purpose too, as user data: the Payment Entry series added from Treasury Company Settings (their
-	Property Setters), the Modes of Payment and the "Treasury Payees" Supplier Group (and its suppliers)."""
+	Property Setters on Payment Entry), the Modes of Payment, the "Treasury Payees" Supplier Group (and its
+	suppliers) and the Series counters.
+
+	Deleted with the app (spec 7h §3.6): the customisations of the app's own doctypes, which `bench
+	uninstall-app` leaves behind as orphans when they have no module (Property Setters, e.g. from Document
+	Naming Settings; Document Naming Rules; Custom Fields, e.g. the accounting dimension fields)."""
 	delete_custom_fields()
-	delete_dimension_fields()
+	delete_app_doctype_customisations()
 	remove_legacy_permissions()  # a site never migrated since the legacy grants
 	report_kept_series()
 	# the categories are deleted with the app's doctypes: a reinstall creates the defaults again
@@ -335,13 +340,38 @@ def delete_custom_fields():
 		frappe.clear_cache(doctype=doctype)
 
 
-def delete_dimension_fields():
-	"""The Accounting Dimension fields ERPNext added to the app's own doctypes (dropped with them anyway; the
-	Custom Field records would otherwise stay behind)."""
-	for doctype, fieldname in dimensions.dimension_custom_fields():
-		name = frappe.db.get_value("Custom Field", {"dt": doctype, "fieldname": fieldname})
-		if name:
-			frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
+def app_doctypes() -> list[str]:
+	"""The DocTypes of the app's Module Defs."""
+	return frappe.get_all(
+		"DocType", filters={"module": ["in", frappe.get_module_list("treasury")]}, pluck="name", order_by="name"
+	)
+
+
+# (doctype of the customisation, its field naming the customised doctype)
+APP_DOCTYPE_CUSTOMISATIONS = (
+	("Property Setter", "doc_type"),
+	("Document Naming Rule", "document_type"),
+	("Custom Field", "dt"),
+)
+
+
+def app_doctype_customisations() -> dict[str, list[str]]:
+	"""{"Property Setter": [...], "Document Naming Rule": [...], "Custom Field": [...]}: the records customising
+	the app's own doctypes (the accounting dimension fields among the Custom Fields)."""
+	doctypes = app_doctypes()
+	return {
+		doctype: frappe.get_all(doctype, filters={field: ["in", doctypes]}, pluck="name", order_by="name")
+		if doctypes
+		else []
+		for doctype, field in APP_DOCTYPE_CUSTOMISATIONS
+	}
+
+
+def delete_app_doctype_customisations():
+	"""Delete the customisations of the app's doctypes: dropped with them, they would be orphans (F2)."""
+	for doctype, names in app_doctype_customisations().items():
+		for name in names:
+			frappe.delete_doc(doctype, name, ignore_permissions=True, force=True)
 
 
 def report_kept_series() -> list[str]:

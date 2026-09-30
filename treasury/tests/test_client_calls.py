@@ -77,9 +77,12 @@ class TestClientCalls(UnitTestCase):
 		self.assertGreater(checked, 20)  # the scan really sees the action buttons
 
 	def test_public_scripts_call_whitelisted_paths(self):
-		"""Phase 7c: the plain scripts of public/js (loaded by `doctype_js`) call existing whitelisted methods."""
+		"""Phase 7c: the plain scripts of public/js (loaded by `doctype_js`) call existing whitelisted methods;
+		Phase 7h: so do the page scripts (the Treasury Dashboard)."""
 		missing, checked = [], 0
-		for path in sorted((APP_PATH / "public" / "js").glob("*.js")):
+		scripts = sorted((APP_PATH / "public" / "js").glob("*.js")) + sorted(APP_PATH.rglob("page/*/*.js"))
+		self.assertTrue(any(p.name == "treasury_dashboard.js" for p in scripts))
+		for path in scripts:
 			source = path.read_text(encoding="utf-8")
 			for pattern in (DOTTED_METHOD, XCALL_METHOD):
 				for dotted in pattern.findall(source):
@@ -197,6 +200,7 @@ class TestClientCalls(UnitTestCase):
 		from treasury.bank_transfers.api import get_fee_preview, get_transfer_settings, make_bank_transfer
 		from treasury.bank_transfers.doctype.bank_charge.bank_charge import get_category_defaults, make_refund
 		from treasury.pdc.api import make_cheque_batch, make_pdc_cheque
+		from treasury.pdc.page.treasury_dashboard.treasury_dashboard import get_dashboard_data
 		from treasury.security_cheques.api import make_security_cheque
 		from treasury.utils.source_documents import get_journal_parties
 
@@ -214,6 +218,8 @@ class TestClientCalls(UnitTestCase):
 				# Phase 7d: an unsaved refund, the defaults of a category
 				make_refund,
 				get_category_defaults,
+				# Phase 7h: the Treasury Dashboard data (read only)
+				get_dashboard_data,
 			):
 				with self.subTest(method=method.__qualname__):
 					self.assertIn(method, frappe.whitelisted)

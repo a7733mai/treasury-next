@@ -85,6 +85,7 @@ class TreasuryCompanySettings(Document):
 		incoming_party_posting: DF.Literal["On Receipt", "On Cheque Date", "Manual"]
 		incoming_under_collection: DF.Literal["On Deposit", "Disabled"]
 		mode_name_template: DF.Data
+		naming_series_help: DF.HTML | None
 		on_bounce: DF.Literal["Cancel Payment Entry", "Reverse by Journal Entry"]
 		on_low_balance: DF.Literal["Ignore", "Warn", "Block"]
 		outgoing_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
@@ -93,6 +94,7 @@ class TreasuryCompanySettings(Document):
 		pdc_accounts: DF.Table[PDCAccountMapping]
 		performance_bond_percent: DF.Percent
 		refund_fees_on_return: DF.Check
+		setup_checklist: DF.HTML | None
 		tender_bond_percent: DF.Percent
 		transfer_approval_threshold: DF.Currency
 		transfer_completion: DF.Literal["On Bank Confirmation", "On Send for Fawran", "On Send"]
@@ -123,6 +125,20 @@ class TreasuryCompanySettings(Document):
 				for d in accounts
 			},
 		)
+		self.set_setup_onload()
+
+	def set_setup_onload(self):
+		"""Spec 7h §3.4 / §3.5: the Setup Checklist and the Naming Series overview (read only)."""
+		from treasury.treasury_setup import checklist
+		from treasury.utils import naming
+
+		items = checklist.get_checklist(self)
+		self.set_onload("setup_checklist", items)
+		self.set_onload(
+			"setup_complete",
+			all(i.status != checklist.MISSING for i in items if i.level == checklist.REQUIRED),
+		)
+		self.set_onload("naming_series", naming.get_series_overview())
 
 	def validate(self):
 		self.warn_outgoing_on_creation()

@@ -1,0 +1,137 @@
+.treasury-dashboard {
+	padding-block: var(--padding-md, 16px);
+}
+
+.treasury-dashboard.td-loading .td-content {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.treasury-dashboard .td-updated {
+	text-align: end;
+	margin-block-end: 8px;
+}
+
+.treasury-dashboard .td-section {
+	margin-block-end: 24px;
+	padding: 12px 16px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md, 8px);
+	background: var(--card-bg, var(--fg-color));
+}
+
+.treasury-dashboard .td-section-title {
+	font-weight: 600;
+	font-size: var(--text-lg, 16px);
+	margin-block-end: 8px;
+	text-align: start;
+}
+
+.treasury-dashboard .td-subtitle {
+	font-weight: 600;
+	margin-block: 12px 4px;
+}
+
+.treasury-dashboard .td-note {
+	margin-block-end: 8px;
+}
+
+.treasury-dashboard .td-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 12px;
+	margin-block-end: 12px;
+}
+
+.treasury-dashboard .td-card {
+	text-align: start;
+	padding: 12px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius, 6px);
+	background: var(--control-bg, var(--fg-color));
+	cursor: pointer;
+}
+
+.treasury-dashboard .td-card:hover,
+.treasury-dashboard .td-clickable:hover {
+	background: var(--fg-hover-color, var(--control-bg));
+	cursor: pointer;
+}
+
+.treasury-dashboard .td-card-label {
+	color: var(--text-muted);
+	font-size: var(--text-sm, 13px);
+}
+
+.treasury-dashboard .td-card-value {
+	font-size: var(--text-xl, 18px);
+	font-weight: 600;
+}
+
+.treasury-dashboard .td-num {
+	text-align: end;
+}
+
+.treasury-dashboard .td-pill {
+	display: inline-block;
+	padding-inline: 8px;
+	border-radius: 10px;
+	color: #fff;
+	font-size: var(--text-xs, 11px);
+	background: var(--gray-500);
+}
+
+.treasury-dashboard .td-level-critical {
+	background: var(--red-500);
+}
+
+.treasury-dashboard .td-level-warning {
+	background: var(--orange-500);
+}
+
+.treasury-dashboard .td-level-ok {
+	background: var(--green-500);
+}
+
+.treasury-dashboard .td-banner {
+	padding: 10px 16px;
+	margin-block-end: 16px;
+	border-radius: var(--border-radius, 6px);
+	border-inline-start: 4px solid var(--orange-500);
+	background: var(--control-bg);
+}
+
+.treasury-dashboard .td-banner a {
+	margin-inline-start: 8px;
+}
+
+.treasury-dashboard .td-banner-red {
+	border-inline-start-color: var(--red-500);
+}
+
+.treasury-dashboard .td-charts {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: 12px;
+}
+
+.treasury-dashboard .td-facility {
+	padding-block: 6px;
+}
+
+.treasury-dashboard .td-bar {
+	block-size: 8px;
+	border-radius: 4px;
+	background: var(--gray-200);
+	overflow: hidden;
+}
+
+.treasury-dashboard .td-bar-fill {
+	block-size: 100%;
+	background: var(--blue-500);
+}
+
+.treasury-dashboard .td-empty {
+	padding-block: 12px;
+	text-align: start;
+}

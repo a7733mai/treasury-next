@@ -1,6 +1,150 @@
 # Changelog
 
-## Unreleased (1.1)
+## 1.1.0 — 2026-09-30
+
+Treasury 1.1 turns the cheque and facility app of 1.0 into a treasury: every Treasury voucher has a Payment
+Entry number to file its paper under, bank transfers, bank charges and bank position alerts are new modules,
+cheques can be paid / received from any ERPNext screen, cheque leaves are printed on layouts, facilities cover
+the Qatar banks and finance companies (Islamic products, auto debit, cheques to the lender), and a Treasury
+Dashboard shows it all. As in 1.0, no Frappe / ERPNext file is changed: everything goes through the app's own
+DocTypes, custom fields, hooks and standard Payment Entries / Journal Entries.
+
+### Upgrading from 1.0.1
+`bench migrate` runs the patches below once, in this order (`[post_model_sync]`); each only fills empty values:
+1. `set_bank_settlement_voucher` — *Bank Settlement Voucher* = Payment Entry, *Mode Name Template*
+   `{method} - {bank}`.
+2. `set_bank_transfer_defaults` — the Bank Transfers settings (Normal, SHA, On Bank Confirmation, Warn).
+3. `set_document_payment_defaults` — *Pay / Receive from Documents* (12 Monthly installments, the bank's active
+   cheque book).
+4. `set_bank_charge_defaults` — *Bank Charge Voucher* Payment Entry, *Bank Charge Clearance* On Posting.
+5. `set_balance_alert_defaults` — *On Low Projected Balance* = Warn.
+6. `set_cheque_leaf_defaults` — cancelled leaves kind and source, cheque print counts, reprint by a Treasury
+   Manager only.
+7. `set_facility_defaults` — lender type / name, repayment mode Manual, the schedule's payment voucher,
+   *Facility Voucher* Payment Entry, *Auto Debit Posting* On Due Date.
+
+**Bank Settlement Voucher = Payment Entry** for every existing company: the under-collection stage and the bank
+settlement of cheques become Internal Transfer Payment Entries. In that mode a foreign-currency cheque is
+settled at its carrying rate: the realised exchange gain / loss is no longer booked at clearance (it is left to
+ERPNext's Exchange Rate Revaluation). Companies with foreign-currency cheques that want it booked at clearance
+set *Bank Settlement Voucher* = Journal Entry after the migrate, before clearing any cheque.
+
+### Payment Entry as the Single Reference (Phase 7a)
+- New company setting **Bank Settlement Voucher** (Payment Entry, the default | Journal Entry): in Payment
+  Entry mode the under-collection stage and the bank settlement of cheques are **Internal Transfer Payment
+  Entries**, with the bank charges inside the same Payment Entry; an Internal Transfer Payment Entry is reversed
+  by a reverse Payment Entry.
+- Child table **Modes of Payment** (*Treasury Payment Mode Map*: bank account, method, Mode of Payment, Payment
+  Entry series) with the actions *Generate Modes of Payment* and *Add Series to Payment Entry* (System Manager,
+  with confirmation); every Payment Entry built by the posting service, the LC settlement included, takes the
+  mode and series of its bank and method.
+- **Accounting Details** and the company's accounting dimensions on PDC Cheque and Cheque Batch, copied to every
+  voucher; cheques created by a batch inherit them.
+- **Open party** (any Party Type) on PDC Cheque, Cheque Batch and security cheque encashment, and the *New Payee*
+  action.
+- **Payment Entry visibility**: a voucher summary on each Treasury document, a *Payment Entry* column in the
+  reports, the Payment Entry number on the PDC Cheque Receipt and the Cheque Batch Receipt.
+- Patch `set_bank_settlement_voucher`; install / uninstall updates.
+
+### Bank Transfers (Phase 7b)
+- New module **Bank Transfers**: the submittable **Bank Transfer** (Party Payment / Party Receipt /
+  Internal Transfer; Normal, Fawran, SWIFT), posted as one Payment Entry with the bank fee as a deduction
+  row; Scheduled transfers are sent by a daily job on their execution date.
+- Treasury Company Settings: *Bank Transfers* section (default method, banks per method, charge bearer,
+  completion, fee refund on return, limit action, approval threshold), **Transfer Fee Rules** and **Transfer
+  Limits**. Patch `set_bank_transfer_defaults` fills the new settings of existing companies.
+- Posting service: charges on Pay / Receive Payment Entries, Internal Transfers between two currencies
+  (no exchange difference in the entry), reversals keeping the charges, a public clearance date setter.
+- PDC Bank Clearing matches statement lines with Sent transfers too.
+- Reports: Bank Transfer Register, Transfer Fees Analysis; Bank Position Forecast flows and summary card.
+- Bank Transfer is an accounting dimension doctype.
+- Controls: the approval threshold compares amount + fee at the higher of the transfer's and the system
+  exchange rate; the transfer limits are enforced under a Bank Account row lock with a locking count on
+  submit, Send Now, Reschedule and the daily job; the form helpers check the company and return a party's
+  bank details only to users who may read the party; return dates cannot be in the future.
+
+### Pay / Receive from Documents (Phase 7c)
+- A **Treasury** button group (plain `public/js/treasury_payment_buttons.js`, loaded by `doctype_js`) on Sales /
+  Purchase Invoice, Sales / Purchase Order, Journal Entry, Expense Claim and Employee Advance (hrms), Customer,
+  Supplier, Employee, Quotation and Supplier Quotation.
+- Read-only server mappers returning an unsaved document: `make_pdc_cheque`, `make_cheque_batch`,
+  `make_security_cheque`, and `make_bank_transfer` extended to Journal Entry and the hrms sources
+  (`treasury/utils/source_documents.py`, `treasury/utils/hrms.py`).
+- Cheque Batch *Created From* (`source_doctype` / `source_name`): *Generate Cheques* allocates the generated
+  rows to that source.
+- Treasury Company Settings section **Pay / Receive from Documents** (default cheque banks, cheque book
+  auto-selection, installment defaults, tender / performance bond %).
+- Treasury connections on the ERPNext / hrms doctypes (`override_doctype_dashboards`) and on the Treasury
+  doctypes. Patch `set_document_payment_defaults`.
+
+### Bank Charges (Phase 7d)
+- New submittable **Bank Charge** (Charge / Refund) in Bank Transfers and the master **Bank Charge
+  Category** (expense account per company, statement keywords) in Treasury Setup; six default categories
+  are created once on install / migrate.
+- Posted as one **Payment Entry** to the Bank's Supplier (Treasury Settings → Bank Suppliers, created on
+  demand) with the whole amount as a deduction, so the supplier balance is never touched — or as one **Bank
+  Entry** Journal Entry (Treasury Company Settings → Bank Charge Voucher). Clearance on posting or on the
+  bank statement line (Bank Charge Clearance). Refunds reduce the charge's refundable amount.
+- PDC Bank Clearing matches Posted bank charges and proposes new charges for unmatched withdrawals whose
+  text contains a category keyword (created, submitted and reconciled in one click).
+- Report **Bank Charges Analysis**: every bank charge booked by Treasury (bank charges, transfer fees,
+  cheque clearance and bounce charges, LG / LC commissions and charges, facility fees) per month, bank,
+  account, category or source, with a detail view.
+- Posting service: `create_bank_charge_payment`. Patch `set_bank_charge_defaults`. Bank Charge is an
+  accounting dimension doctype.
+- UX: the charge form defaults everything from the category (account, cost center, description; the bank
+  account is remembered), explains what Submit will post, heads a submitted charge with its voucher number,
+  statement line and refunds, and offers *Record Refund* and *Reconcile with Statement Line*. PDC Bank
+  Clearing gets a *Document* column, bulk selection buttons, *Set Charge Category*, a selection counter and
+  a per-category confirmation. The category form previews its keywords; the report shows Top Category / Top
+  Source cards, source colours and a drill-down from every group.
+
+### Bank Position Alerts (Phase 7e)
+- Per-bank daily projected positions from the Bank Position Forecast engine (`treasury.pdc.bank_positions`,
+  one engine call per company; banks sharing a GL account are merged), evaluated against new **Balance
+  Thresholds** (Treasury Company Settings: warning / minimum balance per company bank account).
+- Hourly job: a **daily digest** per recipient, company and day from the digest hour on, and **critical /
+  warning alerts** with dedupe and escalation ("Worse:"), as in-system notifications and / or e-mails in each
+  recipient's language, limited to the banks the recipient may see. Settings and **Recipients** in Treasury
+  Settings (install adds Treasury Manager once).
+- **Entry-time low balance guard** (On Low Projected Balance: Ignore / Warn / Block) on cheque delivery
+  (single, Cheque Batch submit / Deliver All, security cheque encashment), Bank Transfer submit / Send Now /
+  Reschedule, Facility Repayment and Bank Charge submit; a Treasury Manager may override a Block (field
+  *Override Low Balance* or the action's confirmation), which is logged. Every guarded entry triggers an
+  evaluation after the commit.
+- New **Treasury Alert Log** (digests, alerts, overrides; Log Settings clears digests and alerts after 180
+  days, override logs are kept permanently), report
+  **Bank Balance Outlook**, number card *Banks Below Minimum (7 days)*, chart *Lowest Projected Balance per
+  Bank*. Patch `set_balance_alert_defaults`. No accounting is posted.
+- Alerts UX (7e-2): Arabic / RTL digest and alert e-mails with level colours and words, weekday dates, the
+  lowest balance per bank, "was …" on worse days and the party Payment Entry of cheque payments; *Preview
+  Digest*, *Send Test to Me* and *Run Alerts Now* for Treasury Managers; *Add All Bank Accounts* and hints
+  in the settings; one red *Low Projected Balance* dialog with *Override and Continue / Submit* on every
+  guarded form; report colours, a minimum line on its chart, a *Largest Shortfall* card and a workspace
+  shortcut.
+
+### Cheque Leaves, Cheque Printing and Security Reports (Phase 7f)
+- **Cheque Leaf Register** (every leaf of the outgoing books with its status, usage, party, dates, Payment
+  Entries; view Leaves / Books) on a read-only leaf engine (`treasury.pdc.cheque_leaves`); print format
+  **Cheque Book Leaves**; Cheque Book Usage gets a Void Leaves column.
+- **Void Leaf** on Cheque Book (one leaf or a range, reason type and reason, also on a Closed book); cancelled /
+  void leaves rows keep kind, reason type, user, time and the cancelled cheque, and can only be written by the
+  leaf actions.
+- **Cheque Layout** per bank account (positions in mm, calibration, fonts, date formats, Arabic-Indic digits,
+  "only" / currency / fraction wording, A4 carrier) with a live preview and a test print; print formats
+  **Treasury Cheque**, **Cheque Batch Leaves**, **Cheque Layout Test Print**. *Print Cheque* registers each
+  print (counter, last printed on / by, status log Printed / Reprinted, reprint reason; Treasury Manager only by
+  default: `cheque_reprint_requires_manager`); *Payee Name on Cheque*.
+- `treasury_amount_in_words`: optional "only", currency name and fraction name overrides, fraction in figures.
+- Reports **Security Cheques Summary** (ageing buckets, chart, cards) and **Security Cheque Movements**.
+- Patch `set_cheque_leaf_defaults`. No accounting in this phase.
+- UX (7f-2): leaf bar and "Active · n left" on the Cheque Book, Void Leaves dialog with a live range check;
+  leaf status pills, book summary rows, usage chart and one-book mode (Print Book / Open Cheque Book) in the
+  Cheque Leaf Register; Cheque Layout form with a scaled preview (language, zoom, pinned while editing, click a
+  box to edit it, out-of-leaf boxes in red, optional scan behind), headline of the layout that prints and a
+  Test Print dialog; Print Cheque dialog with the words preview (`get_cheque_text`), reprint block and the
+  manager rule; Print All Cheques with "Unprinted only / All" and the leaf loading order; print windows open
+  in the click (never blocked); Security Cheques Summary grouped tree and Security Cheque Movements pills.
 
 ### Qatar Facilities and Finance Companies (Phase 7g)
 - **Bank Facility**: *Lender Type* (Bank / Finance Company), *Lender* (Supplier; a bank's is created on first
@@ -42,91 +186,29 @@
   installment states and a *Covered by Cheques* card. Number card **Auto Debits Awaiting Statement**; *Invoice
   Discounting* in the workspace and the facility's Connections (only Active facilities of the company offered).
 
-### Cheque Leaves, Cheque Printing and Security Reports (Phase 7f)
-- **Cheque Leaf Register** (every leaf of the outgoing books with its status, usage, party, dates, Payment
-  Entries; view Leaves / Books) on a read-only leaf engine (`treasury.pdc.cheque_leaves`); print format
-  **Cheque Book Leaves**; Cheque Book Usage gets a Void Leaves column.
-- **Void Leaf** on Cheque Book (one leaf or a range, reason type and reason, also on a Closed book); cancelled /
-  void leaves rows keep kind, reason type, user, time and the cancelled cheque, and can only be written by the
-  leaf actions.
-- **Cheque Layout** per bank account (positions in mm, calibration, fonts, date formats, Arabic-Indic digits,
-  "only" / currency / fraction wording, A4 carrier) with a live preview and a test print; print formats
-  **Treasury Cheque**, **Cheque Batch Leaves**, **Cheque Layout Test Print**. *Print Cheque* registers each
-  print (counter, last printed on / by, status log Printed / Reprinted, reprint reason; Treasury Manager only by
-  default: `cheque_reprint_requires_manager`); *Payee Name on Cheque*.
-- `treasury_amount_in_words`: optional "only", currency name and fraction name overrides, fraction in figures.
-- Reports **Security Cheques Summary** (ageing buckets, chart, cards) and **Security Cheque Movements**.
-- Patch `set_cheque_leaf_defaults`. No accounting in this phase.
-- UX (7f-2): leaf bar and "Active · n left" on the Cheque Book, Void Leaves dialog with a live range check;
-  leaf status pills, book summary rows, usage chart and one-book mode (Print Book / Open Cheque Book) in the
-  Cheque Leaf Register; Cheque Layout form with a scaled preview (language, zoom, pinned while editing, click a
-  box to edit it, out-of-leaf boxes in red, optional scan behind), headline of the layout that prints and a
-  Test Print dialog; Print Cheque dialog with the words preview (`get_cheque_text`), reprint block and the
-  manager rule; Print All Cheques with "Unprinted only / All" and the leaf loading order; print windows open
-  in the click (never blocked); Security Cheques Summary grouped tree and Security Cheque Movements pills.
-
-### Bank Position Alerts (Phase 7e)
-- Per-bank daily projected positions from the Bank Position Forecast engine (`treasury.pdc.bank_positions`,
-  one engine call per company; banks sharing a GL account are merged), evaluated against new **Balance
-  Thresholds** (Treasury Company Settings: warning / minimum balance per company bank account).
-- Hourly job: a **daily digest** per recipient, company and day from the digest hour on, and **critical /
-  warning alerts** with dedupe and escalation ("Worse:"), as in-system notifications and / or e-mails in each
-  recipient's language, limited to the banks the recipient may see. Settings and **Recipients** in Treasury
-  Settings (install adds Treasury Manager once).
-- **Entry-time low balance guard** (On Low Projected Balance: Ignore / Warn / Block) on cheque delivery
-  (single, Cheque Batch submit / Deliver All, security cheque encashment), Bank Transfer submit / Send Now /
-  Reschedule, Facility Repayment and Bank Charge submit; a Treasury Manager may override a Block (field
-  *Override Low Balance* or the action's confirmation), which is logged. Every guarded entry triggers an
-  evaluation after the commit.
-- New **Treasury Alert Log** (digests, alerts, overrides; Log Settings clears digests and alerts after 180
-  days, override logs are kept permanently), report
-  **Bank Balance Outlook**, number card *Banks Below Minimum (7 days)*, chart *Lowest Projected Balance per
-  Bank*. Patch `set_balance_alert_defaults`. No accounting is posted.
-- Alerts UX (7e-2): Arabic / RTL digest and alert e-mails with level colours and words, weekday dates, the
-  lowest balance per bank, "was …" on worse days and the party Payment Entry of cheque payments; *Preview
-  Digest*, *Send Test to Me* and *Run Alerts Now* for Treasury Managers; *Add All Bank Accounts* and hints
-  in the settings; one red *Low Projected Balance* dialog with *Override and Continue / Submit* on every
-  guarded form; report colours, a minimum line on its chart, a *Largest Shortfall* card and a workspace
-  shortcut.
-
-### Bank Charges (Phase 7d)
-- New submittable **Bank Charge** (Charge / Refund) in Bank Transfers and the master **Bank Charge
-  Category** (expense account per company, statement keywords) in Treasury Setup; six default categories
-  are created once on install / migrate.
-- Posted as one **Payment Entry** to the Bank's Supplier (Treasury Settings → Bank Suppliers, created on
-  demand) with the whole amount as a deduction, so the supplier balance is never touched — or as one **Bank
-  Entry** Journal Entry (Treasury Company Settings → Bank Charge Voucher). Clearance on posting or on the
-  bank statement line (Bank Charge Clearance). Refunds reduce the charge's refundable amount.
-- PDC Bank Clearing matches Posted bank charges and proposes new charges for unmatched withdrawals whose
-  text contains a category keyword (created, submitted and reconciled in one click).
-- Report **Bank Charges Analysis**: every bank charge booked by Treasury (bank charges, transfer fees,
-  cheque clearance and bounce charges, LG / LC commissions and charges, facility fees) per month, bank,
-  account, category or source, with a detail view.
-- Posting service: `create_bank_charge_payment`. Patch `set_bank_charge_defaults`. Bank Charge is an
-  accounting dimension doctype.
-- UX: the charge form defaults everything from the category (account, cost center, description; the bank
-  account is remembered), explains what Submit will post, heads a submitted charge with its voucher number,
-  statement line and refunds, and offers *Record Refund* and *Reconcile with Statement Line*. PDC Bank
-  Clearing gets a *Document* column, bulk selection buttons, *Set Charge Category*, a selection counter and
-  a per-category confirmation. The category form previews its keywords; the report shows Top Category / Top
-  Source cards, source colours and a drill-down from every group.
-
-### Bank Transfers (Phase 7b)
-- New module **Bank Transfers**: the submittable **Bank Transfer** (Party Payment / Party Receipt /
-  Internal Transfer; Normal, Fawran, SWIFT), posted as one Payment Entry with the bank fee as a deduction
-  row; Scheduled transfers are sent by a daily job on their execution date.
-- Treasury Company Settings: *Bank Transfers* section (default method, banks per method, charge bearer,
-  completion, fee refund on return, limit action, approval threshold), **Transfer Fee Rules** and **Transfer
-  Limits**. Patch `set_bank_transfer_defaults` fills the new settings of existing companies.
-- Posting service: charges on Pay / Receive Payment Entries, Internal Transfers between two currencies
-  (no exchange difference in the entry), reversals keeping the charges, a public clearance date setter.
-- PDC Bank Clearing matches statement lines with Sent transfers too.
-- Reports: Bank Transfer Register, Transfer Fees Analysis; Bank Position Forecast flows and summary card.
-- Bank Transfer is an accounting dimension doctype.
-- Controls: the approval threshold compares amount + fee at the higher of the transfer's and the system
-  exchange rate; the transfer limits are enforced under a Bank Account row lock with a locking count on
-  submit, Send Now, Reschedule and the daily job; the form helpers check the company and return a party's
-  bank details only to users who may read the party; return dates cannot be in the future.
+### Treasury Dashboard and Setup (Phase 7h)
+- **Treasury Dashboard** page (`/app/treasury-dashboard`, plain page script, no bundle): company, bank
+  accounts and 7 / 14 / 30-day horizon filters; bank position KPIs, per-bank levels, balance curve and cash
+  flows (one 30-day Bank Position Forecast engine call), cheques due this week / issued / in hand / bounced this
+  month, transfers awaiting confirmation, bank charges this month, and the company-wide security cheques,
+  facility utilisation, next installments, expiring Letters of Guarantee / Credit and the 30-day maturities
+  chart. Every card opens its report with the same filters and equals it; sections the user may not read are
+  left out. One read-only endpoint (`get_dashboard_data`, service `treasury.pdc.overview`).
+- **Workspace refresh**: a *Treasury Dashboard* shortcut first, the card *Treasury Masters* becomes **Treasury
+  Setup** (the setup masters in setup order, Document Naming Settings / Rule included), the sidebar gets the
+  dashboard and *Security Cheques* / *Bank Facilities* sections.
+- **Setup Checklist** section in Treasury Company Settings: eight Required / Recommended items (PDC Accounts,
+  Modes of Payment, default banks, transfer fee rules, balance thresholds, Cheque Layouts, Bank Charge
+  Categories, Bank Suppliers), each with what is missing and a link to fix it; a headline while a Required
+  item is missing; the dashboard shows the count.
+- **Naming Series** section: every Treasury series field, its options and default, how the series is chosen,
+  the Document Naming Rules per DocType, and the routes to Frappe's *Document Naming Settings* / *Document
+  Naming Rule* (*Add Rule per Bank*). No new naming mechanism.
+- LC Register filter **Expiring Within (Days)**; Bounced and Postponed Cheques filter **Bank Account**.
+- Uninstall also deletes the Property Setters, Document Naming Rules and Custom Fields of the app's own
+  doctypes (orphans otherwise); the Payment Entry series, Modes of Payment, payees and roles are still kept.
+- Refactors shared by the dashboard and the reports: `bank_positions.collect_positions`,
+  `pdc.dashboard.open_cheque_totals`, `security_exposure.get_totals`. No patch, no accounting.
 
 ## 1.0.1 — 2026-09-29
 

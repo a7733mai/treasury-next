@@ -53,6 +53,11 @@ frappe.query_reports["LC Register"] = {
 			fieldtype: "Check",
 			default: 1,
 		},
+		{
+			fieldname: "expiring_within",
+			label: __("Expiring Within (Days)"),
+			fieldtype: "Int",
+		},
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {

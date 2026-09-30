@@ -95,6 +95,9 @@ frappe.ui.form.on("Treasury Company Settings", {
 		tcs_threshold_buttons(frm);
 		tcs_thresholds_headline(frm);
 		tcs_add_alert_buttons(frm);
+		tcs_render_setup_checklist(frm);
+		tcs_render_naming_series(frm);
+		tcs_checklist_headline(frm);
 	},
 
 	render_balance_alerts_help(frm) {
@@ -769,6 +772,153 @@ function tcs_thresholds_headline(frm) {
 			frm.scroll_to_field("balance_thresholds");
 			tcs_add_all_banks(frm);
 		});
+}
+
+// ---------------------------------------------------------------- Setup Checklist (spec 7h §3.4)
+
+const TCS_MAX_MISSING = 5;
+
+function tcs_render_setup_checklist(frm) {
+	const field = frm.get_field("setup_checklist");
+	if (!field) {
+		return;
+	}
+	const items = (frm.doc.__onload && frm.doc.__onload.setup_checklist) || [];
+	if (frm.is_new() || !items.length) {
+		field.$wrapper.html(
+			`<div class="text-muted small">${frappe.utils.escape_html(
+				__("Save the settings to see the Setup Checklist.")
+			)}</div>`
+		);
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const colors = { OK: "green", Warning: "orange" };
+	const rows = items.map((item, index) => {
+		const color = colors[item.status] || (item.level === "Required" ? "red" : "orange");
+		const shown = item.missing.slice(0, TCS_MAX_MISSING).map(esc).join(", ");
+		const more =
+			item.missing.length > TCS_MAX_MISSING
+				? " " + esc(__("and {0} more", [item.missing.length - TCS_MAX_MISSING]))
+				: "";
+		const fix =
+			item.status === "OK" ? "" : `<a class="tcs-fix" data-index="${index}">${esc(__("Fix", null, TCS_CTX))}</a>`;
+		const quick =
+			item.quick_fill && frm.perm[0] && frm.perm[0].write
+				? ` <a class="tcs-quick-fill" data-index="${index}">${esc(__("Use {0}", [item.quick_fill]))}</a>`
+				: "";
+		return `<tr>
+			<td><span class="indicator-pill ${color}">${esc(__(item.status, null, TCS_CTX))}</span></td>
+			<td><b>${esc(item.label)}</b> <span class="text-muted small">${esc(__(item.level, null, TCS_CTX))}</span>
+				<div class="text-muted small">${esc(item.detail || "")}</div>
+				${shown ? `<div class="small">${shown}${more}</div>` : ""}</td>
+			<td>${fix}${quick}</td>
+		</tr>`;
+	});
+	field.$wrapper.html(`<table class="table table-sm"><tbody>${rows.join("")}</tbody></table>`);
+	field.$wrapper.find(".tcs-fix").on("click", (e) => {
+		const item = items[cint($(e.currentTarget).attr("data-index"))];
+		const action = item.action || {};
+		if (action.route) {
+			frappe.set_route(...action.route, action.route_options || {});
+		} else if (action.field) {
+			frm.scroll_to_field(action.field);
+		}
+	});
+	field.$wrapper.find(".tcs-quick-fill").on("click", (e) => {
+		const item = items[cint($(e.currentTarget).attr("data-index"))];
+		(item.empty_fields || []).forEach((fieldname) => frm.set_value(fieldname, item.quick_fill));
+	});
+}
+
+function tcs_checklist_headline(frm) {
+	if (frm.is_new() || frm.is_dirty()) {
+		return;
+	}
+	const items = (frm.doc.__onload && frm.doc.__onload.setup_checklist) || [];
+	const missing = items.filter((i) => i.level === "Required" && i.status === "Missing");
+	if (!missing.length) {
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const $headline = frm.dashboard.set_headline(
+		`<div>${esc(__("Setup is incomplete: {0}.", [missing.map((i) => i.label).join(", ")]))}
+		<a class="tcs-open-checklist">${esc(__("Setup Checklist"))} →</a></div>`,
+		"red"
+	);
+	$headline && $headline.find(".tcs-open-checklist").on("click", () => frm.scroll_to_field("setup_checklist"));
+}
+
+// ---------------------------------------------------------------- Naming Series (spec 7h §3.5)
+
+function tcs_render_naming_series(frm) {
+	const field = frm.get_field("naming_series_help");
+	if (!field) {
+		return;
+	}
+	const rows = (frm.doc.__onload && frm.doc.__onload.naming_series) || [];
+	const esc = frappe.utils.escape_html;
+	const can_settings = frappe.model.can_write("Document Naming Settings");
+	const can_rule = frappe.model.can_create("Document Naming Rule");
+	const body = rows.map((row, index) => {
+		const defaults =
+			typeof row.default === "object" && row.default
+				? Object.entries(row.default)
+						.map(([direction, series]) => `${esc(__(direction))}: <code>${esc(series)}</code>`)
+						.join("<br>")
+				: `<code>${esc(row.default || "")}</code>`;
+		const chosen = row.forced_by
+			? esc(__("By direction (fixed)", null, TCS_CTX))
+			: esc(__("First option (Document Naming Settings)", null, TCS_CTX));
+		const rules = (row.rules || [])
+			.map(
+				(r) =>
+					`<div class="small"><a href="/app/document-naming-rule/${encodeURIComponent(r.name)}">${esc(
+						r.prefix
+					)}</a> ${esc(r.conditions || "")}${r.disabled ? " (" + esc(__("Disabled")) + ")" : ""}</div>`
+			)
+			.join("");
+		const buttons = [
+			!row.forced_by && can_settings
+				? `<a class="tcs-naming-settings" data-index="${index}">${esc(__("Document Naming Settings", null, TCS_CTX))}</a>`
+				: "",
+			can_rule ? `<a class="tcs-naming-rule" data-index="${index}">${esc(__("Add Rule per Bank"))}</a>` : "",
+		]
+			.filter(Boolean)
+			.join(" · ");
+		return `<tr><td>${esc(__(row.doctype))}</td><td>${row.options.map((o) => `<code>${esc(o)}</code>`).join("<br>")}</td>
+			<td>${defaults}</td><td>${chosen}</td><td><code>${esc(row.bank_field)}</code>${rules}</td><td>${buttons}</td></tr>`;
+	});
+	field.$wrapper.html(`<div class="text-muted small">${esc(
+		__(
+			"A Document Naming Rule overrides the series. Rules are matched highest priority first, and the counter of a rule does not restart each year. Payment Entry series are set per bank and method in Modes of Payment."
+		)
+	)}</div>
+		<table class="table table-sm"><thead><tr>
+			<th>${esc(__("Document Type", null, TCS_CTX))}</th><th>${esc(__("Options", null, TCS_CTX))}</th>
+			<th>${esc(__("Default Series", null, TCS_CTX))}</th><th>${esc(__("How the series is chosen", null, TCS_CTX))}</th>
+			<th>${esc(__("Rule condition field", null, TCS_CTX))}</th><th></th>
+		</tr></thead><tbody>${body.join("")}</tbody></table>`);
+	field.$wrapper.find(".tcs-naming-settings").on("click", (e) => {
+		const row = rows[cint($(e.currentTarget).attr("data-index"))];
+		frappe.route_options = { transaction_type: row.doctype };
+		frappe.set_route("Form", "Document Naming Settings");
+	});
+	field.$wrapper.find(".tcs-naming-rule").on("click", (e) => {
+		const row = rows[cint($(e.currentTarget).attr("data-index"))];
+		frappe.model.with_doctype("Document Naming Rule", () => {
+			const rule = frappe.model.get_new_doc("Document Naming Rule");
+			rule.document_type = row.doctype;
+			const first = row.options[0] || "";
+			rule.prefix = `${first.split("-")[0] || "SER"}-.YYYY.-`;
+			const conditions = [{ field: row.bank_field, condition: "=", value: "" }];
+			if (row.forced_by) {
+				conditions.push({ field: row.forced_by, condition: "=", value: "Outgoing" });
+			}
+			conditions.forEach((values) => Object.assign(frappe.model.add_child(rule, "conditions"), values));
+			frappe.set_route("Form", "Document Naming Rule", rule.name);
+		});
+	});
 }
 
 function tcs_add_alert_buttons(frm) {
