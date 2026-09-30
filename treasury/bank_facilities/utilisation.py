@@ -28,6 +28,8 @@ from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
 from frappe.utils import flt, getdate, now_datetime
 
+from treasury.accounting import posting
+
 HOOK = "treasury_facility_utilisation_sources"
 FACILITY = "Bank Facility"
 DRAWDOWN = "Facility Drawdown"
@@ -45,7 +47,6 @@ LOAN_TYPES = (
 	"Trust Receipt",
 	"Other",
 )
-VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
 
 
 def get_utilisation(facility, limit_type: str | None = None, as_on=None) -> frappe._dict:
@@ -189,7 +190,7 @@ def get_source_balances(
 		else gle.debit_in_account_currency - gle.credit_in_account_currency
 	)
 	balances: dict[tuple[str, str, str], float] = {}
-	for voucher_type in VOUCHER_DOCTYPES:
+	for voucher_type in posting.VOUCHER_DOCTYPES:
 		voucher = frappe.qb.DocType(voucher_type)
 		query = (
 			frappe.qb.from_(gle)

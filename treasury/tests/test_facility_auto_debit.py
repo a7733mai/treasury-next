@@ -20,6 +20,7 @@ from treasury.tests.utils import (
 	TreasuryTestMixin,
 	ensure_alert_bank,
 	ensure_facility_accounts,
+	ensure_islamic_accounts,
 	ensure_mode,
 	ensure_user,
 	get_pe,
@@ -35,6 +36,7 @@ from treasury.tests.utils import (
 
 D = getdate
 TOOL = "PDC Bank Clearing"
+DRAWDOWN = "Facility Drawdown"
 CLEARING_USER = "treasury-7g-autodebit-user@example.com"
 
 
@@ -234,6 +236,79 @@ class TestAutoDebit(AutoDebitTestCase):
 		self.assertEqual(len(self.repayments(good.drawdown.name)), 1)
 		self.assertEqual(self.repayments(broken.drawdown.name), [])
 		self.assertEqual(frappe.db.count("Error Log", error), 1)
+
+	def test_clearing_rechecks_client_rows(self):
+		"""Reviews 7g M3 / security Major 1: the matches come from the client; each installment row is checked
+		again on the server (withdrawal, currency, amount, posting mode, repayment settlement, paid meanwhile)."""
+		self.use_company_settings(auto_debit_posting="On Bank Statement Match")
+		s = self.loan()
+		deposit = make_bank_transaction(s.bank.bank_account, "2025-03-02", deposit=11_104.66, description="IN")
+		smaller = make_bank_transaction(s.bank.bank_account, "2025-03-02", withdrawal=999, description="DEBIT")
+		exact = make_bank_transaction(s.bank.bank_account, "2025-03-02", withdrawal=11_104.66, description="X")
+
+		def clear(bank_transaction: str, **values) -> list[str]:
+			tool = self.tool(s.bank.bank_account)
+			tool.append(
+				"matches",
+				{
+					"selected": 1,
+					"bank_transaction": bank_transaction,
+					"reference_doctype": "Facility Repayment" if values.get("facility_repayment") else DRAWDOWN,
+					"facility_drawdown": s.drawdown.name,
+					"installment_no": 1,
+					**values,
+				},
+			)
+			return [d["reason"] for d in tool.clear_selected()["skipped"]]
+
+		self.assertIn("not an open withdrawal", clear(deposit.name)[0])
+		self.assertIn("does not match the unpaid installment", clear(smaller.name)[0])
+		self.assertEqual(self.repayments(s.drawdown.name), [])
+		# On Due Date: the job posts the installments; the tool only reconciles
+		self.use_company_settings(auto_debit_posting="On Due Date")
+		self.assertIn("posted on their due date", clear(exact.name)[0])
+		self.use_company_settings(auto_debit_posting="On Bank Statement Match")
+		# paid meanwhile (a repayment entered by hand): refused, the statement line stays open
+		manual = make_repayment(s.drawdown, "2025-03-01", allocation_mode="Selected Row", installment_no=1)
+		self.assertIn("already paid by", clear(exact.name)[0])
+		# a repayment not settled by auto debit is not reconciled as one
+		self.assertIn("no longer open", clear(exact.name, facility_repayment=manual.name)[0])
+		self.assertEqual([r.name for r in self.repayments(s.drawdown.name)], [manual.name])
+		exact.reload()
+		self.assertEqual(flt(exact.unallocated_amount), 11_104.66)
+
+	def test_istisna_installment_waits_for_disbursement(self):
+		"""Review 7g m7: an Istisna'a installment due before its stage is disbursed is not posted (the job does
+		not fail every day); it is posted by the first run after the disbursement."""
+		islamic = ensure_islamic_accounts()
+		bank = make_own_bank()
+		facility = make_bank_facility(
+			bank_account=bank.bank_account,
+			limits=[
+				{
+					"limit_type": "Istisna'a",
+					"limit_amount": 500_000,
+					"interest_rate": 10,
+					"liability_account": islamic.istisna,
+				}
+			],
+		)
+		drawdown = make_drawdown(
+			facility,
+			amount=120_000,
+			limit_type="Istisna'a",
+			bank_account=bank.bank_account,
+			repayment_mode="Auto Debit",
+			disbursement_stages=[{"stage_date": "2025-04-15", "amount": 120_000}],
+		)
+		result = auto_debit.post_due_auto_debits(as_of="2025-03-01")
+		self.assertNotIn(drawdown.name, result["failed"])
+		self.assertEqual(self.repayments(drawdown.name), [])
+		drawdown.reload()
+		drawdown.disburse_stage(stage=drawdown.disbursement_stages[0].name, disbursement_date="2025-04-15")
+		result = auto_debit.post_due_auto_debits(as_of="2025-04-16")
+		self.assertNotIn(drawdown.name, result["failed"])
+		self.assertEqual(len(self.repayments(drawdown.name)), 2)  # 2025-02-28 and 2025-03-31
 
 	def test_clearing_permission(self):
 		self.use_company_settings(auto_debit_posting="On Bank Statement Match")

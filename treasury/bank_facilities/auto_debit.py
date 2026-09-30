@@ -15,7 +15,7 @@ the company's alerts afterwards). A debit of another amount (extra charges) is r
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, getdate, today
+from frappe.utils import cint, flt, fmt_money, getdate, today
 
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting, repayment
@@ -87,11 +87,28 @@ def _post_drawdown(name: str, as_of) -> list[str]:
 	"""The unpaid installments of one drawdown due up to `as_of`, oldest first, each on its due date."""
 	posted = []
 	for row in _due_rows(name, as_of):
+		if not _principal_disbursed(name, row):
+			# Istisna'a: the installment's principal is not disbursed yet (a stage is pending); it is posted by
+			# the first run after the disbursement instead of failing every day
+			break
 		before = frappe.db.get_value(SCHEDULE, row.name, "repayment")
 		repayment_name = repay_installment(name, cint(row.installment_no), row.due_date, system=True)
 		if repayment_name and repayment_name != before:
 			posted.append(repayment_name)
 	return posted
+
+
+def _principal_disbursed(drawdown: str, row) -> bool:
+	"""False for an Istisna'a installment whose unpaid principal exceeds the disbursed principal outstanding
+	(repayment.validate_disbursed_principal would refuse it)."""
+	values = frappe.db.get_value(DRAWDOWN, drawdown, ["limit_type", "liability_account"], as_dict=True)
+	if values.limit_type != repayment.ISTISNA or not repayment.unpaid_principal(row):
+		return True
+	from treasury.bank_facilities.utilisation import get_drawdown_outstanding
+
+	source = {"name": drawdown, "liability_account": values.liability_account}
+	outstanding = flt(get_drawdown_outstanding([source]).get(drawdown), 2)
+	return flt(repayment.unpaid_principal(row), 2) <= outstanding
 
 
 def _due_rows(drawdown: str, as_of) -> list[frappe._dict]:
@@ -118,10 +135,21 @@ def _due_rows(drawdown: str, as_of) -> list[frappe._dict]:
 	return [r for r in rows if repayment.unpaid_principal(r) or repayment.unpaid_interest(r)]
 
 
-def repay_installment(drawdown: str, installment_no: int, date, *, bank_transaction=None, system=False) -> str:
+def repay_installment(
+	drawdown: str,
+	installment_no: int,
+	date,
+	*,
+	bank_transaction=None,
+	system=False,
+	expected_amount: float | None = None,
+) -> str:
 	"""The Facility Repayment (settlement Auto Debit) of one installment's unpaid principal and interest, dated
-	`date`. Idempotent: an installment already paid returns its repayment. `system`: the daily job (no user
-	permission check); otherwise the user's own create / submit permission (the PDC Bank Clearing tool)."""
+	`date`. Idempotent: an installment already paid returns its repayment (the daily job). `system`: the daily
+	job (no user permission check); otherwise the user's own create / submit permission (the PDC Bank Clearing
+	tool). With a `bank_transaction` (the statement debit), an installment paid meanwhile is refused (the
+	statement line would stay unmatched) and the unpaid total must be `expected_amount` (the line's open amount),
+	both checked under the drawdown lock."""
 	repayment.lock_drawdown(drawdown)
 	doc = frappe.get_doc(DRAWDOWN, drawdown)
 	row = next(
@@ -136,8 +164,23 @@ def repay_installment(drawdown: str, installment_no: int, date, *, bank_transact
 		frappe.throw(
 			_("Installment {0} does not exist on drawdown {1}.").format(installment_no, frappe.bold(drawdown))
 		)
-	if not (repayment.unpaid_principal(row) or repayment.unpaid_interest(row)):
+	unpaid = flt(repayment.unpaid_principal(row) + repayment.unpaid_interest(row), doc.precision("amount"))
+	if unpaid <= 0:
+		if bank_transaction:
+			frappe.throw(
+				_("Installment {0} of drawdown {1} is already paid by {2}.").format(
+					row.installment_no, frappe.bold(drawdown), frappe.bold(row.repayment or "-")
+				)
+			)
 		return row.repayment
+	if expected_amount is not None and unpaid != flt(expected_amount, doc.precision("amount")):
+		frappe.throw(
+			_("The statement amount {0} does not match the unpaid installment {1} ({2}).").format(
+				fmt_money(expected_amount, currency=doc.currency),
+				row.installment_no,
+				fmt_money(unpaid, currency=doc.currency),
+			)
+		)
 	values = {
 		"doctype": REPAYMENT,
 		"drawdown": drawdown,

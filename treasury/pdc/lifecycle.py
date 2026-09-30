@@ -509,6 +509,8 @@ def represent(name: str, represent_date=None, new_due_date=None, remarks: str | 
 	"""Present a bounced cheque again: a new cycle whose postings are independent of the bounced one."""
 	doc = _begin(name, roles=(MANAGER,))
 	_require_status(doc, ("Bounced",))
+	if doc.get("facility_drawdown"):
+		_facility_cheques().check_can_represent(doc)
 	date = _date(represent_date)
 	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
 

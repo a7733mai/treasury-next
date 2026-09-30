@@ -462,14 +462,22 @@ linked back to the source document, idempotent per source, event and month.
 - **Istisna'a** (staged): the drawdown lists its *Disbursement Stages* (adding up to the amount); submit posts
   only the upfront fees, *Disburse Stage* (Treasury Manager) posts each stage (to the bank or another
   account). The pending stages count against the sub-limit as a commitment; the principal repaid cannot
-  exceed what was disbursed.
+  exceed what was disbursed. The schedule charges profit on the whole contract from the drawdown date; an
+  *Auto Debit* installment due before its stage is disbursed waits: the daily job posts it (on its due date)
+  by the first run after the disbursement.
 - **Trust Receipt**: *Settle* on a Letter of Credit with *Finance by Trust Receipt* creates and submits a
   Trust Receipt drawdown for the settlement less the margin held (bullet, the sub-limit's *Default Tenor* and
   rate unless given), in the same transaction: a Trust Receipt above the available limit rolls the whole
-  settlement back.
+  settlement back. A settled credit is never cancelled; its Trust Receipt (without submitted repayments) may
+  be cancelled on its own, e.g. to re-enter it by hand with other terms: the credit stays settled, keeps the
+  link and logs *Trust Receipt Cancelled*.
 - **Invoice Discounting**: ERPNext's own Invoice Discounting gets a *Bank Facility* field; its total counts
   against the facility's *Invoice Discounting* sub-limit while Sanctioned / Disbursed (checked on submit).
-  ERPNext posts its own entries; Treasury posts nothing. Historical utilisation uses the current status.
+  ERPNext posts its own entries; Treasury posts nothing. Historical utilisation uses the current status; the
+  facility's stored utilisation is refreshed on its submit / cancel and on its loan Journal Entries
+  (Disbursed / Settled). ERPNext 16.36 cannot cancel an Invoice Discounting (its own GL / Payment Ledger rows
+  block Frappe's back-link check); for one under a facility Treasury lets those rows be ignored on cancel, as
+  ERPNext does for its vouchers (a submitted loan Journal Entry still blocks it).
 - **Repayment Mode** (per drawdown, may change after submit):
   - *Manual*: the user records the repayments (settled by the bank).
   - *Auto Debit*: the bank debits each installment. Treasury Company Settings *Auto Debit Posting*: *On Due

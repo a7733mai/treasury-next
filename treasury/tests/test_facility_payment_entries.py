@@ -7,6 +7,8 @@ lender's balance at 0. The standard example: EGP 120,000 drawn on 2025-01-31, 12
 installments at 12 % Actual/365; installment 1 (2025-02-28) = 10,000.00 + 1,104.66.
 """
 
+import json
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
@@ -311,6 +313,43 @@ class TestFacilityPaymentEntries(FacilityPETestCase):
 		):
 			self.assertEqual(frappe.db.get_value(doctype, name, "docstatus"), 2)
 
+	def test_penalty_only_payable_to_charity(self):
+		"""Review 7g M1: the penalty charged after the installment was paid, payable to charity: nothing goes
+		through the bank (no repayment voucher), only the charity Journal Entry."""
+		for setting in (FACILITY_PE, FACILITY_JE):
+			with self.subTest(setting=setting):
+				self.use_company_settings(accrue_facility_interest=0, **setting)
+				s = self.islamic_loan("Payable to Charity")
+				first = make_repayment(
+					s.drawdown, "2025-03-05", allocation_mode="Selected Row", installment_no=1
+				)
+				penalty = make_repayment(
+					s.drawdown,
+					"2025-03-10",
+					allocation_mode="Selected Row",
+					installment_no=1,
+					principal_paid=0,
+					interest_paid=0,
+					penalty=500,
+				)
+				penalty.reload()
+				self.assertEqual((penalty.docstatus, penalty.total_paid, penalty.allocations), (1, 0, []))
+				self.assertEqual((penalty.payment_entry, penalty.journal_entry), (None, None))
+				assert_gl_entries(
+					self,
+					"Journal Entry",
+					penalty.charity_journal_entry,
+					[(self.islamic.charity, 500, 0), (self.islamic.charity_payable, 0, 500)],
+				)
+				row = schedule_row(s.drawdown.name, 1)
+				self.assertEqual((row.status, row.repayment), ("Paid", first.name))
+				penalty.cancel()
+				self.assertEqual(
+					frappe.db.get_value("Journal Entry", penalty.charity_journal_entry, "docstatus"), 2
+				)
+				row = schedule_row(s.drawdown.name, 1)
+				self.assertEqual((row.status, row.repayment), ("Paid", first.name))
+
 	def test_utilisation_and_accrued_from_pe(self):
 		results = {}
 		for setting in (FACILITY_PE, FACILITY_JE):
@@ -381,3 +420,24 @@ class TestFacilityPaymentEntries(FacilityPETestCase):
 		self.assertEqual({(r.paid_principal, r.paid_interest) for r in rows}, {(0, 0)})
 		self.assertEqual({(r.payment_voucher_type, r.payment_journal) for r in rows}, {(None, None)})
 		self.assertEqual(get_utilisation(s.facility.name).utilised, 120_000)
+
+	def test_cancel_with_snapshot_before_1_1(self):
+		"""Review 7g m1: a snapshot taken before 1.1 has no `payment_voucher_type`; the restored rows paid
+		earlier get "Journal Entry" (the only voucher type then), not an empty type under a voucher."""
+		self.use_company_settings(**FACILITY_JE)
+		s = self.loan()
+		first = make_repayment(s.drawdown, "2025-02-28")
+		second = make_repayment(s.drawdown, "2025-03-31")
+		saved = json.loads(frappe.db.get_value("Facility Repayment", second.name, "schedule_snapshot"))
+		for row in saved:
+			row.pop("payment_voucher_type", None)
+		frappe.db.set_value("Facility Repayment", second.name, "schedule_snapshot", json.dumps(saved))
+		second.reload()
+		second.cancel()
+		row = schedule_row(s.drawdown.name, 1)
+		self.assertEqual(
+			(row.payment_voucher_type, row.payment_journal, row.repayment),
+			("Journal Entry", first.journal_entry, first.name),
+		)
+		row = schedule_row(s.drawdown.name, 2)
+		self.assertEqual((row.payment_voucher_type, row.payment_journal, row.repayment), (None, None, None))

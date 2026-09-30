@@ -46,6 +46,9 @@ def drawdown_summary(drawdown: str) -> dict | None:
 	)
 	if not doc:
 		return None
+	if doc.docstatus == 2:
+		# cancelled on its own (the credit stays settled and keeps the link as history)
+		doc.repayment_status = "Cancelled"
 	doc.due_date = frappe.db.get_value(
 		"Facility Repayment Schedule",
 		{"parenttype": DRAWDOWN, "parent": drawdown, "is_prepayment": 0},

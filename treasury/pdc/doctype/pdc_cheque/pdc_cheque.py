@@ -8,7 +8,7 @@ from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_ac
 from frappe import _
 from frappe.contacts.doctype.contact.contact import get_default_contact
 from frappe.model.document import Document
-from frappe.utils import cint, flt, getdate, money_in_words
+from frappe.utils import cint, flt, formatdate, getdate, money_in_words
 
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import cheque_printing, lifecycle
@@ -640,6 +640,17 @@ class PDCCheque(Document):
 			frappe.throw(
 				_("Installment cheques to the lender are only supported in the company currency {0}.").format(
 					company_currency
+				)
+			)
+		# the repayment is posted on the cheque date: the cheque is dated its installment's due date (a
+		# replacement may carry another date; a later date is set by Postpone, which keeps this one)
+		due_date = not self.get("replaces") and frappe.db.get_value(
+			"Facility Repayment Schedule", self.facility_schedule_row, "due_date"
+		)
+		if due_date and getdate(self.original_due_date) != getdate(due_date):
+			frappe.throw(
+				_("The Original Due Date of an installment cheque must be its installment's due date {0}.").format(
+					formatdate(due_date)
 				)
 			)
 

@@ -5,7 +5,8 @@ Journal Entries); Treasury posts nothing. The custom field `treasury_facility` (
 facility with an "Invoice Discounting" sub-limit: the total amount is checked against the available sub-limit
 on submit (facility locked, Active on the loan start date) and counts against it while the discounting is
 Sanctioned or Disbursed (`get_invoice_discounting_utilisation`, hook `treasury_facility_utilisation_sources`).
-Historical utilisation uses the current status (documented in the README).
+Historical utilisation uses the current status (documented in the README). The facility's stored utilisation is
+refreshed on the discounting's submit / cancel and on its loan Journal Entries (status Disbursed / Settled).
 """
 
 import erpnext
@@ -19,6 +20,8 @@ from treasury.bank_facilities.utilisation import refresh_utilisation
 DOCTYPE = "Invoice Discounting"
 LIMIT_TYPE = "Invoice Discounting"
 OPEN_STATUSES = ("Sanctioned", "Disbursed")
+# its own ledger rows (kept, marked cancelled, and reversed by ERPNext on cancel)
+LEDGER_DOCTYPES = ("GL Entry", "Payment Ledger Entry")
 
 
 def validate(doc, method=None):
@@ -61,10 +64,40 @@ def before_submit(doc, method=None):
 	instruments.check_available(facility, LIMIT_TYPE, flt(doc.total_amount), currency, _(LIMIT_TYPE))
 
 
+def before_cancel(doc, method=None):
+	"""doc_events: ERPNext's Invoice Discounting does not list its own ledger entries among the documents ignored
+	by Frappe's back-link check on cancel (unlike its other accounting documents), so its cancellation always
+	fails with "is linked with GL Entry". For a discounting under a facility (whose cancellation frees the
+	sub-limit) they are ignored, as ERPNext does for its vouchers; a submitted loan Journal Entry referencing it
+	still blocks the cancellation."""
+	if not doc.get("treasury_facility"):
+		return
+	current = doc.get("ignore_linked_doctypes") or ()
+	if isinstance(current, str):
+		current = (current,)
+	doc.ignore_linked_doctypes = (*current, *LEDGER_DOCTYPES)
+
+
 def refresh(doc, method=None):
 	"""doc_events on_submit / on_cancel: the facility's display utilisation."""
 	if doc.get("treasury_facility"):
 		refresh_utilisation(doc.treasury_facility)
+
+
+def on_journal_entry(doc, method=None):
+	"""doc_events of Journal Entry on_submit / on_cancel: ERPNext moves an Invoice Discounting to Disbursed /
+	Settled (or back) from its loan Journal Entries, which changes what counts against the facility."""
+	names = {
+		row.reference_name
+		for row in doc.get("accounts") or []
+		if row.reference_type == DOCTYPE and row.reference_name
+	}
+	if not names or not frappe.get_meta(DOCTYPE).has_field("treasury_facility"):
+		return
+	for facility in sorted(
+		set(frappe.get_all(DOCTYPE, filters={"name": ["in", list(names)]}, pluck="treasury_facility")) - {None, ""}
+	):
+		refresh_utilisation(facility)
 
 
 def get_invoice_discounting_utilisation(facility, as_on=None) -> list[dict]:

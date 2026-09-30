@@ -12696,3 +12696,36 @@ msgstr "مغطى بشيكات"
 
 msgid "Auto Debits Awaiting Statement"
 msgstr "خصومات تلقائية بانتظار الكشف"
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 7g fix round 1
+# ---------------------------------------------------------------------------------------------------------
+
+msgctxt "Letter of Credit"
+msgid "Trust Receipt Cancelled"
+msgstr "إلغاء إيصال الأمانة"
+
+msgctxt "Facility Drawdown"
+msgid "Cancelled"
+msgstr "ملغي"
+
+msgid "Installment {0} of drawdown {1} is already paid by {2}."
+msgstr "القسط {0} من السحب {1} مسدد بالفعل بموجب {2}."
+
+msgid "The statement amount {0} does not match the unpaid installment {1} ({2})."
+msgstr "مبلغ الكشف {0} لا يطابق القسط غير المسدد {1} ({2})."
+
+msgid "Bank Transaction {0} is not an open withdrawal of this bank account."
+msgstr "حركة البنك {0} ليست سحباً مفتوحاً على هذا الحساب البنكي."
+
+msgid "Bank Transaction {0} is in {1}, but drawdown {2} is in {3}."
+msgstr "حركة البنك {0} بعملة {1}، بينما السحب {2} بعملة {3}."
+
+msgid "Auto debit installments of {0} are posted on their due date: match the posted repayment instead."
+msgstr "أقساط الخصم التلقائي للشركة {0} تُرحَّل في تاريخ استحقاقها: طابِق السداد المُرحَّل بدلاً من ذلك."
+
+msgid "Cheque {0} can no longer pay installment {1} of drawdown {2} (paid or changed since the bounce): replace or cancel it instead."
+msgstr "لم يعد الشيك {0} صالحاً لسداد القسط {1} من السحب {2} (سُدد أو تغيّر منذ الارتداد): استبدله أو ألغِه بدلاً من ذلك."
+
+msgid "The Original Due Date of an installment cheque must be its installment's due date {0}."
+msgstr "يجب أن يكون تاريخ الاستحقاق الأصلي لشيك القسط هو تاريخ استحقاق القسط {0}."

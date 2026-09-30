@@ -8,6 +8,7 @@ stages still pending (`get_commitment_utilisation`, hook `treasury_facility_util
 amount counts against the sub-limit from the submit on.
 """
 
+import erpnext
 import frappe
 from frappe import _
 from frappe.utils import flt, formatdate, getdate, today
@@ -53,7 +54,11 @@ def disburse_stage(
 	instruments.validate_facility_open(facility, date, _(LIMIT_TYPE, context="Bank Facility"))
 	if flt(exchange_rate) < 0:
 		frappe.throw(_("Exchange Rate cannot be negative."))
-	rate = flt(exchange_rate) or posting.get_cheque_exchange_rate(doc.currency, doc.company, date)
+	if doc.currency == erpnext.get_company_currency(doc.company):
+		# never a client rate on a company currency stage (it would multiply the liability and the bank)
+		rate = 1.0
+	else:
+		rate = flt(exchange_rate) or posting.get_cheque_exchange_rate(doc.currency, doc.company, date)
 
 	voucher_type, voucher_no = accounting.post_stage(doc, row, date, rate)
 	frappe.db.set_value(

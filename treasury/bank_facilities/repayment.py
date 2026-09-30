@@ -255,9 +255,10 @@ def snapshot(drawdown) -> str:
 	)
 
 
-def apply_repayment(drawdown, repayment, voucher: tuple[str, str]):
+def apply_repayment(drawdown, repayment, voucher: tuple[str | None, str | None]):
 	"""Record the allocation of a submitted repayment on the schedule rows (and the prepayment reschedule).
-	`voucher`: (doctype, name) of the repayment's voucher (Payment Entry or Journal Entry)."""
+	`voucher`: (doctype, name) of the repayment's voucher (Payment Entry or Journal Entry); (None, None) for a
+	penalty payable to charity alone, which allocates nothing."""
 	precision = drawdown.precision("amount")
 	voucher_type, voucher_no = voucher
 	rows = {r.name: r for r in drawdown.repayment_schedule}
@@ -377,8 +378,12 @@ def undo_repayment(drawdown, repayment):
 				drawdown.repayment_schedule.remove(row)
 				continue
 			if row.name in saved and row.name not in owned:
+				values = saved[row.name]
 				for fieldname in SNAPSHOT_FIELDS:
-					row.set(fieldname, saved[row.name].get(fieldname))
+					row.set(fieldname, values.get(fieldname))
+				if "payment_voucher_type" not in values and values.get("payment_journal"):
+					# a snapshot taken before 1.1: the payment voucher was always a Journal Entry
+					row.payment_voucher_type = "Journal Entry"
 		_undo_delta(drawdown, repayment, [r for r in owned if r in saved])
 	_save_rows(drawdown)
 	_bump_schedule_version(drawdown.name)

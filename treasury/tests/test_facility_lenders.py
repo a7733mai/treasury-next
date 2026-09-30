@@ -4,6 +4,8 @@ settings, the security cheque to the lender, permissions of the new actions and 
 Fixed dates in 2025 (a fiscal year `ensure_company` creates); every test creates its own facility.
 """
 
+from unittest.mock import patch
+
 import frappe
 from frappe import _
 from frappe.tests import IntegrationTestCase
@@ -229,6 +231,24 @@ class TestLenders(LenderTestCase):
 			frappe.ValidationError, security_api.make_security_cheque, "Bank Facility", draft.name
 		)
 
+		# security review 7g Minor 5: the facility lists only an outgoing cheque, on an active facility the
+		# creator may read (link validation checks existence only)
+		def listed(facility_name: str, **changes) -> bool:
+			cheque.update({"reference_name": facility_name, **changes})
+			cheque.link_facility()
+			return bool(
+				frappe.db.exists(
+					"Bank Facility Security Cheque", {"parent": facility_name, "security_cheque": cheque.name}
+				)
+			)
+
+		other = make_finance_facility(expiry_date=far)
+		self.assertFalse(listed(other.name, direction="Incoming"))
+		self.assertFalse(listed(draft.name, direction="Outgoing"))
+		with patch("frappe.has_permission", return_value=False):
+			self.assertFalse(listed(other.name, direction="Outgoing"))
+		self.assertTrue(listed(other.name, direction="Outgoing"))
+
 	def test_permissions(self):
 		# a Treasury User may not disburse an Istisna'a stage (Treasury Manager action)
 		facility = make_bank_facility(
@@ -277,7 +297,11 @@ class TestFacilityDefaultsPatch(LenderTestCase):
 			facility.name,
 			{"lender_type": "", "lender_name": "", "is_islamic": 0, "late_payment_mode": ""},
 		)
-		frappe.db.set_value("Facility Drawdown", drawdown.name, {"repayment_mode": "", "disburse_to": ""})
+		frappe.db.set_value(
+			"Facility Drawdown",
+			drawdown.name,
+			{"repayment_mode": "", "disburse_to": "", "lender_type": "", "lender_name": "", "is_islamic": 0},
+		)
 		row = drawdown.repayment_schedule[0].name
 		frappe.db.set_value(
 			"Facility Repayment Schedule", row, {"payment_journal": "JV-PATCH", "payment_voucher_type": ""}
@@ -297,6 +321,13 @@ class TestFacilityDefaultsPatch(LenderTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Facility Drawdown", drawdown.name, ["repayment_mode", "disburse_to"]),
 			("Manual", "Bank Account"),
+		)
+		# the values a drawdown fetches from its facility (Profit wording, Lender columns)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Facility Drawdown", drawdown.name, ["lender_type", "lender_name", "is_islamic"]
+			),
+			("Bank", values.lender_name, 1),
 		)
 		self.assertEqual(
 			frappe.db.get_value("Facility Repayment Schedule", row, "payment_voucher_type"), "Journal Entry"

@@ -480,11 +480,7 @@ class PDCBankClearing(Document):
 			if not isinstance(e, frappe.ValidationError | frappe.PermissionError):
 				if kind == TRANSFER_ROW:
 					title = _("PDC Bank Clearing failed for Bank Transfer {0}").format(row.bank_transfer)
-				elif kind == INSTALLMENT_ROW:
-					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(
-						row.bank_transaction
-					)
-				elif kind == CHARGE_ROW:
+				elif kind in (INSTALLMENT_ROW, CHARGE_ROW):
 					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(
 						row.bank_transaction
 					)
@@ -498,7 +494,9 @@ class PDCBankClearing(Document):
 	def clear_installment(self, row):
 		"""An auto-debited installment: the posted repayment is reconciled with the statement line; an open one
 		is recorded on the statement date (auto_debit.repay_installment: cleared and reconciled). The user's own
-		Facility Repayment submit permission applies."""
+		Facility Repayment submit permission applies. The rows come from the client: the match itself (an open
+		withdrawal of this bank account, in the drawdown's currency, of the repayment's / installment's amount) is
+		checked again here."""
 		from treasury.bank_facilities import auto_debit
 
 		if not frappe.has_permission(FACILITY_REPAYMENT, "submit"):
@@ -509,16 +507,22 @@ class PDCBankClearing(Document):
 			["docstatus", "bank_account", "currency", "unallocated_amount", "withdrawal", "date"],
 			as_dict=True,
 		)
-		if not bt or bt.docstatus != 1 or bt.bank_account != self.bank_account or flt(bt.unallocated_amount) <= 0:
+		if (
+			not bt
+			or bt.docstatus != 1
+			or bt.bank_account != self.bank_account
+			or flt(bt.unallocated_amount) <= 0
+			or flt(bt.withdrawal) <= 0
+		):
 			frappe.throw(
-				_("Bank Transaction {0} is not an open transaction of this bank account.").format(
+				_("Bank Transaction {0} is not an open withdrawal of this bank account.").format(
 					row.bank_transaction
 				)
 			)
 		drawdown = frappe.db.get_value(
 			FACILITY_DRAWDOWN,
 			row.facility_drawdown,
-			["company", "bank_account", "repayment_mode", "docstatus"],
+			["company", "bank_account", "repayment_mode", "docstatus", "currency"],
 			as_dict=True,
 		)
 		if (
@@ -532,18 +536,41 @@ class PDCBankClearing(Document):
 					row.facility_drawdown, self.bank_account
 				)
 			)
+		if bt.currency and bt.currency != drawdown.currency:
+			frappe.throw(
+				_("Bank Transaction {0} is in {1}, but drawdown {2} is in {3}.").format(
+					row.bank_transaction, bt.currency, row.facility_drawdown, drawdown.currency
+				)
+			)
+		precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount")
 		if row.get("facility_repayment"):
 			rep = frappe.db.get_value(
 				FACILITY_REPAYMENT,
 				row.facility_repayment,
-				["drawdown", "docstatus", "bank_transaction", "payment_entry", "journal_entry", "total_paid"],
+				[
+					"drawdown",
+					"docstatus",
+					"settlement",
+					"bank_account",
+					"bank_transaction",
+					"payment_entry",
+					"journal_entry",
+					"total_paid",
+				],
 				as_dict=True,
 			)
-			if not rep or rep.docstatus != 1 or rep.drawdown != row.facility_drawdown or rep.bank_transaction:
+			if (
+				not rep
+				or rep.docstatus != 1
+				or rep.drawdown != row.facility_drawdown
+				or rep.settlement != auto_debit.AUTO_DEBIT
+				or rep.bank_account != self.bank_account
+				or rep.bank_transaction
+			):
 				frappe.throw(
 					_("Repayment {0} is already reconciled or no longer open.").format(row.facility_repayment)
 				)
-			if flt(bt.unallocated_amount, 2) != flt(rep.total_paid, 2):
+			if flt(bt.unallocated_amount, precision) != flt(rep.total_paid, precision):
 				frappe.throw(
 					_("The open amount of Bank Transaction {0} does not match repayment {1}.").format(
 						row.bank_transaction, row.facility_repayment
@@ -558,8 +585,19 @@ class PDCBankClearing(Document):
 				FACILITY_REPAYMENT, row.facility_repayment, "bank_transaction", row.bank_transaction
 			)
 		else:
+			if auto_debit.posting_mode(self.company) != auto_debit.ON_STATEMENT:
+				frappe.throw(
+					_(
+						"Auto debit installments of {0} are posted on their due date: match the posted repayment instead."
+					).format(self.company)
+				)
+			# the unpaid total must be the statement line's open amount (checked under the drawdown lock)
 			row.facility_repayment = auto_debit.repay_installment(
-				row.facility_drawdown, cint(row.installment_no), bt.date, bank_transaction=row.bank_transaction
+				row.facility_drawdown,
+				cint(row.installment_no),
+				bt.date,
+				bank_transaction=row.bank_transaction,
+				expected_amount=flt(bt.unallocated_amount, precision),
 			)
 		row.transaction_date = bt.date
 

@@ -9,7 +9,7 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, getdate
 
 from treasury.accounting import posting
-from treasury.bank_facilities import accounting, lc
+from treasury.bank_facilities import accounting, lc, trust_receipt
 from treasury.bank_facilities.report.cost_of_financing.cost_of_financing import execute as cost_of_financing
 from treasury.bank_facilities.utilisation import get_utilisation
 from treasury.pdc import lifecycle
@@ -158,7 +158,8 @@ class TestIstisnaAndIjarah(ProductTestCase):
 			disbursement_stages=[{"stage_date": "2025-02-15", "amount": 100_000}],
 		)
 
-		# a stage paid into the bank in Payment Entry mode: a Receive from the lender
+		# a stage paid into the bank in Payment Entry mode: a Receive from the lender; a rate sent by the client
+		# is ignored for a company currency drawdown (review 7g M2: it would double the liability and the bank)
 		to_bank = make_drawdown(
 			facility,
 			amount=100_000,
@@ -167,7 +168,7 @@ class TestIstisnaAndIjarah(ProductTestCase):
 			disbursement_stages=[{"stage_date": "2025-03-01", "amount": 100_000}],
 		)
 		result = to_bank.disburse_stage(
-			stage=to_bank.disbursement_stages[0].name, disbursement_date="2025-03-01"
+			stage=to_bank.disbursement_stages[0].name, disbursement_date="2025-03-01", exchange_rate=2
 		)
 		self.assertEqual(result["voucher_type"], "Payment Entry")
 		self.assertEqual(
@@ -307,12 +308,28 @@ class TestTrustReceipt(ProductTestCase):
 
 		# a settled credit is never cancelled; its cancellation would cancel the Trust Receipt first
 		self.assertRaises(frappe.ValidationError, credit.cancel)
+		credit.reload()
 		repayment = make_repayment(tr.name, "2025-04-01", principal_paid=1000, interest_paid=0)
 		self.assert_error("Cancel the repayments of Trust Receipt", lc.cancel_trust_receipt, credit)
+		tr.reload()
+		self.assert_error("has submitted repayments", tr.cancel)
 		repayment.cancel()
-		lc.cancel_trust_receipt(credit)
+		# the user cancels the Trust Receipt itself (e.g. wrong terms): the settled credit's links to it and to
+		# its voucher (its field, its status log) do not block it; the credit stays settled and logs it
+		tr.reload()
+		tr.cancel()
 		self.assertEqual(frappe.db.get_value(DRAWDOWN, tr.name, "docstatus"), 2)
 		self.assertEqual(frappe.db.get_value("Payment Entry", tr.payment_entry, "docstatus"), 2)
+		credit.reload()
+		self.assertEqual((credit.docstatus, credit.status), (1, "Settled"))
+		self.assertEqual(credit.trust_receipt_drawdown, tr.name)
+		self.assertEqual(trust_receipt.drawdown_summary(tr.name).repayment_status, "Cancelled")
+		self.assertEqual(
+			(credit.status_log[-1].event, credit.status_log[-1].remarks), ("Trust Receipt Cancelled", tr.name)
+		)
+		utilisation = {row.limit_type: row.utilised for row in get_utilisation(facility.name).limits}
+		self.assertEqual((utilisation["Letter of Credit"], utilisation["Trust Receipt"]), (0, 0))
+		self.assertEqual(flt(get_account_balance(bank.bank_gl, "2025-03-10") - before, 2), -90_000)
 
 	def test_trust_receipt_refusals_roll_back(self):
 		# the Trust Receipt above its available limit: the whole settlement is rolled back
@@ -410,13 +427,27 @@ class TestInvoiceDiscounting(ProductTestCase):
 		# over the limit
 		second = self.discounting(facility, 25_000, submit=False)
 		self.assert_error("exceeds the available", second.submit)
-		# cancelling frees it
+		# cancelling frees it (a user's cancel: ERPNext's own ledger rows do not block it, before_cancel)
 		first.reload()
 		first.cancel()
+		self.assertEqual(frappe.db.get_value("Invoice Discounting", first.name, "docstatus"), 2)
 		self.assertEqual(used(), 0)
 		second.reload()
 		second.submit()
 		self.assertEqual(used(), 25_000)
+		# ERPNext's loan Journal Entries move the status; the stored utilisation follows (Settled: freed)
+		disbursement = second.create_disbursement_entry()
+		disbursement.posting_date = D("2025-03-02")
+		disbursement.submit()
+		self.assertEqual(frappe.db.get_value("Invoice Discounting", second.name, "status"), "Disbursed")
+		self.assertEqual(frappe.db.get_value("Bank Facility", facility.name, "total_utilised"), 25_000)
+		second.reload()
+		closing = second.close_loan()
+		closing.posting_date = D("2025-06-01")
+		closing.submit()
+		self.assertEqual(frappe.db.get_value("Invoice Discounting", second.name, "status"), "Settled")
+		self.assertEqual(used(), 0)
+		self.assertEqual(frappe.db.get_value("Bank Facility", facility.name, "total_utilised"), 0)
 		# a facility without the sub-limit
 		plain = make_bank_facility()
 		self.assert_error(

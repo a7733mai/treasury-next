@@ -21,6 +21,7 @@ from treasury.bank_facilities.utilisation import (
 from treasury.utils import voucher_summary
 
 FACILITY = "Bank Facility"
+LETTER_OF_CREDIT = "Letter of Credit"
 IJARAH, ISTISNA, TRUST_RECEIPT = "Ijarah", "Istisna'a", "Trust Receipt"
 MANUAL, AUTO_DEBIT, PDC_TO_LENDER = "Manual", "Auto Debit", "PDC to Lender"
 REPAYMENT_MODES = (MANUAL, AUTO_DEBIT, PDC_TO_LENDER)
@@ -303,10 +304,23 @@ class FacilityDrawdown(Document):
 				),
 				title=_("Not Allowed"),
 			)
+		if self.letter_of_credit:
+			# a Trust Receipt (e.g. entered with the wrong terms) is cancelled on its own: the settled credit
+			# keeps linking it and its voucher (`trust_receipt_drawdown`, status log) as history
+			self.ignore_linked_doctypes = (*self._ignored_links(), LETTER_OF_CREDIT)
+
+	def _ignored_links(self) -> tuple:
+		current = self.get("ignore_linked_doctypes") or ()
+		return (current,) if isinstance(current, str) else tuple(current)
 
 	def on_cancel(self):
 		# the drawdown, fees, stage and accrual vouchers (before Frappe's check for submitted back links)
-		accounting.cancel_vouchers(self.doctype, self.name)
+		ignore = (LETTER_OF_CREDIT,) if self.letter_of_credit else ()
+		accounting.cancel_vouchers(self.doctype, self.name, ignore)
+		if self.letter_of_credit:
+			from treasury.bank_facilities import lc
+
+			lc.log_trust_receipt_cancelled(self)
 		refresh_utilisation(self.facility)
 
 	# ------------------------------------------------------------------ validation

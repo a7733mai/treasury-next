@@ -20,6 +20,9 @@
 - **Istisna'a** stages (*Disburse Stage*, commitment utilisation), **Ijarah** disbursement to another account,
   **Trust Receipt** created by the LC settlement (*Finance by Trust Receipt*, atomic), ERPNext **Invoice
   Discounting** counted against the facility (custom field `treasury_facility`, doc events).
+- A Trust Receipt drawdown can be cancelled on its own (the settled credit logs it); an Invoice Discounting
+  under a facility can be cancelled (ERPNext's own ledger rows no longer block it) and its loan Journal
+  Entries refresh the facility.
 - *Create → Security Cheque* on a facility (collateral cheque to the lender, linked to the facility).
 - Reports: Cost of Financing categories (Interest, Profit, Ijarah Rentals, Commission, Fees, Penalties, Late
   Payment (Charity)) with the installment cheques; lender columns and the *Lender Type* filter; schedule report

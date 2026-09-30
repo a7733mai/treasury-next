@@ -457,11 +457,14 @@ def post_accrual(drawdown, facility, month_end, amount: float, rate: float) -> s
 	)
 
 
-def cancel_vouchers(source_doctype: str, source_name: str) -> list[str]:
-	"""Cancel every submitted voucher of a source, newest first."""
+def cancel_vouchers(
+	source_doctype: str, source_name: str, ignore_linked_doctypes: tuple[str, ...] = ()
+) -> list[str]:
+	"""Cancel every submitted voucher of a source, newest first (`ignore_linked_doctypes`: see
+	posting.cancel_voucher)."""
 	cancelled = []
 	for voucher in reversed(posting.get_linked_vouchers(source_doctype, source_name)):
 		if voucher.docstatus < 2:
-			posting.cancel_voucher(voucher.doctype, voucher.name)
+			posting.cancel_voucher(voucher.doctype, voucher.name, ignore_linked_doctypes)
 			cancelled.append(voucher.name)
 	return cancelled

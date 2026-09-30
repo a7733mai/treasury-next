@@ -26,6 +26,17 @@ def before_cancel(doc, method=None):
 		throw_managed(doc)
 
 
+def on_cancel(doc, method=None):
+	"""After ERPNext's own `on_cancel` (which sets the voucher's `ignore_linked_doctypes`, and before Frappe's
+	back-link check): the Treasury doctypes `posting.cancel_voucher` was told to ignore."""
+	extra = doc.flags.get("treasury_ignore_linked_doctypes")
+	if extra and frappe.flags.treasury_allow_cancel and is_managed(doc):
+		current = doc.get("ignore_linked_doctypes") or ()
+		if isinstance(current, str):
+			current = (current,)
+		doc.ignore_linked_doctypes = (*current, *extra)
+
+
 def on_trash(doc, method=None):
 	if doc.docstatus > 0 and is_managed(doc) and not frappe.flags.treasury_allow_cancel:
 		throw_managed(doc)

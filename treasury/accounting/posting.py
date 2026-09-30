@@ -1251,8 +1251,12 @@ def set_clearance_date(doctype: str, name: str, clearance_date):
 
 
 @_system_context
-def cancel_voucher(doctype: str, name: str):
-	"""Cancel (or delete, if still draft) a Treasury-managed voucher, bypassing the voucher guard."""
+def cancel_voucher(doctype: str, name: str, ignore_linked_doctypes: tuple[str, ...] = ()):
+	"""Cancel (or delete, if still draft) a Treasury-managed voucher, bypassing the voucher guard.
+
+	`ignore_linked_doctypes`: Treasury doctypes whose submitted documents still link the voucher by design (e.g.
+	a settled Letter of Credit's status log row of its Trust Receipt voucher) and must not block its
+	cancellation; added to ERPNext's own list by `voucher_guard.on_cancel`."""
 	if doctype not in VOUCHER_DOCTYPES:
 		frappe.throw(_("Only Payment Entry and Journal Entry can be cancelled here."))
 
@@ -1261,6 +1265,7 @@ def cancel_voucher(doctype: str, name: str):
 	frappe.flags.treasury_allow_cancel = True
 	try:
 		doc.flags.ignore_permissions = True  # see module docstring
+		doc.flags.treasury_ignore_linked_doctypes = tuple(ignore_linked_doctypes)
 		if doc.docstatus == 1:
 			doc.cancel()
 			_stamp_user(doctype, name)

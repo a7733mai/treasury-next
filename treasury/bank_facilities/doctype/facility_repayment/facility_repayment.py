@@ -148,12 +148,17 @@ class FacilityRepayment(Document):
 	def on_submit(self):
 		drawdown = self.get_drawdown()
 		facility = frappe.get_doc("Bank Facility", drawdown.facility)
-		voucher = self.post_voucher(drawdown, facility)
-		values = {"payment_entry" if voucher[0] == "Payment Entry" else "journal_entry": voucher[1]}
+		values = {}
+		voucher = (None, None)
+		# a penalty payable to charity alone moves nothing through the bank: only its charity Journal Entry
+		if flt(self.total_paid) > 0:
+			voucher = self.post_voucher(drawdown, facility)
+			values["payment_entry" if voucher[0] == "Payment Entry" else "journal_entry"] = voucher[1]
 		charity = accounting.post_charity(self, facility)
 		if charity:
 			values["charity_journal_entry"] = charity
-		self.db_set(values)
+		if values:
+			self.db_set(values)
 		repayment.apply_repayment(drawdown, self, voucher)
 		refresh_utilisation(drawdown.facility)
 		text = guard.finish(

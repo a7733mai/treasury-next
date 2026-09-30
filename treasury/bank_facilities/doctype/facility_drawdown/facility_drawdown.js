@@ -885,7 +885,8 @@ function dd_disburse_stage_dialog(frm) {
 						row.idx,
 						dd_date(row.stage_date),
 						dd_money(frm, row.amount),
-						row.description || "",
+						// Select option labels are rendered as HTML
+						frappe.utils.escape_html(row.description || ""),
 					]),
 				})),
 				default: pending[0].name,

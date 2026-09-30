@@ -28,6 +28,7 @@ from frappe import _
 from frappe.query_builder.functions import Sum
 from frappe.utils import add_months, flt, formatdate, get_last_day, getdate
 
+from treasury.accounting import posting
 from treasury.bank_facilities import accounting
 from treasury.bank_facilities.report_utils import DRAWDOWN, FACILITY, get_facilities, report_today
 from treasury.pdc.report_utils import CTX, column, get_precision, validate_company, validate_date_range
@@ -38,7 +39,6 @@ CHEQUE_EVENTS = ("pdc_party_posting", "pdc_party_posting_reversal")
 MONTHLY, QUARTERLY, YEARLY = "Monthly", "Quarterly", "Yearly"
 PERIOD_MONTHS = {MONTHLY: 1, QUARTERLY: 3, YEARLY: 12}
 CATEGORIES = ("interest", "profit", "ijarah", "commission", "fees", "penalty", "charity")
-VOUCHER_DOCTYPES = ("Payment Entry", "Journal Entry")
 # design 7g §8.1: summary card indicator and chart colour per category
 CATEGORY_STYLE = {
 	"interest": ("Red", "#E24C4C"),
@@ -260,7 +260,7 @@ def _expense_rows(company: str, sources: dict, from_date, to_date) -> list[frapp
 	account = frappe.qb.DocType("Account")
 	names = sorted({s[1] for s in sources})
 	rows = []
-	for voucher_type in VOUCHER_DOCTYPES:
+	for voucher_type in posting.VOUCHER_DOCTYPES:
 		voucher = frappe.qb.DocType(voucher_type)
 		query = (
 			frappe.qb.from_(gle)

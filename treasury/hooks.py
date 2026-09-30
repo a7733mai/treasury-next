@@ -179,18 +179,27 @@ before_uninstall = "treasury.install.before_uninstall"
 doc_events = {
 	"Payment Entry": {
 		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
+		"on_cancel": "treasury.overrides.voucher_guard.on_cancel",
 		"on_trash": "treasury.overrides.voucher_guard.on_trash",
 	},
 	"Journal Entry": {
 		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
+		# the Treasury back links ignored on cancel; an Invoice Discounting's loan Journal Entries (its status)
+		"on_submit": "treasury.bank_facilities.invoice_discounting.on_journal_entry",
+		"on_cancel": [
+			"treasury.overrides.voucher_guard.on_cancel",
+			"treasury.bank_facilities.invoice_discounting.on_journal_entry",
+		],
 		"on_trash": "treasury.overrides.voucher_guard.on_trash",
 	},
-	# ERPNext's Invoice Discounting under a Bank Facility (custom field `treasury_facility`): its limit check and
-	# the facility's utilisation (treasury.bank_facilities.invoice_discounting)
+	# ERPNext's Invoice Discounting under a Bank Facility (custom field `treasury_facility`): its limit check,
+	# its cancellation (its own ledger entries) and the facility's utilisation
+	# (treasury.bank_facilities.invoice_discounting)
 	"Invoice Discounting": {
 		"validate": "treasury.bank_facilities.invoice_discounting.validate",
 		"before_submit": "treasury.bank_facilities.invoice_discounting.before_submit",
 		"on_submit": "treasury.bank_facilities.invoice_discounting.refresh",
+		"before_cancel": "treasury.bank_facilities.invoice_discounting.before_cancel",
 		"on_cancel": "treasury.bank_facilities.invoice_discounting.refresh",
 	},
 }

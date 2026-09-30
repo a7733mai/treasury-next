@@ -183,12 +183,16 @@ class SecurityCheque(Document):
 	def link_facility(self):
 		"""A security cheque referencing a Bank Facility is listed in the facility's Security Cheques (spec 7g
 		§3.11). The row is written directly: the facility's terms are locked once it is active, and only the
-		link is added. The creator's create permission on Security Cheque and read permission on the facility
-		(the reference's link validation) authorise it."""
+		link is added. Only an outgoing cheque (collateral given to the lender) of the facility's company, on an
+		active or suspended facility the creator may read (link validation checks existence only) is listed."""
 		if self.reference_doctype != "Bank Facility" or not self.reference_name:
 			return
-		company = frappe.db.get_value("Bank Facility", self.reference_name, "company")
-		if company != self.company:
+		if self.direction != lifecycle.OUTGOING:
+			return
+		facility = frappe.db.get_value("Bank Facility", self.reference_name, ["company", "status"], as_dict=True)
+		if not facility or facility.company != self.company or facility.status not in ("Active", "Suspended"):
+			return
+		if not frappe.has_permission("Bank Facility", "read", doc=self.reference_name):
 			return
 		row_doctype = "Bank Facility Security Cheque"
 		filters = {"parenttype": "Bank Facility", "parent": self.reference_name, "parentfield": "security_cheques"}

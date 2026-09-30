@@ -128,6 +128,17 @@ def cancel_trust_receipt(doc):
 	drawdown.cancel()
 
 
+def log_trust_receipt_cancelled(drawdown):
+	"""A Trust Receipt drawdown cancelled on its own (Facility Drawdown on_cancel): the settled credit keeps its
+	link as history and logs the cancellation."""
+	name = drawdown.get("letter_of_credit")
+	if not name or frappe.db.get_value(DOCTYPE, name, "docstatus") != 1:
+		return
+	doc = frappe.get_doc(DOCTYPE, name)
+	if doc.trust_receipt_drawdown == drawdown.name:
+		instruments.log_now(doc, "Trust Receipt Cancelled", remarks=drawdown.name)
+
+
 # ---------------------------------------------------------------------------
 # Actions
 # ---------------------------------------------------------------------------

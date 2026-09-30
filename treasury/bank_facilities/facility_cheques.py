@@ -171,10 +171,15 @@ def make_installment_batch(drawdown: str) -> dict:
 
 def validate_batch(batch):
 	"""The Cheque Batch of installment cheques (treasury.pdc.batch.validate_batch; again under the drawdown
-	lock on submit): the drawdown's lender, bank and open installments, each cheque exactly its installment."""
+	lock on submit): the drawdown's lender, bank and open installments, each cheque exactly its installment.
+	Its messages show the installments: the user must be able to read the drawdown."""
 	if getattr(batch, "_action", None) == "submit":
+		# a cheque linked by another batch moves `schedule_version` (`link_cheque`): a batch submitted
+		# meanwhile is detected here instead of issuing a second cheque for the same installment
 		repayment.lock_drawdown(batch.facility_drawdown)
 	drawdown = frappe.get_doc(DRAWDOWN, batch.facility_drawdown)
+	if not batch.flags.ignore_permissions:
+		drawdown.check_permission("read")
 	if drawdown.docstatus != 1 or drawdown.repayment_mode != PDC_TO_LENDER or drawdown.company != batch.company:
 		frappe.throw(
 			_("Drawdown {0} is not repaid by cheques to the lender (Repayment Mode {1}).").format(
@@ -235,9 +240,41 @@ def validate_batch(batch):
 
 
 def link_cheque(cheque):
-	"""The installment's schedule row points at its (new) cheque."""
+	"""The installment's schedule row points at its (new) cheque. The drawdown's `schedule_version` moves, so
+	a concurrent batch, repayment or cheque action on the drawdown sees the change (`repayment.lock_drawdown`)."""
 	if cheque.get("facility_schedule_row"):
 		frappe.db.set_value(SCHEDULE, cheque.facility_schedule_row, "pdc_cheque", cheque.name, update_modified=False)
+		_bump_version(cheque)
+
+
+def _bump_version(cheque):
+	drawdown = cheque.get("facility_drawdown") or frappe.db.get_value(
+		SCHEDULE, cheque.facility_schedule_row, "parent"
+	)
+	if drawdown:
+		repayment._bump_schedule_version(drawdown)
+
+
+def check_can_represent(cheque):
+	"""A bounced installment cheque is presented again only while its installment is still its own and unpaid
+	for its amount (after the bounce, the installment may have been paid by hand or given another cheque)."""
+	row = cheque.get("facility_schedule_row") and frappe.db.get_value(
+		SCHEDULE,
+		cheque.facility_schedule_row,
+		["installment_no", "pdc_cheque", "principal", "interest", "paid_principal", "paid_interest"],
+		as_dict=True,
+	)
+	if not row or row.pdc_cheque != cheque.name or unpaid_total(row) != flt(cheque.amount, 2):
+		frappe.throw(
+			_(
+				"Cheque {0} can no longer pay installment {1} of drawdown {2} (paid or changed since the bounce): replace or cancel it instead."
+			).format(
+				frappe.bold(cheque.name),
+				row.installment_no if row else "-",
+				frappe.bold(cheque.facility_drawdown),
+			),
+			title=_("Not Allowed"),
+		)
 
 
 def _cheque_chain(cheque_name: str) -> set[str]:
@@ -336,6 +373,7 @@ def on_cheque_released(cheque):
 	row = cheque.get("facility_schedule_row")
 	if row and frappe.db.get_value(SCHEDULE, row, "pdc_cheque") == cheque.name:
 		frappe.db.set_value(SCHEDULE, row, "pdc_cheque", None, update_modified=False)
+		_bump_version(cheque)
 
 
 def copy_to_replacement(old, new):

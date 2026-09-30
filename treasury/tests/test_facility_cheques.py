@@ -404,6 +404,58 @@ class TestInstallmentCheques(FacilityChequeTestCase):
 			lifecycle.post_party(result["replaced_by"])
 		self.assertIn("no longer matches the unpaid installment", str(ctx.exception))
 
+	def test_represent_refused_after_installment_paid(self):
+		"""Review 7g m3: after a bounce the installment may be paid by hand (the bounced cheque is not live);
+		presenting the cheque again is then refused up front, not at its posting."""
+		s = self.loan()
+		self.batch(s.drawdown, rows=[1])
+		cheque = self.post(self.cheque(s.drawdown, 1))
+		cheque.bounce(bounce_date="2025-03-03", reason="Insufficient funds")
+		make_repayment(s.drawdown, "2025-03-05", allocation_mode="Selected Row", installment_no=1)
+		cheque.reload()
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			cheque.represent(represent_date="2025-03-06")
+		self.assertIn("can no longer pay installment 1", str(ctx.exception))
+		cheque.reload()
+		self.assertEqual((cheque.operational_status, cheque.cycle), ("Bounced", 1))
+
+	def test_installment_cheque_date_is_the_due_date(self):
+		"""Security review 7g Minor 4: a Created installment cheque cannot be re-dated (its posting date is the
+		repayment date); Postpone keeps the original due date."""
+		s = self.loan()
+		self.batch(s.drawdown, rows=[1], handover_date=None)
+		cheque = self.cheque(s.drawdown, 1)
+		self.assertEqual(cheque.operational_status, "Created")
+		cheque.original_due_date = D("2025-03-15")
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			cheque.save()
+		self.assertIn("must be its installment's due date", str(ctx.exception))
+
+	def test_cheque_links_move_the_schedule_version(self):
+		"""Security review 7g Major 2: linking or releasing an installment cheque moves the drawdown's
+		`schedule_version`, so a second batch waiting on the drawdown lock detects the first one."""
+
+		def version() -> int:
+			return frappe.db.get_value("Facility Drawdown", s.drawdown.name, "schedule_version")
+
+		s = self.loan()
+		before = version()
+		self.batch(s.drawdown, rows=[1, 2], handover_date=None)
+		linked = version()
+		self.assertGreater(linked, before)
+		released = version()
+		self.cheque(s.drawdown, 1).cancel_cheque(reason="Wrong leaf")
+		self.assertGreater(version(), released)
+		self.assertIsNone(self.row(s.drawdown, 1).pdc_cheque)
+
+	def test_batch_needs_read_on_the_drawdown(self):
+		"""Security review 7g Minor 6: the batch's messages show the installments; validating an installment
+		batch needs read permission on the drawdown."""
+		s = self.loan()
+		batch = frappe.get_doc(facility_cheques.make_installment_batch(s.drawdown.name))
+		with self.set_user(ACCOUNTS_USER):
+			self.assertRaises(frappe.PermissionError, facility_cheques.validate_batch, batch)
+
 	def test_manual_repayment_on_cheque_row_refused(self):
 		s = self.loan()
 		self.batch(s.drawdown, rows=[1, 2])
