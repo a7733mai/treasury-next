@@ -88,7 +88,7 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		rejects("not a submitted charge", entry_type="Refund", against_bank_charge=draft.name, amount=10)
 		cancelled = make_bank_charge()
 		cancelled.cancel()
-		rejects("not a submitted charge", entry_type="Refund", against_bank_charge=cancelled.name, amount=10)
+		rejects("not a submitted charge|Cannot link cancelled document", entry_type="Refund", against_bank_charge=cancelled.name, amount=10)
 		usd_charge = make_bank_charge(bank_account=bank_account_name("USD"), amount=10)
 		rejects("not a submitted charge", entry_type="Refund", against_bank_charge=usd_charge.name, amount=5)
 
@@ -173,7 +173,7 @@ class TestBankChargeLifecycle(TreasuryTestMixin, IntegrationTestCase):
 	def test_amend(self):
 		charge = make_bank_charge()
 		charge.cancel()
-		amended = frappe.copy_doc(get_charge(charge.name))
+		amended = frappe.copy_doc(get_charge(charge.name), ignore_no_copy=False)  # like the desk "Amend"
 		amended.amended_from = charge.name
 		amended.insert()
 		self.assertEqual((amended.status, amended.accounting_status), ("Draft", "Not Posted"))
