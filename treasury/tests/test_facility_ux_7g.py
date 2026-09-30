@@ -333,7 +333,7 @@ class TestReports7gUX(UX7gTestCase):
 		drawdown.disburse_stage(stage=drawdown.disbursement_stages[0].name, disbursement_date="2025-02-15")
 		columns, data, *_rest = utilisation_report({"company": COMPANY, "facility": facility.name})
 		self.assertEqual(columns[0]["label"], "Lender / Facility / Limit Type")
-		top, facility_row, limit = data
+		top, _facility_row, limit = data
 		facility.reload()
 		self.assertEqual((top.label, top.lender_name), (facility.lender_name, facility.lender_name))
 		self.assertEqual(top.row_id, f"lender-{facility.lender_name}")
