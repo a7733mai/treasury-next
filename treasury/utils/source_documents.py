@@ -116,6 +116,13 @@ def resolve(source, party_type: str | None = None, party: str | None = None) -> 
 	)
 
 
+def default_company(company: str | None = None) -> str | None:
+	"""The company of a document created from a party master: the one given, else the user's default company
+	(ERPNext's `company` default, then Global Defaults). Not `get_user_default("Company")`: "Company" is a User
+	Permission key, which reads only the scrubbed `company` default or a single permitted company."""
+	return company or erpnext.get_default_company()
+
+
 def _choose_journal_party(je, party_type: str | None, party: str | None) -> dict:
 	parties = journal_parties(je)
 	if party_type and party:
@@ -292,8 +299,9 @@ def to_document_currency(
 	source,
 	precision: int,
 ) -> float:
-	"""An outstanding in the party account currency, as an amount of a document in `doc_currency`."""
-	if party_currency == doc_currency or not doc_currency:
+	"""An outstanding in the party account currency, as an amount of a document in `doc_currency` (the
+	currency of `bank_account`). Without a bank there is no document currency yet: the outstanding as it is."""
+	if party_currency == doc_currency or not doc_currency or not bank_account:
 		return outstanding
 	if party_currency == erpnext.get_company_currency(company) and flt(exchange_rate):
 		return flt(outstanding / flt(exchange_rate), precision)

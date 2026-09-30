@@ -76,6 +76,7 @@ class TreasuryCompanySettings(Document):
 		outgoing_party_posting: DF.Literal["On Handover", "On Cheque Date", "On Creation", "Manual"]
 		payment_modes: DF.Table[TreasuryPaymentModeMap]
 		pdc_accounts: DF.Table[PDCAccountMapping]
+		performance_bond_percent: DF.Percent
 		refund_fees_on_return: DF.Check
 		tender_bond_percent: DF.Percent
 		transfer_approval_threshold: DF.Currency
@@ -125,7 +126,8 @@ class TreasuryCompanySettings(Document):
 	# ------------------------------------------------------------------ pay / receive from documents
 
 	def validate_document_settings(self):
-		"""Default cheque banks (company banks with a PDC Accounts row), installment count, tender bond %."""
+		"""Default cheque banks (company banks with a PDC Accounts row), installment count, tender and
+		performance bond %."""
 		from treasury.pdc.batch import MAX_ROWS
 
 		mapped = {row.bank_account for row in self.get("pdc_accounts")}
@@ -143,6 +145,8 @@ class TreasuryCompanySettings(Document):
 			frappe.throw(_("Installment Cheques (Count) must be between 1 and {0}.").format(MAX_ROWS))
 		if not 0 <= flt(self.tender_bond_percent) <= 100:
 			frappe.throw(_("Tender Bond % must be between 0 and 100."))
+		if not 0 <= flt(self.performance_bond_percent) <= 100:
+			frappe.throw(_("Performance Bond % must be between 0 and 100."))
 
 	# ------------------------------------------------------------------ bank transfers
 

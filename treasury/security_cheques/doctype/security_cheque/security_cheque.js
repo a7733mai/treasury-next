@@ -262,7 +262,7 @@ frappe.ui.form.on("Security Cheque", {
 
 function sec_set_source_intro(frm) {
 	// what is left to type on a new security cheque opened from a quotation, order or party (Treasury buttons
-	// of the ERPNext forms; `__treasury_from` / `__tender_bond` are client only and never saved)
+	// of the ERPNext forms; `__treasury_from` / `__bond` are client only and never saved)
 	const doc = frm.doc;
 	const from =
 		doc.__treasury_from ||
@@ -274,7 +274,7 @@ function sec_set_source_intro(frm) {
 		return;
 	}
 	const esc = frappe.utils.escape_html;
-	const bond = doc.__tender_bond;
+	const bond = doc.__bond;
 	let text;
 	if (flt(doc.amount) && bond) {
 		const args = [
@@ -282,15 +282,23 @@ function sec_set_source_intro(frm) {
 			`<bdi>${esc(format_currency(bond.base, bond.currency))}</bdi>`,
 			`<bdi>${esc(format_currency(doc.amount, doc.currency))}</bdi>`,
 		];
-		// the supplier gives us the cheque: its number is on the paper; ours comes from the cheque book
-		text =
-			doc.direction === "Incoming"
+		// the other party gives us the cheque: its number is on the paper; ours comes from the cheque book
+		const incoming = doc.direction === "Incoming";
+		if (bond.kind === "performance") {
+			text = incoming
+				? __("Performance bond {0}% of {1}: {2}. Type the cheque number and save.", args)
+				: __("Performance bond {0}% of {1}: {2}. Check and save.", args);
+		} else {
+			text = incoming
 				? __("Tender bond {0}% of {1}: {2}. Type the cheque number and save.", args)
 				: __("Tender bond {0}% of {1}: {2}. Check and save.", args);
+		}
 	} else {
 		text = esc(__("Type the amount of the security cheque and save."));
 		if (["Quotation", "Supplier Quotation"].includes(from.doctype)) {
 			text += ` ${esc(__("Tip: set Tender Bond % in Treasury Company Settings."))}`;
+		} else if (["Sales Order", "Purchase Order"].includes(from.doctype)) {
+			text += ` ${esc(__("Tip: set Performance Bond % in Treasury Company Settings."))}`;
 		}
 	}
 	if (from.doctype === "Sales Order" && doc.direction === "Outgoing") {

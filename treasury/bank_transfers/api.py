@@ -76,7 +76,7 @@ def _make_bank_transfer(source_doctype, source_name, method, company, party_type
 	source = sd.get_source(source_doctype, source_name, _(DOCTYPE))
 	info = sd.resolve(source, party_type, party)
 	transfer_type = TRANSFER_TYPE[info.direction]
-	company = info.company or company or frappe.defaults.get_user_default("Company")
+	company = info.company or sd.default_company(company)
 	info.company = company
 	check_company_permission(company)
 	sd.check_payable(source, info)
@@ -89,11 +89,10 @@ def _make_bank_transfer(source_doctype, source_name, method, company, party_type
 	doc.bank_account = settings.get(TRANSFER_DEFAULT_BANK_FIELDS[doc.method])
 	doc.charge_bearer = settings.default_charge_bearer or fees.SHA
 	doc.request_date = doc.execution_date = today()
-	if doc.bank_account:
-		gl_account = frappe.db.get_value("Bank Account", doc.bank_account, "account")
-		doc.currency = get_account_currency(gl_account) if gl_account else None
-		if doc.currency:
-			doc.exchange_rate = posting.get_cheque_exchange_rate(doc.currency, company, doc.execution_date)
+	# without a default bank: the company currency (never `new_doc`'s default currency, the site's global
+	# default, e.g. INR); the controller sets the bank's currency when the user picks one
+	doc.currency = sd.bank_currency(doc.bank_account) or erpnext.get_company_currency(company)
+	doc.exchange_rate = posting.get_cheque_exchange_rate(doc.currency, company, doc.execution_date)
 	doc.party_type = info.party_type
 	doc.party = info.party
 	doc.party_name = get_party_name(doc.party_type, doc.party)
@@ -113,21 +112,24 @@ def _make_bank_transfer(source_doctype, source_name, method, company, party_type
 
 
 def _set_amount(doc, source, info):
-	"""What is left of the source (party account currency: allocated), in the bank currency (the amount)."""
+	"""What is left of the source (party account currency: allocated), in the bank currency (the amount). No
+	amount without a bank when the party is not in the company currency: the user picks a bank in the party's
+	currency, the allocation is known already."""
 	precision = frappe.get_precision(DOCTYPE, "amount") or 2
 	party_account = posting.get_party_account(doc.party_type, doc.party, doc.company)
 	party_currency = get_account_currency(party_account)
 	outstanding = sd.available_outstanding(source, info, party_currency, precision)
-	doc.amount = sd.to_document_currency(
-		outstanding,
-		party_currency,
-		doc.currency,
-		doc.company,
-		doc.exchange_rate,
-		doc.bank_account,
-		source,
-		precision,
-	)
+	if doc.bank_account or party_currency == erpnext.get_company_currency(doc.company):
+		doc.amount = sd.to_document_currency(
+			outstanding,
+			party_currency,
+			doc.currency if doc.bank_account else None,
+			doc.company,
+			doc.exchange_rate,
+			doc.bank_account,
+			source,
+			precision,
+		)
 	doc.append(
 		"references",
 		{"reference_doctype": source.doctype, "reference_name": source.name, "allocated_amount": outstanding},

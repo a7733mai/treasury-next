@@ -941,6 +941,8 @@ DOCUMENT_SETTINGS = {
 	"default_installment_count": 12,
 	"default_installment_frequency": "Monthly",
 	"tender_bond_percent": 0,
+	# shipped default 10; 0 here so that order-based security cheques start without an amount
+	"performance_bond_percent": 0,
 }
 
 

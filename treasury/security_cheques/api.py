@@ -28,6 +28,10 @@ SOURCES = {
 	"Employee": (lifecycle.INCOMING, "Employee Custody", "Employee", None),
 }
 QUOTATIONS = ("Quotation", "Supplier Quotation")
+# The bond kind and its Treasury Company Settings % of the source's grand total: tender bonds go with a bid
+# (quotations), performance bonds with a contract (orders).
+TENDER_BOND, PERFORMANCE_BOND = "tender", "performance"
+BOND_PERCENT_FIELDS = {TENDER_BOND: "tender_bond_percent", PERFORMANCE_BOND: "performance_bond_percent"}
 
 
 @frappe.whitelist()
@@ -35,8 +39,9 @@ def make_security_cheque(source_doctype: str, source_name: str, company: str | N
 	"""A new Security Cheque (not inserted) guaranteeing a quotation / order, or held for a party master.
 	`company`: for a party master (default: the user's default company); a document's own company wins.
 
-	When the amount is the Tender Bond % of the source's grand total, the result also carries
-	`__tender_bond` = {percent, base, currency}: the form explains the amount with it (client only)."""
+	When the amount is the Tender Bond % (quotations) or Performance Bond % (orders) of the source's grand total,
+	the result also carries `__bond` = {kind, percent, base, currency}: the form explains the amount with it
+	(client only)."""
 	with sd.treasury_refusals():
 		return _make_security_cheque(source_doctype, source_name, company)
 
@@ -49,7 +54,7 @@ def _make_security_cheque(source_doctype: str, source_name: str, company: str | 
 		frappe.throw(_("{0} {1} does not exist").format(_(source_doctype), source_name or "-"))
 	source = frappe.get_doc(source_doctype, source_name)
 	source.check_permission("read")
-	company = source.get("company") or company or frappe.defaults.get_user_default("Company")
+	company = source.get("company") or sd.default_company(company)
 	sd.check_create_permission(DOCTYPE, company)
 	if source.docstatus == 2:
 		frappe.throw(_("{0} {1} is cancelled.").format(_(source_doctype), frappe.bold(source_name)))
@@ -79,16 +84,26 @@ def _make_security_cheque(source_doctype: str, source_name: str, company: str | 
 		doc.currency = source.get("currency") if source.meta.has_field("grand_total") else None
 		doc.currency = doc.currency or company_currency
 
-	tender_bond = None
+	bond = None
 	if source_doctype not in sd.PARTY_MASTERS:
 		doc.reference_doctype, doc.reference_name = source_doctype, source_name
-		label = _("Tender bond for {0} {1}") if purpose == TENDER else _("Guarantee for {0} {1}")
-		doc.remarks = label.format(_(source_doctype), source_name)
-		tender_bond = _set_amount(doc, source, flt(settings.get("tender_bond_percent")), company_currency)
+		kind = TENDER_BOND if source_doctype in QUOTATIONS else PERFORMANCE_BOND
+		bond = _set_amount(doc, source, kind, flt(settings.get(BOND_PERCENT_FIELDS[kind])), company_currency)
+		doc.remarks = _remarks(kind, source_doctype, source_name, bond)
 	values = sd.mark_new(doc)
-	if tender_bond:
-		values["__tender_bond"] = tender_bond
+	if bond:
+		values["__bond"] = bond
 	return values
+
+
+def _remarks(kind: str, source_doctype: str, source_name: str, bond: dict | None) -> str:
+	if kind == TENDER_BOND:
+		return _("Tender bond for {0} {1}").format(_(source_doctype), source_name)
+	if bond:
+		return _("Performance bond {0}% for {1} {2}").format(
+			f"{flt(bond['percent']):g}", _(source_doctype), source_name
+		)
+	return _("Performance bond for {0} {1}").format(_(source_doctype), source_name)
 
 
 def _set_party(doc, source):
@@ -102,9 +117,9 @@ def _set_party(doc, source):
 	doc.party = source.get(party_field) if party_field else source.name
 
 
-def _set_amount(doc, source, percent: float, company_currency: str) -> dict | None:
+def _set_amount(doc, source, kind: str, percent: float, company_currency: str) -> dict | None:
 	"""`percent` of the source's grand total, in the cheque currency (none when it cannot be expressed).
-	Returns {percent, base, currency} when the amount was set."""
+	Returns {kind, percent, base, currency} when the amount was set."""
 	if percent <= 0 or not source.meta.has_field("grand_total"):
 		return None
 	if doc.currency == source.get("currency"):
@@ -117,4 +132,4 @@ def _set_amount(doc, source, percent: float, company_currency: str) -> dict | No
 	if amount <= 0:
 		return None
 	doc.amount = doc.required_amount = amount
-	return {"percent": percent, "base": base, "currency": doc.currency}
+	return {"kind": kind, "percent": percent, "base": base, "currency": doc.currency}

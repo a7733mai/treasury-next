@@ -537,7 +537,7 @@ A **Treasury** button group on Sales / Purchase Invoice, Sales / Purchase Order,
 Supplier, Employee, Quotation, Supplier Quotation and (with HRMS) Expense Claim / Employee Advance opens a new,
 **unsaved** Treasury document prepared from the one on screen: *Pay / Receive by Cheque* (PDC Cheque),
 *Bank Transfer*, *Fawran*, *Installment Cheques* (Cheque Batch) and *Security Cheque* (a tender bond on a
-quotation). Nothing is written until the user saves it, through the normal validations; the buttons are hints
+quotation, a performance bond on an order). Nothing is written until the user saves it, through the normal validations; the buttons are hints
 only (the server checks the permissions and the document again).
 
 - **Amount**: what is still outstanding on the invoice / order / Journal Entry / Expense Claim, less what open
@@ -555,8 +555,11 @@ only (the server checks the permissions and the document again).
   allocated by hand).
 - **Journal Entry**: one of its open parties (asked when there are several). **Expense Claim / Employee
   Advance**: only where HRMS is installed and its Payment Entry accepts them as references.
-- **Tender bond**: *Tender Bond %* of the quotation's grand total (0 = enter the amount); a quotation to a
-  Lead becomes a security cheque of party type *Other*. Security cheques never post.
+- **Tender bond** (Quotation / Supplier Quotation only): *Tender Bond %* of the quotation's grand total
+  (default 0 = enter the amount); a quotation to a Lead becomes a security cheque of party type *Other*.
+- **Performance bond** (Sales Order / Purchase Order): *Performance Bond %* of the order's grand total
+  (default 10; 0 = enter the amount), with the remark "Performance bond 10% for Sales Order …". Security
+  cheques never post.
 - Treasury always settles on the party's **default** party account: a Journal Entry row, Expense Claim or
   Employee Advance booked on another account (e.g. an employee advance account) is refused ("Settle it from
   ERPNext"). With *Book Advance Payments in Separate Party Account*, order advances are posted as in 1.0 (on

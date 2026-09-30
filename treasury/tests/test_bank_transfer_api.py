@@ -140,10 +140,15 @@ class TestBankTransferAPI(TreasuryTestMixin, IntegrationTestCase):
 			[("Journal Entry", supplier_je.name)],
 		)
 		customer_je = make_party_journal_entry("Customer", CUSTOMER, 700, acc("Sales"))
+		# no default Fawran bank: the company currency, not the site's global default currency
+		self.use_company_settings(default_fawran_bank_account=None)
 		values = build_transfer("Journal Entry", customer_je.name, "Fawran")
 		self.assertEqual(
 			(values["transfer_type"], values["party"], values["amount"], values["method"]),
 			("Party Receipt", CUSTOMER, 700, "Fawran"),
+		)
+		self.assertEqual(
+			(values["bank_account"], values["currency"], values["exchange_rate"]), (None, "EGP", 1)
 		)
 
 	def test_reserved_amount(self):

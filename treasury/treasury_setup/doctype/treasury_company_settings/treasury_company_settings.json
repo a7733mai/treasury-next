@@ -52,6 +52,7 @@
   "default_installment_count",
   "default_installment_frequency",
   "tender_bond_percent",
+  "performance_bond_percent",
   "facilities_section",
   "accrue_facility_interest"
  ],
@@ -359,10 +360,17 @@
   },
   {
    "default": "0",
-   "description": "Security cheques created from a quotation: this % of its grand total. 0 = enter the amount.",
+   "description": "Security cheques created from a Quotation or Supplier Quotation: this % of its grand total. 0 = enter the amount.",
    "fieldname": "tender_bond_percent",
    "fieldtype": "Percent",
    "label": "Tender Bond %"
+  },
+  {
+   "default": "10",
+   "description": "Security cheques created from a Sales Order or Purchase Order: this % of its grand total. 0 = enter the amount.",
+   "fieldname": "performance_bond_percent",
+   "fieldtype": "Percent",
+   "label": "Performance Bond %"
   },
   {
    "fieldname": "facilities_section",
@@ -378,7 +386,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-02 12:00:00.000000",
+ "modified": "2026-10-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

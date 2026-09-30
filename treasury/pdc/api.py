@@ -113,7 +113,7 @@ def _prepare(target: str, source_doctype, source_name, company, party_type, part
 	source = sd.get_source(source_doctype, source_name, _(target))
 	info = sd.resolve(source, party_type, party)
 	if info.kind == sd.PARTY:
-		info.company = company or frappe.defaults.get_user_default("Company")
+		info.company = sd.default_company(company)
 	sd.check_create_permission(target, info.company)
 	sd.check_payable(source, info)
 	# the settings exist (else a clear "missing settings" message before anything else)

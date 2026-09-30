@@ -30,6 +30,7 @@ class TestDocumentPaymentSettings(TreasuryTestMixin, IntegrationTestCase):
 					"default_incoming_cheque_bank_account",
 					"default_installment_count",
 					"tender_bond_percent",
+					"performance_bond_percent",
 				],
 				as_dict=True,
 			),
@@ -39,6 +40,7 @@ class TestDocumentPaymentSettings(TreasuryTestMixin, IntegrationTestCase):
 			default_incoming_cheque_bank_account=self.data.usd.bank_account,
 			default_installment_count=120,
 			tender_bond_percent=100,
+			performance_bond_percent=0,
 		)
 		doc.save()
 		self.assertEqual(doc.default_installment_count, 120)
@@ -50,15 +52,23 @@ class TestDocumentPaymentSettings(TreasuryTestMixin, IntegrationTestCase):
 				with self.assertRaisesRegex(frappe.ValidationError, "needs a row in PDC Accounts"):
 					self.settings(**{fieldname: own.bank_account}).save()
 
-	def test_installment_count_and_tender_bond(self):
+	def test_installment_count_and_bond_percents(self):
 		for count in (0, 121):
 			with self.subTest(count=count):
 				with self.assertRaisesRegex(frappe.ValidationError, "must be between 1 and 120"):
 					self.settings(default_installment_count=count).save()
-		for percent in (-1, 101):
-			with self.subTest(percent=percent):
-				with self.assertRaisesRegex(frappe.ValidationError, "must be between 0 and 100"):
-					self.settings(tender_bond_percent=percent).save()
+		for fieldname, message in (
+			("tender_bond_percent", "Tender Bond % must be between 0 and 100"),
+			("performance_bond_percent", "Performance Bond % must be between 0 and 100"),
+		):
+			for percent in (-1, 101):
+				with self.subTest(fieldname=fieldname, percent=percent):
+					with self.assertRaisesRegex(frappe.ValidationError, message):
+						self.settings(**{fieldname: percent}).save()
+
+	def test_performance_bond_default(self):
+		self.assertEqual(frappe.get_meta(DOCTYPE).get_field("performance_bond_percent").default, "10")
+		self.assertEqual(frappe.new_doc(DOCTYPE).performance_bond_percent, 10)
 
 	def test_patch_is_idempotent(self):
 		self.use_company_settings(

@@ -9,6 +9,7 @@ from erpnext.controllers.sales_and_purchase_return import make_return_doc
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, flt, getdate, today
 
+from treasury.bank_transfers.api import make_bank_transfer as build_transfer
 from treasury.pdc import batch
 from treasury.pdc.api import make_cheque_batch as map_batch
 from treasury.pdc.api import make_pdc_cheque as map_cheque
@@ -217,13 +218,17 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 				self.assertFalse(values.get("amount"))
 				self.assertEqual(values.get("references"), [])
 
-		previous = frappe.defaults.get_user_default("Company")
-		frappe.defaults.set_user_default("Company", COMPANY)
+		# without `company`: the user's default company (ERPNext's "company" default, as the desk's company
+		# selector sets it; the "Company" key is a User Permission key and is not read back by itself)
+		previous = frappe.defaults.get_user_default("company")
+		frappe.defaults.set_user_default("company", COMPANY)
 		if previous:
-			self.addCleanup(frappe.defaults.set_user_default, "Company", previous)
+			self.addCleanup(frappe.defaults.set_user_default, "company", previous)
 		else:
-			self.addCleanup(frappe.defaults.clear_user_default, "Company")
+			self.addCleanup(frappe.defaults.clear_user_default, "company")
 		self.assertEqual(map_cheque("Supplier", SUPPLIER)["company"], COMPANY)
+		self.assertEqual(build_transfer("Customer", CUSTOMER)["company"], COMPANY)
+		self.assertEqual(map_security("Customer", CUSTOMER)["company"], COMPANY)
 
 	def test_currency(self):
 		usd, egp = self.data.usd, self.data.egp
@@ -502,19 +507,29 @@ class TestBatchMapper(DocumentPaymentsTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "does not belong to"):
 			new_batch(party=other_customer).insert()
 
-		with self.assertRaisesRegex(frappe.ValidationError, "cannot be a Cheque Batch source"):
+		# Frappe validates the Dynamic Link before the controller runs (`Document._validate_links` precedes
+		# `before_insert` / `validate`): an existing document of an unsupported type reaches our check on save ...
+		with self.assertRaisesRegex(frappe.ValidationError, "Customer cannot be a Cheque Batch source"):
+			new_batch(source_doctype="Customer", source_name=CUSTOMER).insert()
+		# ... a name that is not a document of that type is refused by Frappe's link check first
+		with self.assertRaises(frappe.LinkValidationError):
 			new_batch(source_doctype="Item").insert()
+		with self.assertRaisesRegex(frappe.ValidationError, "Item cannot be a Cheque Batch source"):
+			batch.validate_source(new_batch(source_doctype="Item"))
 
 		# a source name without its type: the pair is cleared
 		doc = new_batch(source_doctype=None)
 		self.assertIsNone(batch.validate_source(doc))
 		self.assertEqual((doc.source_doctype, doc.source_name), (None, None))
 
+		# a cancelled source: Frappe refuses the cancelled link on save; our check refuses it too
 		doc = new_batch()
 		si.reload()
 		si.cancel()
-		with self.assertRaisesRegex(frappe.ValidationError, "does not belong to"):
+		with self.assertRaisesRegex(frappe.CancelledLinkError, "Cannot link cancelled document"):
 			doc.insert()
+		with self.assertRaisesRegex(frappe.ValidationError, "does not belong to"):
+			batch.validate_source(doc)
 
 		# another company (the batch's company is compared, it need not exist for the check)
 		other = frappe._dict(

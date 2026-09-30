@@ -69,8 +69,11 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual((flt(values["amount"]), flt(values["required_amount"])), (5000, 5000))
 		# how the amount was computed, for the intro of the form (client only, never saved)
-		bond = values["__tender_bond"]
-		self.assertEqual((flt(bond["percent"]), flt(bond["base"]), bond["currency"]), (5, 100000, "EGP"))
+		bond = values["__bond"]
+		self.assertEqual(
+			(bond["kind"], flt(bond["percent"]), flt(bond["base"]), bond["currency"]), ("tender", 5, 100000, "EGP")
+		)
+		self.assertEqual(values["remarks"], f"Tender bond for Quotation {quotation.name}")
 		self.assertEqual(getdate(values["expiry_date"]), getdate(quotation.valid_till))
 		self.assertEqual((values["reference_doctype"], values["reference_name"]), ("Quotation", quotation.name))
 		self.assertEqual(
@@ -114,14 +117,41 @@ class TestSecurityChequeAPI(TreasuryTestMixin, IntegrationTestCase):
 					(direction, purpose, party_type, party),
 				)
 				self.assertEqual(values["company"], COMPANY)
-				# tender_bond_percent = 0: the user enters the amount
+				# tender / performance bond % = 0: the user enters the amount
 				self.assertFalse(flt(values.get("amount")))
-				self.assertNotIn("__tender_bond", values)
+				self.assertNotIn("__bond", values)
 				master = doctype in ("Customer", "Supplier", "Employee")
 				self.assertEqual(values.get("reference_name"), None if master else name)
 				if direction == "Incoming":
 					self.assertFalse(values.get("bank_account"))
 					self.assertEqual(values["currency"], "EGP")
+
+	def test_performance_bond_from_orders(self):
+		# the Tender Bond % applies to quotations only; orders take the Performance Bond %
+		self.use_company_settings(tender_bond_percent=5, performance_bond_percent=10)
+		so, po = make_sales_order(3000), make_purchase_order(4000)
+		for doctype, order, direction, amount in (
+			("Sales Order", so, "Outgoing", 300),
+			("Purchase Order", po, "Incoming", 400),
+		):
+			with self.subTest(doctype=doctype):
+				values = map_security(doctype, order.name)
+				self.assertEqual((values["direction"], values["purpose"]), (direction, "Contract Performance"))
+				self.assertEqual((flt(values["amount"]), flt(values["required_amount"])), (amount, amount))
+				bond = values["__bond"]
+				self.assertEqual((bond["kind"], flt(bond["percent"])), ("performance", 10))
+				self.assertEqual(values["remarks"], f"Performance bond 10% for {doctype} {order.name}")
+
+		# a quotation keeps the Tender Bond %
+		values = map_security("Supplier Quotation", make_supplier_quotation(2000).name)
+		self.assertEqual((values["__bond"]["kind"], flt(values["amount"])), ("tender", 100))
+
+		# Performance Bond % = 0: no amount, the remark without a percentage
+		self.use_company_settings(performance_bond_percent=0)
+		values = map_security("Sales Order", so.name)
+		self.assertFalse(flt(values.get("amount")))
+		self.assertNotIn("__bond", values)
+		self.assertEqual(values["remarks"], f"Performance bond for Sales Order {so.name}")
 
 	def test_cancelled_and_permissions(self):
 		quotation = make_quotation(1000, submit=True)

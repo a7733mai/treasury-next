@@ -8729,6 +8729,10 @@ msgid "Tender Bond %"
 msgstr "نسبة التأمين الابتدائي %"
 
 msgctxt "Treasury Company Settings"
+msgid "Performance Bond %"
+msgstr "نسبة التأمين النهائي (حسن التنفيذ) %"
+
+msgctxt "Treasury Company Settings"
 msgid "Monthly"
 msgstr "شهري"
 
@@ -8753,8 +8757,11 @@ msgstr "اختياري."
 msgid "Outgoing cheques take the next leaf of the oldest active cheque book of the bank."
 msgstr "تأخذ الشيكات الصادرة الورقة التالية من أقدم دفتر شيكات نشط للبنك."
 
-msgid "Security cheques created from a quotation: this % of its grand total. 0 = enter the amount."
-msgstr "شيكات الضمان المنشأة من عرض سعر: هذه النسبة % من إجماليه. 0 = إدخال المبلغ يدويًا."
+msgid "Security cheques created from a Quotation or Supplier Quotation: this % of its grand total. 0 = enter the amount."
+msgstr "شيكات الضمان المنشأة من عرض سعر أو عرض سعر مورد: هذه النسبة % من إجماليه. 0 = إدخال المبلغ يدويًا."
+
+msgid "Security cheques created from a Sales Order or Purchase Order: this % of its grand total. 0 = enter the amount."
+msgstr "شيكات الضمان المنشأة من أمر بيع أو أمر شراء: هذه النسبة % من إجماليه. 0 = إدخال المبلغ يدويًا."
 
 msgctxt "Cheque Batch"
 msgid "Created From Type"
@@ -8827,14 +8834,20 @@ msgstr "يجب أن يكون عدد شيكات الأقساط بين 1 و {0}."
 msgid "Tender Bond % must be between 0 and 100."
 msgstr "يجب أن تكون نسبة التأمين الابتدائي بين 0 و 100."
 
+msgid "Performance Bond % must be between 0 and 100."
+msgstr "يجب أن تكون نسبة التأمين النهائي بين 0 و 100."
+
 msgid "Allocate the cheques by hand: the batch currency differs from the party account currency."
 msgstr "خصص الشيكات يدويًا: عملة الدفعة تختلف عن عملة حساب الطرف."
 
 msgid "Tender bond for {0} {1}"
 msgstr "تأمين ابتدائي عن {0} {1}"
 
-msgid "Guarantee for {0} {1}"
-msgstr "ضمان عن {0} {1}"
+msgid "Performance bond for {0} {1}"
+msgstr "تأمين نهائي (حسن تنفيذ) عن {0} {1}"
+
+msgid "Performance bond {0}% for {1} {2}"
+msgstr "تأمين نهائي (حسن تنفيذ) {0}% عن {1} {2}"
 
 msgctxt "Treasury"
 msgid "Accounting"
@@ -8992,6 +9005,15 @@ msgstr "أدخل مبلغ شيك الضمان واحفظ."
 
 msgid "Tip: set Tender Bond % in Treasury Company Settings."
 msgstr "تلميح: حدد \"نسبة التأمين الابتدائي %\" في إعدادات الخزينة للشركة."
+
+msgid "Tip: set Performance Bond % in Treasury Company Settings."
+msgstr "تلميح: حدد \"نسبة التأمين النهائي (حسن التنفيذ) %\" في إعدادات الخزينة للشركة."
+
+msgid "Performance bond {0}% of {1}: {2}. Check and save."
+msgstr "تأمين نهائي (حسن تنفيذ) {0}% من {1}: {2}. راجع واحفظ."
+
+msgid "Performance bond {0}% of {1}: {2}. Type the cheque number and save."
+msgstr "تأمين نهائي (حسن تنفيذ) {0}% من {1}: {2}. أدخل رقم الشيك واحفظ."
 
 msgid "Outgoing: we give this cheque to the customer as a performance bond. If the customer gives you a cheque, change Direction to Incoming."
 msgstr "صادر: نسلّم هذا الشيك للعميل كضمان حسن تنفيذ. إذا كان العميل هو من يسلّمك الشيك فغيّر الاتجاه إلى وارد."
