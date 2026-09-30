@@ -82,7 +82,11 @@ def targets(rows: list[dict]) -> set[tuple[str, str]]:
 
 
 def ordered_targets(rows: list[dict]) -> list[tuple[str, str]]:
-	return [(row["link_type"], row["link_to"]) for row in rows if row.get("link_type") in LINK_TYPES]
+	return [
+		(row["link_type"], row["link_to"])
+		for row in rows
+		if row.get("link_to") and row.get("link_type") in LINK_TYPES
+	]
 
 
 class TestWorkspaceCompleteness(IntegrationTestCase):

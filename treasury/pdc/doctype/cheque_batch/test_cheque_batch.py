@@ -7,6 +7,7 @@ import re
 from unittest.mock import patch
 
 import frappe
+from frappe import _
 from frappe.cache_manager import clear_user_cache
 from frappe.permissions import update_permission_property
 from frappe.tests import IntegrationTestCase
@@ -1071,7 +1072,8 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 			doc.insert()
 			with self.assertRaises(frappe.PermissionError) as ctx:
 				doc.submit()
-		self.assertIn(CHEQUE, str(ctx.exception))
+		message = _("You need permission to create PDC Cheques to submit a Cheque Batch.")
+		self.assertIn(message, str(ctx.exception))
 		self.assertEqual(frappe.db.get_value(DOCTYPE, doc.name, "docstatus"), 0)
 		self.assertEqual(frappe.db.count(CHEQUE, {"cheque_batch": doc.name}), 0)
 
