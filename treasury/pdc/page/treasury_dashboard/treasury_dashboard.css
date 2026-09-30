@@ -17,6 +17,10 @@
 	flex: 0 1 120px;
 }
 
+.treasury-dashboard .page-form .trd-filter-timing {
+	flex: 0 1 150px;
+}
+
 .treasury-dashboard .trd-root {
 	padding-block: var(--padding-md, 16px);
 }
@@ -508,6 +512,11 @@
 	.treasury-dashboard .page-form .trd-filter-banks {
 		flex: 1 1 100%;
 		order: 3;
+	}
+
+	.treasury-dashboard .page-form .trd-filter-timing {
+		flex: 1 1 100%;
+		order: 4;
 	}
 
 	.treasury-dashboard .trd-kpis {

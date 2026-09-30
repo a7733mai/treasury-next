@@ -373,6 +373,17 @@
    "dependencies": "Security Cheque",
    "hidden": 0,
    "is_query_report": 1,
+   "label": "Security Exposure",
+   "link_count": 0,
+   "link_to": "Security Exposure",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "Security Cheque",
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Security Cheques Summary",
    "link_count": 0,
    "link_to": "Security Cheques Summary",
@@ -387,17 +398,6 @@
    "label": "Security Cheque Movements",
    "link_count": 0,
    "link_to": "Security Cheque Movements",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "dependencies": "Security Cheque",
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Security Exposure",
-   "link_count": 0,
-   "link_to": "Security Exposure",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
@@ -621,7 +621,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-01 12:00:00.000000",
+ "modified": "2026-11-02 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "PDC",
  "name": "Treasury",

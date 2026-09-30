@@ -8087,7 +8087,7 @@ msgid "{0} document(s) cleared and reconciled."
 msgstr "تم صرف ومطابقة {0} مستند."
 
 msgid "PDC Bank Clearing failed for Bank Transfer {0}"
-msgstr "فشلت المطابقة البنكية للتحويل البنكي {0}"
+msgstr "فشلت تسوية الشيكات مع البنك للتحويل البنكي {0}"
 
 # Reports
 msgid "Transfers"
@@ -8435,7 +8435,7 @@ msgid "Date on the bank statement; it becomes the clearance date of the Payment 
 msgstr "التاريخ الوارد في كشف البنك، ويصبح تاريخ صرف سند الدفع. فارغ: تاريخ الإتمام."
 
 msgid "Tip: PDC Bank Clearing completes transfers from the bank statement automatically."
-msgstr "تلميح: أداة المطابقة البنكية تُتم التحويلات تلقائياً من كشف البنك."
+msgstr "تلميح: أداة تسوية الشيكات مع البنك تُتم التحويلات تلقائياً من كشف البنك."
 
 msgid "A reversal voucher is posted on the return date. Linked invoices become outstanding again."
 msgstr "يُرحَّل سند عكس بتاريخ الارتجاع، وتعود الفواتير المرتبطة مستحقة من جديد."
@@ -9045,7 +9045,7 @@ msgid "A charge the bank debited to a company bank account (or a refund of one),
 msgstr "مصروف خصمه البنك من حساب بنكي للشركة (أو استرداد له)، يُسجَّل بسند دفع واحد لمورد البنك أو قيد بنكي واحد، ويُسوّى مع حركته في كشف البنك."
 
 msgid "A kind of bank charge (account maintenance, cheque book, SMS alerts ...), with its expense account per company and the statement keywords that propose it in PDC Bank Clearing."
-msgstr "نوع من المصاريف البنكية (إدارة حساب، دفتر شيكات، رسائل تنبيه ...) بحساب المصروف لكل شركة والكلمات الدلالية في كشف البنك التي تجعل أداة التسوية البنكية تقترحه."
+msgstr "نوع من المصاريف البنكية (إدارة حساب، دفتر شيكات، رسائل تنبيه ...) بحساب المصروف لكل شركة والكلمات الدلالية في كشف البنك التي تجعل أداة تسوية الشيكات مع البنك تقترحه."
 
 msgid "Status history of a Bank Charge (append-only, written by the charge actions)."
 msgstr "سجل حالات المصروف البنكي (إضافة فقط، تكتبه إجراءات المصروف)."
@@ -9371,7 +9371,7 @@ msgid "Accounts"
 msgstr "الحسابات"
 
 msgid "Statement lines matched by keyword are selected for creation in PDC Bank Clearing."
-msgstr "حركات الكشف المطابقة بكلمة دلالية تُحدَّد للإنشاء في أداة التسوية البنكية."
+msgstr "حركات الكشف المطابقة بكلمة دلالية تُحدَّد للإنشاء في أداة تسوية الشيكات مع البنك."
 
 msgid "Default description of new charges."
 msgstr "البيان الافتراضي للمصاريف الجديدة."
@@ -9760,7 +9760,7 @@ msgid "It is cleared on its posting date."
 msgstr "ويُصرف بتاريخ ترحيله."
 
 msgid "It stays open until it is matched with the bank statement (PDC Bank Clearing)."
-msgstr "ويبقى مفتوحاً حتى تتم مطابقته مع كشف البنك (أداة التسوية البنكية)."
+msgstr "ويبقى مفتوحاً حتى تتم مطابقته مع كشف البنك (تسوية الشيكات مع البنك)."
 
 msgid "It is reconciled with statement line {0} at once."
 msgstr "ويُسوّى فوراً مع حركة الكشف {0}."
@@ -9810,7 +9810,7 @@ msgid "Too short (at least 3 characters)"
 msgstr "قصيرة جداً (3 أحرف على الأقل)"
 
 msgid "No keywords: this category is never proposed by PDC Bank Clearing."
-msgstr "لا توجد كلمات دلالية: لن تقترح أداة التسوية البنكية هذا التصنيف."
+msgstr "لا توجد كلمات دلالية: لن تقترح أداة تسوية الشيكات مع البنك هذا التصنيف."
 
 msgid "Proposals are shown but not pre-selected."
 msgstr "تُعرض المقترحات دون تحديدها تلقائياً."
@@ -9832,7 +9832,7 @@ msgid "New bank charges will be booked by Journal Entry (Bank Entry), without a 
 msgstr "ستُسجَّل المصاريف البنكية الجديدة بقيد يومية (قيد بنكي) دون رقم سند دفع."
 
 msgid "New bank charges stay uncleared until they are matched in PDC Bank Clearing."
-msgstr "ستبقى المصاريف البنكية الجديدة غير مصروفة حتى تتم مطابقتها في أداة التسوية البنكية."
+msgstr "ستبقى المصاريف البنكية الجديدة غير مصروفة حتى تتم مطابقتها في أداة تسوية الشيكات مع البنك."
 
 # PDC Bank Clearing (bank charges)
 msgctxt "PDC Clearing Match"
@@ -13303,3 +13303,26 @@ msgstr "هذه الأسماء لا يمكن تغييرها: {0}"
 # Sidebar section and workspace card ("Cheques", "Reports", "Setup" are translated above or by the core apps)
 msgid "Transfers & Charges"
 msgstr "التحويلات والمصاريف البنكية"
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 8b: cheque timing (treasury.pdc.timing; "Current-dated" is stored, "Current" is a core msgid)
+# ---------------------------------------------------------------------------------------------------------
+
+msgid "Cheque Timing"
+msgstr "توقيت الشيك"
+
+msgid "Current-dated"
+msgstr "حال"
+
+msgid "Post-dated"
+msgstr "آجل"
+
+msgid "Current-dated: due on its issue date. Post-dated: due after its issue date. Set from the dates on save."
+msgstr "حال: يستحق في تاريخ إصداره. آجل: يستحق بعد تاريخ إصداره. يُحدَّد من التواريخ عند الحفظ."
+
+msgid "Invalid Cheque Timing: {0}"
+msgstr "توقيت شيك غير صالح: {0}"
+
+msgctxt "Treasury Dashboard"
+msgid "All Cheques"
+msgstr "كل الشيكات"

@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.2.0 — 2026-10-01
+
+Treasury 1.2 speaks of cheques, not PDCs: the screens say "Cheque", "Cheque Register" and "Cheque Bank
+Clearing" in English and "شيك / الشيكات" in Arabic, since the app handles current-dated cheques as well as
+post-dated ones. Every cheque now shows whether it is current-dated or post-dated, and the Treasury workspace
+and sidebar list every document, report and page of the app. Nothing is renamed internally and no posting
+changes.
+
+### Upgrading from 1.1.0
+1. `bench migrate` runs the new patch `set_cheque_timing` (`[post_model_sync]`, after `set_facility_defaults`):
+   every existing PDC Cheque without a Cheque Timing gets one from its issue and original due dates. It only
+   fills empty values and does not change `modified`.
+2. `bench compile-po-to-mo --app treasury` builds the new English catalogue (`en.mo`) next to the Arabic one;
+   without it English screens keep showing "PDC".
+3. `bench --site <site> clear-cache`, so the desk loads the new wording, sidebar and workspace.
+
+### Cheques instead of PDC (Phase 8)
+- Labels only: the module, DocTypes, reports, number cards, chart and print formats are shown as "Cheques",
+  "Cheque", "Cheque Register", "Cheque Maturity", "Cheque Bank Clearing", "Cheques by Status" …; messages and
+  field labels follow.
+- Internal names are unchanged: DocTypes, reports, fieldnames, routes (`/app/pdc-cheque`), the REST API, the
+  naming series `PDC-OUT-` / `PDC-IN-` and fixtures keep "PDC", so scripts, integrations and imports keep
+  working.
+- New English catalogue `locale/en.po` (Frappe translates English too): it maps every visible "PDC" string to
+  the new wording. The Arabic catalogue uses "شيك / الشيكات" instead of "شيك آجل"; "آجل" is kept only where it
+  really means post-dated or usance.
+- Treasury Dashboard: the cheque cards are "Cheques Issued" and "Cheques in Hand" (they count every open cheque,
+  not only post-dated ones).
+- The Arabic name of PDC Bank Clearing is "تسوية الشيكات مع البنك" in every message.
+
+### Cheque timing (Phase 8)
+- New read-only field **Cheque Timing** on the cheque (in the list view and as a standard filter):
+  *Current-dated* when the original due date is the issue date, *Post-dated* when it is later. It is set from
+  the dates on every save, for both directions; a postponement does not change it (the original due date is
+  used), and both dates are locked once the cheque leaves Created.
+- Stored as "Current-dated" / "Post-dated" (English screens show "Current"; Arabic "حال" / "آجل").
+- Informational only: no GL effect, no new voucher. A current-dated cheque follows the normal flow and can be
+  handed over, posted and cleared on the same day.
+- New **Cheque Timing** filter and column in PDC Register (Cheque Register), PDC Maturity and Cheque Leaf
+  Register; a leaf matches only when its cheque is readable and has that timing.
+- Treasury Dashboard: a **Cheque Timing** filter narrows the four open-cheque cards (Due Out / Due In This
+  Week, Cheques Issued, Cheques in Hand) and their Cheque Register drill-downs; cash positions and Bounced This
+  Month are not filtered (their reports have no timing filter). The filter is remembered with the others and
+  cleared by Reset Filters.
+
+### Complete workspace (Phase 8)
+- The sidebar and the Treasury workspace have the same six sections / cards: **Cheques**, **Transfers &
+  Charges**, **Security Cheques**, **Bank Facilities**, **Reports** (the Treasury Dashboard and all 23 reports)
+  and **Setup**.
+- Newly linked: Cheque Batch, Cheque Discounting, Custody Location, Treasury Alert Log, the reports Cost of
+  Financing, Discounted Cheques, LG Register, LC Register, Security Cheques by Custody and Expired Security
+  Cheques Not Returned, and the core Invoice Discounting, Bank Transaction, Bank Account, Mode of Payment,
+  Document Naming Settings and Document Naming Rule.
+- Bank Reconciliation Tool and Bank Clearance are deliberately not linked: they would clear Treasury vouchers
+  outside the cheque lifecycle.
+- A static test keeps the sidebar and workspace complete when a DocType or report is added.
+
 ## 1.1.0 — 2026-09-30
 
 Treasury 1.1 turns the cheque and facility app of 1.0 into a treasury: every Treasury voucher has a Payment

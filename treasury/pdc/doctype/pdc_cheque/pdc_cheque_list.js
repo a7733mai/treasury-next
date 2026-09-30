@@ -2,7 +2,13 @@
 // For license information, please see license.txt
 
 frappe.listview_settings["PDC Cheque"] = {
-	add_fields: ["direction", "operational_status", "accounting_status", "effective_due_date"],
+	add_fields: [
+		"direction",
+		"operational_status",
+		"accounting_status",
+		"effective_due_date",
+		"cheque_timing",
+	],
 
 	get_indicator(doc) {
 		const settled = [

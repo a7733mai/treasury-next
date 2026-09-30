@@ -106,6 +106,7 @@ PDC_FIELDS = [
 	"issue_date",
 	"handover_date",
 	"effective_due_date",
+	"cheque_timing",
 	"actual_clearance_date",
 	"print_count",
 	"creation",
@@ -423,6 +424,7 @@ def _leaf_row(context: frappe._dict, book, number: int) -> frappe._dict:
 		"issue_date",
 		"handover_date",
 		"due_date",
+		"cheque_timing",
 		"expiry_date",
 		"return_date",
 		"clearance_date",
@@ -494,6 +496,7 @@ def _set_document(context: frappe._dict, row: frappe._dict, doctype: str, name: 
 	if doctype == PDC:
 		row.update(
 			due_date=doc.effective_due_date,
+			cheque_timing=doc.cheque_timing,
 			clearance_date=doc.actual_clearance_date,
 			payment_entry=context.payment_entries.get(name, ""),
 			print_count=cint(doc.print_count),

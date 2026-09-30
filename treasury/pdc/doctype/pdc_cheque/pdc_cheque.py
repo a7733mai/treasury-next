@@ -13,6 +13,7 @@ from frappe.utils import cint, flt, formatdate, getdate, money_in_words
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import cheque_printing, lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no, lock_covering_books
+from treasury.pdc.timing import get_cheque_timing
 from treasury.utils import references, voucher_summary
 from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils.protected_fields import changed_fields, changed_tables
@@ -131,6 +132,7 @@ class PDCCheque(Document):
 		cheque_discounting: DF.Link | None
 		cheque_image: DF.AttachImage | None
 		cheque_no: DF.Data | None
+		cheque_timing: DF.Literal["Current-dated", "Post-dated"]
 		company: DF.Link
 		contact_person: DF.Link | None
 		cost_center: DF.Link | None
@@ -616,6 +618,8 @@ class PDCCheque(Document):
 			self.effective_due_date = self.original_due_date
 		elif not self.effective_due_date:
 			self.effective_due_date = self.original_due_date
+		# derived (spec 8 §4.2): a client-sent value is simply overwritten
+		self.cheque_timing = get_cheque_timing(self.issue_date, self.original_due_date)
 
 	def validate_references(self):
 		references.validate_references(

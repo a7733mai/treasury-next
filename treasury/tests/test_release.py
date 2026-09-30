@@ -1,5 +1,5 @@
-"""Phase 7h: release 1.1.0 (spec 7h §3.7, §5, §6, §7 E): version, CHANGELOG, README, the patch order and the
-workspace / sidebar records."""
+"""Releases 1.1.0 (spec 7h §3.7, §5, §6, §7 E) and 1.2.0 (spec 8 §6, §7): version, CHANGELOG, README, the patch
+order and the workspace / sidebar records."""
 
 import importlib
 import json
@@ -21,6 +21,7 @@ PATCHES = [
 	"treasury.patches.v1_1.set_balance_alert_defaults",
 	"treasury.patches.v1_1.set_cheque_leaf_defaults",
 	"treasury.patches.v1_1.set_facility_defaults",
+	"treasury.patches.v1_2.set_cheque_timing",
 ]
 PAGE = "treasury-dashboard"
 
@@ -31,16 +32,33 @@ def read_json(*parts) -> dict:
 
 class TestRelease(IntegrationTestCase):
 	def test_version(self):
-		self.assertEqual(treasury.__version__, "1.1.0")
+		self.assertEqual(treasury.__version__, "1.2.0")
 
 	def test_changelog(self):
 		lines = (REPO_PATH / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
 		self.assertEqual(lines[0], "# Changelog")
 		headings = [(i, line) for i, line in enumerate(lines) if line.startswith("## ")]
-		self.assertRegex(headings[0][1], r"^## 1\.1\.0 — \d{4}-\d{2}-\d{2}$")
+		self.assertRegex(headings[0][1], r"^## 1\.2\.0 — \d{4}-\d{2}-\d{2}$")
 		self.assertFalse([line for line in lines if "Unreleased" in line])
 
-		start, end = headings[0][0], headings[1][0]
+		# 1.2.0: the upgrade steps, then the three Phase 8 sections
+		section = lines[headings[0][0] : headings[1][0]]
+		subheadings = [line for line in section if line.startswith("### ")]
+		self.assertEqual(subheadings[0], "### Upgrading from 1.1.0")
+		self.assertEqual(
+			[line for line in subheadings if line.endswith("(Phase 8)")],
+			[
+				"### Cheques instead of PDC (Phase 8)",
+				"### Cheque timing (Phase 8)",
+				"### Complete workspace (Phase 8)",
+			],
+		)
+		upgrade = "\n".join(section)
+		for step in ("set_cheque_timing", "compile-po-to-mo --app treasury", "clear-cache"):
+			self.assertIn(step, upgrade)
+
+		self.assertEqual(headings[1][1], "## 1.1.0 — 2026-09-30")
+		start, end = headings[1][0], headings[2][0]
 		section = lines[start:end]
 		positions = []
 		for phase in ("7a", "7b", "7c", "7d", "7e", "7f", "7g", "7h"):
@@ -51,15 +69,30 @@ class TestRelease(IntegrationTestCase):
 			positions.append(found[0])
 		self.assertEqual(positions, sorted(positions))
 
-		self.assertEqual(headings[1][1], "## 1.0.1 — 2026-09-29")
+		self.assertEqual(headings[2][1], "## 1.0.1 — 2026-09-29")
 		first = next(line for line in lines[end + 1 :] if line.strip())
 		self.assertEqual(first, "Fixes found during UAT on a live ERPNext 16 site.")
 
 	def test_readme(self):
 		text = (REPO_PATH / "README.md").read_text(encoding="utf-8")
-		self.assertIn("Version 1.1.0", text)
-		for heading in ("What's new in 1.1", "Upgrading from 1.0", "Setup guide", "Known limitations"):
+		self.assertIn("Version 1.2.0", text)
+		self.assertNotIn("Version 1.1.0", text)
+		for heading in (
+			"What's new in 1.2",
+			"Upgrading from 1.1",
+			"What's new in 1.1",
+			"Upgrading from 1.0",
+			"Setup guide",
+			"Known limitations",
+		):
 			self.assertTrue(re.search(rf"^#+ {re.escape(heading)}", text, re.M), heading)
+		self.assertTrue(re.search(r"^#### Cheques$", text, re.M))
+		self.assertFalse(re.search(r"^#+ PDC Cheques$", text, re.M))
+		# the naming note: screens say "Cheque", internal names and series stay "PDC"
+		for name in ("Cheque Register", "Cheque Bank Clearing", "PDC Register", "PDC Bank Clearing", "PDC-OUT-"):
+			self.assertIn(name, text)
+		self.assertIn("Cheque Timing", text)
+		self.assertIn("set_cheque_timing", text)
 		self.assertIn("post_scheduled_transfers", text)
 		self.assertIn(PAGE, text)
 		self.assertNotIn("No warning when an outgoing cheque would make the", text)
@@ -71,7 +104,7 @@ class TestRelease(IntegrationTestCase):
 			line.strip() for line in section.splitlines() if line.strip() and not line.strip().startswith("#")
 		]
 		self.assertEqual(listed, PATCHES)
-		modules = sorted(p.stem for p in (APP_PATH / "patches" / "v1_1").glob("*.py") if p.stem != "__init__")
+		modules = sorted(p.stem for p in (APP_PATH / "patches").glob("v1_*/*.py") if p.stem != "__init__")
 		self.assertEqual(sorted(p.rsplit(".", 1)[1] for p in listed), modules)
 		for path in listed:
 			with self.subTest(patch=path):
@@ -140,6 +173,8 @@ class TestRelease(IntegrationTestCase):
 			],
 		)
 		self.assertTrue(all(row["onboard"] for row in setup[:-1]))
+		self.assertEqual(setup[-1]["link_to"], "Treasury Alert Log")
+		self.assertFalse(setup[-1]["onboard"])
 		page_links = [link for link in links if link["type"] == "Link" and link.get("link_type") == "Page"]
 		self.assertEqual([link["link_to"] for link in page_links], [PAGE])
 

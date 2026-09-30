@@ -25,7 +25,21 @@ from treasury.tests.test_translations import (
 
 SECTIONS = ["Cheques", "Transfers & Charges", "Security Cheques", "Bank Facilities", "Reports", "Setup"]
 SETUP = "Setup"
+REPORTS = "Reports"
 SETUP_ONLY = ("Treasury Settings", "Treasury Company Settings", "Treasury Alert Log")
+# Useful core links (spec 8 §3.3), in the sidebar and the workspace
+EXPECTED_CORE = frozenset(
+	{
+		("DocType", "Bank Transaction"),
+		("DocType", "Invoice Discounting"),
+		("DocType", "Mode of Payment"),
+		("DocType", "Bank Account"),
+		("DocType", "Document Naming Settings"),
+		("DocType", "Document Naming Rule"),
+	}
+)
+# Not linked on purpose (risk R4): a second way to clear Treasury vouchers without the cheque lifecycle
+FORBIDDEN_CORE = frozenset({"Bank Reconciliation Tool", "Bank Clearance"})
 # Singles that are tools of daily work rather than settings
 TOOL_SINGLES = frozenset({"PDC Bank Clearing"})
 PAGE = "treasury-dashboard"
@@ -64,7 +78,11 @@ def workspace_cards(links: list[dict]) -> list[tuple[dict, list[dict]]]:
 
 
 def targets(rows: list[dict]) -> set[tuple[str, str]]:
-	return {(row["link_type"], row["link_to"]) for row in rows if row.get("link_type") in LINK_TYPES}
+	return set(ordered_targets(rows))
+
+
+def ordered_targets(rows: list[dict]) -> list[tuple[str, str]]:
+	return [(row["link_type"], row["link_to"]) for row in rows if row.get("link_type") in LINK_TYPES]
 
 
 class TestWorkspaceCompleteness(IntegrationTestCase):
@@ -88,8 +106,16 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 		expected = {("DocType", name) for name in doctypes}
 		expected |= {("Report", name) for name in reports} | {("Page", name) for name in pages}
 		self.assertEqual(sorted(expected - linked), [])
+		workspace_linked = targets(self.workspace["links"])
+		self.assertEqual(sorted(EXPECTED_CORE - linked), [])
+		self.assertEqual(sorted(EXPECTED_CORE - workspace_linked), [])
+		shortcuts = {s.get("link_to") for s in self.workspace["shortcuts"]}
+		for name in FORBIDDEN_CORE:
+			with self.subTest(forbidden=name):
+				self.assertNotIn(name, {link_to for _type, link_to in linked | workspace_linked})
+				self.assertNotIn(name, shortcuts)
 
-		setup = {item["link_to"] for item in self.sections[SETUP]}
+		setup ={item["link_to"] for item in self.sections[SETUP]}
 		section_of = {}
 		for label, rows in self.sections.items():
 			for row in rows:
@@ -137,11 +163,15 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 	def test_workspace_matches_sidebar(self):
 		cards = workspace_cards(self.workspace["links"])
 		self.assertEqual([card["label"] for card, _rows in cards], SECTIONS)
-		page = {("Page", PAGE)}  # first in the Reports card, second item of the sidebar (above the sections)
 		for card, rows in cards:
 			with self.subTest(card=card["label"]):
 				self.assertEqual(card["link_count"], len(rows))
-				self.assertEqual(targets(rows) - page, targets(self.sections[card["label"]]))
+				if card["label"] == REPORTS:
+					# the Page is the first link of Reports (in the sidebar: the second item, above the sections)
+					self.assertEqual((rows[0]["link_type"], rows[0]["link_to"]), ("Page", PAGE))
+					rows = rows[1:]
+				# same links in the same order as the sidebar section
+				self.assertEqual(ordered_targets(rows), ordered_targets(self.sections[card["label"]]))
 		self.assertEqual(targets(self.workspace["links"]), targets(self.items))
 
 		labels = {

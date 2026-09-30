@@ -11,3 +11,4 @@ treasury.patches.v1_1.set_bank_charge_defaults
 treasury.patches.v1_1.set_balance_alert_defaults
 treasury.patches.v1_1.set_cheque_leaf_defaults
 treasury.patches.v1_1.set_facility_defaults
+treasury.patches.v1_2.set_cheque_timing

@@ -10,16 +10,23 @@ from frappe.utils import cint
 
 from treasury.pdc.overview import DEFAULT_HORIZON, get_overview
 from treasury.pdc.report_utils import as_list
+from treasury.pdc.timing import validate_timing
 
 
 @frappe.whitelist()
 def get_dashboard_data(
-	company: str | None = None, bank_accounts: str | list | None = None, horizon: int | str | None = None
+	company: str | None = None,
+	bank_accounts: str | list | None = None,
+	horizon: int | str | None = None,
+	cheque_timing: str | None = None,
 ) -> dict:
 	"""The dashboard of `company`: `bank_accounts` a list or its JSON (none: every bank), `horizon` 7, 14 or 30
-	days. Permissions: see treasury.pdc.overview."""
+	days, `cheque_timing` Current-dated / Post-dated (none: every cheque; narrows the open-cheque KPIs only).
+	Permissions: see treasury.pdc.overview."""
 	horizon = DEFAULT_HORIZON if horizon in (None, "") else cint(horizon)
-	return get_overview(company, parse_bank_accounts(bank_accounts), horizon)
+	return get_overview(
+		company, parse_bank_accounts(bank_accounts), horizon, cheque_timing=validate_timing(cheque_timing)
+	)
 
 
 def parse_bank_accounts(value) -> list[str]:

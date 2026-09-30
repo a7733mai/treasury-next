@@ -16,6 +16,7 @@ from frappe import _
 from frappe.utils import cint, date_diff, flt, getdate
 
 from treasury.pdc.lifecycle import FINAL_STATUSES
+from treasury.pdc.timing import validate_timing
 from treasury.pdc.report_utils import (
 	ALL_OPERATIONAL_STATUSES,
 	BANK_POSTED,
@@ -81,6 +82,8 @@ def get_filters(filters: frappe._dict, company: str) -> list:
 		conditions.append(["operational_status", "in", statuses])
 	if filters.accounting_status:
 		conditions.append(["accounting_status", "=", filters.accounting_status])
+	if timing := validate_timing(filters.cheque_timing):
+		conditions.append(["cheque_timing", "=", timing])
 	if filters.party_type:
 		conditions.append(["party_type", "=", filters.party_type])
 	if filters.party:
@@ -166,6 +169,7 @@ def get_rows(filters: frappe._dict, company: str) -> list[frappe._dict]:
 				issue_date=cheque.issue_date,
 				handover_date=cheque.handover_date,
 				original_due_date=cheque.original_due_date,
+				cheque_timing=cheque.cheque_timing,
 				effective_due_date=cheque.effective_due_date,
 				actual_clearance_date=cheque.actual_clearance_date,
 				days_to_due=date_diff(cheque.effective_due_date, today) if is_open else None,
@@ -244,6 +248,7 @@ def get_columns(group_field: str | None) -> list[dict]:
 		column("issue_date", _("Issue Date", context="Treasury"), "Date", 100),
 		column("handover_date", _("Handover / Receipt Date"), "Date"),
 		column("original_due_date", _("Original Due Date"), "Date"),
+		column("cheque_timing", _("Cheque Timing"), width=100),
 		column("effective_due_date", _("Effective Due Date"), "Date"),
 		column("actual_clearance_date", _("Actual Clearance Date"), "Date"),
 		column("days_to_due", _("Days to Due"), "Int", 90),

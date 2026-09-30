@@ -95,7 +95,11 @@ def readable_sections(company: str) -> list[str]:
 	return [key for key, doctype in SECTIONS.items() if allowed[doctype]]
 
 
-def get_overview(company, bank_accounts=None, horizon=DEFAULT_HORIZON, today=None) -> frappe._dict:
+def get_overview(
+	company, bank_accounts=None, horizon=DEFAULT_HORIZON, today=None, cheque_timing=None
+) -> frappe._dict:
+	"""`cheque_timing` (Current-dated / Post-dated, validated by the caller) narrows only the four open-cheque
+	KPIs (spec 8 §4.4): positions and this month's bounces drill down to reports without a timing filter."""
 	if not company:
 		frappe.throw(_("Company is required."))
 	if not frappe.db.exists("Company", company):
@@ -126,6 +130,7 @@ def get_overview(company, bank_accounts=None, horizon=DEFAULT_HORIZON, today=Non
 		company_currency=erpnext.get_company_currency(company),
 		precision=get_precision(),
 		rates={},
+		cheque_timing=cheque_timing or None,
 	)
 	ctx.month_start = getdate(get_first_day(ctx.today))
 	ctx.rate = lambda currency: _rate(ctx, currency)
@@ -135,6 +140,7 @@ def get_overview(company, bank_accounts=None, horizon=DEFAULT_HORIZON, today=Non
 		company_currency=ctx.company_currency,
 		today=str(ctx.today),
 		horizon=horizon,
+		cheque_timing=cheque_timing or "",
 		bank_accounts=banks or [],
 		sections=frappe._dict(),
 		hidden=[],
@@ -435,7 +441,9 @@ def cheques_section(ctx) -> frappe._dict:
 	)
 
 	converter = amount_converter(ctx)
-	totals = open_cheque_totals(ctx.company, ctx.banks, ctx.today, converter=converter)
+	totals = open_cheque_totals(
+		ctx.company, ctx.banks, ctx.today, converter=converter, cheque_timing=ctx.cheque_timing
+	)
 	register = ["query-report", "PDC Register"]
 
 	def card(direction, scope):

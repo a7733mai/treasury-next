@@ -33,6 +33,7 @@ from treasury.pdc.report_utils import (
 	validate_date_range,
 	validate_party,
 )
+from treasury.pdc.timing import validate_timing
 
 BOOK = "Cheque Book"
 BOOK_STATUSES = ("Active", "Exhausted", "Closed")
@@ -69,8 +70,14 @@ def execute(filters=None):
 		frappe.throw(_("Invalid View: {0}").format(view))
 
 	books = get_books(filters, company)
+	filters.cheque_timing = validate_timing(filters.cheque_timing)
 	row_filtered = bool(
-		statuses or filters.usage or filters.party_type or filters.from_date or filters.to_date
+		statuses
+		or filters.usage
+		or filters.party_type
+		or filters.from_date
+		or filters.to_date
+		or filters.cheque_timing
 	)
 	chart = None
 	if view == VIEW_BOOKS and not row_filtered:
@@ -128,6 +135,9 @@ def matches(row: frappe._dict, filters: frappe._dict, statuses: list[str]) -> bo
 			return False
 		if filters.party and row.party != filters.party:
 			return False
+	# only the leaves of PDC Cheques the user may read carry a timing (unused, security and void leaves never)
+	if filters.cheque_timing and (row.restricted or row.cheque_timing != filters.cheque_timing):
+		return False
 	if filters.from_date or filters.to_date:
 		if row.status == UNUSED:
 			return UNUSED in statuses
@@ -252,6 +262,7 @@ def get_columns(one_book: bool = False) -> list[dict]:
 		column("party_name", _("Party Name"), width=180),
 		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
 		column("due_date", _("Due Date", context="Treasury"), "Date", 95),
+		column("cheque_timing", _("Cheque Timing"), width=100),
 		{**payment_entry_column(), "width": 170},
 		column(
 			"document_type",

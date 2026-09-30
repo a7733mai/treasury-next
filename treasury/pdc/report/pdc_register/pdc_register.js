@@ -59,6 +59,16 @@ frappe.query_reports["PDC Register"] = {
 			],
 		},
 		{
+			fieldname: "cheque_timing",
+			label: __("Cheque Timing"),
+			fieldtype: "Select",
+			options: [
+				{ value: "", label: "" },
+				{ value: "Current-dated", label: __("Current-dated") },
+				{ value: "Post-dated", label: __("Post-dated") },
+			],
+		},
+		{
 			// any Party Type: a cheque may be of an Employee, a Shareholder ...
 			fieldname: "party_type",
 			label: __("Party Type"),
@@ -179,7 +189,10 @@ frappe.query_reports["PDC Register"] = {
 				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><bdi>${frappe.utils.escape_html(n)}</bdi></a>`)
 				.join(", ");
 		}
-		if (data && ["operational_status", "accounting_status", "direction"].includes(column.fieldname)) {
+		if (
+			data &&
+			["operational_status", "accounting_status", "direction", "cheque_timing"].includes(column.fieldname)
+		) {
 			value = value ? __(value) : value;
 		}
 		let formatted = default_formatter(value, row, column, data);

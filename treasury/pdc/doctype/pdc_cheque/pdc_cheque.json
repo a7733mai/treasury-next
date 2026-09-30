@@ -32,6 +32,7 @@
   "issue_date",
   "handover_date",
   "original_due_date",
+  "cheque_timing",
   "effective_due_date",
   "column_break_dates",
   "deposit_date",
@@ -326,6 +327,18 @@
    "fieldtype": "Date",
    "label": "Original Due Date",
    "reqd": 1
+  },
+  {
+   "description": "Current-dated: due on its issue date. Post-dated: due after its issue date. Set from the dates on save.",
+   "fieldname": "cheque_timing",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cheque Timing",
+   "no_copy": 1,
+   "options": "Current-dated\nPost-dated",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "effective_due_date",

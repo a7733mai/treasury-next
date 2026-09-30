@@ -108,6 +108,16 @@ frappe.query_reports["Cheque Leaf Register"] = {
 			],
 		},
 		{
+			fieldname: "cheque_timing",
+			label: __("Cheque Timing"),
+			fieldtype: "Select",
+			options: [
+				{ value: "", label: "" },
+				{ value: "Current-dated", label: __("Current-dated") },
+				{ value: "Post-dated", label: __("Post-dated") },
+			],
+		},
+		{
 			fieldname: "party_type",
 			label: __("Party Type"),
 			fieldtype: "Select",
@@ -285,6 +295,7 @@ function cheque_leaf_register_format(value, row, column, data, default_formatter
 				.map((n) => `<a href="/app/payment-entry/${encodeURIComponent(n)}"><b><bdi>${esc(n)}</bdi></b></a>`)
 				.join(", ");
 		case "pdc_status":
+		case "cheque_timing":
 			return value ? esc(__(value)) : "";
 		case "print_count":
 			if (!cint(value)) {

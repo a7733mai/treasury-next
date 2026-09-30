@@ -12,6 +12,8 @@ const TD_STORAGE_KEY = "treasury_dashboard_filters";
 const TD_BANNER_KEY = "treasury_dashboard_banner_dismissed";
 const TD_HORIZONS = [7, 14, 30];
 const TD_DEFAULT_HORIZON = 7;
+// cheque timing filter (spec 8 §4.4): narrows only the four open-cheque KPIs; "" = all cheques
+const TD_TIMINGS = ["Current-dated", "Post-dated"];
 const TD_DUE_DAYS = 7; // the "this week" convention of the cards and PDC Register (spec §8 Q1)
 const TD_STALE_MINUTES = 10;
 const TD_MAX_BANK_ROWS = 8;
@@ -158,9 +160,23 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 			default: String(horizon),
 			change: reload,
 		});
+		const timing = TD_TIMINGS.includes(stored.cheque_timing) ? stored.cheque_timing : "";
+		this.timing_field = this.page.add_field({
+			fieldname: "cheque_timing",
+			label: __("Cheque Timing"),
+			fieldtype: "Select",
+			options: [
+				{ value: "", label: __("All Cheques", null, TD_CTX) },
+				{ value: "Current-dated", label: __("Current-dated") },
+				{ value: "Post-dated", label: __("Post-dated") },
+			],
+			default: timing,
+			change: reload,
+		});
 		$(this.company_field.wrapper).addClass("trd-filter-company");
 		$(this.bank_field.wrapper).addClass("trd-filter-banks");
 		$(this.horizon_field.wrapper).addClass("trd-filter-horizon");
+		$(this.timing_field.wrapper).addClass("trd-filter-timing");
 
 		// a saved bank list only applies to the company it was saved for
 		if (stored.company === company && Array.isArray(stored.bank_accounts) && stored.bank_accounts.length) {
@@ -174,6 +190,7 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 			company: this.company_field.get_value(),
 			bank_accounts: this.bank_field.get_value() || [],
 			horizon: cint(this.horizon_field.get_value()) || TD_DEFAULT_HORIZON,
+			cheque_timing: TD_TIMINGS.includes(this.timing_field.get_value()) ? this.timing_field.get_value() : "",
 		};
 	}
 
@@ -187,6 +204,7 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 		this.company_field.set_value(this.default_company() || "");
 		this.bank_field.set_value([]);
 		this.horizon_field.set_value(String(TD_DEFAULT_HORIZON));
+		this.timing_field.set_value("");
 		this.ready = true;
 		this.refresh();
 	}
@@ -370,6 +388,7 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 					company: filters.company,
 					bank_accounts: JSON.stringify(filters.bank_accounts),
 					horizon: filters.horizon,
+					cheque_timing: filters.cheque_timing,
 				},
 				callback: (r) => {
 					settled = true;
@@ -1004,10 +1023,12 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 		const cash = this.data.sections.positions && this.data.sections.positions.totals.current_company;
 		const share = flt(cash) > 0 ? Math.round((flt(c.due_out.amount) * 100) / flt(cash)) : null;
 		const month_start = moment(this.data.today).startOf("month").format("YYYY-MM-DD");
+		// the timing filter narrows the four open-cheque KPIs, not Bounced This Month
+		const timing = this.data.cheque_timing;
 		return this.section({
 			key: "cheques",
 			span: 12,
-			title: __("Cheques", null, TD_CTX),
+			title: __("Cheques", null, TD_CTX) + (timing ? ` · ${__(timing)}` : ""),
 			body: this.kpis([
 				this.kpi({
 					label: __("Due Out This Week"),

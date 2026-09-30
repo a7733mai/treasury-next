@@ -88,6 +88,10 @@ msgstr "Cheques to Lender"
 msgid "Issued (PDC)"
 msgstr "Issued (Payment)"
 
+# Cheque Timing option: stored as "Current-dated" because "Current" is a core msgid (Arabic "تيار")
+msgid "Current-dated"
+msgstr "Current"
+
 # Messages
 msgid "No PDC account mapping found for Bank Account {0} in Treasury Company Settings {1}."
 msgstr "No cheque account mapping found for Bank Account {0} in Treasury Company Settings {1}."

@@ -58,6 +58,13 @@ POST_DATED_ALLOWED = frozenset(
 			"Each installment is paid by a post-dated cheque to {0}. The cheque is posted on its date as the "
 			"repayment; nothing is posted at delivery.",
 		),
+		# Phase 8b: the Cheque Timing option and its field description
+		(None, "Post-dated"),
+		(
+			None,
+			"Current-dated: due on its issue date. Post-dated: due after its issue date. Set from the dates on "
+			"save.",
+		),
 	}
 )
 SOURCE_SUFFIXES = (".py", ".js", ".html", ".json")

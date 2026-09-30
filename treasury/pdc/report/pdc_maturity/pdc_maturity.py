@@ -25,6 +25,7 @@ from treasury.pdc.report_utils import (
 	report_today,
 	validate_company,
 )
+from treasury.pdc.timing import validate_timing
 
 BUCKETS = (
 	("overdue", None, -1),
@@ -52,6 +53,8 @@ def execute(filters=None):
 	}
 	if filters.bank_account:
 		conditions["bank_account"] = filters.bank_account
+	if timing := validate_timing(filters.cheque_timing):
+		conditions["cheque_timing"] = timing
 
 	converter = AmountConverter(company, as_on)
 	groups: dict[str, frappe._dict] = {}

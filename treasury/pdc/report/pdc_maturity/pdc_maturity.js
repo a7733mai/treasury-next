@@ -37,6 +37,16 @@ frappe.query_reports["PDC Maturity"] = {
 			},
 		},
 		{
+			fieldname: "cheque_timing",
+			label: __("Cheque Timing"),
+			fieldtype: "Select",
+			options: [
+				{ value: "", label: "" },
+				{ value: "Current-dated", label: __("Current-dated") },
+				{ value: "Post-dated", label: __("Post-dated") },
+			],
+		},
+		{
 			fieldname: "as_on",
 			label: __("As On"),
 			fieldtype: "Date",

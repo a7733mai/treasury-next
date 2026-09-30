@@ -76,6 +76,7 @@ CHEQUE_FIELDS = [
 	"issue_date",
 	"handover_date",
 	"original_due_date",
+	"cheque_timing",
 	"effective_due_date",
 	"actual_clearance_date",
 	"bank_transaction_date",

@@ -64,13 +64,18 @@ def get_cheque_total(filters: str | dict | None = None) -> dict:
 
 
 def open_cheque_totals(
-	company: str, bank_accounts: list[str] | None = None, today=None, converter: AmountConverter | None = None
+	company: str,
+	bank_accounts: list[str] | None = None,
+	today=None,
+	converter: AmountConverter | None = None,
+	cheque_timing: str | None = None,
 ) -> frappe._dict:
 	"""The number-card figures of both directions from one `get_cheques` query (the caller has validated the
 	company): {"Outgoing": {"due_7_days": {count, amount, route_options}, "outstanding": {...}}, "Incoming":
 	{...}, "company_currency"}. Amounts in the company currency (`converter`, default an AmountConverter at
 	`today`); `bank_accounts` narrows to those banks (the route options then carry the bank only when there is
-	exactly one)."""
+	exactly one). `cheque_timing` (validated by the caller) narrows to Current-dated / Post-dated cheques, and
+	the route options carry it."""
 	today = getdate(today or report_today())
 	window = [today, getdate(add_days(today, DUE_WINDOW_DAYS))]
 	conditions = {
@@ -80,6 +85,8 @@ def open_cheque_totals(
 	}
 	if bank_accounts:
 		conditions["bank_account"] = ["in", list(bank_accounts)]
+	if cheque_timing:
+		conditions["cheque_timing"] = cheque_timing
 	converter = converter or AmountConverter(company, today)
 	result = frappe._dict(company_currency=converter.company_currency)
 	for direction, statuses in CARD_STATUSES.items():
@@ -91,6 +98,8 @@ def open_cheque_totals(
 		}
 		if bank_accounts and len(bank_accounts) == 1:
 			route_options["bank_account"] = bank_accounts[0]
+		if cheque_timing:
+			route_options["cheque_timing"] = cheque_timing
 		result[direction] = frappe._dict(
 			{
 				DUE_7_DAYS: frappe._dict(

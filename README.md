@@ -1,46 +1,69 @@
 ## Treasury
 
-Post-dated cheques, security cheques, multi-cheque vouchers, bank transfers, bank charges, bank position
-alerts, bank facilities and a treasury dashboard for ERPNext v16.
+Cheques (current and post-dated), security cheques, multi-cheque vouchers, bank transfers, bank charges, bank
+position alerts, bank facilities and a treasury dashboard for ERPNext v16.
 
-**English.** Treasury manages the cheques a company writes and receives (post-dated cheques with their full
-lifecycle and configurable posting events), multi-cheque vouchers (e.g. 12 rent cheques in one document),
+**English.** Treasury manages the cheques a company writes and receives (current-dated and post-dated cheques
+with their full lifecycle and configurable posting events), multi-cheque vouchers (e.g. 12 rent cheques in one document),
 guarantee cheques that never touch the ledger, bank transfers (Normal, Fawran, SWIFT) with their fees, bank
 charges, daily bank position alerts and bank credit facilities (limits, loans, Murabaha and the other Islamic
 products, Letters of Guarantee / Credit, cheque discounting), with a bank position forecast, a **Treasury
 Dashboard** and Arabic / English print formats. Every accounting effect is a standard ERPNext Payment Entry or
 Journal Entry; no ERPNext or Frappe file is changed.
 
-**العربية.** تطبيق الخزينة لـ ERPNext بيدير الشيكات الآجلة الصادرة والواردة بدورة حالات كاملة وأحداث ترحيل
+**العربية.** تطبيق الخزينة لـ ERPNext بيدير الشيكات (الحالّة والآجلة) الصادرة والواردة بدورة حالات كاملة وأحداث ترحيل
 قابلة للضبط لكل شركة، وسند الشيكات المتعدد (زي 12 شيك إيجار في مستند واحد)، وشيكات الضمان من غير أي قيد
 محاسبي، والتحويلات البنكية (عادي وفوري وسويفت) برسومها، ومصاريف البنوك، وتنبيهات مركز البنك اليومية،
 والتسهيلات البنكية (الحدود، والقروض، والمرابحة وباقي المنتجات الإسلامية، وخطابات الضمان، والاعتمادات
 المستندية، وخصم الأوراق التجارية)، ومعاهم تقرير مركز البنك المتوقع و**لوحة الخزينة** وطباعة عربي وإنجليزي.
 كل القيود بتطلع كـ Payment Entry أو Journal Entry قياسية، ومن غير أي تعديل على كود ERPNext أو Frappe.
 
-Version 1.1.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
+Version 1.2.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
+
+> [!NOTE]
+> **Naming.** The screens say **Cheque**, **Cheque Register**, **Cheque Maturity** and **Cheque Bank
+> Clearing** (Arabic: شيك / الشيكات). The internal names stay **PDC Cheque**, **PDC Register**, **PDC
+> Maturity** and **PDC Bank Clearing** (DocTypes, reports, module, fieldnames, routes such as `/app/pdc-cheque`),
+> and the naming series stay `PDC-OUT-` / `PDC-IN-`: use these names in scripts, the REST API and data imports.
+> This README uses the internal names where a script or an import needs them.
 
 ---
 
 ### Contents
 
-1. [What's new in 1.1](#whats-new-in-11)
-2. [Installation](#installation)
-3. [Upgrading from 1.0](#upgrading-from-10)
-4. [Setup guide](#setup-guide)
-5. [Configuration](#configuration)
-6. [Modules](#modules): [PDC Cheques](#pdc-cheques), [Cheque Batch](#cheque-batch-multi-cheque-voucher),
+1. [What's new in 1.2](#whats-new-in-12)
+2. [What's new in 1.1](#whats-new-in-11)
+3. [Installation](#installation)
+4. [Upgrading from 1.1](#upgrading-from-11)
+5. [Upgrading from 1.0](#upgrading-from-10)
+6. [Setup guide](#setup-guide)
+7. [Configuration](#configuration)
+8. [Modules](#modules): [Cheques](#cheques), [Cheque Batch](#cheque-batch-multi-cheque-voucher),
    [Security Cheques](#security-cheques), [Bank Facilities](#bank-facilities), [Bank Transfers](#bank-transfers),
    [Bank Charges](#bank-charges), [Bank Position Alerts](#bank-position-alerts),
    [Pay or receive from any screen](#pay-or-receive-from-any-screen), [Treasury Dashboard](#treasury-dashboard)
-7. [Reports and workspace](#reports-and-workspace)
-8. [Roles and permissions](#roles-and-permissions)
-9. [Scheduled jobs](#scheduled-jobs)
-10. [Known limitations and follow-ups](#known-limitations-and-follow-ups)
-11. [Uninstall](#uninstall-what-is-kept)
-12. [Testing](#testing)
+9. [Reports and workspace](#reports-and-workspace)
+10. [Roles and permissions](#roles-and-permissions)
+11. [Scheduled jobs](#scheduled-jobs)
+12. [Known limitations and follow-ups](#known-limitations-and-follow-ups)
+13. [Uninstall](#uninstall-what-is-kept)
+14. [Testing](#testing)
 
 ---
+
+### What's new in 1.2
+
+- **Cheques instead of PDC** (labels only): English and Arabic screens call the documents and reports
+  "Cheque(s)" (a new English catalogue `locale/en.po`; see the naming note above). Internal names, the API and
+  the naming series are unchanged.
+- **Cheque timing**: every cheque shows whether it is **Current-dated** (due on its issue date) or
+  **Post-dated** (due later), with a filter in the cheque list, Cheque Register, Cheque Maturity, Cheque Leaf
+  Register and on the Treasury Dashboard ([Cheques](#cheque-timing)).
+- **Complete workspace**: the sidebar and the Treasury workspace list every document, report and the dashboard
+  in six sections: Cheques, Transfers & Charges, Security Cheques, Bank Facilities, Reports, Setup
+  ([Reports and workspace](#reports-and-workspace)).
+
+No posting changes: the accounting of every cheque is exactly the one of 1.1.
 
 ### What's new in 1.1
 
@@ -58,7 +81,7 @@ Version 1.1.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
 - **7e — Bank Position Alerts**: balance thresholds, the daily digest and critical alerts, the entry-time low
   balance guard, Bank Balance Outlook ([Bank Position Alerts](#bank-position-alerts)).
 - **7f — Cheque leaves, cheque printing, security reports**: Cheque Leaf Register, Void Leaf, Cheque Layout
-  printing, Security Cheques Summary / Movements ([PDC Cheques](#pdc-cheques)).
+  printing, Security Cheques Summary / Movements ([Cheques](#cheques)).
 - **7g — Qatar facilities and finance companies**: lenders, Islamic products, Payment Entry facility vouchers,
   Auto Debit and PDC to Lender repayments ([Bank Facilities](#bank-facilities)).
 - **7h — Treasury Dashboard and setup**: the dashboard page, the *Treasury Setup* workspace card, the *Setup
@@ -73,7 +96,7 @@ Version 1.1.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
 cd $PATH_TO_YOUR_BENCH
 bench get-app $URL_OF_THIS_REPO --branch develop
 bench --site <site> install-app treasury
-bench compile-po-to-mo --app treasury      # Arabic translations (locale/ar.po -> sites/assets/locale)
+bench compile-po-to-mo --app treasury      # Arabic and English wording (locale/*.po -> sites/assets/locale)
 ```
 
 - Requires ERPNext (the app links to Company, Account, Bank Account, Payment Entry, Journal Entry ...).
@@ -94,6 +117,20 @@ bench compile-po-to-mo --app treasury      # Arabic translations (locale/ar.po -
   customisations of the app's own doctypes (see [Uninstall](#uninstall-what-is-kept)). The three roles and
   their assignment to users are kept on purpose (without the app they grant nothing); delete them in *Role*
   if they are not wanted. The vouchers created by Treasury stay ordinary Payment / Journal Entries.
+
+### Upgrading from 1.1
+
+```bash
+bench --site <site> migrate                 # runs treasury.patches.v1_2.set_cheque_timing
+bench compile-po-to-mo --app treasury       # builds en.mo (the "Cheque" wording) next to ar.mo
+bench --site <site> clear-cache
+```
+
+- `treasury.patches.v1_2.set_cheque_timing` gives every existing cheque without a Cheque Timing the one of its
+  dates (issue date vs original due date). It only fills empty values and does not change `modified`.
+- Without `compile-po-to-mo`, English screens keep showing "PDC …"; without `clear-cache`, the old sidebar and
+  wording may stay in the desk until the cache expires.
+- Nothing else changes: no setting, no voucher, no internal name.
 
 ### Upgrading from 1.0
 
@@ -135,7 +172,7 @@ settings sections are synced by the migrate. After the migrate, open *Treasury C
 ### Setup guide
 
 The order below is the order of the **Setup Checklist** (Treasury Company Settings, first section) and of the
-*Treasury Setup* card of the workspace. Every checklist item says what is missing and links to the place to
+*Setup* card of the workspace. Every checklist item says what is missing and links to the place to
 fix it; *Required* items must be done before the first cheque, *Recommended* ones before the related feature.
 
 1. **Roles and users.** Give the treasury staff *Treasury Manager*, *Treasury User* or *Cheque Approver*,
@@ -155,7 +192,7 @@ fix it; *Required* items must be done before the first cheque, *Recommended* one
 7. **Balance thresholds, alert settings and recipients**: one threshold row per company bank (*Add All Bank
    Accounts*), then Treasury Settings → Bank Position Alerts ([Bank Position Alerts](#bank-position-alerts)).
 8. **Cheque books and Cheque Layouts**: a default Cheque Layout (or a Cheque Print Format on the PDC Accounts
-   row) for every PDC bank ([PDC Cheques](#pdc-cheques)).
+   row) for every PDC bank ([Cheques](#cheques)).
 9. **Bank Charge Categories and Bank Suppliers**: an expense account of the company on every enabled category;
    map each Bank to its existing Supplier in Treasury Settings → Bank Suppliers, or let the first charge create
    one ([Bank Charges](#bank-charges)).
@@ -324,15 +361,25 @@ any party can be encashed (not one of an *Other* party).
 
 ### Modules
 
-#### PDC Cheques
+#### Cheques
 
-- **PDC Cheque** (PDC-OUT- / PDC-IN-): direction, party (any Party Type), bank account, cheque book
+- **Cheque** (DocType *PDC Cheque*, series PDC-OUT- / PDC-IN-): current-dated and post-dated cheques; direction, party (any Party Type), bank account, cheque book
   (outgoing: the next free leaf is allocated when the Cheque No is left empty), cheque no, drawer bank,
   amount, currency (always the bank account's; company currency while an incoming cheque has no bank),
   exchange rate, references to invoices / orders (the allocation becomes final at the party posting; what
   is no longer outstanding then stays an unallocated advance, with a message).
 - **Distinct dates**: issue, handover / receipt, original due, effective due (moved by postponements),
   deposit, actual clearance, bank transaction, party posting, bank posting. The print date is never stored.
+- <a id="cheque-timing"></a>**Cheque Timing** (read-only, in the list view and a standard filter): *Current-dated*
+  when the original due date is the issue date, *Post-dated* when it is later (English screens show
+  "Current", Arabic "حال" / "آجل"). It is computed from those two dates on every save, for both directions;
+  an incoming cheque uses its issue date too (its receipt date does not exist yet when it is keyed in and may
+  change later). A postponement moves the effective due date only, so the timing never changes once the
+  cheque leaves Created (both dates are then locked). It is informational: a current-dated cheque follows the
+  normal posting flow, which may run on a single day, and no voucher depends on it. Filters: the cheque list,
+  Cheque Register (*PDC Register*), Cheque Maturity (*PDC Maturity*), Cheque Leaf Register (a leaf matches
+  only when its cheque is readable and has that timing) and the Treasury Dashboard. Cheques saved before 1.2
+  get it from the patch `set_cheque_timing`.
 - **Two statuses**, set only by the actions: operational (Created, Delivered / Received, Deposited,
   Cleared, Bounced, Returned, Endorsed, Discounted, Replaced, Cancelled; *Postponed* is a flag with a
   counter, *Overdue* an indicator) and accounting (Not Posted, Party Posted, Under Collection Posted, Bank
@@ -914,7 +961,9 @@ of its sidebar) shows the treasury of one company at a glance. It only reads dat
 when clicked (with the same filters).
 
 - **Filters**: Company, Bank Accounts (several; a bank sharing its GL account with a selected one is added,
-  as in Bank Balance Outlook, unless a User Permission hides it from the user), Horizon 7 / 14 / 30 days. The last filters are remembered in the browser.
+  as in Bank Balance Outlook, unless a User Permission hides it from the user), Horizon 7 / 14 / 30 days,
+  Cheque Timing (All Cheques / Current-dated / Post-dated; it narrows only the four open-cheque cards and
+  their Cheque Register drill-downs). The last filters are remembered in the browser.
 - **Bank positions** (bank filter applies): *Cash Today* and *Projected in {H} Days* (the closing at the end
   of the chosen horizon H, company currency),
   *Banks Below Minimum* / *Below Warning* (Bank Balance Outlook for the horizon), one row per bank (level,
@@ -922,8 +971,10 @@ when clicked (with the same filters).
   projected balance curve and the daily (weekly for 30 days) inflows / outflows. The positions come from one
   30-day Bank Position Forecast engine call: a day's projected closing never depends on the horizon.
 - **Cheques** (bank filter applies): due this week (today to today + 7, the number-card convention) outgoing /
-  incoming, post-dated issued / in hand (the *Outstanding PDC* cards) and bounced this month (Bounced and
-  Postponed Cheques, one row per bounce).
+  incoming, cheques issued / in hand (every open cheque, current-dated or post-dated: the *Outstanding PDC*
+  cards) and bounced this month (Bounced and Postponed Cheques, one row per bounce). The Cheque Timing filter
+  applies to the first four only: cash positions and bounced this month drill down to reports without a timing
+  filter.
 - **Transfers awaiting confirmation** (Sent, from or to the selected banks) and **bank charges this month**
   (Bank Charges Analysis net, by category).
 - **Company-wide** (never filtered by bank; the page says so when banks are selected): security cheques held /
@@ -942,11 +993,24 @@ when clicked (with the same filters).
 
 The **Treasury** workspace (sidebar + desktop icon; shown to Treasury Manager / User, Accounts Manager /
 User and System Manager) opens with the **Treasury Dashboard** shortcut (page `treasury-dashboard`) and holds
-the number cards, the *Expected Cash Flow*, *PDC by Status* and *Lowest Projected Balance per Bank* charts,
-the report links and the **Treasury Setup** card (the setup masters in setup order: Treasury Company
-Settings, Treasury Settings, Mode of Payment, Cheque Book, Cheque Layout, Bank Charge Category, Custody
-Location, Document Naming Settings, Document Naming Rule). The sidebar has sections for the security cheques
-and the bank facilities. Reports only read data, with the user's permissions and User Permissions (a user
+the number cards, the *Expected Cash Flow*, *PDC by Status* (Cheques by Status) and *Lowest Projected Balance
+per Bank* charts and six cards. The sidebar has the same six sections, with the same links in the same order,
+below *Home* and *Treasury Dashboard*:
+
+| Section / card | Links |
+|---|---|
+| Cheques | Cheque (*PDC Cheque*), Cheque Batch, Cheque Bank Clearing (*PDC Bank Clearing*) |
+| Transfers & Charges | Bank Transfer, Bank Charge, Bank Transaction (ERPNext) |
+| Security Cheques | Security Cheque |
+| Bank Facilities | Bank Facility, Facility Drawdown, Facility Repayment, Letter of Guarantee, Letter of Credit, Cheque Discounting, Invoice Discounting (ERPNext) |
+| Reports | the Treasury Dashboard (workspace card only) and the 23 reports below, by area |
+| Setup | Treasury Company Settings, Treasury Settings, Mode of Payment, Bank Account, Cheque Book, Cheque Layout, Bank Charge Category, Custody Location, Document Naming Settings, Document Naming Rule, Treasury Alert Log |
+
+Every app DocType (except child tables), report and page is linked; a static test
+(`tests/test_workspace_completeness.py`) fails when a new one is not. ERPNext's *Bank Reconciliation Tool* and
+*Bank Clearance* are deliberately not linked: they would clear Treasury vouchers outside the cheque lifecycle
+(use Cheque Bank Clearing). The link labels are the DocType / report names, translated on display ("PDC
+Register" shows as "Cheque Register"). Reports only read data, with the user's permissions and User Permissions (a user
 restricted to other companies gets a permission error for a forbidden Company filter). Company currency
 amounts of other currencies use today's rate.
 
@@ -954,10 +1018,12 @@ amounts of other currencies use today's rate.
 |---|---|---|
 | PDC | Bank Position Forecast, Bank Balance Outlook, Projected Party Statement, PDC Register, PDC Maturity, Bounced and Postponed Cheques, Cheque Book Usage, Cheque Leaf Register | Outgoing / Incoming Cheques Due Today, Due in 7 Days, Overdue; Outstanding PDC Payable / Receivable; Banks Below Minimum (7 days) |
 | Bank Transfers | Bank Transfer Register, Transfer Fees Analysis, Bank Charges Analysis | — |
-| Security Cheques | Security Cheque Register, Security Cheques Summary, Security Cheque Movements, Security Exposure, Security Cheques by Custody, Expired Security Cheques Not Returned | Security Held, Security Given, Security Cheques Expiring in 30 Days, Expired Security Cheques Not Returned |
+| Security Cheques | Security Cheque Register, Security Exposure, Security Cheques Summary, Security Cheque Movements, Security Cheques by Custody, Expired Security Cheques Not Returned | Security Held, Security Given, Security Cheques Expiring in 30 Days, Expired Security Cheques Not Returned |
 | Bank Facilities | Facility Utilisation, Facility Repayment Schedule Report, Cost of Financing, LG Register, LC Register, Discounted Cheques | Total Facility Limits, Total Facility Utilised, Installments Due in 30 Days, Overdue Facility Installments, Auto Debits Awaiting Statement, Open Letters of Guarantee, Open Letters of Credit, Discounted Cheques Outstanding |
 
 - **Page**: *Treasury Dashboard* (see [Treasury Dashboard](#treasury-dashboard)).
+- **Cheque Timing** filter and column: PDC Register, PDC Maturity and Cheque Leaf Register (see
+  [Cheque Timing](#cheque-timing)).
 - **LC Register**: *Expiring Within (Days)* narrows to the Opened / Amended credits expiring by today + that
   many days (as in LG Register). **Bounced and Postponed Cheques**: *Bank Account* filter.
 
