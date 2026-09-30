@@ -12,6 +12,7 @@ from frappe.utils import add_days, today
 
 from treasury.overrides import dashboards
 from treasury.tests.utils import (
+	BANK_CHARGE_SETTINGS,
 	COMPANY,
 	CUSTOMER,
 	PE_SETTINGS,
@@ -21,6 +22,7 @@ from treasury.tests.utils import (
 	ensure_fiscal_year,
 	ensure_supplier,
 	get_voucher_count,
+	make_bank_charge,
 	make_bank_facility,
 	make_bank_transfer,
 	make_drawdown,
@@ -29,6 +31,7 @@ from treasury.tests.utils import (
 	make_purchase_invoice,
 	make_quotation,
 	make_security_cheque,
+	set_bank_suppliers,
 	unique_cheque_no,
 )
 
@@ -42,6 +45,7 @@ TREASURY_ITEMS = {
 	"Payment Entry": [
 		"PDC Cheque",
 		"Bank Transfer",
+		"Bank Charge",
 		"Letter of Credit",
 		"Letter of Guarantee",
 		"Cheque Discounting",
@@ -49,6 +53,7 @@ TREASURY_ITEMS = {
 	"Journal Entry": [
 		"PDC Cheque",
 		"Bank Transfer",
+		"Bank Charge",
 		"Letter of Credit",
 		"Letter of Guarantee",
 		"Cheque Discounting",
@@ -58,7 +63,14 @@ TREASURY_ITEMS = {
 	"Customer": ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Security Cheque"],
 	"Supplier": ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Security Cheque", "Letter of Credit"],
 	"Employee": ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Security Cheque"],
-	"Bank Account": ["PDC Cheque", "Cheque Batch", "Cheque Book", "Bank Transfer", "Security Cheque"],
+	"Bank Account": [
+		"PDC Cheque",
+		"Cheque Batch",
+		"Cheque Book",
+		"Bank Transfer",
+		"Bank Charge",
+		"Security Cheque",
+	],
 	"Expense Claim": ["PDC Cheque", "Cheque Batch", "Bank Transfer"],
 	"Employee Advance": ["PDC Cheque", "Cheque Batch", "Bank Transfer"],
 }
@@ -66,6 +78,7 @@ OWN_DASHBOARDS = (
 	"PDC Cheque",
 	"Cheque Batch",
 	"Bank Transfer",
+	"Bank Charge",
 	"Security Cheque",
 	"Bank Facility",
 	"Facility Drawdown",
@@ -210,6 +223,16 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 		counts = self.counts("Payment Entry", transfer.payment_entry)
 		self.assertEqual((counts["PDC Cheque"], counts["Bank Transfer"]), (0, 1))
 
+		# Phase 7d: a Bank Charge through its status log, in Payment Entry and Journal Entry mode
+		self.use_company_settings(**BANK_CHARGE_SETTINGS)
+		set_bank_suppliers(self, [])
+		charge = make_bank_charge()
+		counts = self.counts("Payment Entry", charge.payment_entry)
+		self.assertEqual((counts["Bank Charge"], counts["Bank Transfer"]), (1, 0))
+		self.use_company_settings(bank_charge_voucher="Journal Entry")
+		charge = make_bank_charge()
+		self.assertEqual(self.counts("Journal Entry", charge.journal_entry)["Bank Charge"], 1)
+
 	def test_counts_on_parties_and_bank(self):
 		name = "_Test Treasury Party Counts"
 		customer = ensure_customer(name)
@@ -245,11 +268,13 @@ class TestDashboards(TreasuryTestMixin, IntegrationTestCase):
 			}
 		).insert()
 		make_security_cheque(direction="Outgoing", party_type="Supplier", bank_account=own.bank_account)
+		make_bank_charge(submit=False, bank_account=own.bank_account)
 		counts = self.counts("Bank Account", own.bank_account)
 		self.assertEqual(
 			(counts["Cheque Book"], counts["Security Cheque"], counts["PDC Cheque"], counts["Bank Transfer"]),
 			(1, 1, 0, 0),
 		)
+		self.assertEqual(counts["Bank Charge"], 1)
 		self.assertEqual(counts["Bank Facility"], 0)
 
 	def test_counts_on_quotation(self):

@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:category_name",
+ "creation": "2026-10-06 12:00:00.000000",
+ "description": "A kind of bank charge (account maintenance, cheque book, SMS alerts ...), with its expense account per company and the statement keywords that propose it in PDC Bank Clearing.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "category_name",
+  "disabled",
+  "auto_select_proposals",
+  "column_break_main",
+  "default_description",
+  "keywords",
+  "accounts_section",
+  "accounts"
+ ],
+ "fields": [
+  {
+   "fieldname": "category_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Category",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Disabled"
+  },
+  {
+   "default": "1",
+   "description": "Statement lines matched by keyword are selected for creation in PDC Bank Clearing.",
+   "fieldname": "auto_select_proposals",
+   "fieldtype": "Check",
+   "label": "Pre-select Clearing Proposals"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default description of new charges.",
+   "fieldname": "default_description",
+   "fieldtype": "Small Text",
+   "label": "Default Description"
+  },
+  {
+   "description": "One per line. A bank statement line whose description or reference contains one of them is proposed as this category (not case sensitive).",
+   "fieldname": "keywords",
+   "fieldtype": "Small Text",
+   "label": "Keywords"
+  },
+  {
+   "fieldname": "accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts per Company"
+  },
+  {
+   "fieldname": "accounts",
+   "fieldtype": "Table",
+   "label": "Accounts",
+   "options": "Bank Charge Category Account"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-06 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Treasury Setup",
+ "name": "Bank Charge Category",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "category_name",
+ "sort_field": "category_name",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "category_name",
+ "track_changes": 1,
+ "translated_doctype": 1
+}

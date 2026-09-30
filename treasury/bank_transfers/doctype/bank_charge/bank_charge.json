@@ -1,0 +1,454 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-06 12:00:00.000000",
+ "description": "A charge the bank debited to a company bank account (or a refund of one), booked as one Payment Entry to the bank's supplier or one Bank Entry, and reconciled with its bank statement line.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "charge_section",
+  "naming_series",
+  "entry_type",
+  "company",
+  "posting_date",
+  "column_break_charge",
+  "status",
+  "accounting_status",
+  "category",
+  "against_bank_charge",
+  "title",
+  "bank_section",
+  "bank_account",
+  "bank",
+  "currency",
+  "column_break_bank",
+  "bank_reference",
+  "bank_transaction",
+  "bank_transaction_date",
+  "clearance_date",
+  "amount_section",
+  "amount",
+  "exchange_rate",
+  "base_amount",
+  "column_break_amount",
+  "expense_account",
+  "description",
+  "refunded_amount",
+  "accounting_details_section",
+  "cost_center",
+  "project",
+  "column_break_accounting",
+  "mode_of_payment",
+  "accounting_dimensions_section",
+  "dimension_col_break",
+  "vouchers_section",
+  "payment_entry",
+  "journal_entry",
+  "column_break_vouchers",
+  "vouchers_html",
+  "status_log_section",
+  "status_log",
+  "more_info_section",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "charge_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Charge"
+  },
+  {
+   "default": "BCH-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "BCH-.YYYY.-.#####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Charge",
+   "description": "Refund: money the bank gives back.",
+   "fieldname": "entry_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Entry Type",
+   "options": "Charge\nRefund",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "description": "Date the bank debited (refund: credited) the account; posting date of the voucher.",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_charge",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Draft\nPosted\nReconciled\nCancelled",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Not Posted",
+   "depends_on": "eval:doc.docstatus>0",
+   "fieldname": "accounting_status",
+   "fieldtype": "Select",
+   "label": "Accounting Status",
+   "no_copy": 1,
+   "options": "Not Posted\nPosted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Category",
+   "options": "Bank Charge Category",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.entry_type==='Refund'",
+   "fieldname": "against_bank_charge",
+   "fieldtype": "Link",
+   "label": "Refund of",
+   "options": "Bank Charge",
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bank_section",
+   "fieldtype": "Section Break",
+   "label": "Bank"
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "bank_account.bank",
+   "fieldname": "bank",
+   "fieldtype": "Link",
+   "label": "Bank",
+   "options": "Bank",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_bank",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Reference of the bank statement line.",
+   "fieldname": "bank_reference",
+   "fieldtype": "Data",
+   "label": "Bank Reference"
+  },
+  {
+   "description": "Statement line this charge is reconciled with.",
+   "fieldname": "bank_transaction",
+   "fieldtype": "Link",
+   "label": "Bank Transaction",
+   "no_copy": 1,
+   "options": "Bank Transaction",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "bank_transaction_date",
+   "fieldtype": "Date",
+   "label": "Bank Transaction Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "clearance_date",
+   "fieldtype": "Date",
+   "label": "Clearance Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount_section",
+   "fieldtype": "Section Break",
+   "label": "Amount"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.currency && doc.currency!==frappe.defaults.get_default('currency')",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate (to Company Currency)",
+   "precision": "9"
+  },
+  {
+   "fieldname": "base_amount",
+   "fieldtype": "Currency",
+   "label": "Amount (Company Currency)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amount",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default: the category's account for the company.",
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.entry_type==='Charge' && doc.docstatus===1",
+   "fieldname": "refunded_amount",
+   "fieldtype": "Currency",
+   "label": "Refunded Amount",
+   "no_copy": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_details_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Details"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "column_break_accounting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Payment Entry only. Empty: from the Modes of Payment map (method Bank Charge).",
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "fieldname": "dimension_col_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "vouchers_section",
+   "fieldtype": "Section Break",
+   "label": "Payment Entries and Vouchers"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Payment Entry",
+   "no_copy": 1,
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_vouchers",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vouchers_html",
+   "fieldtype": "HTML",
+   "label": "Payment Entries and Vouchers"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "status_log_section",
+   "fieldtype": "Section Break",
+   "label": "Status Log"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status_log",
+   "fieldtype": "Table",
+   "label": "Status Log",
+   "no_copy": 1,
+   "options": "Bank Charge Status Log",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.remarks",
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Info"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Bank Charge",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-06 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bank Transfers",
+ "name": "Bank Charge",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Treasury User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "category,bank_account,bank_reference",
+ "sort_field": "posting_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

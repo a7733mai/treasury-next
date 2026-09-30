@@ -30,6 +30,7 @@ QUOTATION_ITEMS = {"Security Cheque": "reference_name"}
 VOUCHER_ITEMS = {
 	"PDC Cheque": "voucher_no",
 	"Bank Transfer": "voucher_no",
+	"Bank Charge": "voucher_no",
 	"Letter of Credit": "voucher_no",
 	"Letter of Guarantee": "voucher_no",
 	"Cheque Discounting": "voucher_no",
@@ -47,6 +48,7 @@ BANK_ACCOUNT_ITEMS = {
 	"Cheque Batch": "bank_account",
 	"Cheque Book": "bank_account",
 	"Bank Transfer": "bank_account",
+	"Bank Charge": "bank_account",
 	"Security Cheque": "bank_account",
 }
 BANK_ACCOUNT_FACILITY_ITEMS = {

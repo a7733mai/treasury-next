@@ -9017,3 +9017,641 @@ msgstr "تأمين نهائي (حسن تنفيذ) {0}% من {1}: {2}. أدخل �
 
 msgid "Outgoing: we give this cheque to the customer as a performance bond. If the customer gives you a cheque, change Direction to Incoming."
 msgstr "صادر: نسلّم هذا الشيك للعميل كضمان حسن تنفيذ. إذا كان العميل هو من يسلّمك الشيك فغيّر الاتجاه إلى وارد."
+
+# ---------------------------------------------------------------------------
+# Phase 7d — Bank charges
+# ---------------------------------------------------------------------------
+
+# DocTypes, report, workspace
+msgid "Bank Charge"
+msgstr "رسم بنكي"
+
+msgid "Bank Charge Category"
+msgstr "فئة الرسوم البنكية"
+
+msgid "Bank Charge Category Account"
+msgstr "حساب فئة الرسوم البنكية"
+
+msgid "Bank Charge Status Log"
+msgstr "سجل حالات الرسم البنكي"
+
+msgid "Treasury Bank Supplier"
+msgstr "مورد البنك"
+
+msgid "Bank Charges Analysis"
+msgstr "تحليل الرسوم البنكية"
+
+msgid "Refunds"
+msgstr "الاستردادات"
+
+msgid "{} to Reconcile"
+msgstr "{} بانتظار المطابقة"
+
+msgid "A charge the bank debited to a company bank account (or a refund of one), booked as one Payment Entry to the bank's supplier or one Bank Entry, and reconciled with its bank statement line."
+msgstr "رسم خصمه البنك من حساب بنكي للشركة (أو استرداد له)، يُقيَّد بسند دفع واحد لمورد البنك أو قيد بنكي واحد، ويُطابق مع سطر كشف الحساب البنكي."
+
+msgid "A kind of bank charge (account maintenance, cheque book, SMS alerts ...), with its expense account per company and the statement keywords that propose it in PDC Bank Clearing."
+msgstr "نوع من الرسوم البنكية (إدارة حساب، دفتر شيكات، رسائل تنبيه ...) بحساب المصروف لكل شركة والكلمات المفتاحية في كشف الحساب التي تقترحه في مطابقة الشيكات مع البنك."
+
+msgid "Status history of a Bank Charge (append-only, written by the charge actions)."
+msgstr "سجل حالات الرسم البنكي (إضافة فقط، تكتبه إجراءات الرسم)."
+
+# Default categories (translated_doctype: the names are translated on display)
+msgid "Account Maintenance"
+msgstr "رسوم إدارة الحساب"
+
+msgid "SMS Alerts"
+msgstr "رسائل وتنبيهات"
+
+msgid "Returned Cheque"
+msgstr "شيك مرتد"
+
+msgid "Transfer Fees"
+msgstr "رسوم التحويل"
+
+# Bank Charge fields
+msgctxt "Bank Charge"
+msgid "Bank Charge"
+msgstr "الرسم البنكي"
+
+msgctxt "Bank Charge"
+msgid "Series"
+msgstr "السلسلة"
+
+msgctxt "Bank Charge"
+msgid "Entry Type"
+msgstr "نوع القيد"
+
+msgctxt "Bank Charge"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Bank Charge"
+msgid "Posting Date"
+msgstr "تاريخ القيد"
+
+msgctxt "Bank Charge"
+msgid "Status"
+msgstr "الحالة"
+
+msgctxt "Bank Charge"
+msgid "Accounting Status"
+msgstr "الحالة المحاسبية"
+
+msgctxt "Bank Charge"
+msgid "Category"
+msgstr "الفئة"
+
+msgctxt "Bank Charge"
+msgid "Refund of"
+msgstr "استرداد للرسم"
+
+msgctxt "Bank Charge"
+msgid "Title"
+msgstr "العنوان"
+
+msgctxt "Bank Charge"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Bank Charge"
+msgid "Bank Account"
+msgstr "الحساب البنكي"
+
+msgctxt "Bank Charge"
+msgid "Currency"
+msgstr "العملة"
+
+msgctxt "Bank Charge"
+msgid "Bank Reference"
+msgstr "مرجع البنك"
+
+msgctxt "Bank Charge"
+msgid "Bank Transaction"
+msgstr "حركة البنك"
+
+msgctxt "Bank Charge"
+msgid "Bank Transaction Date"
+msgstr "تاريخ حركة البنك"
+
+msgctxt "Bank Charge"
+msgid "Clearance Date"
+msgstr "تاريخ التسوية"
+
+msgctxt "Bank Charge"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Bank Charge"
+msgid "Exchange Rate (to Company Currency)"
+msgstr "سعر الصرف (إلى عملة الشركة)"
+
+msgctxt "Bank Charge"
+msgid "Amount (Company Currency)"
+msgstr "المبلغ (بعملة الشركة)"
+
+msgctxt "Bank Charge"
+msgid "Expense Account"
+msgstr "حساب المصروف"
+
+msgctxt "Bank Charge"
+msgid "Description"
+msgstr "البيان"
+
+msgctxt "Bank Charge"
+msgid "Refunded Amount"
+msgstr "المبلغ المسترد"
+
+msgctxt "Bank Charge"
+msgid "Accounting Details"
+msgstr "التفاصيل المحاسبية"
+
+msgctxt "Bank Charge"
+msgid "Cost Center"
+msgstr "مركز التكلفة"
+
+msgctxt "Bank Charge"
+msgid "Project"
+msgstr "المشروع"
+
+msgctxt "Bank Charge"
+msgid "Mode of Payment"
+msgstr "طريقة الدفع"
+
+msgctxt "Bank Charge"
+msgid "Accounting Dimensions"
+msgstr "الأبعاد المحاسبية"
+
+msgctxt "Bank Charge"
+msgid "Payment Entries and Vouchers"
+msgstr "سندات الدفع والقيود"
+
+msgctxt "Bank Charge"
+msgid "Payment Entry"
+msgstr "سند الدفع"
+
+msgctxt "Bank Charge"
+msgid "Journal Entry"
+msgstr "قيد اليومية"
+
+msgctxt "Bank Charge"
+msgid "Status Log"
+msgstr "سجل الحالات"
+
+msgctxt "Bank Charge"
+msgid "More Info"
+msgstr "مزيد من المعلومات"
+
+msgctxt "Bank Charge"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Bank Charge"
+msgid "Amended From"
+msgstr "معدل من"
+
+# Bank Charge options and statuses (stored in English, translated on display)
+msgctxt "Bank Charge"
+msgid "Charge"
+msgstr "رسم"
+
+msgctxt "Bank Charge"
+msgid "Refund"
+msgstr "استرداد"
+
+msgctxt "Bank Charge"
+msgid "Draft"
+msgstr "مسودة"
+
+msgctxt "Bank Charge"
+msgid "Posted"
+msgstr "مُرحّل"
+
+msgctxt "Bank Charge"
+msgid "Reconciled"
+msgstr "تمت المطابقة"
+
+msgctxt "Bank Charge"
+msgid "Cancelled"
+msgstr "ملغى"
+
+msgctxt "Bank Charge"
+msgid "Not Posted"
+msgstr "غير مُرحّل"
+
+# Bank Charge field descriptions
+msgid "Refund: money the bank gives back."
+msgstr "استرداد: مبلغ يرده البنك."
+
+msgid "Date the bank debited (refund: credited) the account; posting date of the voucher."
+msgstr "تاريخ خصم البنك من الحساب (الاسترداد: تاريخ الإضافة)؛ وهو تاريخ قيد السند."
+
+msgid "Reference of the bank statement line."
+msgstr "مرجع سطر كشف الحساب البنكي."
+
+msgid "Statement line this charge is reconciled with."
+msgstr "سطر كشف الحساب الذي طوبق معه هذا الرسم."
+
+msgid "Default: the category's account for the company."
+msgstr "الافتراضي: حساب الفئة للشركة."
+
+msgid "Payment Entry only. Empty: from the Modes of Payment map (method Bank Charge)."
+msgstr "لسند الدفع فقط. إذا تُرك فارغًا: من جدول طرق الدفع (الطريقة: رسم بنكي)."
+
+# Bank Charge form (bank_charge.js)
+msgctxt "Bank Charge"
+msgid "Actions"
+msgstr "إجراءات"
+
+msgctxt "Bank Charge"
+msgid "Record Refund"
+msgstr "تسجيل استرداد"
+
+msgctxt "Bank Charge"
+msgid "Match Bank Statement"
+msgstr "مطابقة كشف الحساب"
+
+# Bank Charge Status Log fields and events
+msgctxt "Bank Charge Status Log"
+msgid "Date and Time"
+msgstr "التاريخ والوقت"
+
+msgctxt "Bank Charge Status Log"
+msgid "Event Date"
+msgstr "تاريخ الحدث"
+
+msgctxt "Bank Charge Status Log"
+msgid "User"
+msgstr "المستخدم"
+
+msgctxt "Bank Charge Status Log"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Bank Charge Status Log"
+msgid "From Status"
+msgstr "من الحالة"
+
+msgctxt "Bank Charge Status Log"
+msgid "To Status"
+msgstr "إلى الحالة"
+
+msgctxt "Bank Charge Status Log"
+msgid "From Accounting Status"
+msgstr "من الحالة المحاسبية"
+
+msgctxt "Bank Charge Status Log"
+msgid "To Accounting Status"
+msgstr "إلى الحالة المحاسبية"
+
+msgctxt "Bank Charge Status Log"
+msgid "Voucher Type"
+msgstr "نوع السند"
+
+msgctxt "Bank Charge Status Log"
+msgid "Voucher No"
+msgstr "رقم السند"
+
+msgctxt "Bank Charge Status Log"
+msgid "Remarks"
+msgstr "ملاحظات"
+
+msgctxt "Bank Charge Status Log"
+msgid "Created"
+msgstr "تم الإنشاء"
+
+msgctxt "Bank Charge Status Log"
+msgid "Posted"
+msgstr "تم الترحيل"
+
+msgctxt "Bank Charge Status Log"
+msgid "Reconciled"
+msgstr "تمت المطابقة"
+
+msgctxt "Bank Charge Status Log"
+msgid "Refunded"
+msgstr "تم الاسترداد"
+
+msgctxt "Bank Charge Status Log"
+msgid "Refund Cancelled"
+msgstr "إلغاء الاسترداد"
+
+msgctxt "Bank Charge Status Log"
+msgid "Cancelled"
+msgstr "تم الإلغاء"
+
+msgid "The date of the event itself (e.g. the posting or bank transaction date)."
+msgstr "تاريخ الحدث نفسه (مثل تاريخ القيد أو تاريخ حركة البنك)."
+
+# Bank Charge Category fields
+msgctxt "Bank Charge Category"
+msgid "Category"
+msgstr "الفئة"
+
+msgctxt "Bank Charge Category"
+msgid "Disabled"
+msgstr "معطلة"
+
+msgctxt "Bank Charge Category"
+msgid "Pre-select Clearing Proposals"
+msgstr "تحديد مقترحات المطابقة مسبقًا"
+
+msgctxt "Bank Charge Category"
+msgid "Default Description"
+msgstr "البيان الافتراضي"
+
+msgctxt "Bank Charge Category"
+msgid "Keywords"
+msgstr "الكلمات المفتاحية"
+
+msgctxt "Bank Charge Category"
+msgid "Accounts per Company"
+msgstr "الحسابات لكل شركة"
+
+msgctxt "Bank Charge Category"
+msgid "Accounts"
+msgstr "الحسابات"
+
+msgid "Statement lines matched by keyword are selected for creation in PDC Bank Clearing."
+msgstr "تُحدَّد أسطر كشف الحساب المطابقة بالكلمات المفتاحية لإنشاء رسومها في مطابقة الشيكات مع البنك."
+
+msgid "Default description of new charges."
+msgstr "البيان الافتراضي للرسوم الجديدة."
+
+msgid "One per line. A bank statement line whose description or reference contains one of them is proposed as this category (not case sensitive)."
+msgstr "كلمة في كل سطر. سطر كشف الحساب الذي يحتوي بيانه أو مرجعه على إحداها يُقترح بهذه الفئة (دون تمييز بين الأحرف الكبيرة والصغيرة)."
+
+msgctxt "Bank Charge Category Account"
+msgid "Company"
+msgstr "الشركة"
+
+msgctxt "Bank Charge Category Account"
+msgid "Expense Account"
+msgstr "حساب المصروف"
+
+msgctxt "Bank Charge Category Account"
+msgid "Cost Center"
+msgstr "مركز التكلفة"
+
+# Treasury Settings / Treasury Bank Supplier
+msgctxt "Treasury Settings"
+msgid "Bank Charges"
+msgstr "الرسوم البنكية"
+
+msgctxt "Treasury Settings"
+msgid "Bank Suppliers"
+msgstr "موردو البنوك"
+
+msgid "The Supplier each Bank is booked to on bank-charge Payment Entries. Created on demand."
+msgstr "المورد الذي يُقيَّد عليه كل بنك في سندات دفع الرسوم البنكية. يُنشأ عند الحاجة."
+
+msgctxt "Treasury Bank Supplier"
+msgid "Bank"
+msgstr "البنك"
+
+msgctxt "Treasury Bank Supplier"
+msgid "Supplier"
+msgstr "المورد"
+
+# Treasury Company Settings (Bank Charges)
+msgctxt "Treasury Company Settings"
+msgid "Bank Charges"
+msgstr "الرسوم البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Charge Voucher"
+msgstr "سند الرسوم البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Charge Clearance"
+msgstr "تسوية الرسوم البنكية"
+
+msgctxt "Treasury Company Settings"
+msgid "On Posting"
+msgstr "عند القيد"
+
+msgctxt "Treasury Company Settings"
+msgid "On Bank Transaction"
+msgstr "عند حركة البنك"
+
+msgid "Payment Entry: paid to the Bank's Supplier (Treasury Settings), the whole amount as a deduction on the expense account; the supplier balance is not affected."
+msgstr "سند دفع: يُدفع لمورد البنك (إعدادات الخزينة) والمبلغ كله خصم على حساب المصروف؛ ولا يتأثر رصيد المورد."
+
+msgid "On Posting: the voucher is cleared on its posting date. On Bank Transaction: only when reconciled with a statement line."
+msgstr "عند القيد: يُسوّى السند في تاريخ قيده. عند حركة البنك: فقط عند مطابقته مع سطر من كشف الحساب."
+
+# PDC Clearing Match / PDC Bank Clearing (bank charges)
+msgctxt "PDC Clearing Match"
+msgid "Bank Charge"
+msgstr "رسم بنكي"
+
+msgctxt "PDC Clearing Match"
+msgid "Charge Category"
+msgstr "فئة الرسم"
+
+msgctxt "PDC Clearing Match"
+msgid "Description"
+msgstr "البيان"
+
+msgctxt "PDC Clearing Match"
+msgid "Keyword"
+msgstr "كلمة مفتاحية"
+
+msgid "The bank reference of a Bank Transfer or Bank Charge."
+msgstr "مرجع البنك للتحويل البنكي أو الرسم البنكي."
+
+msgid "The category of the Bank Charge to create (keyword proposals)."
+msgstr "فئة الرسم البنكي المراد إنشاؤه (مقترحات الكلمات المفتاحية)."
+
+msgid "Statement description."
+msgstr "بيان كشف الحساب."
+
+msgid "Matches bank statement lines with open cheques, bank transfers and bank charges, and proposes bank charges for unmatched lines."
+msgstr "يطابق أسطر كشف الحساب البنكي مع الشيكات والتحويلات والرسوم البنكية المفتوحة، ويقترح رسومًا بنكية للأسطر غير المطابقة."
+
+msgid "Clear {0} cheque(s), {1} bank transfer(s), reconcile {2} bank charge(s) and create {3} bank charge(s)?"
+msgstr "تسوية {0} شيك و{1} تحويل بنكي، ومطابقة {2} رسم بنكي وإنشاء {3} رسم بنكي؟"
+
+msgid "Several categories match; choose one."
+msgstr "تطابق أكثر من فئة؛ اختر واحدة."
+
+msgid "Bank Charge {0} created and reconciled"
+msgstr "تم إنشاء الرسم البنكي {0} ومطابقته"
+
+msgid "{0} bank charge(s) created."
+msgstr "تم إنشاء {0} رسم بنكي."
+
+msgid "PDC Bank Clearing failed for Bank Transaction {0}"
+msgstr "تعذرت مطابقة حركة البنك {0}"
+
+msgid "The bank transaction no longer exists."
+msgstr "حركة البنك لم تعد موجودة."
+
+msgid "Bank Charge {0} does not belong to Bank Account {1}."
+msgstr "الرسم البنكي {0} لا يخص الحساب البنكي {1}."
+
+# Voucher summary
+msgctxt "Treasury Voucher"
+msgid "Bank Charge"
+msgstr "رسم بنكي"
+
+# Messages (Bank Charge controller, lifecycle, bank supplier, settings)
+msgid "Bank Charge {0}: {1}"
+msgstr "رسم بنكي {0}: {1}"
+
+msgid "Bank Charge Refund {0}: {1}"
+msgstr "استرداد رسم بنكي {0}: {1}"
+
+msgid "Bank Account {0} has no Bank: set its Bank, or book bank charges by Journal Entry (Treasury Company Settings)."
+msgstr "الحساب البنكي {0} ليس له بنك: حدد البنك، أو قيّد الرسوم البنكية بقيد يومية (إعدادات الخزينة للشركة)."
+
+msgid "Bank Charge {0} has submitted refunds ({1}); cancel them first."
+msgstr "للرسم البنكي {0} استردادات معتمدة ({1})؛ ألغها أولًا."
+
+msgid "Refunds of Bank Charge {0} cannot exceed its amount ({1} left)."
+msgstr "لا يمكن أن تتجاوز استردادات الرسم البنكي {0} مبلغه (المتبقي {1})."
+
+msgid "The open amount of Bank Transaction {0} does not match Bank Charge {1}."
+msgstr "المبلغ المفتوح لحركة البنك {0} لا يطابق الرسم البنكي {1}."
+
+msgid "Bank Transaction {0} already has Bank Charge {1}."
+msgstr "لحركة البنك {0} رسم بنكي بالفعل: {1}."
+
+msgid "Bank Transaction is required."
+msgstr "حركة البنك مطلوبة."
+
+msgid "Bank Charge {0} has no voucher to reconcile."
+msgstr "لا يوجد سند للرسم البنكي {0} لمطابقته."
+
+msgid "Choose a Charge Category."
+msgstr "اختر فئة الرسم."
+
+msgid "Bank Transaction {0} is not an open withdrawal of this bank account."
+msgstr "حركة البنك {0} ليست سحبًا مفتوحًا من هذا الحساب البنكي."
+
+msgid "Bank Charge Category {0} is disabled."
+msgstr "فئة الرسوم البنكية {0} معطلة."
+
+msgid "Set the Expense Account of Bank Charge Category {0} for company {1}."
+msgstr "حدد حساب المصروف لفئة الرسوم البنكية {0} للشركة {1}."
+
+msgid "Supplier {0} of Bank {1} is disabled (Treasury Settings)."
+msgstr "المورد {0} الخاص بالبنك {1} معطل (إعدادات الخزينة)."
+
+msgid "Row #{0}: Bank {1} already has a Supplier."
+msgstr "الصف #{0}: للبنك {1} مورد بالفعل."
+
+msgid "Row #{0}: Supplier {1} is disabled."
+msgstr "الصف #{0}: المورد {1} معطل."
+
+msgid "Row #{0}: Company {1} already has an account."
+msgstr "الصف #{0}: للشركة {1} حساب بالفعل."
+
+msgid "Row #{0}: Cost Center {1} does not belong to company {2}."
+msgstr "الصف #{0}: مركز التكلفة {1} لا يخص الشركة {2}."
+
+msgid "Keyword \"{0}\" is too short (at least 3 characters)."
+msgstr "الكلمة المفتاحية \"{0}\" قصيرة جدًا (3 أحرف على الأقل)."
+
+msgid "Bank Charge {0} is not a submitted charge of this bank account."
+msgstr "الرسم البنكي {0} ليس رسمًا معتمدًا لهذا الحساب البنكي."
+
+msgid "A refund must use the category and expense account of Bank Charge {0}."
+msgstr "يجب أن يستخدم الاسترداد فئة وحساب مصروف الرسم البنكي {0}."
+
+msgid "Bank Charge {0} has nothing left to refund."
+msgstr "لا يتبقى شيء لاسترداده من الرسم البنكي {0}."
+
+msgid "You are not permitted to create or change Bank Charges."
+msgstr "غير مسموح لك بإنشاء الرسوم البنكية أو تعديلها."
+
+# Report Bank Charges Analysis
+msgctxt "Treasury Report"
+msgid "Category"
+msgstr "الفئة"
+
+msgctxt "Treasury Report"
+msgid "Source"
+msgstr "المصدر"
+
+msgctxt "Bank Charge"
+msgid "Source"
+msgstr "المصدر"
+
+msgctxt "Bank Charge"
+msgid "View"
+msgstr "العرض"
+
+msgctxt "Bank Charge"
+msgid "Summary"
+msgstr "ملخص"
+
+msgctxt "Bank Charge"
+msgid "Detail"
+msgstr "تفصيلي"
+
+msgctxt "Bank Charge"
+msgid "Charges"
+msgstr "الرسوم"
+
+msgctxt "Bank Charge"
+msgid "Refunds and Recoveries"
+msgstr "الاستردادات والتحصيلات"
+
+msgctxt "Bank Charge"
+msgid "Net Charges"
+msgstr "صافي الرسوم"
+
+msgctxt "Bank Charge"
+msgid "Vouchers"
+msgstr "السندات"
+
+msgctxt "Bank Charge"
+msgid "Share %"
+msgstr "النسبة %"
+
+msgctxt "Bank Charge"
+msgid "Document Type"
+msgstr "نوع المستند"
+
+msgctxt "Bank Charge"
+msgid "Document"
+msgstr "المستند"
+
+msgctxt "Bank Charge"
+msgid "Event"
+msgstr "الحدث"
+
+msgctxt "Bank Charge"
+msgid "Bank Charges"
+msgstr "الرسوم البنكية"
+
+msgctxt "Bank Charge"
+msgid "Transfer Fees"
+msgstr "رسوم التحويلات"
+
+msgctxt "Bank Charge"
+msgid "Cheque Clearance Charges"
+msgstr "رسوم تحصيل الشيكات"
+
+msgctxt "Bank Charge"
+msgid "Bounce Charges Recovered"
+msgstr "رسوم الارتداد المحصلة"
+
+msgctxt "Bank Charge"
+msgid "LG Commissions"
+msgstr "عمولات خطابات الضمان"
+
+msgctxt "Bank Charge"
+msgid "LC Commissions and Charges"
+msgstr "عمولات ومصاريف الاعتمادات المستندية"
+
+msgctxt "Bank Charge"
+msgid "Facility Fees"
+msgstr "رسوم التسهيلات"
+
+msgid "View must be Summary or Detail."
+msgstr "يجب أن يكون العرض ملخصًا أو تفصيليًا."
+
+msgid "Unknown source {0}."
+msgstr "مصدر غير معروف {0}."

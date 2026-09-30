@@ -15,7 +15,7 @@ from frappe.utils.nestedset import get_root_of
 
 from treasury import install
 from treasury.accounting import dimensions, payment_modes
-from treasury.patches.v1_1 import set_bank_settlement_voucher
+from treasury.patches.v1_1 import set_bank_charge_defaults, set_bank_settlement_voucher
 from treasury.tests.utils import COMPANY, ensure_branch_dimension, setup_treasury_test_data
 from treasury.utils import party
 from treasury.utils.party import DEFAULT_PAYEE_GROUP, ensure_payee_supplier_group
@@ -103,6 +103,39 @@ class TestInstall(IntegrationTestCase):
 		)
 		self.assertIn(
 			"treasury.bank_transfers.forecast.get_flows", frappe.get_hooks("treasury_forecast_sources")
+		)
+
+	def test_bank_charges(self):
+		"""Phase 7d: Bank Charge is a dimension doctype, setup() creates the default categories, and the patch
+		fills the Bank Charge settings of existing companies."""
+		self.assertIn("Bank Charge", frappe.get_hooks("accounting_dimension_doctypes"))
+		self.assertIn("Bank Charge", dimensions.TREASURY_DIMENSION_DOCTYPES)
+		self.assertTrue(frappe.get_meta("Bank Charge").has_field(self.dimension_field))
+		self.assertIn(("Bank Charge", self.dimension_field), set(dimensions.dimension_custom_fields()))
+
+		# the DDL steps are not run (they would commit the test transaction)
+		with (
+			patch.object(install, "create_custom_fields"),
+			patch.object(install.dimensions, "create_dimension_fields"),
+			patch.object(install.charge_defaults, "ensure_default_categories") as ensure_categories,
+		):
+			install.setup()
+		ensure_categories.assert_called_once_with()
+
+		setup_treasury_test_data()
+		fields = ["bank_charge_voucher", "bank_charge_clearance"]
+		previous = frappe.db.get_value("Treasury Company Settings", COMPANY, fields, as_dict=True)
+		self.addCleanup(frappe.db.set_value, "Treasury Company Settings", COMPANY, dict(previous))
+		frappe.db.set_value("Treasury Company Settings", COMPANY, dict.fromkeys(fields, ""))
+		set_bank_charge_defaults.execute()
+		self.assertEqual(
+			frappe.db.get_value("Treasury Company Settings", COMPANY, fields),
+			("Payment Entry", "On Posting"),
+		)
+		frappe.db.set_value("Treasury Company Settings", COMPANY, "bank_charge_voucher", "Journal Entry")
+		set_bank_charge_defaults.execute()
+		self.assertEqual(
+			frappe.db.get_value("Treasury Company Settings", COMPANY, "bank_charge_voucher"), "Journal Entry"
 		)
 
 	def test_uninstall_keeps_series_modes_and_payees(self):

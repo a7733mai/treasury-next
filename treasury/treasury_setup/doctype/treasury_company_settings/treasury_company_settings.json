@@ -44,6 +44,10 @@
   "transfer_fees_help",
   "transfer_limits_section",
   "transfer_limits",
+  "bank_charges_section",
+  "bank_charge_voucher",
+  "column_break_bank_charges",
+  "bank_charge_clearance",
   "documents_section",
   "default_outgoing_cheque_bank_account",
   "default_incoming_cheque_bank_account",
@@ -311,6 +315,33 @@
    "options": "Bank Transfer Limit"
   },
   {
+   "fieldname": "bank_charges_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Charges"
+  },
+  {
+   "default": "Payment Entry",
+   "description": "Payment Entry: paid to the Bank's Supplier (Treasury Settings), the whole amount as a deduction on the expense account; the supplier balance is not affected.",
+   "fieldname": "bank_charge_voucher",
+   "fieldtype": "Select",
+   "label": "Bank Charge Voucher",
+   "options": "Payment Entry\nJournal Entry",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_bank_charges",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "On Posting",
+   "description": "On Posting: the voucher is cleared on its posting date. On Bank Transaction: only when reconciled with a statement line.",
+   "fieldname": "bank_charge_clearance",
+   "fieldtype": "Select",
+   "label": "Bank Charge Clearance",
+   "options": "On Posting\nOn Bank Transaction",
+   "reqd": 1
+  },
+  {
    "collapsible": 1,
    "collapsible_depends_on": "eval:!doc.default_outgoing_cheque_bank_account",
    "description": "Defaults for the Treasury buttons on invoices, orders, quotations, journal entries, expense claims and parties.",
@@ -386,7 +417,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-03 12:00:00.000000",
+ "modified": "2026-10-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

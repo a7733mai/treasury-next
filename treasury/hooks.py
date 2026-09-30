@@ -205,7 +205,7 @@ scheduler_events = {
 
 # Accounting dimensions (Cost Center-like Link fields ERPNext adds per Accounting Dimension), merged with
 # ERPNext's own list; the doctypes have the `accounting_dimensions_section` / `dimension_col_break` fields.
-accounting_dimension_doctypes = ["PDC Cheque", "Cheque Batch", "Bank Transfer"]
+accounting_dimension_doctypes = ["PDC Cheque", "Cheque Batch", "Bank Transfer", "Bank Charge"]
 
 # Extra expected cash flows and summary cards for the Bank Position Forecast report (dotted paths; see
 # treasury.pdc.forecast_sources).

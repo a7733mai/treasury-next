@@ -4,7 +4,6 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, flt, getdate, today
 
-from treasury.tests.test_pdc_bank_clearing import make_bank_transaction
 from treasury.tests.utils import (
 	BANK,
 	COMPANY,
@@ -14,6 +13,7 @@ from treasury.tests.utils import (
 	add_user_permission,
 	ensure_second_egp_bank,
 	ensure_user,
+	make_bank_transaction,
 	make_bank_transfer,
 	make_pdc_cheque,
 	set_fee_rules,

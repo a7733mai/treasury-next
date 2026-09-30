@@ -14,19 +14,22 @@ class PDCClearingMatch(Document):
 		from frappe.types import DF
 
 		amount: DF.Currency
+		bank_charge: DF.Link | None
+		bank_charge_category: DF.Link | None
 		bank_transaction: DF.Link | None
 		bank_transfer: DF.Link | None
 		cheque: DF.Link | None
 		cheque_no: DF.Data | None
 		currency: DF.Link | None
+		description: DF.SmallText | None
 		direction: DF.Data | None
 		due_date: DF.Date | None
-		match_quality: DF.Literal["Strong", "Weak"]
+		match_quality: DF.Literal["Strong", "Weak", "Keyword"]
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data
 		party: DF.Data | None
-		reference_doctype: DF.Literal["PDC Cheque", "Bank Transfer"]
+		reference_doctype: DF.Literal["PDC Cheque", "Bank Transfer", "Bank Charge"]
 		result: DF.SmallText | None
 		selected: DF.Check
 		transaction_date: DF.Date | None

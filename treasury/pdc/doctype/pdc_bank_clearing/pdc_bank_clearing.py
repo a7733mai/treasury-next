@@ -13,6 +13,11 @@ Bank Transfers (Sent): the statement line of the transfer's own bank (its amount
 transfer and is reconciled against its Payment Entry, which is cleared on the statement date; the deposit on
 the target bank of an Internal Transfer is reconciled against the same Payment Entry and logged ("Target
 Confirmed"), the transfer's status and clearance date stay as they are.
+
+Bank Charges (spec 7d §3.5): a Posted charge is matched like a transfer (its bank reference, or its posting
+date) and reconciled against its voucher. A withdrawal left unmatched whose description / reference contains a
+keyword of a Bank Charge Category is proposed as a new charge of that category ("Keyword"): clearing it creates,
+submits and reconciles the charge in one step.
 """
 
 import re
@@ -20,16 +25,24 @@ import re
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_days, cint, flt, formatdate, getdate, strip_html
+from frappe.utils import add_days, cint, date_diff, flt, formatdate, getdate, strip_html
 
 from treasury.accounting import posting
+from treasury.bank_transfers import charges
 from treasury.bank_transfers import lifecycle as transfer_lifecycle
 from treasury.pdc import lifecycle
-from treasury.utils.context import elevated
+from treasury.treasury_setup.doctype.bank_charge_category.bank_charge_category import (
+	normalise,
+	parse_keywords,
+)
+from treasury.utils.bank_reconciliation import reconcile_voucher  # re-exported (earlier home of the helper)
 
 CHEQUE = "PDC Cheque"
 TRANSFER = "Bank Transfer"
+BANK_CHARGE = "Bank Charge"
 BANK_TRANSACTION = "Bank Transaction"
+CHEQUE_ROW, TRANSFER_ROW, CHARGE_ROW = "cheque", "transfer", "charge"
+CHARGE_FIELDS = ["name", "entry_type", "amount", "currency", "posting_date", "bank_reference", "category"]
 SOURCE_SIDE = "source"
 TARGET_SIDE = "target"
 TRANSFER_FIELDS = [
@@ -52,6 +65,7 @@ ROLES = ("Treasury Manager", "Treasury User", "System Manager")
 SAVEPOINT = "treasury_pdc_bank_clearing"
 STRONG = "Strong"
 WEAK = "Weak"
+KEYWORD = "Keyword"
 # Cheques that can still be cleared by the bank (Cleared = cleared without bank posting, `Manual` mode).
 CLEARABLE = {lifecycle.OUTGOING: ("Delivered",), lifecycle.INCOMING: ("Received", "Deposited")}
 OPEN_TRANSACTION_STATUSES = ("Pending", "Unreconciled")
@@ -83,26 +97,26 @@ class PDCBankClearing(Document):
 
 	@frappe.whitelist()
 	def get_suggestions(self):
-		"""Fill `matches`: strong (cheque no / transfer reference in the reference / description and same
-		amount) first, then weak (same amount, transaction date within `date_tolerance` days of the effective
-		due date / execution date). Every bank transaction, cheque and transfer is suggested at most once."""
+		"""Fill `matches`: strong (cheque no / transfer or charge reference in the reference / description and
+		same amount) first, then weak (same amount, transaction date within `date_tolerance` days of the
+		effective due date / execution date / posting date), then the keyword proposals of new bank charges.
+		Every bank transaction, cheque, transfer and charge is suggested at most once."""
 		self.check_access("read")
 		self.validate_filters()
 		# Bank Transactions are read without the user's (usual lack of) permission on them, but only those of
-		# a bank account the user may read (validate_filters); the cheques and transfers are the ones the user
-		# may read.
+		# a bank account the user may read (validate_filters); the cheques, transfers and charges are the ones
+		# the user may read.
 		transactions = self.get_open_transactions()
 		documents = [(CHEQUE, c) for c in self.get_open_cheques()]
 		documents += [(TRANSFER, t) for t in self.get_open_transfers()]
+		documents += [(BANK_CHARGE, c) for c in self.get_open_bank_charges()]
 		tolerance = cint(self.date_tolerance)
+		quality_of = {CHEQUE: match_quality, TRANSFER: transfer_match_quality, BANK_CHARGE: charge_match_quality}
 
 		candidates = []
 		for bt in transactions:
 			for doctype, doc in documents:
-				if doctype == CHEQUE:
-					quality = match_quality(bt, doc, tolerance)
-				else:
-					quality = transfer_match_quality(bt, doc, tolerance)
+				quality = quality_of[doctype](bt, doc, tolerance)
 				if quality:
 					candidates.append((0 if quality == STRONG else 1, bt, doctype, doc, quality))
 		candidates.sort(key=lambda c: (c[0], getdate(c[1].date), c[1].name, c[2], c[3].name))
@@ -131,7 +145,7 @@ class PDCBankClearing(Document):
 					party=doc.party_name or doc.party,
 					due_date=doc.effective_due_date,
 				)
-			else:
+			elif doctype == TRANSFER:
 				row.update(
 					bank_transfer=doc.name,
 					cheque_no=doc.bank_reference,
@@ -139,8 +153,59 @@ class PDCBankClearing(Document):
 					party=doc.counterparty,
 					due_date=doc.execution_date,
 				)
+			else:
+				row.update(
+					bank_charge=doc.name,
+					bank_charge_category=doc.category,
+					cheque_no=doc.bank_reference,
+					direction=doc.direction,
+					due_date=doc.posting_date,
+				)
 			self.append("matches", row)
+
+		if frappe.has_permission(BANK_CHARGE, "create"):
+			self.add_keyword_proposals([bt for bt in transactions if bt.name not in used_transactions])
 		return len(self.matches)
+
+	def add_keyword_proposals(self, transactions: list):
+		"""A row "Keyword" (a Bank Charge to create) for each open withdrawal whose description / reference
+		contains a keyword of an enabled category: the category with the longest keyword found; a tie between
+		categories is proposed but not selected."""
+		categories = keyword_categories(self.company)
+		if not categories:
+			return
+		for bt in transactions:
+			if flt(bt.withdrawal) <= 0:
+				continue
+			winners = match_categories(f"{bt.description or ''} {bt.reference_number or ''}", categories)
+			if not winners:
+				continue
+			category = categories[winners[0]]
+			ambiguous = len(winners) > 1
+			result = None
+			if not category.has_account:
+				result = _("Set the Expense Account of Bank Charge Category {0} for company {1}.").format(
+					winners[0], self.company
+				)
+			elif ambiguous:
+				result = _("Several categories match; choose one.")
+			self.append(
+				"matches",
+				{
+					"selected": 1 if not ambiguous and category.auto_select and category.has_account else 0,
+					"match_quality": KEYWORD,
+					"bank_transaction": bt.name,
+					"transaction_date": bt.date,
+					"amount": flt(bt.unallocated_amount),
+					"currency": bt.currency,
+					"reference_doctype": BANK_CHARGE,
+					"bank_charge_category": winners[0],
+					"direction": lifecycle.OUTGOING,
+					"due_date": bt.date,
+					"description": bt.description,
+					"result": result,
+				},
+			)
 
 	def validate_filters(self):
 		if not self.company or not self.bank_account:
@@ -259,16 +324,37 @@ class PDCBankClearing(Document):
 		transfers += [transfer_side(row, TARGET_SIDE) for row in targets if row.name not in confirmed]
 		return transfers
 
+	def get_open_bank_charges(self) -> list[frappe._dict]:
+		"""Posted (not yet reconciled) charges and refunds of the bank account that the user may read, with the
+		statement `direction` (a charge is a withdrawal, a refund a deposit)."""
+		if not frappe.has_permission(BANK_CHARGE, "read"):
+			return []
+		rows = frappe.get_list(
+			BANK_CHARGE,
+			filters={
+				"company": self.company,
+				"bank_account": self.bank_account,
+				"docstatus": 1,
+				"status": charges.POSTED,
+			},
+			fields=CHARGE_FIELDS,
+			limit_page_length=0,
+		)
+		for row in rows:
+			row.direction = lifecycle.OUTGOING if row.entry_type == charges.CHARGE else lifecycle.INCOMING
+		return rows
+
 	# ------------------------------------------------------------------ clearing
 
 	@frappe.whitelist(methods=["POST"])
 	def clear_selected(self) -> dict:
-		"""Clear the selected rows. Returns {"cleared": [cheques and transfers], "skipped": [{"cheque",
-		"bank_transfer", "document", "reason"}]}. The write permission on Bank Transfer is checked per
-		transfer row (a row the user may not change is skipped)."""
+		"""Clear the selected rows. Returns {"cleared": [cheques, transfers and reconciled charges], "created":
+		[bank charges created], "skipped": [{"cheque", "bank_transfer", "bank_charge", "document", "reason"}]}.
+		The permissions on Bank Transfer / Bank Charge are checked per row (a row the user may not change is
+		skipped)."""
 		self.check_access("write")
 		selected = [row for row in self.matches if cint(row.selected)]
-		if any(not is_transfer_row(row) for row in selected):
+		if any(row_kind(row) == CHEQUE_ROW for row in selected):
 			frappe.has_permission(CHEQUE, "write", throw=True)
 		if not set(ROLES) & set(frappe.get_roles()):
 			frappe.throw(
@@ -278,20 +364,29 @@ class PDCBankClearing(Document):
 			)
 		self.validate_filters()
 
-		result = {"cleared": [], "skipped": []}
+		result = {"cleared": [], "created": [], "skipped": []}
 		for row in selected:
-			document = row.bank_transfer if is_transfer_row(row) else row.cheque
+			kind = row_kind(row)
+			creates = kind == CHARGE_ROW and not row.get("bank_charge")
 			reason = self.clear_row(row)
+			document = {CHEQUE_ROW: row.cheque, TRANSFER_ROW: row.get("bank_transfer")}.get(
+				kind, row.get("bank_charge")
+			)
 			if reason:
 				row.result = reason
 				result["skipped"].append(
 					{
 						"cheque": row.cheque,
 						"bank_transfer": row.get("bank_transfer"),
-						"document": document,
+						"bank_charge": row.get("bank_charge"),
+						"document": document or row.bank_transaction,
 						"reason": reason,
 					}
 				)
+			elif creates:
+				row.result = _("Bank Charge {0} created and reconciled").format(row.bank_charge)
+				row.selected = 0
+				result["created"].append(row.bank_charge)
 			else:
 				row.result = _("Cleared and reconciled")
 				row.selected = 0
@@ -313,26 +408,55 @@ class PDCBankClearing(Document):
 
 	def clear_row(self, row) -> str | None:
 		"""Clear and reconcile one match in its own savepoint. Returns the reason it was skipped, if so."""
+		kind = row_kind(row)
+		bank_charge = row.get("bank_charge")
 		frappe.db.savepoint(SAVEPOINT)
 		try:
-			if is_transfer_row(row):
+			if kind == TRANSFER_ROW:
 				self.clear_transfer(row)
+			elif kind == CHARGE_ROW:
+				self.clear_charge(row)
 			else:
 				self.validate_row(row)
 				self.clear_cheque(row)
 				self.reconcile(row)
 		except Exception as e:
 			frappe.db.rollback(save_point=SAVEPOINT)
+			row.bank_charge = bank_charge  # a charge created in the rolled back savepoint no longer exists
 			# expected: business rules and the user's permission on the document; anything else is logged
 			if not isinstance(e, frappe.ValidationError | frappe.PermissionError):
-				if is_transfer_row(row):
+				if kind == TRANSFER_ROW:
 					title = _("PDC Bank Clearing failed for Bank Transfer {0}").format(row.bank_transfer)
+				elif kind == CHARGE_ROW:
+					title = _("PDC Bank Clearing failed for Bank Transaction {0}").format(row.bank_transaction)
 				else:
 					title = _("PDC Bank Clearing failed for cheque {0}").format(row.cheque)
 				frappe.log_error(title=title)
 			return strip_html(str(e)) or _("Could not be cleared.")
 		frappe.db.release_savepoint(SAVEPOINT)
 		return None
+
+	def clear_charge(self, row):
+		"""An existing (Posted) charge is reconciled with the statement line; a keyword proposal creates,
+		submits and reconciles a charge of the chosen category. The user's own Bank Charge permissions apply."""
+		if not row.bank_transaction:
+			frappe.throw(_("The bank transaction no longer exists."))
+		if row.get("bank_charge"):
+			charge = frappe.db.get_value(BANK_CHARGE, row.bank_charge, ["company", "bank_account"], as_dict=True)
+			if not charge or (charge.company, charge.bank_account) != (self.company, self.bank_account):
+				frappe.throw(
+					_("Bank Charge {0} does not belong to Bank Account {1}.").format(
+						row.bank_charge, self.bank_account
+					)
+				)
+			charges.reconcile(row.bank_charge, row.bank_transaction)
+		else:
+			if not row.get("bank_charge_category"):
+				frappe.throw(_("Choose a Charge Category."))
+			row.bank_charge = charges.create_from_bank_transaction(
+				row.bank_transaction, row.bank_charge_category, self.company, self.bank_account
+			)
+		row.transaction_date = frappe.db.get_value(BANK_TRANSACTION, row.bank_transaction, "date")
 
 	def validate_row(self, row):
 		if not row.cheque or not row.bank_transaction:
@@ -521,6 +645,8 @@ class PDCBankClearing(Document):
 	@staticmethod
 	def summary_message(result: dict) -> str:
 		lines = [_("{0} document(s) cleared and reconciled.").format(len(result["cleared"]))]
+		if result.get("created"):
+			lines.append(_("{0} bank charge(s) created.").format(len(result["created"])))
 		if result["skipped"]:
 			lines.append(_("{0} row(s) skipped:").format(len(result["skipped"])))
 			lines += [
@@ -531,25 +657,79 @@ class PDCBankClearing(Document):
 		return "<br>".join(lines)
 
 
-def reconcile_voucher(bank_transaction: str, voucher_doctype: str, voucher_name: str):
-	"""Reconcile a Bank Transaction against a voucher with ERPNext's BankTransaction methods, in the order
-	`bank_reconciliation_tool.reconcile_vouchers` calls them. The user's right to clear the Treasury document
-	was checked by its lifecycle just before; Treasury users need not hold Bank Transaction / voucher
-	permissions (like the vouchers of treasury.accounting.posting)."""
-	with elevated():
-		transaction = frappe.get_doc(BANK_TRANSACTION, bank_transaction)
-		transaction.add_payment_entries([{"payment_doctype": voucher_doctype, "payment_name": voucher_name}])
-		transaction.validate_duplicate_references()
-		transaction.allocate_payment_entries()
-		transaction.update_allocated_amount()
-		transaction.set_status()
-		transaction.flags.ignore_permissions = True
-		transaction.save()
-
-
 # ---------------------------------------------------------------------------
 # Matching
 # ---------------------------------------------------------------------------
+
+
+def row_kind(row) -> str:
+	""""cheque", "transfer" or "charge" from the row's document type (rows without one: by their links)."""
+	doctype = row.get("reference_doctype")
+	if doctype == TRANSFER or (doctype != BANK_CHARGE and row.get("bank_transfer") and not row.get("cheque")):
+		return TRANSFER_ROW
+	if doctype == BANK_CHARGE or (row.get("bank_charge") and not row.get("cheque")):
+		return CHARGE_ROW
+	return CHEQUE_ROW
+
+
+def charge_match_quality(bt, charge, tolerance_days: int) -> str | None:
+	"""Strong: the open amount on the right side (a charge is a withdrawal, a refund a deposit) and the charge's
+	bank reference (or name) in the reference number / description. Weak: same amount, within
+	`tolerance_days` of the posting date."""
+	side = flt(bt.withdrawal) if charge.entry_type == charges.CHARGE else flt(bt.deposit)
+	if side <= 0 or (bt.currency and charge.currency and bt.currency != charge.currency):
+		return None
+	precision = frappe.get_precision(BANK_TRANSACTION, "unallocated_amount")
+	if flt(bt.unallocated_amount, precision) != flt(charge.amount, precision):
+		return None
+	reference = charge.bank_reference or charge.name
+	if cheque_no_in(reference, bt.reference_number) or cheque_no_in(reference, bt.description):
+		return STRONG
+	if abs(date_diff(bt.date, charge.posting_date)) <= tolerance_days:
+		return WEAK
+	return None
+
+
+def keyword_categories(company: str) -> dict[str, frappe._dict]:
+	"""{category: {keywords, auto_select, has_account}} of the enabled categories that have keywords."""
+	rows = frappe.get_all(
+		"Bank Charge Category",
+		filters={"disabled": 0, "keywords": ["is", "set"]},
+		fields=["name", "keywords", "auto_select_proposals"],
+	)
+	if not rows:
+		return {}
+	with_account = set(
+		frappe.get_all(
+			"Bank Charge Category Account",
+			filters={"parenttype": "Bank Charge Category", "company": company},
+			pluck="parent",
+		)
+	)
+	categories = {}
+	for row in rows:
+		keywords = parse_keywords(row.keywords)
+		if keywords:
+			categories[row.name] = frappe._dict(
+				keywords=keywords,
+				auto_select=cint(row.auto_select_proposals),
+				has_account=row.name in with_account,
+			)
+	return categories
+
+
+def match_categories(text: str, categories: dict) -> list[str]:
+	"""The categories whose longest keyword found in `text` is the longest of all (several: a tie), sorted."""
+	text = normalise(text)
+	best, winners = 0, []
+	for name, category in categories.items():
+		length = max((len(k) for k in category.keywords if k in text), default=0)
+		if not length or length < best:
+			continue
+		if length > best:
+			best, winners = length, []
+		winners.append(name)
+	return sorted(winners)
 
 
 def match_quality(bt, cheque, tolerance_days: int) -> str | None:
@@ -574,7 +754,7 @@ def match_quality(bt, cheque, tolerance_days: int) -> str | None:
 
 
 def is_transfer_row(row) -> bool:
-	return row.get("reference_doctype") == TRANSFER or bool(row.get("bank_transfer") and not row.cheque)
+	return row_kind(row) == TRANSFER_ROW
 
 
 def transfer_side(transfer, side: str) -> frappe._dict:

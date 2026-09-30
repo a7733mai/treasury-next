@@ -11,7 +11,9 @@
   "column_break_alerts",
   "allow_future_clearance_date",
   "payees_section",
-  "payee_supplier_group"
+  "payee_supplier_group",
+  "bank_charges_section",
+  "bank_suppliers"
  ],
  "fields": [
   {
@@ -66,11 +68,23 @@
    "label": "Payee Supplier Group",
    "options": "Supplier Group",
    "reqd": 1
+  },
+  {
+   "fieldname": "bank_charges_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Charges"
+  },
+  {
+   "description": "The Supplier each Bank is booked to on bank-charge Payment Entries. Created on demand.",
+   "fieldname": "bank_suppliers",
+   "fieldtype": "Table",
+   "label": "Bank Suppliers",
+   "options": "Treasury Bank Supplier"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-09-29 18:00:00.000000",
+ "modified": "2026-10-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Settings",

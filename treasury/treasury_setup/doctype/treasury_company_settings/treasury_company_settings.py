@@ -56,6 +56,8 @@ class TreasuryCompanySettings(Document):
 
 		accrue_facility_interest: DF.Check
 		auto_select_cheque_book: DF.Check
+		bank_charge_clearance: DF.Literal["On Posting", "On Bank Transaction"]
+		bank_charge_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bank_settlement_voucher: DF.Literal["Payment Entry", "Journal Entry"]
 		bounce_charges_account: DF.Link | None
 		company: DF.Link

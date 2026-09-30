@@ -7,6 +7,7 @@ from frappe.permissions import reset_perms
 from frappe.utils import cint
 
 from treasury.accounting import dimensions, payment_modes
+from treasury.bank_transfers import charge_defaults
 from treasury.utils.party import ensure_payee_supplier_group
 from treasury.utils.settings import set_missing_single_defaults
 
@@ -102,6 +103,7 @@ def setup():
 	ensure_payee_supplier_group()  # before the defaults: Payee Supplier Group links to it
 	set_default_settings()
 	dimensions.create_dimension_fields()
+	charge_defaults.ensure_default_categories()
 
 
 def set_default_settings() -> list[str]:

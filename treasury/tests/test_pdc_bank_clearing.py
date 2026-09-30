@@ -18,31 +18,12 @@ from treasury.tests.utils import (
 	ensure_company,
 	ensure_user,
 	get_voucher_count,
+	make_bank_transaction,
 	make_pdc_cheque,
 )
 
 DOCTYPE = "PDC Cheque"
 TOOL = "PDC Bank Clearing"
-
-
-def make_bank_transaction(bank_account: str, date, deposit=0, withdrawal=0, **values):
-	"""A submitted Bank Transaction in the currency of the bank account."""
-	gl_account = frappe.db.get_value("Bank Account", bank_account, "account")
-	currency = frappe.get_cached_value("Account", gl_account, "account_currency")
-	doc = frappe.get_doc(
-		{
-			"doctype": "Bank Transaction",
-			"date": getdate(date),
-			"bank_account": bank_account,
-			"currency": currency,
-			"deposit": deposit,
-			"withdrawal": withdrawal,
-			**values,
-		}
-	)
-	doc.insert(ignore_permissions=True)
-	doc.submit()
-	return doc
 
 
 class TestPDCBankClearing(TreasuryTestMixin, IntegrationTestCase):

@@ -31,6 +31,7 @@ from treasury.tests.utils import (
 	day,
 	ensure_instrument_accounts,
 	ensure_user,
+	make_bank_charge,
 	make_bank_facility,
 	make_bank_transfer,
 	make_cheque_book,
@@ -39,6 +40,7 @@ from treasury.tests.utils import (
 	make_pdc_cheque,
 	make_sales_invoice,
 	make_security_cheque,
+	set_bank_suppliers,
 	unique_cheque_no,
 )
 from treasury.utils import voucher_summary
@@ -192,6 +194,21 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual([pe["name"] for pe in treasury_payment_entries(transfer)], [transfer.payment_entry])
 		with self.set_user(NO_ACCESS_USER):
 			self.assertEqual(treasury_payment_entries(transfer), [])
+
+	def test_bank_charge_summary(self):
+		"""Phase 7d: a charge lists its Payment Entry with the Bank Charge label; a refund shows its own."""
+		self.use_company_settings(bank_charge_voucher="Payment Entry", bank_charge_clearance="On Posting")
+		set_bank_suppliers(self, [])
+		charge = make_bank_charge()
+		refund = make_bank_charge(entry_type="Refund", against_bank_charge=charge.name, amount=40)
+		html = self.load_summary(charge)
+		self.assertIn(charge.payment_entry, html)
+		self.assertIn("Bank Charge", html)
+		self.assertNotIn(refund.payment_entry, html)
+		html = self.load_summary(refund)
+		self.assertIn(refund.payment_entry, html)
+		self.assertNotIn(charge.payment_entry, html)
+		self.assertEqual(voucher_summary.event_label("bank_charge"), "Bank Charge")
 
 	def test_event_labels(self):
 		self.assertEqual(voucher_summary.event_label("bt_transfer"), "Transfer")

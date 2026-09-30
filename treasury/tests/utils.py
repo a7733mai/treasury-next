@@ -1480,6 +1480,121 @@ def assert_deductions(testcase, pe, expected: list[tuple]):
 	testcase.assertEqual(wanted, actual, f"deductions of {pe.name}")
 
 
+def make_bank_transaction(bank_account: str, date, deposit=0, withdrawal=0, **values):
+	"""A submitted Bank Transaction in the currency of the bank account."""
+	gl_account = frappe.db.get_value("Bank Account", bank_account, "account")
+	currency = frappe.get_cached_value("Account", gl_account, "account_currency")
+	doc = frappe.get_doc(
+		{
+			"doctype": "Bank Transaction",
+			"date": getdate(date),
+			"bank_account": bank_account,
+			"currency": currency,
+			"deposit": deposit,
+			"withdrawal": withdrawal,
+			**values,
+		}
+	)
+	doc.insert(ignore_permissions=True)
+	doc.submit()
+	return doc
+
+
+# ---------------------------------------------------------------------------
+# Phase 7d: bank charges
+# ---------------------------------------------------------------------------
+
+CHARGE_CATEGORY = "_Test Treasury Charge"
+# The Bank Charge settings every 7d test starts from (the shipped defaults).
+BANK_CHARGE_SETTINGS = {"bank_charge_voucher": "Payment Entry", "bank_charge_clearance": "On Posting"}
+BANK_SUPPLIER_DOCTYPE = "Treasury Bank Supplier"
+
+
+def ensure_charge_category(
+	name: str = CHARGE_CATEGORY,
+	keywords=("acct maint fee",),
+	account: str | None = None,
+	company: str = COMPANY,
+	auto_select: int = 1,
+	**values,
+) -> str:
+	"""A Bank Charge Category with `keywords` and an account row of `company` (`account` False: no row)."""
+	if not frappe.db.exists("Bank Charge Category", name):
+		accounts = []
+		if account is not False:
+			accounts = [{"company": company, "expense_account": account or acc("Treasury Bank Charges")}]
+		frappe.get_doc(
+			{
+				"doctype": "Bank Charge Category",
+				"category_name": name,
+				"keywords": "\n".join(keywords or ()),
+				"auto_select_proposals": auto_select,
+				"accounts": accounts,
+				**values,
+			}
+		).insert(ignore_permissions=True)
+	return name
+
+
+def make_bank_charge(submit: bool = True, **values):
+	"""A Bank Charge of 150 on the EGP bank dated day(-5), of the test category; submitted unless `submit` is
+	False."""
+	category = values.pop("category", None) or ensure_charge_category()
+	doc = frappe.get_doc(
+		{
+			"doctype": "Bank Charge",
+			"entry_type": "Charge",
+			"company": COMPANY,
+			"bank_account": bank_account_name("EGP"),
+			"category": category,
+			"amount": 150,
+			"posting_date": day(-5),
+			**values,
+		}
+	)
+	doc.insert()
+	if submit:
+		doc.submit()
+		doc.reload()
+	return doc
+
+
+def get_charge(name: str):
+	return frappe.get_doc("Bank Charge", name)
+
+
+def _bank_supplier_rows() -> list[dict]:
+	return frappe.get_all(
+		BANK_SUPPLIER_DOCTYPE,
+		filters={"parenttype": "Treasury Settings", "parent": "Treasury Settings"},
+		fields=["bank", "supplier"],
+		order_by="idx asc",
+	)
+
+
+def _write_bank_supplier_rows(rows: list[dict]):
+	frappe.db.delete(BANK_SUPPLIER_DOCTYPE, {"parenttype": "Treasury Settings", "parent": "Treasury Settings"})
+	for idx, row in enumerate(rows, 1):
+		frappe.get_doc(
+			{
+				"doctype": BANK_SUPPLIER_DOCTYPE,
+				"name": frappe.generate_hash(length=10),
+				"parenttype": "Treasury Settings",
+				"parentfield": "bank_suppliers",
+				"parent": "Treasury Settings",
+				"idx": idx,
+				**row,
+			}
+		).db_insert()
+
+
+def set_bank_suppliers(testcase, rows: list[dict]):
+	"""Replace Treasury Settings → Bank Suppliers for the current test (restored by a cleanup)."""
+	previous = [dict(row) for row in _bank_supplier_rows()]
+	_write_bank_supplier_rows(rows)
+	testcase.addCleanup(_write_bank_supplier_rows, previous)
+
+
 # ---------------------------------------------------------------------------
 # Assertions / queries
 # ---------------------------------------------------------------------------

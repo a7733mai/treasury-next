@@ -531,6 +531,54 @@ Reports: **Bank Transfer Register** and **Transfer Fees Analysis** (per month, b
 with a chart). Scheduled transfers are expected flows of the Bank Position Forecast; Sent ones not yet
 confirmed show as a summary card (they are in the GL already).
 
+#### Bank Charges
+
+A **Bank Charge** records a charge the bank debited to a company bank account (account maintenance, cheque
+book, SMS alerts, returned cheque ...) or, with *Entry Type* **Refund**, money the bank gives back. Each
+charge has a **Bank Charge Category** (Treasury Setup), which gives its expense account (and cost center)
+per company, a default description and the statement **keywords** that propose it. Six categories are created
+once on install / migrate (Account Maintenance, Cheque Book, SMS Alerts, Returned Cheque, Transfer Fees,
+Other), with the Bank Charges Account of the company's PDC Accounts when the company maps exactly one; a
+category you delete is not created again.
+
+**Voucher** (Treasury Company Settings → *Bank Charge Voucher*):
+- *Payment Entry* (default): a Pay Payment Entry to the Bank's Supplier with the whole amount as one
+  deduction on the expense account. It books only Cr Bank / Dr Expense: no party row and no Payment Ledger
+  entry, so the supplier's balance and the payable reports are never affected. The Payment Entry takes the
+  Mode of Payment and series of the Modes of Payment map (method *Bank Charge*). A refund is a Receive with
+  a negative deduction (Dr Bank / Cr Expense).
+- *Journal Entry*: one Bank Entry, Dr Expense / Cr Bank (a refund: the reverse).
+
+**Bank Supplier**: Treasury Settings → *Bank Suppliers* maps each Bank to the Supplier its charges are paid
+to. On the first charge of a bank without a row, an enabled Supplier named like the Bank is reused, or one is
+created in the Payee Supplier Group, and the row is added. A Bank Account without a Bank can only book its
+charges by Journal Entry.
+
+**Clearance** (*Bank Charge Clearance*): *On Posting* clears the voucher on its posting date; *On Bank
+Transaction* leaves it uncleared until it is reconciled with its statement line (PDC Bank Clearing, or a
+Bank Transaction set on the draft charge, which is then reconciled on submit).
+
+**Refunds**: *Record Refund* on a submitted charge prepares a refund for what is left; a refund uses the
+charge's category and expense account and all refunds together cannot exceed the charge. A charge with
+submitted refunds cannot be cancelled before them. **Cancel** cancels the voucher (Treasury Manager);
+ERPNext then un-reconciles its statement line.
+
+**Statement matching** (PDC Bank Clearing): a Posted charge is matched like a transfer (strong when the line
+shows its bank reference or name, weak by its posting date). A withdrawal left unmatched whose description
+or reference contains a category keyword (at least 3 characters, not case sensitive, the longest keyword
+wins) is proposed as a *Keyword* row; clearing it creates, submits and reconciles the charge in one step, row
+by row or in bulk. A tie between categories, or a category with *Pre-select Clearing Proposals* off, is
+proposed unselected; choose the category in the row.
+
+> **Warning**: a bank that shows a transfer's fee as its own statement line would get that fee proposed as a
+> new charge, although the transfer already booked it. The default *Transfer Fees* category is therefore
+> never pre-selected: do not create charges for those lines.
+
+Report: **Bank Charges Analysis** — every bank charge booked by Treasury (bank charges and refunds, transfer
+fees, cheque clearance charges, bounce charges recovered, LG / LC commissions and charges, facility fees) per
+month, bank, bank account, category or source, with a chart and a detail view linking each voucher. Cheque
+discounting charges and facility interest stay in Cost of Financing.
+
 #### Pay or receive from any screen
 
 A **Treasury** button group on Sales / Purchase Invoice, Sales / Purchase Order, Journal Entry, Customer,

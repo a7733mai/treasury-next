@@ -128,6 +128,11 @@ class TestClientCalls(UnitTestCase):
 			BankTransfer.mark_completed,
 			BankTransfer.mark_returned,
 		)
+		# Phase 7d
+		from treasury.bank_transfers.doctype.bank_charge.bank_charge import BankCharge
+		from treasury.pdc.doctype.pdc_bank_clearing.pdc_bank_clearing import PDCBankClearing
+
+		methods += (BankCharge.reconcile_bank_transaction, PDCBankClearing.clear_selected)
 		previous = getattr(frappe.local, "request", None)
 		try:
 			for method in methods:
@@ -148,6 +153,7 @@ class TestClientCalls(UnitTestCase):
 		from frappe.handler import is_valid_http_method
 
 		from treasury.bank_transfers.api import get_fee_preview, get_transfer_settings, make_bank_transfer
+		from treasury.bank_transfers.doctype.bank_charge.bank_charge import get_category_defaults, make_refund
 		from treasury.pdc.api import make_cheque_batch, make_pdc_cheque
 		from treasury.security_cheques.api import make_security_cheque
 		from treasury.utils.source_documents import get_journal_parties
@@ -163,6 +169,9 @@ class TestClientCalls(UnitTestCase):
 				make_cheque_batch,
 				make_security_cheque,
 				get_journal_parties,
+				# Phase 7d: an unsaved refund, the defaults of a category
+				make_refund,
+				get_category_defaults,
 			):
 				with self.subTest(method=method.__qualname__):
 					self.assertIn(method, frappe.whitelisted)

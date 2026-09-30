@@ -23,17 +23,21 @@ from treasury.install import (
 	remove_legacy_permissions,
 )
 from treasury.tests.utils import (
+	BANK_CHARGE_SETTINGS,
 	CUSTOMER,
 	DEFAULT_PDC_SETTINGS,
 	SUPPLIER,
 	TreasuryTestMixin,
 	assert_gl_entries,
 	day,
+	ensure_charge_category,
 	ensure_user,
 	get_party_outstanding,
+	make_bank_charge,
 	make_pdc_cheque,
 	make_purchase_invoice,
 	make_sales_invoice,
+	set_bank_suppliers,
 )
 from treasury.utils.context import REAL_USER_FLAG, elevated, real_user
 
@@ -205,6 +209,24 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 				(egp.bank_charges, 0, 75, None, day(-10)),
 			],
 		)
+
+	def test_bank_charge_roles(self):
+		"""Phase 7d: a Treasury User creates and submits a Bank Charge (its Payment Entry is built elevated and
+		owned by the user) but cannot cancel it; an Accounts User may read charges, not create them."""
+		self.use_company_settings(**BANK_CHARGE_SETTINGS)
+		set_bank_suppliers(self, [])
+		category = ensure_charge_category()
+		with self.set_user(TREASURY_USER):
+			charge = make_bank_charge(category=category, amount=321)
+			self.assertEqual((charge.status, charge.accounting_status), ("Posted", "Posted"))
+			self.assertRaises(frappe.PermissionError, charge.cancel)
+		self.assert_owned_by("Payment Entry", charge.payment_entry, TREASURY_USER)
+		self.assertEqual(charge.status_log[-1].user, TREASURY_USER)
+
+		reader = ensure_user("treasury-perm-charge-reader@example.com", ["Accounts User"])
+		self.assertTrue(frappe.has_permission("Bank Charge", "read", doc=charge.name, user=reader))
+		with self.set_user(reader):
+			self.assertRaises(frappe.PermissionError, make_bank_charge, category=category, amount=322)
 
 	def test_role_check_still_applies(self):
 		# elevation happens only inside the posting service, after the lifecycle's permission / role checks

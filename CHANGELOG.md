@@ -2,6 +2,22 @@
 
 ## Unreleased (1.1)
 
+### Bank Charges (Phase 7d)
+- New submittable **Bank Charge** (Charge / Refund) in Bank Transfers and the master **Bank Charge
+  Category** (expense account per company, statement keywords) in Treasury Setup; six default categories
+  are created once on install / migrate.
+- Posted as one **Payment Entry** to the Bank's Supplier (Treasury Settings → Bank Suppliers, created on
+  demand) with the whole amount as a deduction, so the supplier balance is never touched — or as one **Bank
+  Entry** Journal Entry (Treasury Company Settings → Bank Charge Voucher). Clearance on posting or on the
+  bank statement line (Bank Charge Clearance). Refunds reduce the charge's refundable amount.
+- PDC Bank Clearing matches Posted bank charges and proposes new charges for unmatched withdrawals whose
+  text contains a category keyword (created, submitted and reconciled in one click).
+- Report **Bank Charges Analysis**: every bank charge booked by Treasury (bank charges, transfer fees,
+  cheque clearance and bounce charges, LG / LC commissions and charges, facility fees) per month, bank,
+  account, category or source, with a detail view.
+- Posting service: `create_bank_charge_payment`. Patch `set_bank_charge_defaults`. Bank Charge is an
+  accounting dimension doctype.
+
 ### Bank Transfers (Phase 7b)
 - New module **Bank Transfers**: the submittable **Bank Transfer** (Party Payment / Party Receipt /
   Internal Transfer; Normal, Fawran, SWIFT), posted as one Payment Entry with the bank fee as a deduction

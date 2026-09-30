@@ -1,7 +1,7 @@
 """The "Payment Entries and Vouchers" summary of a Treasury document, rendered on the server.
 
 Every Treasury document (PDC Cheque, Letter of Credit / Guarantee, Facility Drawdown / Repayment, Cheque
-Discounting, Security Cheque) shows the Payment Entries and Journal Entries the posting service created for it
+Discounting, Security Cheque, Bank Transfer, Bank Charge) shows the Payment Entries and Journal Entries the posting service created for it
 (`treasury.accounting.posting.get_voucher_rows`): Payment Entries first, the paper-filing key, then Journal
 Entries, each oldest first. The form script only places the returned HTML (`__onload.voucher_summary`); every
 value is escaped by the template (`|e`), labels are translated here.
@@ -52,6 +52,7 @@ EVENT_LABELS = {
 	"lc_document_charges": "Document Charges",
 	"lc_settlement": "Settlement",
 	"bt_transfer": "Transfer",
+	"bank_charge": "Bank Charge",
 }
 
 # docstatus -> (label, indicator colour): Treasury always submits, so a draft is an interrupted posting.
