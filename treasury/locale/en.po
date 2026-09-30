@@ -1,0 +1,201 @@
+# English wording of the Treasury app.
+# Copyright (C) 2026 Ahmed Abdelmageed
+# This file is distributed under the same license as the treasury package.
+#
+# The screens say "Cheque / Cheque Register / Cheque Bank Clearing"; DocType, report, module and API names stay
+# "PDC ..." (scripts, the REST API and imports use them). Frappe translates English too (there is no English
+# short-circuit), so these plain entries replace the internal names wherever they are shown.
+msgid ""
+msgstr ""
+"Project-Id-Version: treasury\n"
+"Report-Msgid-Bugs-To: ahmed3mageed@gmail.com\n"
+"POT-Creation-Date: 2026-11-01 12:00+0000\n"
+"PO-Revision-Date: 2026-11-01 12:00+0000\n"
+"Last-Translator: ahmed3mageed@gmail.com\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# Module and DocTypes
+msgid "PDC"
+msgstr "Cheques"
+
+msgid "PDC Cheque"
+msgstr "Cheque"
+
+msgid "PDC Bank Clearing"
+msgstr "Cheque Bank Clearing"
+
+msgid "PDC Clearing Match"
+msgstr "Cheque Clearing Match"
+
+msgid "PDC Cheque Reference"
+msgstr "Cheque Reference"
+
+msgid "PDC Status Log"
+msgstr "Cheque Status Log"
+
+msgid "PDC Postponement"
+msgstr "Cheque Postponement"
+
+msgid "PDC Account Mapping"
+msgstr "Cheque Account Mapping"
+
+# Reports, number cards, dashboard chart, print formats
+msgid "PDC Register"
+msgstr "Cheque Register"
+
+msgid "PDC Maturity"
+msgstr "Cheque Maturity"
+
+msgid "PDC by Status"
+msgstr "Cheques by Status"
+
+msgid "Outstanding PDC Payable"
+msgstr "Outstanding Cheques Payable"
+
+msgid "Outstanding PDC Receivable"
+msgstr "Outstanding Cheques Receivable"
+
+msgid "PDC Cheque Receipt"
+msgstr "Cheque Receipt"
+
+msgid "PDC Cheque Print"
+msgstr "Cheque Print"
+
+# Labels and Select options
+msgid "PDC Accounts"
+msgstr "Cheque Accounts"
+
+msgid "PDC Payable Account"
+msgstr "Cheques Payable Account"
+
+msgid "PDC Receivable Account"
+msgstr "Cheques Receivable Account"
+
+msgid "Converted PDC Cheque"
+msgstr "Converted Cheque"
+
+msgid "PDC Status"
+msgstr "Cheque Status"
+
+msgid "PDC to Lender"
+msgstr "Cheques to Lender"
+
+msgid "Issued (PDC)"
+msgstr "Issued (Payment)"
+
+# Messages
+msgid "No PDC account mapping found for Bank Account {0} in Treasury Company Settings {1}."
+msgstr "No cheque account mapping found for Bank Account {0} in Treasury Company Settings {1}."
+
+msgid "Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead."
+msgstr "Cheque No {0} is used by a Cheque or a Security Cheque. Cancel that cheque instead."
+
+msgid "Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel or replace that cheque instead."
+msgstr "Cheque No {0} is used by a Cheque or a Security Cheque. Cancel or replace that cheque instead."
+
+msgid "PDC scheduled party posting failed for cheque {0}"
+msgstr "Scheduled party posting failed for cheque {0}"
+
+msgid "PDC due alert email could not be sent"
+msgstr "Cheque due alert email could not be sent"
+
+msgid "You are not permitted to use the PDC Bank Clearing tool."
+msgstr "You are not permitted to use the Cheque Bank Clearing tool."
+
+msgid "PDC Bank Clearing failed for cheque {0}"
+msgstr "Cheque Bank Clearing failed for cheque {0}"
+
+msgid "PDC Bank Clearing failed for Bank Transfer {0}"
+msgstr "Cheque Bank Clearing failed for Bank Transfer {0}"
+
+msgid "PDC Bank Clearing failed for Bank Transaction {0}"
+msgstr "Cheque Bank Clearing failed for Bank Transaction {0}"
+
+msgid "Open in PDC Register"
+msgstr "Open in Cheque Register"
+
+msgid "Open in PDC Register (all bank accounts: approximate)"
+msgstr "Open in Cheque Register (all bank accounts: approximate)"
+
+msgid "Open PDC Bank Clearing"
+msgstr "Open Cheque Bank Clearing"
+
+msgid "Cheques in PDC Register"
+msgstr "Cheques in Cheque Register"
+
+msgid "You need permission to create PDC Cheques to submit a Cheque Batch."
+msgstr "You need permission to create Cheques to submit a Cheque Batch."
+
+msgid "You need permission to create PDC Cheques or Cheque Batches to add a payee."
+msgstr "You need permission to create Cheques or Cheque Batches to add a payee."
+
+msgid "Vouchers of the PDC Cheque {0}"
+msgstr "Vouchers of the Cheque {0}"
+
+msgid "{0} {1} needs a row in PDC Accounts."
+msgstr "{0} {1} needs a row in Cheque Accounts."
+
+msgid "Every company bank account needs its PDC accounts (payable, receivable, under collection)."
+msgstr "Every company bank account needs its cheque accounts (payable, receivable, under collection)."
+
+msgid "the PDC Account Mapping format"
+msgstr "the Cheque Account Mapping format"
+
+msgid "A guarantee cheque held from a party (incoming) or given to a party (outgoing). It never creates accounting entries; only its encashment, through a PDC Cheque, does."
+msgstr "A guarantee cheque held from a party (incoming) or given to a party (outgoing). It never creates accounting entries; only its encashment, through a Cheque, does."
+
+msgid "A PDC Cheque is created for the encashment and posted per Treasury Company Settings. The security cheque itself never posts."
+msgstr "A Cheque is created for the encashment and posted per Treasury Company Settings. The security cheque itself never posts."
+
+msgid "Only a security cheque of a party (Customer, Supplier, Employee …) can be encashed through a PDC Cheque; this one is of {0}."
+msgstr "Only a security cheque of a party (Customer, Supplier, Employee …) can be encashed through a Cheque; this one is of {0}."
+
+msgid "Incoming cheques Received and posted to the party (in PDC Receivable), due after the discount date, in the facility currency."
+msgstr "Incoming cheques Received and posted to the party (in Cheques Receivable), due after the discount date, in the facility currency."
+
+msgid "Cheque {0} must be posted to the party (in PDC Receivable) before it can be discounted; it is {1}."
+msgstr "Cheque {0} must be posted to the party (in Cheques Receivable) before it can be discounted; it is {1}."
+
+msgid "Default: the Bank Charges Account of the bank in PDC Accounts, else the Bounce Charges Account."
+msgstr "Default: the Bank Charges Account of the bank in Cheque Accounts, else the Bounce Charges Account."
+
+msgid "A kind of bank charge (account maintenance, cheque book, SMS alerts ...), with its expense account per company and the statement keywords that propose it in PDC Bank Clearing."
+msgstr "A kind of bank charge (account maintenance, cheque book, SMS alerts ...), with its expense account per company and the statement keywords that propose it in Cheque Bank Clearing."
+
+msgid "Statement lines matched by keyword are selected for creation in PDC Bank Clearing."
+msgstr "Statement lines matched by keyword are selected for creation in Cheque Bank Clearing."
+
+msgid "No keywords: this category is never proposed by PDC Bank Clearing."
+msgstr "No keywords: this category is never proposed by Cheque Bank Clearing."
+
+msgid "New bank charges stay uncleared until they are matched in PDC Bank Clearing."
+msgstr "New bank charges stay uncleared until they are matched in Cheque Bank Clearing."
+
+msgid "It stays open until it is matched with the bank statement (PDC Bank Clearing)."
+msgstr "It stays open until it is matched with the bank statement (Cheque Bank Clearing)."
+
+msgid "Tip: PDC Bank Clearing completes transfers from the bank statement automatically."
+msgstr "Tip: Cheque Bank Clearing completes transfers from the bank statement automatically."
+
+msgid "Auto Debit drawdowns: the daily job posts each installment on its due date, or the installment is posted when matched with the bank statement line in PDC Bank Clearing."
+msgstr "Auto Debit drawdowns: the daily job posts each installment on its due date, or the installment is posted when matched with the bank statement line in Cheque Bank Clearing."
+
+msgid "The bank debits each installment automatically. Import the bank statement and match it in PDC Bank Clearing to post the repayment."
+msgstr "The bank debits each installment automatically. Import the bank statement and match it in Cheque Bank Clearing to post the repayment."
+
+msgid "An installment cheque to the lender of this drawdown (PDC to Lender): its party posting is the repayment of the installment."
+msgstr "An installment cheque to the lender of this drawdown (Cheques to Lender): its party posting is the repayment of the installment."
+
+msgid "Auto Debit: the bank debits each installment (Treasury Company Settings: Auto Debit Posting). PDC to Lender: one post-dated cheque per installment (Generate Installment Cheques)."
+msgstr "Auto Debit: the bank debits each installment (Treasury Company Settings: Auto Debit Posting). Cheques to Lender: one post-dated cheque per installment (Generate Installment Cheques)."
+
+msgid "Bank: entered by a user. Auto Debit: debited by the bank (daily job or bank statement). PDC Cheque: the party posting of an installment cheque to the lender."
+msgstr "Bank: entered by a user. Auto Debit: debited by the bank (daily job or bank statement). Cheque: the party posting of an installment cheque to the lender."
+
+msgid "PDC to Lender · {0} of {1} cheques"
+msgstr "Cheques to Lender · {0} of {1} cheques"

@@ -81,12 +81,13 @@ class TestRelease(IntegrationTestCase):
 		workspace = read_json("pdc", "workspace", "treasury", "treasury.json")
 		shortcuts = workspace["shortcuts"]
 		self.assertEqual((shortcuts[0]["type"], shortcuts[0]["link_to"]), ("Page", PAGE))
-		self.assertGreater(workspace["modified"], "2026-10-20 12:00:00")
+		self.assertGreater(workspace["modified"], "2026-10-26 12:00:00")
 
 		links = workspace["links"]
 		cards = [link["label"] for link in links if link["type"] == "Card Break"]
-		self.assertIn("Treasury Setup", cards)
-		self.assertNotIn("Treasury Masters", cards)
+		self.assertIn("Setup", cards)
+		for removed in ("Treasury Masters", "Treasury Setup", "PDC Reports", "Bank Transfers"):
+			self.assertNotIn(removed, cards)
 		labels = {
 			"shortcut": {s["label"] for s in shortcuts},
 			"card": set(cards),
@@ -118,7 +119,9 @@ class TestRelease(IntegrationTestCase):
 				count += 1
 			self.assertEqual(link["link_count"], count, link["label"])
 
-		setup_card = next(i for i, link in enumerate(links) if link["label"] == "Treasury Setup")
+		setup_card = next(
+			i for i, link in enumerate(links) if link["type"] == "Card Break" and link["label"] == "Setup"
+		)
 		setup = links[setup_card + 1 : setup_card + 1 + links[setup_card]["link_count"]]
 		self.assertEqual(
 			[row["link_to"] for row in setup],
@@ -126,6 +129,7 @@ class TestRelease(IntegrationTestCase):
 				"Treasury Company Settings",
 				"Treasury Settings",
 				"Mode of Payment",
+				"Bank Account",
 				"Cheque Book",
 				"Cheque Layout",
 				"Bank Charge Category",
@@ -140,12 +144,13 @@ class TestRelease(IntegrationTestCase):
 		self.assertEqual([link["link_to"] for link in page_links], [PAGE])
 
 		sidebar = read_json("workspace_sidebar", "treasury.json")
-		self.assertGreater(sidebar["modified"], "2026-10-14 12:00:00")
+		self.assertGreater(sidebar["modified"], "2026-10-26 12:00:00")
 		items = sidebar["items"]
 		self.assertEqual((items[1]["link_type"], items[1]["link_to"]), ("Page", PAGE))
 		sections = [i["label"] for i in items if i["type"] == "Section Break"]
-		self.assertIn("Security Cheques", sections)
-		self.assertIn("Bank Facilities", sections)
+		expected = ("Cheques", "Transfers & Charges", "Security Cheques", "Bank Facilities", "Reports", "Setup")
+		for section in expected:
+			self.assertIn(section, sections)
 
 		reports = {link["link_to"] for link in links if link.get("link_type") == "Report"}
 		reports |= {i["link_to"] for i in items if i.get("link_type") == "Report"}

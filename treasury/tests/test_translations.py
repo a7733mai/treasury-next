@@ -12,6 +12,9 @@
 - The treasury terms (Amount, Due Date, Issue Date ...), whose core translation is wrong for a treasury, are
   never translated without a context in the Python code, the client scripts and the Jinja / report templates,
   and have an entry under msgctxt "Treasury".
+- Phase 8a: the English catalogue (locale/en.po) shows "Cheque(s)" for every user-visible string that names
+  "PDC" (internal names stay "PDC ..."), only overrides strings of the app, and every override has an Arabic
+  entry; the Arabic wording never says "PDC", and "آجل" only where post-dated / usance is meant.
 """
 
 import ast
@@ -24,7 +27,42 @@ from frappe.tests import IntegrationTestCase
 
 APP_DIR = Path(__file__).resolve().parents[1]
 PO_FILE = APP_DIR / "locale" / "ar.po"
+EN_PO_FILE = APP_DIR / "locale" / "en.po"
 CORE_APPS = ("frappe", "erpnext")
+
+# Phase 8: the screens say "Cheque(s)"; "PDC" survives only in internal names, which en.po / ar.po translate.
+PDC_WORD = re.compile(r"\bPDC\b")
+POST_DATED_WORD = "آجل"
+# (msgctxt, msgid) of the Arabic entries where "آجل" really means usance or post-dated
+POST_DATED_ALLOWED = frozenset(
+	{
+		("Letter of Credit", "Usance"),
+		(
+			None,
+			"An import Letter of Credit opened by the bank under a Bank Facility: cash margin and commission on "
+			"opening, amendments, documents, acceptance (usance) and settlement to the supplier.",
+		),
+		(
+			None,
+			"Usance: the date the bank pays the supplier (expected outflow in the Bank Position Forecast).",
+		),
+		(None, "Only a Usance Letter of Credit is accepted; settle a Sight credit directly."),
+		(None, "Usance Days are required for a Usance Letter of Credit."),
+		(
+			None,
+			"Auto Debit: the bank debits each installment (Treasury Company Settings: Auto Debit Posting). PDC to "
+			"Lender: one post-dated cheque per installment (Generate Installment Cheques).",
+		),
+		(
+			None,
+			"Each installment is paid by a post-dated cheque to {0}. The cheque is posted on its date as the "
+			"repayment; nothing is posted at delivery.",
+		),
+	}
+)
+SOURCE_SUFFIXES = (".py", ".js", ".html", ".json")
+SIDEBAR_FILE = APP_DIR / "workspace_sidebar" / "treasury.json"
+WORKSPACE_FILE = APP_DIR / "pdc" / "workspace" / "treasury" / "treasury.json"
 
 # Generic words translated by Frappe / ERPNext: we may only translate them with a context (msgctxt), and code
 # using them without context relies on the core translation.
@@ -355,6 +393,69 @@ def app_doctypes():
 			yield definition["name"], definition
 
 
+def read_json(path: Path) -> dict:
+	return json.loads(path.read_text(encoding="utf-8"))
+
+
+def source_texts() -> list[str]:
+	"""The text of every app source file (code, templates, JSON records), tests and catalogues excluded."""
+	texts = []
+	for suffix in SOURCE_SUFFIXES:
+		for path in sorted(APP_DIR.rglob(f"*{suffix}")):
+			parts = path.relative_to(APP_DIR).parts
+			if {"tests", "locale", "node_modules"} & set(parts) or path.name.startswith("test_"):
+				continue
+			texts.append(path.read_text(encoding="utf-8"))
+	return texts
+
+
+def workspace_labels():
+	"""(label, where) of the sidebar items and of the workspace links, shortcuts, number cards and charts."""
+	for item in read_json(SIDEBAR_FILE)["items"]:
+		yield item["label"], "sidebar"
+	workspace = read_json(WORKSPACE_FILE)
+	for key in ("links", "shortcuts", "number_cards", "charts"):
+		for row in workspace.get(key, []):
+			yield row["label"], f"workspace {key}"
+
+
+def visible_strings():
+	"""(text, where) of every string of the app a user can see: translated literals of the code and templates,
+	DocType names / labels / descriptions / Select options, report, print format, number card and chart names,
+	number card labels, module names and the workspace / sidebar labels."""
+	for suffix, extract in MESSAGE_EXTRACTORS:
+		for path in source_files(suffix):
+			for msgid, _context, line in extract(path):
+				yield msgid, f"{path.relative_to(APP_DIR)}:{line}"
+
+	for doctype, definition in app_doctypes():
+		yield doctype, f"DocType {doctype}"
+		if definition.get("description"):
+			yield definition["description"], f"DocType {doctype}"
+		for df in definition.get("fields", []):
+			where = f"{doctype}.{df['fieldname']}"
+			for key in ("label", "description"):
+				if df.get(key):
+					yield df[key], where
+			if df.get("fieldtype") == "Select" and df["fieldname"] != "naming_series":
+				for option in (df.get("options") or "").split("\n"):
+					if option:
+						yield option, where
+
+	for kind in ("report", "print_format", "number_card", "dashboard_chart"):
+		for path in sorted(APP_DIR.glob(f"*/{kind}/*/*.json")):
+			definition = read_json(path)
+			yield definition["name"], str(path.relative_to(APP_DIR))
+			if kind == "number_card" and definition.get("label"):
+				yield definition["label"], str(path.relative_to(APP_DIR))
+
+	for module in (APP_DIR / "modules.txt").read_text(encoding="utf-8").splitlines():
+		if module.strip():
+			yield module.strip(), "modules.txt"
+
+	yield from workspace_labels()
+
+
 # ---------------------------------------------------------------------------------------------- tests
 
 
@@ -368,6 +469,8 @@ class TestTranslations(IntegrationTestCase):
 		cls.contexts_by_msgid = {}
 		for entry in cls.messages:
 			cls.contexts_by_msgid.setdefault(entry["msgid"], set()).add(entry.get("msgctxt"))
+		cls.en_entries = parse_po(EN_PO_FILE)
+		cls.en_messages = [e for e in cls.en_entries if e["msgid"]]
 
 	def test_header(self):
 		self.assertEqual(self.header["msgid"], "", "the first entry must be the header")
@@ -557,3 +660,90 @@ class TestTranslations(IntegrationTestCase):
 		found = {(msgid, context) for msgid, context, _line in js_messages(js)}
 		self.assertIn(("Treasury Dashboard", None), found)
 		self.assertIn(js, source_files(".js"))
+
+	# ------------------------------------------------------------------ Phase 8a: "PDC" is shown as "Cheques"
+
+	def test_en_catalogue(self):
+		"""en.po is valid: header, babel, no duplicate, plain entries only, translated with the placeholders,
+		and never shows "PDC"."""
+		header = self.en_entries[0]
+		self.assertEqual(header["msgid"], "", "the first entry must be the header")
+		self.assertIn("Content-Type: text/plain; charset=UTF-8\n", header["msgstr"])
+		self.assertIn("Language: en\n", header["msgstr"])
+		self.assertEqual([e["line"] for e in self.en_entries if not e["msgid"]], [header["line"]])
+		self.assertGreater(len(self.en_messages), 40)
+
+		try:
+			from babel.messages.pofile import read_po
+		except ImportError:
+			read_po = None
+		if read_po:
+			with open(EN_PO_FILE, "rb") as f:
+				try:
+					catalog = read_po(f, abort_invalid=True)
+				except TypeError:  # older babel without abort_invalid
+					f.seek(0)
+					catalog = read_po(f)
+			self.assertEqual(len([m for m in catalog if m.id]), len(self.en_messages))
+
+		problems, seen = [], set()
+		for entry in self.en_messages:
+			where = f"en.po:{entry['line']}"
+			key = (entry.get("msgctxt"), entry["msgid"])
+			if key in seen:
+				problems.append(f"{where}: duplicate {key}")
+			seen.add(key)
+			if "msgctxt" in entry:
+				problems.append(f"{where}: en.po entries are plain (no msgctxt)")
+			if not entry["msgstr"].strip():
+				problems.append(f"{where}: empty translation of {entry['msgid']!r}")
+			elif sorted(PLACEHOLDER.findall(entry["msgid"])) != sorted(PLACEHOLDER.findall(entry["msgstr"])):
+				problems.append(f"{where}: placeholders differ in {entry['msgid']!r}")
+			if PDC_WORD.search(entry["msgstr"]):
+				problems.append(f"{where}: 'PDC' in the English wording {entry['msgstr']!r}")
+		self.assertEqual(problems, [])
+
+	def test_en_msgids_exist_in_source(self):
+		"""Every English override replaces a string the app really shows (copied byte-exactly)."""
+		texts = source_texts()
+		missing = []
+		for entry in self.en_messages:
+			msgid = entry["msgid"]
+			forms = {msgid, json.dumps(msgid)[1:-1], json.dumps(msgid, ensure_ascii=False)[1:-1]}
+			if not any(form in text for form in forms for text in texts):
+				missing.append(f"en.po:{entry['line']}: {msgid!r}")
+		self.assertEqual(missing, [])
+
+	def test_every_visible_pdc_string_has_an_english_entry(self):
+		en = {entry["msgid"] for entry in self.en_messages}
+		missing, count = set(), 0
+		for text, where in visible_strings():
+			count += 1
+			if PDC_WORD.search(text) and text not in en:
+				missing.add(f"{where}: {text!r}")
+		self.assertGreater(count, 800, "no visible strings found")
+		self.assertEqual(sorted(missing), [])
+
+	def test_no_pdc_in_arabic(self):
+		shown = [f"ar.po:{e['line']}: {e['msgstr']!r}" for e in self.messages if PDC_WORD.search(e["msgstr"])]
+		self.assertEqual(shown, [])
+
+	def test_post_dated_word_only_where_meant(self):
+		"""The Arabic "آجل" (post-dated / usance) is only used where it is meant: every cheque is "شيك"."""
+		unexpected = [
+			f"ar.po:{e['line']}: {e['msgid']!r}"
+			for e in self.messages
+			if POST_DATED_WORD in e["msgstr"] and (e.get("msgctxt"), e["msgid"]) not in POST_DATED_ALLOWED
+		]
+		self.assertEqual(unexpected, [])
+		present = {(e.get("msgctxt"), e["msgid"]) for e in self.messages if POST_DATED_WORD in e["msgstr"]}
+		self.assertEqual(sorted(POST_DATED_ALLOWED - present, key=str), [], "stale allow-list entries")
+
+	def test_every_english_entry_has_an_arabic_entry(self):
+		core = core_msgids()
+		missing = [
+			f"en.po:{e['line']}: {e['msgid']!r}"
+			for e in self.en_messages
+			if e["msgid"] not in self.contexts_by_msgid and e["msgid"] not in core
+		]
+		self.assertEqual(missing, [])

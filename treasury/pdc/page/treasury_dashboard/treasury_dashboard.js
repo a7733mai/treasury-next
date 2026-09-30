@@ -1007,7 +1007,7 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 		return this.section({
 			key: "cheques",
 			span: 12,
-			title: __("PDC Cheques", null, TD_CTX),
+			title: __("Cheques", null, TD_CTX),
 			body: this.kpis([
 				this.kpi({
 					label: __("Due Out This Week"),
@@ -1031,13 +1031,13 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 					tooltip: due_tip,
 				}),
 				this.kpi({
-					label: __("Post-dated Issued"),
+					label: __("Cheques Issued"),
 					amount: c.issued.amount,
 					sub: count_sub(c.issued),
 					target: c.issued,
 				}),
 				this.kpi({
-					label: __("Post-dated in Hand"),
+					label: __("Cheques in Hand"),
 					amount: c.in_hand.amount,
 					sub: count_sub(c.in_hand),
 					target: c.in_hand,

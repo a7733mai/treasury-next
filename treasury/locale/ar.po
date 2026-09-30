@@ -20,7 +20,7 @@ msgid "Treasury Setup"
 msgstr "إعدادات الخزينة"
 
 msgid "PDC"
-msgstr "الشيكات الآجلة"
+msgstr "الشيكات"
 
 msgid "Security Cheques"
 msgstr "شيكات الضمان"
@@ -46,7 +46,7 @@ msgid "Treasury Company Settings"
 msgstr "إعدادات الخزينة للشركة"
 
 msgid "PDC Account Mapping"
-msgstr "ربط حسابات الشيكات الآجلة"
+msgstr "ربط حسابات الشيكات"
 
 # Treasury Settings fields
 msgid "Default Alert Days"
@@ -90,7 +90,7 @@ msgid "Bounce Charges Account"
 msgstr "حساب مصاريف الارتداد"
 
 msgid "PDC Accounts"
-msgstr "حسابات الشيكات الآجلة"
+msgstr "حسابات الشيكات"
 
 # PDC Account Mapping fields
 msgid "PDC Payable Account"
@@ -208,7 +208,7 @@ msgid "Missing Settings"
 msgstr "إعدادات ناقصة"
 
 msgid "No PDC account mapping found for Bank Account {0} in Treasury Company Settings {1}."
-msgstr "لا يوجد ربط لحسابات الشيكات الآجلة للحساب البنكي {0} في إعدادات الخزينة للشركة {1}."
+msgstr "لا يوجد ربط لحسابات الشيكات للحساب البنكي {0} في إعدادات الخزينة للشركة {1}."
 
 msgid "{0} {1} does not exist"
 msgstr "{0} {1} غير موجود"
@@ -284,16 +284,16 @@ msgid "Cheque Book Cancelled Leaf"
 msgstr "ورقة ملغاة من دفتر الشيكات"
 
 msgid "PDC Cheque"
-msgstr "شيك آجل"
+msgstr "شيك"
 
 msgid "PDC Cheque Reference"
-msgstr "مرجع الشيك الآجل"
+msgstr "مرجع الشيك"
 
 msgid "PDC Status Log"
-msgstr "سجل حالات الشيك الآجل"
+msgstr "سجل حالات الشيك"
 
 msgid "PDC Postponement"
-msgstr "تأجيل الشيك الآجل"
+msgstr "تأجيل الشيك"
 
 # Cheque Book fields
 msgid "Book No"
@@ -576,7 +576,7 @@ msgid "Cheque No {0} is already cancelled."
 msgstr "رقم الشيك {0} ملغي بالفعل."
 
 msgid "Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel that cheque instead."
-msgstr "رقم الشيك {0} مستخدم في شيك آجل أو شيك ضمان. قم بإلغاء ذلك الشيك بدلاً من ذلك."
+msgstr "رقم الشيك {0} مستخدم في شيك أو شيك ضمان. قم بإلغاء ذلك الشيك بدلاً من ذلك."
 
 # PDC Cheque messages
 msgid "Cheque {0} has accounting entries and cannot be deleted. Cancel it instead."
@@ -927,7 +927,7 @@ msgstr "بنس"
 
 # Phase 1b — print formats
 msgid "PDC Cheque Receipt"
-msgstr "إيصال شيك آجل"
+msgstr "إيصال شيك"
 
 msgid "PDC Cheque Print"
 msgstr "طباعة ورقة الشيك"
@@ -1107,10 +1107,10 @@ msgid "Projected Party Statement"
 msgstr "كشف حساب استباقي"
 
 msgid "PDC Register"
-msgstr "سجل الشيكات الآجلة"
+msgstr "سجل الشيكات"
 
 msgid "PDC Maturity"
-msgstr "استحقاقات الشيكات الآجلة"
+msgstr "استحقاقات الشيكات"
 
 msgid "Bounced and Postponed Cheques"
 msgstr "الشيكات المرتدة والمؤجلة"
@@ -1193,11 +1193,11 @@ msgid "Show Cheques"
 msgstr "عرض الشيكات"
 
 msgid "Open in PDC Register"
-msgstr "فتح في سجل الشيكات الآجلة"
+msgstr "فتح في سجل الشيكات"
 
 # Phase 2 fix round
 msgid "Open in PDC Register (all bank accounts: approximate)"
-msgstr "فتح في سجل الشيكات الآجلة (كل الحسابات البنكية: تقريبي)"
+msgstr "فتح في سجل الشيكات (كل الحسابات البنكية: تقريبي)"
 
 msgid "You are not permitted to view Bank Account {0}."
 msgstr "غير مسموح لك بعرض الحساب البنكي {0}."
@@ -1342,10 +1342,7 @@ msgid "Expected Cash Flow"
 msgstr "التدفق النقدي المتوقع"
 
 msgid "PDC by Status"
-msgstr "الشيكات الآجلة حسب الحالة"
-
-msgid "PDC Reports"
-msgstr "تقارير الشيكات الآجلة"
+msgstr "الشيكات حسب الحالة"
 
 msgid "Treasury Masters"
 msgstr "بيانات الخزينة الأساسية"
@@ -1705,7 +1702,7 @@ msgid "FIFO allocation needs the party account in the cheque currency {0} (it is
 msgstr "التخصيص على الأقدم أولاً يتطلب أن يكون حساب الطرف بعملة الشيك {0} (وهو بعملة {1}). قم بتخصيص السطور يدوياً."
 
 msgid "You need permission to create PDC Cheques to submit a Cheque Batch."
-msgstr "تحتاج صلاحية إنشاء الشيكات الآجلة لاعتماد سند الشيكات."
+msgstr "تحتاج صلاحية إنشاء الشيكات لاعتماد سند الشيكات."
 
 msgid "Cheque Batch {0}"
 msgstr "سند الشيكات {0}"
@@ -1727,7 +1724,7 @@ msgstr "لا يمكن تعديل سند الشيكات إلا وهو مسودة.
 
 # Phase 3 — Cheque Batch form (cheque_batch.js, cheque_batch_list.js)
 msgid "Cheques in PDC Register"
-msgstr "الشيكات في سجل الشيكات الآجلة"
+msgstr "الشيكات في سجل الشيكات"
 
 msgid "Generate Cheques"
 msgstr "توليد الشيكات"
@@ -1881,7 +1878,7 @@ msgstr "الوصف"
 
 # Phase 4 — Security Cheque fields
 msgid "A guarantee cheque held from a party (incoming) or given to a party (outgoing). It never creates accounting entries; only its encashment, through a PDC Cheque, does."
-msgstr "شيك ضمان محفوظ لدينا من طرف (وارد) أو مسلَّم منا لطرف (صادر). لا ينشئ أي قيود محاسبية أبداً؛ فقط تسييله من خلال شيك آجل هو الذي ينشئها."
+msgstr "شيك ضمان محفوظ لدينا من طرف (وارد) أو مسلَّم منا لطرف (صادر). لا ينشئ أي قيود محاسبية أبداً؛ فقط تسييله من خلال شيك هو الذي ينشئها."
 
 msgid "Incoming: a guarantee we hold from the party. Outgoing: a guarantee we gave to the party."
 msgstr "وارد: ضمان محفوظ لدينا من الطرف. صادر: ضمان سلمناه للطرف."
@@ -1989,7 +1986,7 @@ msgid "Encashment"
 msgstr "التسييل"
 
 msgid "Converted PDC Cheque"
-msgstr "الشيك الآجل الناتج عن التسييل"
+msgstr "الشيك الناتج عن التسييل"
 
 msgid "Encashed Amount"
 msgstr "المبلغ المسيَّل"
@@ -2168,9 +2165,6 @@ msgstr "اختر مكان الحفظ أيضاً."
 msgid "The cheque is already at this location with this custodian."
 msgstr "الشيك موجود بالفعل في هذا المكان مع نفس المسؤول."
 
-msgid "Only a security cheque of a Customer or Supplier can be encashed through a PDC Cheque; this one is of {0}."
-msgstr "لا يمكن تسييل شيك الضمان من خلال شيك آجل إلا إذا كان لعميل أو مورد؛ وهذا الشيك من نوع {0}."
-
 msgid "Enter the amount to encash: security cheque {0} is Open / Blank."
 msgstr "أدخل المبلغ المراد تسييله: شيك الضمان {0} مفتوح / على بياض."
 
@@ -2324,7 +2318,7 @@ msgid "Encash"
 msgstr "تسييل"
 
 msgid "A PDC Cheque is created for the encashment and posted per Treasury Company Settings. The security cheque itself never posts."
-msgstr "يتم إنشاء شيك آجل للتسييل ويُرحَّل حسب إعدادات الخزينة للشركة. شيك الضمان نفسه لا يُرحَّل أبداً."
+msgstr "يتم إنشاء شيك للتسييل ويُرحَّل حسب إعدادات الخزينة للشركة. شيك الضمان نفسه لا يُرحَّل أبداً."
 
 msgid "Deposit to Bank Account"
 msgstr "الإيداع في الحساب البنكي"
@@ -4413,7 +4407,7 @@ msgstr "الحسابات"
 
 msgctxt "Treasury Company Settings"
 msgid "PDC Accounts"
-msgstr "حسابات الشيكات الآجلة"
+msgstr "حسابات الشيكات"
 
 msgctxt "Treasury Company Settings"
 msgid "Bank Facilities"
@@ -5060,7 +5054,7 @@ msgstr "بنك الساحب"
 
 msgctxt "Cheque Batch Item"
 msgid "PDC Cheque"
-msgstr "الشيك الآجل"
+msgstr "الشيك"
 
 msgctxt "Cheque Batch Item"
 msgid "Remarks"
@@ -5218,7 +5212,7 @@ msgstr "التسييل"
 
 msgctxt "Security Cheque"
 msgid "Converted PDC Cheque"
-msgstr "الشيك الآجل الناتج عن التسييل"
+msgstr "الشيك الناتج عن التسييل"
 
 msgctxt "Security Cheque"
 msgid "Encashed Amount"
@@ -5320,7 +5314,7 @@ msgstr "إلى الحالة"
 
 msgctxt "Security Cheque Status Log"
 msgid "PDC Cheque"
-msgstr "الشيك الآجل"
+msgstr "الشيك"
 
 msgctxt "Security Cheque Status Log"
 msgid "Remarks"
@@ -6477,7 +6471,7 @@ msgstr "معدّل من"
 # Cheque Discounting Item ("Days" and statuses are above)
 msgctxt "Cheque Discounting Item"
 msgid "PDC Cheque"
-msgstr "الشيك الآجل"
+msgstr "الشيك"
 
 msgctxt "Cheque Discounting Item"
 msgid "Cheque No"
@@ -6797,7 +6791,7 @@ msgid "{0} is not a Party Type."
 msgstr "{0} ليس نوع طرف."
 
 msgid "You need permission to create PDC Cheques or Cheque Batches to add a payee."
-msgstr "تحتاج إلى صلاحية إنشاء الشيكات الآجلة أو دفعات الشيكات لإضافة مستفيد."
+msgstr "تحتاج إلى صلاحية إنشاء الشيكات أو دفعات الشيكات لإضافة مستفيد."
 
 msgid "A payee name is required."
 msgstr "اسم المستفيد مطلوب."
@@ -6815,7 +6809,7 @@ msgid "Set a valid Payee Supplier Group in Treasury Settings."
 msgstr "حدد مجموعة موردي مستفيدين صحيحة في إعدادات الخزينة."
 
 msgid "Only a security cheque of a party (Customer, Supplier, Employee …) can be encashed through a PDC Cheque; this one is of {0}."
-msgstr "لا يمكن صرف شيك الضمان عبر شيك آجل إلا إذا كان لطرف (عميل، مورد، موظف …)؛ وهذا الشيك يخص {0}."
+msgstr "لا يمكن صرف شيك الضمان عبر شيك إلا إذا كان لطرف (عميل، مورد، موظف …)؛ وهذا الشيك يخص {0}."
 
 # Messages (accounting details)
 msgid "Cost Center {0} does not belong to company {1}."
@@ -7006,7 +7000,7 @@ msgid "No Payment Entries or vouchers yet."
 msgstr "لا توجد سندات دفع أو قيود بعد."
 
 msgid "Vouchers of the PDC Cheque {0}"
-msgstr "سندات الشيك الآجل {0}"
+msgstr "سندات الشيك {0}"
 
 # Reports and prints ("Payment Entry" column / filter, receipts)
 msgctxt "Treasury Report"
@@ -7881,7 +7875,7 @@ msgstr "التحويل البنكي"
 
 msgctxt "PDC Clearing Match"
 msgid "PDC Cheque"
-msgstr "شيك آجل"
+msgstr "شيك"
 
 msgid "The bank reference of a Bank Transfer."
 msgstr "مرجع البنك للتحويل البنكي."
@@ -8469,7 +8463,7 @@ msgid "Amounts in the bank account currency. The daily limit counts submitted, n
 msgstr "المبالغ بعملة الحساب البنكي. يُحتسب الحد اليومي من التحويلات المعتمدة غير الملغاة حسب تاريخ التنفيذ."
 
 msgid "Default: the Bank Charges Account of the bank in PDC Accounts, else the Bounce Charges Account."
-msgstr "الافتراضي: حساب المصاريف البنكية للبنك في حسابات الشيكات الآجلة، وإلا حساب مصاريف الارتداد."
+msgstr "الافتراضي: حساب المصاريف البنكية للبنك في حسابات الشيكات، وإلا حساب مصاريف الارتداد."
 
 msgid "Sent transfers will be marked Completed at once and their Payment Entries cleared on the execution date, without waiting for the bank statement."
 msgstr "ستُعتبر التحويلات المرسلة مكتملة فوراً، ويُسجَّل صرف سندات الدفع بتاريخ التنفيذ دون انتظار كشف البنك."
@@ -8826,7 +8820,7 @@ msgid "{0} {1} does not belong to {2} {3}."
 msgstr "{0} {1} لا يخص {2} {3}."
 
 msgid "{0} {1} needs a row in PDC Accounts."
-msgstr "{0} {1} يحتاج إلى صف في حسابات الشيكات الآجلة."
+msgstr "{0} {1} يحتاج إلى صف في حسابات الشيكات."
 
 msgid "Installment Cheques (Count) must be between 1 and {0}."
 msgstr "يجب أن يكون عدد شيكات الأقساط بين 1 و {0}."
@@ -10610,7 +10604,7 @@ msgstr "محررة"
 
 msgctxt "Cheque Leaf"
 msgid "Issued (PDC)"
-msgstr "مسلمة – شيك آجل"
+msgstr "مسلمة – شيك سداد"
 
 msgctxt "Cheque Leaf"
 msgid "Cleared"
@@ -10780,7 +10774,7 @@ msgid "Cheque No {0} is already cancelled or void."
 msgstr "الشيك رقم {0} ملغى أو تالف بالفعل."
 
 msgid "Cheque No {0} is used by a PDC Cheque or a Security Cheque. Cancel or replace that cheque instead."
-msgstr "الشيك رقم {0} مستخدم في شيك آجل أو شيك ضمان. ألغِ ذلك الشيك أو استبدله بدلاً من ذلك."
+msgstr "الشيك رقم {0} مستخدم في شيك أو شيك ضمان. ألغِ ذلك الشيك أو استبدله بدلاً من ذلك."
 
 msgid "Leaves {0} voided ({1}): {2}"
 msgstr "تم إتلاف الأوراق {0} ({1}): {2}"
@@ -10835,7 +10829,7 @@ msgid "Leaf No"
 msgstr "رقم الورقة"
 
 msgid "PDC Status"
-msgstr "حالة الشيك الآجل"
+msgstr "حالة الشيك"
 
 msgid "Times Printed"
 msgstr "مرات الطباعة"
@@ -11730,7 +11724,7 @@ msgid "Payable to Charity"
 msgstr "مستحقة للأعمال الخيرية"
 
 msgid "PDC to Lender"
-msgstr "شيكات آجلة للممول"
+msgstr "شيكات للممول"
 
 msgid "Other Account"
 msgstr "حساب آخر"
@@ -11866,7 +11860,7 @@ msgstr "خصم تلقائي"
 
 msgctxt "Facility Drawdown"
 msgid "PDC to Lender"
-msgstr "شيكات آجلة للممول"
+msgstr "شيكات للممول"
 
 msgctxt "Facility Drawdown"
 msgid "Disburse To"
@@ -11920,7 +11914,7 @@ msgid "A drawing under a Bank Facility (loan, Murabaha, Tawarruq, Ijarah, Istisn
 msgstr "سحب بموجب تسهيل بنكي (قرض، مرابحة، تورق، إجارة، استصناع، إيصال أمانة ...): أصل المبلغ المضاف إلى الحساب البنكي وجدول سداده ورسومه."
 
 msgid "Auto Debit: the bank debits each installment (Treasury Company Settings: Auto Debit Posting). PDC to Lender: one post-dated cheque per installment (Generate Installment Cheques)."
-msgstr "خصم تلقائي: يخصم البنك كل قسط (إعدادات الخزينة للشركة: ترحيل الخصم التلقائي). شيكات آجلة للممول: شيك آجل لكل قسط (إنشاء شيكات الأقساط)."
+msgstr "خصم تلقائي: يخصم البنك كل قسط (إعدادات الخزينة للشركة: ترحيل الخصم التلقائي). شيكات للممول: شيك آجل لكل قسط (إنشاء شيكات الأقساط)."
 
 msgid "E.g. Capital Work in Progress: the financier pays the supplier / contractor directly."
 msgstr "مثل المشروعات تحت التنفيذ: يدفع الممول للمورد / المقاول مباشرة."
@@ -11979,7 +11973,7 @@ msgstr "خصم تلقائي"
 
 msgctxt "Facility Repayment"
 msgid "PDC Cheque"
-msgstr "شيك آجل"
+msgstr "شيك"
 
 msgctxt "Facility Repayment"
 msgid "Installment Cheque"
@@ -12014,7 +12008,7 @@ msgid "Charity Journal Entry"
 msgstr "قيد الأعمال الخيرية"
 
 msgid "Bank: entered by a user. Auto Debit: debited by the bank (daily job or bank statement). PDC Cheque: the party posting of an installment cheque to the lender."
-msgstr "البنك: أدخله مستخدم. خصم تلقائي: خصمه البنك (المهمة اليومية أو كشف البنك). شيك آجل: قيد الطرف لشيك قسط للممول."
+msgstr "البنك: أدخله مستخدم. خصم تلقائي: خصمه البنك (المهمة اليومية أو كشف البنك). شيك: قيد الطرف لشيك قسط للممول."
 
 msgid "From the facility's Late Payment Mode setting (Islamic facilities): paid to the lender with the installment, or payable to charity (not paid through the bank)."
 msgstr "من إعداد معالجة غرامة التأخير في التسهيل (التسهيلات الإسلامية): تُدفع للممول مع القسط، أو تُستحق للأعمال الخيرية (لا تُدفع من البنك)."
@@ -12050,7 +12044,7 @@ msgid "Facility Repayment"
 msgstr "سداد التسهيل"
 
 msgid "An installment cheque to the lender of this drawdown (PDC to Lender): its party posting is the repayment of the installment."
-msgstr "شيك قسط لممول هذا السحب (شيكات آجلة للممول): قيد الطرف الخاص به هو سداد القسط."
+msgstr "شيك قسط لممول هذا السحب (شيكات للممول): قيد الطرف الخاص به هو سداد القسط."
 
 msgctxt "Cheque Batch"
 msgid "Facility Drawdown"
@@ -12807,18 +12801,18 @@ msgstr "المتوقع بعد 7 أيام"
 msgid "Due This Week"
 msgstr "مستحق هذا الأسبوع"
 
-msgid "Post-dated Issued"
-msgstr "شيكات آجلة صادرة"
+msgid "Cheques Issued"
+msgstr "شيكات صادرة"
 
-msgid "Post-dated in Hand"
-msgstr "شيكات آجلة بالخزينة"
+msgid "Cheques in Hand"
+msgstr "شيكات بالخزينة"
 
 msgid "Bounced This Month"
 msgstr "المرتدة هذا الشهر"
 
 msgctxt "Treasury Dashboard"
-msgid "PDC Cheques"
-msgstr "الشيكات الآجلة"
+msgid "Cheques"
+msgstr "الشيكات"
 
 msgid "Transfers Awaiting Confirmation"
 msgstr "تحويلات في انتظار التأكيد"
@@ -12883,7 +12877,7 @@ msgid "No company bank account with a GL account of type Bank."
 msgstr "لا يوجد حساب بنكي للشركة مرتبط بحساب من نوع بنك في دليل الحسابات."
 
 msgid "Every company bank account needs its PDC accounts (payable, receivable, under collection)."
-msgstr "كل حساب بنكي للشركة يحتاج حسابات الشيكات الآجلة الخاصة به (أوراق الدفع، أوراق القبض، تحت التحصيل)."
+msgstr "كل حساب بنكي للشركة يحتاج حسابات الشيكات الخاصة به (أوراق الدفع، أوراق القبض، تحت التحصيل)."
 
 msgid "Series not registered for Payment Entry yet: {0}"
 msgstr "مسلسلات غير مسجلة في سند الدفع بعد: {0}"
@@ -13301,3 +13295,11 @@ msgstr "لكل بنك وطريقة في طرق الدفع"
 msgctxt "Treasury Company Settings"
 msgid "These names cannot be changed: {0}"
 msgstr "هذه الأسماء لا يمكن تغييرها: {0}"
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 8a: "PDC" is shown as "Cheques" (labels only), complete workspace
+# ---------------------------------------------------------------------------------------------------------
+
+# Sidebar section and workspace card ("Cheques", "Reports", "Setup" are translated above or by the core apps)
+msgid "Transfers & Charges"
+msgstr "التحويلات والمصاريف البنكية"

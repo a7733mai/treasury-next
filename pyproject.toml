@@ -3,7 +3,7 @@ name = "treasury"
 authors = [
     { name = "Ahmed Abdelmageed", email = "ahmed3mageed@gmail.com"}
 ]
-description = "Post-dated cheques, security cheques, multi-cheque vouchers and bank facilities for ERPNext"
+description = "Cheques (current and post-dated), security cheques, multi-cheque vouchers and bank facilities for ERPNext"
 requires-python = ">=3.14"
 readme = "README.md"
 dynamic = ["version"]

@@ -174,7 +174,7 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		make_pdc_cheque(cheque_book=book.name)  # leaf 0 is used
 		cancel_leaf(book.name, self.leaf(book, 1), "Spoilt")
 		args = {"reason_type": "Damaged", "reason": "Torn"}
-		self.assert_error("is used by a PDC Cheque", void_leaf, book.name, self.leaf(book, 0), **args)
+		self.assert_error("Cheque or a Security Cheque", void_leaf, book.name, self.leaf(book, 0), **args)
 		self.assert_error("already cancelled or void", void_leaf, book.name, self.leaf(book, 1), **args)
 		self.assert_error(
 			"cannot be before", void_leaf, book.name, self.leaf(book, 5), self.leaf(book, 3), **args
@@ -207,7 +207,7 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		# a range reaching a used leaf (a security cheque's leaf included) is refused as a whole
 		make_security_cheque("Outgoing", cheque_no=self.leaf(book, 10))
 		self.assert_error(
-			"is used by a PDC Cheque", void_leaf, book.name, self.leaf(book, 8), self.leaf(book, 12), **args
+			"Cheque or a Security Cheque", void_leaf, book.name, self.leaf(book, 8), self.leaf(book, 12), **args
 		)
 		book.reload()
 		self.assertEqual([r.cheque_no for r in book.cancelled_leaves], [self.leaf(book, 1)])
@@ -321,7 +321,7 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		self.assert_error("is a cancelled leaf of Cheque Book", make_pdc_cheque, cheque_no=self.leaf(book, 1))
 		make_pdc_cheque(cheque_no=self.leaf(book, 2))
 		self.assert_error(
-			"is used by a PDC Cheque",
+			"Cheque or a Security Cheque",
 			void_leaf,
 			book.name,
 			self.leaf(book, 2),

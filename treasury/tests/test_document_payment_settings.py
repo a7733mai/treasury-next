@@ -49,7 +49,7 @@ class TestDocumentPaymentSettings(TreasuryTestMixin, IntegrationTestCase):
 		own = make_own_bank()
 		for fieldname in ("default_outgoing_cheque_bank_account", "default_incoming_cheque_bank_account"):
 			with self.subTest(fieldname=fieldname):
-				with self.assertRaisesRegex(frappe.ValidationError, "needs a row in PDC Accounts"):
+				with self.assertRaisesRegex(frappe.ValidationError, "needs a row in (PDC|Cheque) Accounts"):
 					self.settings(**{fieldname: own.bank_account}).save()
 
 	def test_installment_count_and_bond_percents(self):

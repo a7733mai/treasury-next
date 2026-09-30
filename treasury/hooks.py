@@ -2,7 +2,7 @@ app_name = "treasury"
 app_title = "Treasury"
 app_publisher = "Ahmed Abdelmageed"
 app_description = (
-	"Post-dated cheques, security cheques, multi-cheque vouchers and bank facilities for ERPNext"
+	"Cheques (current and post-dated), security cheques, multi-cheque vouchers and bank facilities for ERPNext"
 )
 app_email = "ahmed3mageed@gmail.com"
 app_license = "mit"

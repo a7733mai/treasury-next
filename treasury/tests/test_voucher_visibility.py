@@ -243,7 +243,7 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 		pdc = frappe.get_doc(CHEQUE, security.converted_pdc_cheque)
 		self.assertTrue(pdc.party_payment_entry)
 		html = self.load_summary(security)
-		self.assertIn("Vouchers of the PDC Cheque", html)
+		self.assertIn(frappe._("Vouchers of the PDC Cheque {0}").split("{0}")[0].strip(), html)
 		self.assertIn(pdc.name, html)
 		self.assertIn(pdc.party_payment_entry, html)
 

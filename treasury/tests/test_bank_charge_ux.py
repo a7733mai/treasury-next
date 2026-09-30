@@ -212,28 +212,24 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		path = APP_PATH / "pdc" / "workspace" / "treasury" / "treasury.json"
 		workspace = json.loads(path.read_text(encoding="utf-8"))
 		links = workspace["links"]
-		start = next(
-			i
-			for i, link in enumerate(links)
-			if link["type"] == "Card Break" and link["label"] == "Bank Transfers"
-		)
-		card = []
-		for link in links[start + 1 :]:
-			if link["type"] == "Card Break":
-				break
-			card.append(link["label"])
-		self.assertEqual(
-			card,
-			[
-				"Bank Transfer",
-				"Bank Charge",
-				"Bank Transfer Register",
-				"Transfer Fees Analysis",
-				"Bank Charges Analysis",
-				"Bank Charge Category",
-			],
-		)
-		self.assertEqual(links[start]["link_count"], len(card))
+
+		def card(label: str) -> list[str]:
+			start = next(
+				i for i, link in enumerate(links) if link["type"] == "Card Break" and link["label"] == label
+			)
+			rows = []
+			for link in links[start + 1 :]:
+				if link["type"] == "Card Break":
+					break
+				rows.append(link["label"])
+			self.assertEqual(links[start]["link_count"], len(rows), label)
+			return rows
+
+		self.assertEqual(card("Transfers & Charges"), ["Bank Transfer", "Bank Charge", "Bank Transaction"])
+		reports = card("Reports")
+		for report in ("Bank Transfer Register", "Transfer Fees Analysis", "Bank Charges Analysis"):
+			self.assertIn(report, reports)
+		self.assertIn("Bank Charge Category", card("Setup"))
 		shortcut = next(s for s in workspace["shortcuts"] if s["label"] == "Bank Charge")
 		self.assertEqual(shortcut["color"], "Orange")
 		self.assertFalse(shortcut.get("stats_filter"))
@@ -241,7 +237,7 @@ class TestBankChargeUX(TreasuryTestMixin, IntegrationTestCase):
 		sidebar = json.loads((APP_PATH / "workspace_sidebar" / "treasury.json").read_text(encoding="utf-8"))
 		labels = [item["label"] for item in sidebar["items"]]
 		self.assertEqual(labels[labels.index("Bank Transfer") + 1], "Bank Charge")
-		self.assertIn("Bank Charge Category", labels[labels.index("Treasury Setup") :])
+		self.assertIn("Bank Charge Category", labels[labels.index("Setup") :])
 
 	def test_client_scripts_call_whitelisted_methods(self):
 		"""Every module method the Bank Charge scripts call through their method prefix exists, is
