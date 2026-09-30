@@ -5,6 +5,8 @@ We deliberately do NOT import `erpnext.tests.utils`: importing it runs ERPNext's
 and creates only what Treasury needs, inside the IntegrationTestCase transaction.
 """
 
+import random
+
 import frappe
 from erpnext.accounts.utils import get_balance_on
 from frappe.utils import add_days, add_years, flt, getdate, today
@@ -54,6 +56,9 @@ PHASE_7A_TEST_RECORD_IGNORES = [
 	"Branch",
 	"Department",
 ]
+# Link targets added by Phase 7f: the audit columns of Cheque Book Cancelled Leaf (`user` -> User, walked on
+# to Email Account -> Payment Gateway; `source_doctype` -> DocType) and PDC Cheque `last_printed_by`.
+PHASE_7F_TEST_RECORD_IGNORES = ["User", "DocType"]
 
 
 def acc(name: str, abbr: str = ABBR) -> str:
@@ -462,6 +467,24 @@ def make_pdc_cheque(
 	)
 	doc.insert()
 	return doc
+
+
+def unique_leaf_start(size: int = 1_000, digits: int = 8) -> int:
+	"""A random first leaf number for a book of `size` leaves whose range no Cheque Book of the site (any bank
+	account, any status) overlaps and no PDC / Security Cheque number falls in: a test never depends on the
+	books of other tests, of its own class (they stay until the class rolls back) or of an earlier run."""
+	low, high = 10 ** (digits - 1), 10**digits - size
+	for _attempt in range(100):
+		start = random.randrange(low, high)
+		end = start + size - 1
+		if frappe.get_all("Cheque Book", filters=[["start_no", "<=", end], ["end_no", ">=", start]], limit=1):
+			continue
+		# numbers of the same width compare as text; a wider or narrower number is not a leaf of the range
+		numbers = [["cheque_no", ">=", str(start).zfill(digits)], ["cheque_no", "<=", str(end).zfill(digits)]]
+		if any(frappe.get_all(dt, filters=numbers, limit=1) for dt in ("PDC Cheque", "Security Cheque")):
+			continue
+		return start
+	raise AssertionError(f"No free range of {size} cheque leaves")
 
 
 def make_cheque_book(start_no: int, end_no: int, currency: str = "EGP", **values):

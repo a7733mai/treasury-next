@@ -38,6 +38,7 @@ from treasury.tests.utils import (
 	make_purchase_invoice,
 	make_sales_invoice,
 	unique_cheque_no,
+	unique_leaf_start,
 )
 from treasury.utils.amount_in_words import treasury_amount_in_words
 
@@ -95,9 +96,6 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		# books accumulate until the class rolls back: every test gets its own range (distinct from the
-		# ranges of the other test classes)
-		cls.next_start = 73_000_000
 		ensure_supplier(FIFO_SUPPLIER)
 		ensure_supplier(RESERVED_SUPPLIER)
 		ensure_customer(FIFO_CUSTOMER)
@@ -112,8 +110,8 @@ class TestChequeBatch(TreasuryTestMixin, IntegrationTestCase):
 	# ------------------------------------------------------------------ helpers
 
 	def book(self, size: int = 20):
-		start = type(self).next_start
-		type(self).next_start += 1_000
+		# books accumulate until the class rolls back: every test gets a random range no book overlaps
+		start = unique_leaf_start(size)
 		return make_cheque_book(start, start + size - 1, leaf_digits=8)
 
 	@staticmethod

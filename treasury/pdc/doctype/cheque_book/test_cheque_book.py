@@ -12,33 +12,36 @@ from treasury.pdc.doctype.cheque_book.cheque_book import (
 )
 from treasury.tests.utils import (
 	DEFAULT_PDC_SETTINGS,
+	PHASE_7A_TEST_RECORD_IGNORES,
+	PHASE_7F_TEST_RECORD_IGNORES,
 	TreasuryTestMixin,
 	ensure_user,
 	get_voucher_count,
 	make_cheque_book,
 	make_pdc_cheque,
 	make_security_cheque,
+	unique_leaf_start,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Account", "Bank Account", "Print Format"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Account",
+	"Bank Account",
+	"Print Format",
+	*PHASE_7A_TEST_RECORD_IGNORES,
+	*PHASE_7F_TEST_RECORD_IGNORES,
+]
 BOOK_READER = "treasury-cheque-book-reader@example.com"
 
 
 class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
-	@classmethod
-	def setUpClass(cls):
-		super().setUpClass()
-		# books accumulate until the class rolls back: give every test its own, non-overlapping range.
-		# Fixed base, distinct from the ranges used by other test classes (e.g. test_pdc_lifecycle).
-		cls.next_start = 71_000_000
-
 	def setUp(self):
 		super().setUp()
 		self.use_company_settings(**DEFAULT_PDC_SETTINGS)
 
 	def book(self, size: int = 5, **values):
-		start = type(self).next_start
-		type(self).next_start += 1_000
+		# books accumulate until the class rolls back: every test gets a random range no book overlaps
+		start = unique_leaf_start(size)
 		return make_cheque_book(start, start + size - 1, leaf_digits=8, **values)
 
 	def leaf(self, book, offset: int) -> str:
@@ -97,8 +100,7 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(make_pdc_cheque(cheque_book=book.name).cheque_no, self.leaf(book, 1))
 
 	def test_range_validation(self):
-		start = type(self).next_start
-		type(self).next_start += 1_000
+		start = unique_leaf_start(11)
 		self.assertRaises(frappe.ValidationError, make_cheque_book, start + 10, start)
 		self.assertRaises(frappe.ValidationError, make_cheque_book, 0, 10)
 

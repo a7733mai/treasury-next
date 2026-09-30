@@ -28,6 +28,7 @@ from treasury.tests.utils import (
 	make_cheque_book,
 	make_pdc_cheque,
 	make_security_cheque,
+	unique_leaf_start,
 )
 
 OTHER_SUPPLIER = "_Test Treasury Leaf Supplier"
@@ -41,8 +42,6 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		# books accumulate until the class rolls back: every test gets its own, non-overlapping range
-		cls.next_start = 72_000_000
 		ensure_supplier(OTHER_SUPPLIER)
 
 	def setUp(self):
@@ -55,8 +54,9 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 	# ------------------------------------------------------------------ helpers
 
 	def book(self, size: int = 20, **values):
-		start = type(self).next_start
-		type(self).next_start += 1_000
+		# books accumulate until the class rolls back (test_max_leaves has 10 001 leaves): every test gets a
+		# random range that no book of the site overlaps
+		start = unique_leaf_start(size)
 		return make_cheque_book(start, start + size - 1, leaf_digits=8, **values)
 
 	@staticmethod

@@ -27,6 +27,7 @@ from treasury.tests.utils import (
 	make_sales_invoice,
 	make_sales_order,
 	unique_cheque_no,
+	unique_leaf_start,
 )
 
 DOCTYPE = "PDC Cheque"
@@ -781,12 +782,13 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 	# ------------------------------------------------------------------ replacement variants
 
 	def test_replace_bounced_cheque_takes_next_leaf(self):
-		book = make_cheque_book(72_000_000, 72_000_009, leaf_digits=8)
+		start = unique_leaf_start(10)
+		book = make_cheque_book(start, start + 9, leaf_digits=8)
 		pi = make_purchase_invoice(1000, posting_date=day(-30))
 		cheque = make_pdc_cheque(
 			amount=1000, issue_date=day(-30), due_date=day(-10), invoice=pi, cheque_book=book.name
 		)
-		self.assertEqual(cheque.cheque_no, "72000000")
+		self.assertEqual(cheque.cheque_no, str(start).zfill(8))
 		cheque.deliver(handover_date=day(-30))
 		cheque.bounce(bounce_date=day(-8), reason="Insufficient funds")
 		self.assertEqual(get_party_outstanding("Purchase Invoice", pi.name), 1000)
@@ -798,7 +800,7 @@ class TestPDCLifecycle(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(self.vouchers(cheque), 2)  # its PE and the bounce reversal; nothing new
 
 		new = frappe.get_doc(DOCTYPE, result["replaced_by"])
-		self.assertEqual((new.cheque_book, new.cheque_no), (book.name, "72000001"))
+		self.assertEqual((new.cheque_book, new.cheque_no), (book.name, str(start + 1).zfill(8)))
 		self.assertEqual(new.replaces, cheque.name)
 		self.assertEqual((new.operational_status, new.accounting_status), ("Delivered", "Party Posted"))
 		self.assertEqual(getdate(new.handover_date), day(-6))

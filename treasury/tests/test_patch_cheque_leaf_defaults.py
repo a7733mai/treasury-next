@@ -5,7 +5,13 @@ from frappe.tests import IntegrationTestCase
 
 from treasury.patches.v1_1 import set_cheque_leaf_defaults
 from treasury.pdc.doctype.cheque_book.cheque_book import cancel_leaf
-from treasury.tests.utils import DEFAULT_PDC_SETTINGS, TreasuryTestMixin, make_cheque_book, make_pdc_cheque
+from treasury.tests.utils import (
+	DEFAULT_PDC_SETTINGS,
+	TreasuryTestMixin,
+	make_cheque_book,
+	make_pdc_cheque,
+	unique_leaf_start,
+)
 
 LEAF = "Cheque Book Cancelled Leaf"
 SAVEPOINT = "treasury_patch_null"
@@ -49,7 +55,7 @@ class TestPatchChequeLeafDefaults(TreasuryTestMixin, IntegrationTestCase):
 		return True
 
 	def test_patch(self):
-		start = 74_000_000 + (int(frappe.generate_hash(length=5), 16) % 90_000) * 10
+		start = unique_leaf_start(10)
 		book = make_cheque_book(start, start + 9, leaf_digits=8)
 		cheque = make_pdc_cheque(cheque_book=book.name)
 		cheque.cancel_cheque(reason="Wrong amount")
@@ -72,7 +78,7 @@ class TestPatchChequeLeafDefaults(TreasuryTestMixin, IntegrationTestCase):
 
 	def test_ambiguous_source_is_left_empty(self):
 		"""Two cancelled cheques with the leaf's number: the source cannot be told, it stays empty."""
-		start = 75_000_000 + (int(frappe.generate_hash(length=5), 16) % 90_000) * 10
+		start = unique_leaf_start(10)
 		book = make_cheque_book(start, start + 9, leaf_digits=8)
 		first = make_pdc_cheque(cheque_book=book.name)
 		first.cancel_cheque(reason="Wrong amount")

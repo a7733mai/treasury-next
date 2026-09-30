@@ -229,11 +229,15 @@ class ChequeBook(Document):
 
 	@frappe.whitelist(methods=["POST"])
 	def close(self):
-		self.check_permission("write")
-		if self.status == "Closed":
-			frappe.throw(_("Cheque Book {0} is already closed.").format(frappe.bold(self.name)))
-		self.status = "Closed"
-		self.save()
+		# the latest saved book, locked: since this one was loaded, a cheque may have taken a leaf (the allocation
+		# writes next_no / status), which would make saving this copy fail with a timestamp mismatch
+		book = _lock_book(self.name)
+		book.check_permission("write")
+		if book.status == "Closed":
+			frappe.throw(_("Cheque Book {0} is already closed.").format(frappe.bold(book.name)))
+		book.status = "Closed"
+		book.save()
+		self.reload()
 
 
 def _lock_book(cheque_book: str):

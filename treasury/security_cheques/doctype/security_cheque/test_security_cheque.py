@@ -41,6 +41,7 @@ from treasury.tests.utils import (
 	make_sales_order,
 	make_security_cheque,
 	unique_cheque_no,
+	unique_leaf_start,
 )
 
 # Fixtures are built by treasury.tests.utils; don't let Frappe pull ERPNext's global test records.
@@ -555,7 +556,7 @@ class TestSecurityCheque(SecurityChequeTestCase):
 		self.assertRaises(frappe.ValidationError, make_security_cheque, "Outgoing", cheque_no=pdc_no)
 
 	def test_cheque_book_leaf_is_consumed_for_good(self):
-		start = 1_000_000 + (int(frappe.generate_hash(length=6), 16) % 100_000) * 10
+		start = unique_leaf_start(4, digits=7)
 		book = make_cheque_book(start, start + 3)
 		security = make_security_cheque("Outgoing", cheque_book=book.name)
 		self.assertEqual(security.cheque_no, str(start))
@@ -576,7 +577,7 @@ class TestSecurityCheque(SecurityChequeTestCase):
 		self.assertEqual((row.used_leaves, row.remaining_leaves), (3, 1))
 
 	def test_cheque_book_must_match_the_bank_account(self):
-		start = 2_000_000 + (int(frappe.generate_hash(length=6), 16) % 100_000) * 10
+		start = unique_leaf_start(2, digits=7)
 		usd_book = make_cheque_book(start, start + 1, currency="USD")
 		self.assertRaises(frappe.ValidationError, make_security_cheque, "Outgoing", cheque_book=usd_book.name)
 

@@ -42,6 +42,7 @@ from treasury.tests.utils import (
 	make_security_cheque,
 	set_bank_suppliers,
 	unique_cheque_no,
+	unique_leaf_start,
 )
 from treasury.utils import voucher_summary
 from treasury.utils.print_helpers import treasury_payment_entries
@@ -302,7 +303,7 @@ class TestVoucherVisibility(TreasuryTestMixin, IntegrationTestCase):
 
 	def test_cheque_book_usage_lists_readable_cheques_only(self):
 		# a leaf range of this test only
-		start = 100_000 + int(frappe.generate_hash(length=5), 16) % 800_000
+		start = unique_leaf_start(10, digits=6)
 		book = make_cheque_book(start, start + 9)
 		allowed, hidden = (
 			make_pdc_cheque(

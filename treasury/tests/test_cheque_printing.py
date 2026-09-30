@@ -209,10 +209,11 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		units = frappe.db.get_value("Currency", "KWD", "fraction_units")
 		if units == 1000:
 			self.assertEqual(currency_decimals("KWD"), 3)
+			# every decimal of the currency prints, a trailing zero included (fmt_money alone gives "1.25")
 			leaf = self.leaf("en", amount=1.250, currency="KWD")
-			self.assertEqual(leaf.figures, f"#{fmt_money(1.25, precision=3)}#")
-			self.assertIn("1.250", leaf.figures)
+			self.assertEqual(leaf.figures, "#1.250#")
 			self.assertIn("Two Hundred And Fifty", leaf.words)
+			self.assertEqual(self.leaf("en", amount=1250, currency="KWD").figures, "#1,250.000#")
 		self.assertEqual(currency_decimals("EGP"), 2)
 
 	def test_date_formats(self):

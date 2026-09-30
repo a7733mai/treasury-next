@@ -14,6 +14,7 @@ Nothing here posts anything, and security cheques are not printed on layouts.
 
 import frappe
 from frappe import _
+from frappe.locale import get_number_format
 from frappe.model.document import Document
 from frappe.utils import cint, escape_html, flt, fmt_money, getdate, today
 from markupsafe import Markup
@@ -148,6 +149,21 @@ def format_cheque_date(date, date_format: str) -> str:
 	return text
 
 
+def format_figures(amount, decimals: int) -> str:
+	"""The amount in figures with the system number format and exactly `decimals` decimals, no symbol.
+
+	`fmt_money` drops the third decimal of a 3-decimal amount whose last digit is 0 when no currency is given
+	(KWD 1.250 → "1.25"), and giving the currency adds its symbol: the missing zeros are padded here."""
+	text = fmt_money(amount, precision=decimals)
+	separator = get_number_format().decimal_separator
+	if decimals <= 2 or not separator:
+		return text
+	whole, found, fraction = text.rpartition(separator)
+	if not found:
+		whole, fraction = text, ""
+	return f"{whole}{separator}{fraction.ljust(decimals, '0')}"
+
+
 def _mm(value) -> str:
 	return f"{flt(value, 2):.2f}mm"
 
@@ -164,7 +180,7 @@ def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frapp
 
 	date_text = format_cheque_date(date, layout.date_format)
 	guard = layout.figures_guard or ""
-	amount_text = fmt_money(amount, precision=currency_decimals(currency))
+	amount_text = format_figures(amount, currency_decimals(currency))
 	if indic:
 		date_text, amount_text = date_text.translate(ARABIC_INDIC), amount_text.translate(ARABIC_INDIC)
 	figures = f"{guard}{amount_text}{guard}"
@@ -196,7 +212,7 @@ def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frapp
 	offset_top = flt(layout.offset_top_mm) if carrier else 0
 	offset_left = flt(layout.offset_left_mm) if carrier else 0
 	base_font = flt(layout.base_font_size_pt) or 11
-	boxes = {}
+	boxes = frappe._dict()
 	for name, prefix, font_field, height_field in BOXES:
 		font = flt(layout.get(font_field)) if font_field else 0
 		top, left = flt(layout.get(f"{prefix}_top_mm")), flt(layout.get(f"{prefix}_left_mm"))

@@ -7,6 +7,8 @@ from frappe.tests import IntegrationTestCase
 from treasury.pdc.cheque_printing import get_layout
 from treasury.tests.utils import (
 	COMPANY,
+	PHASE_7A_TEST_RECORD_IGNORES,
+	PHASE_7F_TEST_RECORD_IGNORES,
 	SUPPLIER,
 	TreasuryTestMixin,
 	ensure_alert_bank,
@@ -14,7 +16,14 @@ from treasury.tests.utils import (
 	make_cheque_layout,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Account", "Bank Account", "Print Format"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Account",
+	"Bank Account",
+	"Print Format",
+	*PHASE_7A_TEST_RECORD_IGNORES,
+	*PHASE_7F_TEST_RECORD_IGNORES,
+]
 
 
 class TestChequeLayout(TreasuryTestMixin, IntegrationTestCase):
