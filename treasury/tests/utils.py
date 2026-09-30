@@ -1830,7 +1830,12 @@ def today_date():
 class BalanceAlertTestMixin(TreasuryTestMixin):
 	"""Phase 7e test classes: dates relative to the real today; every test starts from the shipped alert
 	settings, no thresholds, no recipients and On Low Projected Balance = Warn; `frappe.enqueue` is replaced by
-	a mock (`self.enqueue`), so the event trigger is recorded, not queued."""
+	a mock (`self.enqueue`), so the event trigger is recorded, not queued.
+
+	IntegrationTestCase rolls back only at the end of the class, so the alert logs and bank notifications of
+	the previous tests of the class would still be there: the dedupe keys (Digest: company, user, day) would
+	suppress this test's sends. Every test therefore starts without Treasury Alert Logs of the test company and
+	without Bank Account notifications (deleted in the class transaction, restored by its rollback)."""
 
 	@classmethod
 	def setUpClass(cls):
@@ -1846,6 +1851,8 @@ class BalanceAlertTestMixin(TreasuryTestMixin):
 		set_alert_settings(self)
 		set_thresholds(self, [])
 		set_recipients(self, [])
+		frappe.db.delete(ALERT_LOG_DOCTYPE, {"company": COMPANY})
+		frappe.db.delete("Notification Log", {"document_type": "Bank Account"})
 		enqueue = patch("frappe.enqueue")
 		self.enqueue = enqueue.start()
 		self.addCleanup(enqueue.stop)

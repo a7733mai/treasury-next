@@ -104,7 +104,7 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertIn(_("Low projected balance after {0} {1}:").format(_("PDC Cheque"), c3.name), text)
 		indicators = [m.get("indicator") for m in frappe.local.message_log if m.get("message") == message]
 		self.assertEqual(indicators, ["orange"])
-		self.assertFalse(alert_logs(alert_type="Override"))
+		self.assertFalse(alert_logs(alert_type="Override", bank_account=self.bank))
 
 	def test_message_html(self):
 		"""Design 7e §4.1: names and amounts in <bdi>, at most 3 lines per bank then "+n more day(s)", and a
@@ -153,7 +153,7 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual((row.event, row.user), ("Low Balance Override", TREASURY_MANAGER))
 		self.assertIn(formatdate(self.day(4)), row.remarks)
 		self.assertIn(fmt_money(14980, currency="EGP"), row.remarks)
-		(log,) = alert_logs(alert_type="Override")
+		(log,) = alert_logs(alert_type="Override", bank_account=self.bank)
 		self.assertEqual(
 			(log.reference_doctype, log.reference_name, log.user, log.bank_account),
 			("PDC Cheque", c3.name, TREASURY_MANAGER, self.bank),
@@ -322,9 +322,11 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 			calls.append(("lock", bank_account))
 			return real_lock(bank_account)
 
-		def check(*args, **kwargs):
-			calls.append(("check", None))
-			return real_check(*args, **kwargs)
+		def check(doc, execution_date=None, lock=False):
+			# ("check", False): the plain read of `validate` (Warn messages, no lock);
+			# ("check", True): the locking read of `enforce_limits` in before_submit
+			calls.append(("check", bool(lock)))
+			return real_check(doc, execution_date, lock=lock)
 
 		with (
 			patch.object(fees, "lock_bank_account", side_effect=lock),
@@ -334,8 +336,12 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 			make_bank_transfer(
 				transfer_type="Internal Transfer", amount=100, bank_account=second, to_bank_account=first
 			)
-		self.assertEqual(calls[:2], [("lock", first), ("lock", second)])
-		self.assertLess(calls.index(("lock", second)), calls.index(("check", None)))
+		locks = [c for c in calls if c[0] == "lock"]
+		self.assertEqual(locks[:2], [("lock", first), ("lock", second)])
+		# nothing locks before the guard: the limit checks before it (insert / submit validate) are plain reads
+		self.assertNotIn(("check", True), calls[: calls.index(("lock", first))])
+		# the locking limit check comes after both bank rows are locked in name order
+		self.assertLess(calls.index(("lock", second)), calls.index(("check", True)))
 
 	# ------------------------------------------------------------------ Facility Repayment
 
@@ -406,7 +412,7 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		)
 		self.assertEqual(doc.docstatus, 1)
 		self.assertEqual(len(self.warnings()), 1)
-		self.assertFalse(alert_logs(alert_type="Override"))
+		self.assertFalse(alert_logs(alert_type="Override", bank_account=self.bank))
 
 	def test_bank_charge_refund_not_guarded(self):
 		ensure_charge_category()
