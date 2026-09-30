@@ -128,7 +128,7 @@
    "fieldname": "party_type",
    "fieldtype": "Link",
    "label": "Party Type",
-   "options": "Party Type",
+   "options": "DocType",
    "reqd": 1
   },
   {

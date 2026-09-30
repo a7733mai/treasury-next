@@ -3,8 +3,10 @@ rows (cheques, transfers, charges, security cheques, instruments, a drawdown, a 
 per-row cost is one `get_utilisation` per facility, capped by MAX_FACILITIES.
 
 Every query branch is taken before the first measurement (one Sent transfer with its fee, one bank charge this
-month, a facility with Letter of Guarantee / Credit sub-limits), so the two measurements compare the same
-code paths with more rows; each measurement follows a warm-up call (caches of the rows just added)."""
+month, a facility with Letter of Guarantee / Credit sub-limits holding one guarantee and one credit: a facility's
+first guarantee adds the fixed bank-funded-claims lookup of `lg.get_lg_utilisation`, one query per voucher
+DocType whatever the number of guarantees), so the two measurements compare the same code paths with more
+rows; each measurement follows a warm-up call (caches of the rows just added)."""
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -55,6 +57,8 @@ class TestTreasuryDashboardQueries(BalanceAlertTestMixin, IntegrationTestCase):
 			start_date=self.day(-30),
 			expiry_date=self.day(365),
 		)
+		make_letter_of_guarantee(self.instruments, amount=500, issue_date=self.today, expiry_date=self.day(20))
+		make_letter_of_credit(self.instruments, amount=500, issue_date=self.today, expiry_date=self.day(20))
 
 	def measure(self) -> int:
 		get_overview(COMPANY, None, 30)  # warm-up

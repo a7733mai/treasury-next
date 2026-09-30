@@ -197,7 +197,7 @@
    "fieldtype": "Link",
    "label": "Party Type",
    "mandatory_depends_on": "eval:doc.transfer_type!=='Internal Transfer'",
-   "options": "Party Type"
+   "options": "DocType"
   },
   {
    "fieldname": "party",

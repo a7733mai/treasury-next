@@ -37,6 +37,9 @@ function cheque_batch_reference_types(direction, party_type) {
 frappe.ui.form.on("Cheque Batch", {
 	setup(frm) {
 		// any Party Type (Customer, Supplier, Employee, Shareholder ...)
+		frm.set_query("party_type", () => ({
+			query: "erpnext.setup.doctype.party_type.party_type.get_party_type",
+		}));
 		frm.set_query("bank_account", () => ({
 			filters: { company: frm.doc.company, is_company_account: 1 },
 		}));
