@@ -162,8 +162,8 @@ class TestTreasuryDashboard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertTrue(all(not any(v[1:]) for v in values.values()))
 		self.assertEqual(maturities.barOptions, {"stacked": 1})
 		# 7h-2: the untranslated category of each dataset (fixed colours on the page), legend order kept
-		self.assertEqual(maturities.keys, ["Cheques In", "Cheques Out", "Installments", "Transfers"])
-		self.assertEqual(maturities.keys, [d["name"] for d in maturities.data["datasets"]])
+		self.assertEqual(maturities["keys"], ["Cheques In", "Cheques Out", "Installments", "Transfers"])
+		self.assertEqual(maturities["keys"], [d["name"] for d in maturities.data["datasets"]])
 		self.assertEqual(maturities.overdue, 0)
 
 	def test_horizon_totals(self):
