@@ -90,12 +90,17 @@ def get_source(source_doctype: str, source_name: str, target_label: str):
 
 
 def resolve(source, party_type: str | None = None, party: str | None = None) -> frappe._dict:
-	"""{kind, direction, party_type, party, company} of a source (a Journal Entry also gives the `account`
-	of the chosen party row). A party master has no company: the caller sets it."""
+	"""{kind, direction, party_type, party, company} of a source (a Journal Entry also gives the `accounts`
+	the chosen party is booked on). A party master's company is its own (an Employee's), else None: the caller
+	sets it."""
 	kind, direction, source_party_type, party_field = SOURCES[source.doctype]
 	if kind == PARTY:
 		return frappe._dict(
-			kind=kind, direction=direction, party_type=source_party_type, party=source.name, company=None
+			kind=kind,
+			direction=direction,
+			party_type=source_party_type,
+			party=source.name,
+			company=source.get("company") if source.meta.has_field("company") else None,
 		)
 	if kind == JOURNAL:
 		row = _choose_journal_party(source, party_type, party)
@@ -106,6 +111,7 @@ def resolve(source, party_type: str | None = None, party: str | None = None) -> 
 			party=row["party"],
 			company=source.company,
 			account=row["account"],
+			accounts=row["accounts"],
 		)
 	return frappe._dict(
 		kind=kind,
@@ -161,8 +167,9 @@ def source_party(source_doctype: str, source_name: str, party_type: str | None, 
 @frappe.whitelist()
 def get_journal_parties(journal_entry: str) -> list[dict]:
 	"""The parties a submitted Journal Entry still leaves open (read only): {party_type, party, party_name,
-	account, outstanding, currency, direction, supported}. `supported`: the row is booked on the party's
-	default account, the only one Treasury settles on."""
+	account, accounts, outstanding, currency, direction, supported}. `accounts`: every account the party is
+	booked on in the entry (`account`: the first); `supported`: that is only the party's default account, the
+	only one Treasury settles on."""
 	je = frappe.get_doc("Journal Entry", journal_entry)
 	je.check_permission("read")
 	return journal_parties(je)
@@ -193,6 +200,7 @@ def journal_parties(je) -> list[dict]:
 				"party": party,
 				"party_name": get_party_name(party_type, party),
 				"account": accounts[0],
+				"accounts": accounts,
 				"outstanding": outstanding,
 				"currency": get_account_currency(accounts[0]),
 				"direction": direction,
@@ -208,8 +216,10 @@ def journal_parties(je) -> list[dict]:
 
 
 def check_payable(source, info: frappe._dict):
-	"""An invoice / order / Journal Entry / hrms document Treasury may still settle (party masters: always)."""
+	"""An invoice / order / Journal Entry / hrms document Treasury may still settle; a party master that is
+	enabled (an Employee: Active)."""
 	if info.kind == PARTY:
+		check_active_party(source)
 		return
 	name = frappe.bold(source.name)
 	nothing_outstanding = _("{0} {1} has nothing outstanding.").format(_(source.doctype), name)
@@ -233,16 +243,29 @@ def check_payable(source, info: frappe._dict):
 	_check_party_account(source, info)
 
 
+def check_active_party(source):
+	"""A disabled Customer / Supplier, or an Employee who is not Active, gets no new Treasury document."""
+	if source.meta.has_field("disabled") and cint(source.get("disabled")):
+		status = "Disabled"
+	elif source.doctype == "Employee" and source.get("status") and source.status != "Active":
+		status = source.status
+	else:
+		return
+	frappe.throw(_("{0} {1} is {2}.").format(_(source.doctype), frappe.bold(source.name), _(status)))
+
+
 def _check_party_account(source, info: frappe._dict):
 	"""Treasury posts on the party's default account (F12): a document booked on another account cannot be
-	settled by it."""
+	settled by it. A Journal Entry party booked on several accounts (the default one among them) cannot
+	either: its outstanding sums them all, the Payment Entry would settle only the default one."""
 	if info.kind == JOURNAL:
-		account = info.account
+		accounts = info.get("accounts") or [info.account]
 	elif info.kind == HRMS:
-		account = source.get(hrms.PARTY_ACCOUNT_FIELD[source.doctype])
+		accounts = [source.get(hrms.PARTY_ACCOUNT_FIELD[source.doctype])]
 	else:
 		return
 	default_account = posting.get_party_account(info.party_type, info.party, info.company)
+	account = next((a for a in accounts if a != default_account), default_account)
 	if account != default_account:
 		frappe.throw(
 			_(
@@ -273,20 +296,28 @@ def available_outstanding(
 ) -> float:
 	"""The outstanding of the source (party account currency) not yet covered by open cheques or scheduled
 	transfers; throws when nothing is left."""
+	available, refusal = uncovered_outstanding(source, info, party_currency, precision, exclude_batch)
+	if refusal:
+		frappe.throw(refusal)
+	return available
+
+
+def uncovered_outstanding(
+	source, info: frappe._dict, party_currency: str, precision: int, exclude_batch: str | None = None
+) -> tuple[float, str | None]:
+	"""(what `available_outstanding` returns, None), or (0, the reason nothing is left) without throwing."""
 	name = frappe.bold(source.name)
 	outstanding = posting.get_reference_outstanding(
 		source.doctype, source.name, info.party_type, info.party, party_currency, precision
 	)
 	if outstanding <= 0:
-		frappe.throw(_("{0} {1} has nothing outstanding.").format(_(source.doctype), name))
+		return 0.0, _("{0} {1} has nothing outstanding.").format(_(source.doctype), name)
 	available = flt(outstanding - reserved_amount(source.doctype, source.name, exclude_batch), precision)
 	if available <= 0:
-		frappe.throw(
-			_("{0} {1} is already covered by open cheques or scheduled transfers.").format(
-				_(source.doctype), name
-			)
+		return 0.0, _("{0} {1} is already covered by open cheques or scheduled transfers.").format(
+			_(source.doctype), name
 		)
-	return available
+	return available, None
 
 
 def to_document_currency(
@@ -403,9 +434,3 @@ def check_create_permission(doctype: str, company: str | None):
 			frappe.PermissionError,
 			title=_("Not Permitted"),
 		)
-
-
-def mark_new(doc) -> dict:
-	"""The unsaved document as the client opens it (`frappe.model.sync`: local, named on the client)."""
-	doc.set("__islocal", 1)
-	return doc.as_dict()

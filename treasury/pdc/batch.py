@@ -34,6 +34,7 @@ import erpnext
 import frappe
 from erpnext.accounts.doctype.account.account import get_account_currency
 from frappe import _
+from frappe.model.document import Document
 from frappe.query_builder.functions import IfNull, Sum
 from frappe.utils import add_days, cint, flt, getdate
 
@@ -219,9 +220,15 @@ def generate_rows(batch) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def validate_source(batch):
+def validate_source(batch, check_payable: bool | None = None):
 	"""The document a batch was created from: a submitted invoice / order / Journal Entry / hrms document of
-	the batch's company and party. Returns it (None without a source); a half-set pair is cleared."""
+	the batch's company and party. Returns it (None without a source); a half-set pair is cleared.
+
+	The fields are read only in the form only, so a new or changed source (and every Generate Cheques,
+	`allocate_to_source`) is also checked as the mappers check it: the user may read it (nothing about a
+	document the user cannot read is revealed, not even whose it is) and Treasury may still settle it (an open
+	party of a Journal Entry, booked on the party's default account; not a return / on hold / closed ...). An
+	unchanged source is not checked again, so another user may still edit or submit the draft."""
 	from treasury.utils import source_documents
 
 	if not (batch.get("source_doctype") and batch.get("source_name")):
@@ -230,7 +237,11 @@ def validate_source(batch):
 	doctype, name = batch.source_doctype, batch.source_name
 	if doctype not in source_documents.REFERENCE_SOURCES:
 		frappe.throw(_("{0} cannot be a Cheque Batch source.").format(_(doctype)))
+	if check_payable is None:
+		check_payable = _source_changed(batch)
 	values = frappe.db.get_value(doctype, name, ["docstatus", "company"], as_dict=True)
+	if values and check_payable:
+		frappe.has_permission(doctype, "read", doc=name, throw=True)
 	if (
 		not values
 		or values.docstatus != 1
@@ -242,15 +253,30 @@ def validate_source(batch):
 				_(doctype), frappe.bold(name), _(batch.party_type or "-"), frappe.bold(batch.party or "-")
 			)
 		)
-	return frappe.get_doc(doctype, name)
+	source = frappe.get_doc(doctype, name)
+	if check_payable:
+		info = source_documents.resolve(source, batch.party_type, batch.party)
+		source_documents.check_payable(source, info)
+	return source
+
+
+def _source_changed(batch) -> bool:
+	"""A new batch, or a source set / changed since the last save (a plain dict: always)."""
+	if not isinstance(batch, Document):
+		return True
+	return (
+		batch.is_new() or batch.has_value_changed("source_doctype") or batch.has_value_changed("source_name")
+	)
 
 
 def allocate_to_source(batch) -> float:
 	"""Allocate the rows to the batch's source, earliest due first, up to what is left of it (party account
-	currency); the rows after that stay unallocated (an advance). Returns the total allocated."""
+	currency); the rows after that stay unallocated (an advance). Returns the total allocated. A source with
+	nothing left (paid, or covered by other cheques / scheduled transfers) leaves every row unallocated, with an
+	orange message: the cheques are still generated."""
 	from treasury.utils import source_documents
 
-	source = validate_source(batch)
+	source = validate_source(batch, check_payable=True)
 	if not source:
 		return 0
 	header = transient_cheque(batch)
@@ -271,9 +297,12 @@ def allocate_to_source(batch) -> float:
 		return 0
 	precision = _precision("PDC Cheque Reference", "allocated_amount")
 	info = frappe._dict(party_type=batch.party_type, party=batch.party)
-	remaining = source_documents.available_outstanding(
+	remaining, nothing_left = source_documents.uncovered_outstanding(
 		source, info, party_currency, precision, exclude_batch=batch.name
 	)
+	if nothing_left:
+		frappe.msgprint(nothing_left, title=_("Not Allocated"), indicator="orange")
+		return 0
 	allocated = 0.0
 	for row in sorted(batch.cheques, key=lambda r: (getdate(r.due_date), r.idx)):
 		take = flt(min(flt(row.amount, precision), remaining), precision)

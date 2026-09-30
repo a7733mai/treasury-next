@@ -1,6 +1,7 @@
 """PDC Cheque / Cheque Batch mappers for the Treasury buttons of the ERPNext documents (spec 7c §3.3).
 
-Read only, like Frappe's `make_mapped_doc`: they return a new, unsaved document (`__islocal`) that the client
+Read only, like Frappe's `make_mapped_doc`: they return a new, unsaved document (`__islocal`, set by
+`frappe.new_doc`) that the client
 opens with `frappe.model.sync` + `set_route`; nothing is written until the user saves it through the normal
 insert path, which runs every validation. A cheque leaf is never allocated here: `PDCCheque.before_insert`
 allocates it on save (and a batch's leaves on submit).
@@ -61,7 +62,7 @@ def _make_pdc_cheque(source_doctype, source_name, company, party_type, party) ->
 				"allocated_amount": outstanding,
 			},
 		)
-	return sd.mark_new(doc)
+	return doc.as_dict()
 
 
 @frappe.whitelist()
@@ -105,7 +106,7 @@ def _make_cheque_batch(source_doctype, source_name, company, party_type, party) 
 		if doc.cheque_book and flt(doc.gen_total) > 0:
 			# the batch numbers its own cheques: the rows (allocated to the source) come ready
 			batch.generate_rows(doc)
-	return sd.mark_new(doc)
+	return doc.as_dict()
 
 
 def _prepare(target: str, source_doctype, source_name, company, party_type, party):
@@ -113,7 +114,8 @@ def _prepare(target: str, source_doctype, source_name, company, party_type, part
 	source = sd.get_source(source_doctype, source_name, _(target))
 	info = sd.resolve(source, party_type, party)
 	if info.kind == sd.PARTY:
-		info.company = sd.default_company(company)
+		# an Employee's own company; a Customer / Supplier has none: the one given, else the user's default
+		info.company = info.company or sd.default_company(company)
 	sd.check_create_permission(target, info.company)
 	sd.check_payable(source, info)
 	# the settings exist (else a clear "missing settings" message before anything else)

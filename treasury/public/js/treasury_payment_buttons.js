@@ -307,6 +307,10 @@ treasury.payment_buttons.show_refusal = (r, hint) => {
 	};
 
 	const journal_buttons = (frm, config) => {
+		// no server call for a reader who may create none of the documents the buttons open
+		if (!config.buttons.some((key) => frappe.model.can_create(ACTIONS[key].doctype))) {
+			return;
+		}
 		const name = frm.doc.name;
 		frappe.xcall("treasury.utils.source_documents.get_journal_parties", { journal_entry: name }).then((parties) => {
 			if (frm.doc.name !== name || frm.is_new()) {
@@ -352,9 +356,8 @@ treasury.payment_buttons.show_refusal = (r, hint) => {
 					return;
 				}
 				const lines = bonds.slice(0, TENDER_LINES).map((bond) => {
-					const link = `<a href="/app/security-cheque/${encodeURIComponent(bond.name)}"><b><bdi>${esc(
-						bond.name
-					)}</bdi></b></a>`;
+					const href = frappe.utils.get_form_link("Security Cheque", bond.name);
+					const link = `<a href="${esc(href)}"><b><bdi>${esc(bond.name)}</bdi></b></a>`;
 					const amount = `<bdi>${esc(format_currency(bond.amount, bond.currency))}</bdi>`;
 					const status = esc(__(bond.status, null, "Security Cheque"));
 					return bond.expiry_date

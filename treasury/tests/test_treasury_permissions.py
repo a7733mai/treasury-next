@@ -5,17 +5,19 @@ in an elevated context (treasury.utils.context.elevated) after the lifecycle che
 on the cheque. Also covers the one-time removal of the Custom DocPerm grants of earlier versions.
 """
 
+import json
 from unittest.mock import patch
 
 import frappe
 from erpnext.accounts.doctype.payment_entry.payment_entry import PaymentEntry
 from frappe.cache_manager import clear_user_cache
-from frappe.permissions import add_permission
+from frappe.permissions import add_permission, reset_perms
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
 
 from treasury.install import (
 	LEGACY_CLEANUP_DONE_KEY,
+	LEGACY_GRANTS_KEY,
 	LEGACY_PERMISSION_DOCTYPES,
 	LEGACY_PERMISSION_ROLES,
 	remove_legacy_permissions,
@@ -38,6 +40,8 @@ from treasury.utils.context import REAL_USER_FLAG, elevated, real_user
 TREASURY_USER = "treasury-perm-user@example.com"
 TREASURY_MANAGER = "treasury-perm-manager@example.com"
 SAVEPOINT = "treasury_legacy_permissions_test"
+# stands for another app's role holding Custom DocPerm rows on core doctypes (hrms: Employee Self Service)
+OTHER_APP_ROLE = "_Test Treasury Other App Role"
 SAVEPOINT_FAILED_POSTING = "treasury_failed_posting_test"
 
 
@@ -217,12 +221,19 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 
 
 class TestLegacyPermissionCleanup(IntegrationTestCase):
-	"""`remove_legacy_permissions` undoes the Custom DocPerm grants of earlier versions."""
+	"""`remove_legacy_permissions` undoes the Custom DocPerm grants of earlier versions, and only those.
+
+	Other apps keep Custom DocPerm rows on the same core doctypes (hrms: its "Employee Self Service" user type
+	adds `select` on Currency / Mode of Payment / Company / Account ..., HR User / HR Manager read Currency), so
+	the tests never assume a doctype without customisation: `clean_site` first puts the doctypes they use back
+	to their standard permissions (rolled back with the savepoint), and `other_app_row` recreates such a row
+	explicitly. They pass the same with or without hrms installed."""
 
 	def setUp(self):
 		super().setUp()
 		frappe.db.savepoint(SAVEPOINT)
 		self.addCleanup(self.restore)
+		frappe.db.set_global(LEGACY_GRANTS_KEY, None)
 
 	@staticmethod
 	def restore():
@@ -230,11 +241,29 @@ class TestLegacyPermissionCleanup(IntegrationTestCase):
 		for doctype in LEGACY_PERMISSION_DOCTYPES:
 			frappe.clear_cache(doctype=doctype)
 		clear_user_cache()
+		frappe.clear_cache(user="__global")  # the cleanup markers (global defaults) written in the test
+
+	@staticmethod
+	def clean_site(*doctypes: str):
+		"""The doctypes as on a site without any other app or customisation: standard permissions only."""
+		for doctype in doctypes:
+			reset_perms(doctype)
 
 	@staticmethod
 	def legacy_grant(doctype: str, role: str):
 		"""What the legacy version did: copy the standard permissions, then add a read row for the role."""
 		add_permission(doctype, role, 0, "read")
+
+	@staticmethod
+	def other_app_row(doctype: str) -> str:
+		"""A Custom DocPerm row of another app's role (like hrms's Employee Self Service `select` rows)."""
+		if not frappe.db.exists("Role", OTHER_APP_ROLE):
+			frappe.get_doc({"doctype": "Role", "role_name": OTHER_APP_ROLE, "desk_access": 1}).insert(
+				ignore_permissions=True
+			)
+		name = add_permission(doctype, OTHER_APP_ROLE, 0)
+		frappe.db.set_value("Custom DocPerm", name, {"select": 1, "read": 0, "export": 0})
+		return name
 
 	@staticmethod
 	def treasury_rows(doctype: str) -> list[str]:
@@ -245,6 +274,7 @@ class TestLegacyPermissionCleanup(IntegrationTestCase):
 		)
 
 	def test_copied_permissions_are_reset_to_standard(self):
+		self.clean_site("Mode of Payment")
 		for role in LEGACY_PERMISSION_ROLES:
 			self.legacy_grant("Mode of Payment", role)
 		self.assertTrue(self.treasury_rows("Mode of Payment"))
@@ -255,7 +285,35 @@ class TestLegacyPermissionCleanup(IntegrationTestCase):
 		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": "Mode of Payment"}))
 		self.assertTrue(frappe.db.get_global(LEGACY_CLEANUP_DONE_KEY))
 
+	def test_other_apps_permissions_are_kept(self):
+		# hrms-like: another app's role holds Custom DocPerm rows on the doctype, before and after the legacy
+		# grant; the Treasury rows go, every other row stays, and the doctype is not reset to standard
+		self.clean_site("Mode of Payment", "Currency")
+		before = self.other_app_row("Mode of Payment")
+		for role in LEGACY_PERMISSION_ROLES:
+			self.legacy_grant("Mode of Payment", role)
+			self.legacy_grant("Currency", role)
+		after = self.other_app_row("Currency")
+		kept = frappe.get_all(
+			"Custom DocPerm",
+			filters={
+				"parent": ["in", ("Mode of Payment", "Currency")],
+				"role": ["not in", LEGACY_PERMISSION_ROLES],
+			},
+			pluck="name",
+		)
+
+		reset = remove_legacy_permissions(force=True)
+
+		self.assertNotIn("Mode of Payment", reset)
+		self.assertNotIn("Currency", reset)
+		self.assertFalse(self.treasury_rows("Mode of Payment") + self.treasury_rows("Currency"))
+		for name in (before, after, *kept):
+			self.assertTrue(frappe.db.exists("Custom DocPerm", name), name)
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", before, ["select", "read"]), (1, 0))
+
 	def test_other_customisations_are_kept(self):
+		self.clean_site("Bank")
 		self.legacy_grant("Bank", "Treasury User")
 		# an administrator's own change on another role of the copied permissions
 		row = frappe.get_all(
@@ -272,7 +330,60 @@ class TestLegacyPermissionCleanup(IntegrationTestCase):
 		self.assertFalse(self.treasury_rows("Bank"))
 		self.assertTrue(frappe.db.exists("Custom DocPerm", row.name))
 
+	def test_recorded_grants_undo_only_what_treasury_did(self):
+		# the legacy record: Treasury created the Treasury Manager row on Bank (and caused the copy), and only
+		# switched `read` on in a Treasury User row an administrator had made before
+		self.clean_site("Bank", "Currency")
+		admin_row = add_permission("Bank", "Treasury User", 0)
+		frappe.db.set_value("Custom DocPerm", admin_row, {"read": 0, "select": 1, "report": 1})
+		self.legacy_grant("Bank", "Treasury Manager")
+		frappe.db.set_value("Custom DocPerm", admin_row, "read", 1)
+		# a Treasury role row the legacy version never recorded (made by an administrator): kept
+		unrecorded = add_permission("Currency", "Treasury Manager", 0)
+		frappe.db.set_global(
+			LEGACY_GRANTS_KEY,
+			json.dumps(
+				{
+					"grants": [
+						{"doctype": "Bank", "role": "Treasury Manager", "ptype": "read", "created_row": True},
+						{"doctype": "Bank", "role": "Treasury Manager", "ptype": "select", "created_row": True},
+						{"doctype": "Bank", "role": "Treasury User", "ptype": "read", "created_row": False},
+					],
+					"copied": [],
+				}
+			),
+		)
+
+		reset = remove_legacy_permissions(force=True)
+
+		self.assertEqual(reset, [])
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": "Bank", "role": "Treasury Manager"}))
+		self.assertEqual(
+			frappe.db.get_value("Custom DocPerm", admin_row, ["read", "select", "report"]), (0, 1, 1)
+		)
+		self.assertTrue(frappe.db.exists("Custom DocPerm", unrecorded))
+		self.assertIsNone(frappe.db.get_global(LEGACY_GRANTS_KEY))
+
+	def test_recorded_copy_is_reset_to_standard(self):
+		self.clean_site("Bank")
+		self.legacy_grant("Bank", "Treasury User")
+		frappe.db.set_global(
+			LEGACY_GRANTS_KEY,
+			json.dumps(
+				{
+					"grants": [
+						{"doctype": "Bank", "role": "Treasury User", "ptype": "read", "created_row": True}
+					],
+					"copied": ["Bank"],
+				}
+			),
+		)
+
+		self.assertEqual(remove_legacy_permissions(force=True), ["Bank"])
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": "Bank"}))
+
 	def test_runs_once_and_is_idempotent(self):
+		self.clean_site("Currency")
 		remove_legacy_permissions(force=True)
 		# a grant made by an administrator after the cleanup is left alone by later migrates
 		self.legacy_grant("Currency", "Treasury Manager")

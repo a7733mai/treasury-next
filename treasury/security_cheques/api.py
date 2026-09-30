@@ -54,6 +54,8 @@ def _make_security_cheque(source_doctype: str, source_name: str, company: str | 
 		frappe.throw(_("{0} {1} does not exist").format(_(source_doctype), source_name or "-"))
 	source = frappe.get_doc(source_doctype, source_name)
 	source.check_permission("read")
+	if source_doctype in sd.PARTY_MASTERS:
+		sd.check_active_party(source)
 	company = source.get("company") or sd.default_company(company)
 	sd.check_create_permission(DOCTYPE, company)
 	if source.docstatus == 2:
@@ -90,7 +92,7 @@ def _make_security_cheque(source_doctype: str, source_name: str, company: str | 
 		kind = TENDER_BOND if source_doctype in QUOTATIONS else PERFORMANCE_BOND
 		bond = _set_amount(doc, source, kind, flt(settings.get(BOND_PERCENT_FIELDS[kind])), company_currency)
 		doc.remarks = _remarks(kind, source_doctype, source_name, bond)
-	values = sd.mark_new(doc)
+	values = doc.as_dict()
 	if bond:
 		values["__bond"] = bond
 	return values

@@ -1,3 +1,5 @@
+import json
+
 import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
@@ -129,35 +131,93 @@ def create_roles():
 def remove_legacy_permissions(force: bool = False) -> list[str]:
 	"""Undo the Custom DocPerm grants of earlier development versions (see LEGACY_PERMISSION_DOCTYPES).
 
-	For each of those doctypes: delete the Custom DocPerm rows of the Treasury Manager / Treasury User roles
-	(and only those), then, if the remaining Custom DocPerm rows are exactly a copy of the standard DocPerm
-	rows, reset the doctype to its standard permissions (Frappe then follows the shipped permissions again).
-	A doctype an administrator customised otherwise keeps its customisation.
+	Only what Treasury itself did is undone; the Custom DocPerm rows of any other role (other apps, e.g. the
+	hrms "Employee Self Service" user type and HR roles on Currency / Mode of Payment / Company, or an
+	administrator) are never touched:
+	- with the record the legacy version kept (`LEGACY_GRANTS_KEY`): each recorded grant is undone (the row
+	  it created is deleted, a permission it switched on in an existing row is switched off again);
+	- without it: the Custom DocPerm rows of the Treasury Manager / Treasury User roles on those doctypes.
+	Then a doctype whose remaining Custom DocPerm rows are exactly a copy of its standard DocPerm rows is
+	reset to its standard permissions (Frappe then follows the shipped permissions again). A doctype with any
+	other customisation (another app's rows included) keeps its Custom DocPerm rows as they are.
 
 	Runs once per site (marker `LEGACY_CLEANUP_DONE_KEY`) unless `force`; idempotent either way.
 	Returns the doctypes that were reset to their standard permissions.
 	"""
 	if not force and frappe.db.get_global(LEGACY_CLEANUP_DONE_KEY):
 		return []
+	state = _legacy_state()
+	if state is None:
+		doctypes = [d for d in LEGACY_PERMISSION_DOCTYPES if frappe.db.exists("DocType", d)]
+		for doctype in doctypes:
+			for row in frappe.get_all(
+				"Custom DocPerm",
+				filters={"parent": doctype, "role": ["in", LEGACY_PERMISSION_ROLES]},
+				pluck="name",
+			):
+				frappe.delete_doc("Custom DocPerm", row, ignore_permissions=True, force=True)
+		copied = doctypes
+	else:
+		doctypes = _undo_recorded_grants(state)
+		# only a copy of the standard permissions the legacy grant itself caused
+		copied = [d for d in state.get("copied") or [] if d in doctypes]
 	reset = []
-	for doctype in LEGACY_PERMISSION_DOCTYPES:
-		if not frappe.db.exists("DocType", doctype):
-			continue
-		for row in frappe.get_all(
-			"Custom DocPerm",
-			filters={"parent": doctype, "role": ["in", LEGACY_PERMISSION_ROLES]},
-			pluck="name",
+	for doctype in doctypes:
+		if (
+			doctype in copied
+			and frappe.db.exists("Custom DocPerm", {"parent": doctype})
+			and _docperms(doctype, "Custom DocPerm") == _docperms(doctype, "DocPerm")
 		):
-			frappe.delete_doc("Custom DocPerm", row, ignore_permissions=True, force=True)
-		if frappe.db.exists("Custom DocPerm", {"parent": doctype}) and _docperms(
-			doctype, "Custom DocPerm"
-		) == _docperms(doctype, "DocPerm"):
 			reset_perms(doctype)
 			reset.append(doctype)
 		frappe.clear_cache(doctype=doctype)
 	frappe.db.set_global(LEGACY_GRANTS_KEY, None)
 	frappe.db.set_global(LEGACY_CLEANUP_DONE_KEY, "1")
 	return reset
+
+
+def _legacy_state() -> dict | None:
+	"""The record of the legacy grants: {"grants": [{doctype, role, ptype, created_row}], "copied": [doctype]}
+	(None when the site has none or it cannot be read)."""
+	value = frappe.db.get_global(LEGACY_GRANTS_KEY)
+	if not value:
+		return None
+	try:
+		state = json.loads(value)
+	except (TypeError, ValueError):
+		return None
+	if not isinstance(state, dict) or not isinstance(state.get("grants"), list):
+		return None
+	return state
+
+
+def _undo_recorded_grants(state: dict) -> list[str]:
+	"""Undo the grants of the legacy record (Treasury roles only); returns the doctypes involved (granted or
+	copied)."""
+	doctypes = []
+	created: set[tuple[str, str]] = set()
+	for grant in state["grants"]:
+		if not isinstance(grant, dict):
+			continue
+		doctype, role, ptype = grant.get("doctype"), grant.get("role"), grant.get("ptype")
+		if role not in LEGACY_PERMISSION_ROLES or not frappe.db.exists("DocType", doctype or ""):
+			continue
+		if doctype not in doctypes:
+			doctypes.append(doctype)
+		name = frappe.db.get_value(
+			"Custom DocPerm", {"parent": doctype, "role": role, "permlevel": 0, "if_owner": 0}, "name"
+		)
+		if not name:
+			continue
+		if grant.get("created_row") or (doctype, role) in created:
+			created.add((doctype, role))
+			frappe.delete_doc("Custom DocPerm", name, ignore_permissions=True, force=True)
+		elif ptype in DOCPERM_COLUMNS:
+			frappe.db.set_value("Custom DocPerm", name, ptype, 0, update_modified=False)
+	for doctype in state.get("copied") or []:
+		if doctype not in doctypes and isinstance(doctype, str) and frappe.db.exists("DocType", doctype):
+			doctypes.append(doctype)
+	return doctypes
 
 
 def _docperms(doctype: str, perm_doctype: str) -> list[tuple]:

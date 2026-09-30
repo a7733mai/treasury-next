@@ -1,6 +1,7 @@
 """Phase 7c: PDC Cheque / Cheque Batch mappers for invoices, orders, Journal Entries and party masters, and the
 Cheque Batch "Created From" source (spec 7c §3.1, §3.3, §4 A-G, §7)."""
 
+import copy
 import random
 
 import frappe
@@ -55,6 +56,7 @@ NO_ROLES_USER = "treasury-7c-noroles@example.com"
 READER = "treasury-7c-reader@example.com"
 TREASURY_USER = "treasury-7c-user@example.com"
 OTHER_COMPANY_USER = "treasury-7c-othercompany@example.com"
+TREASURY_READER = "treasury-7c-user-reader@example.com"
 CHEQUE_OUT_MODE = "_Test Treasury 7c Cheque Out"
 
 
@@ -343,6 +345,82 @@ class TestChequeMapper(DocumentPaymentsTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "uses account"):
 			map_cheque("Journal Entry", je.name)
 
+	def test_journal_party_on_two_accounts(self):
+		# the Supplier is credited 5,000 on Creditors (its default) and debited 1,000 on another payable
+		# account: the ledger outstanding (4,000) sums both, a Treasury Payment Entry would settle only
+		# Creditors and leave the two accounts open by opposite amounts (F12): every mapper refuses it
+		other_payable = ensure_account("Treasury Creditors 7c", "Accounts Payable", "Payable")
+		je = frappe.get_doc(
+			{
+				"doctype": "Journal Entry",
+				"company": COMPANY,
+				"posting_date": today(),
+				"accounts": [
+					{
+						"account": self.data.payable,
+						"party_type": "Supplier",
+						"party": SUPPLIER,
+						"credit_in_account_currency": 5000,
+						"cost_center": acc("Main"),
+					},
+					{
+						"account": other_payable,
+						"party_type": "Supplier",
+						"party": SUPPLIER,
+						"debit_in_account_currency": 1000,
+						"cost_center": acc("Main"),
+					},
+					{
+						"account": acc("Cost of Goods Sold"),
+						"debit_in_account_currency": 4000,
+						"cost_center": acc("Main"),
+					},
+				],
+			}
+		).insert()
+		je.submit()
+
+		[row] = source_documents.get_journal_parties(je.name)
+		self.assertEqual(
+			(row["account"], row["accounts"], flt(row["outstanding"]), row["supported"]),
+			(self.data.payable, [self.data.payable, other_payable], 4000, False),
+		)
+		for mapper, kwargs in (
+			(map_cheque, {}),
+			(map_cheque, {"party_type": "Supplier", "party": SUPPLIER}),
+			(map_batch, {}),
+			(build_transfer, {}),
+		):
+			with self.subTest(mapper=mapper.__name__, **kwargs):
+				with self.assertRaisesRegex(source_documents.TreasuryPartyAccountError, "uses account") as caught:
+					mapper("Journal Entry", je.name, **kwargs)
+				self.assertIn(other_payable, str(caught.exception))
+
+	def test_party_master_company_and_status(self):
+		# an Employee's documents are prepared for the Employee's own company, whatever the user's default
+		employee = ensure_employee()
+		ensure_company(OTHER_COMPANY, OTHER_ABBR)
+		self.assertEqual(map_cheque("Employee", employee, company=OTHER_COMPANY)["company"], COMPANY)
+		self.assertEqual(map_batch("Employee", employee, company=OTHER_COMPANY)["company"], COMPANY)
+		self.assertEqual(build_transfer("Employee", employee, company=OTHER_COMPANY)["company"], COMPANY)
+		self.assertEqual(map_security("Employee", employee, company=OTHER_COMPANY)["company"], COMPANY)
+
+		# disabled / inactive masters get nothing (the buttons are hidden; the server refuses too)
+		frappe.db.set_value("Supplier", SUPPLIER, "disabled", 1)
+		frappe.db.set_value("Employee", employee, "status", "Left")
+		for mapper, doctype, name, status in (
+			(map_cheque, "Supplier", SUPPLIER, "Disabled"),
+			(map_batch, "Supplier", SUPPLIER, "Disabled"),
+			(build_transfer, "Supplier", SUPPLIER, "Disabled"),
+			(map_security, "Supplier", SUPPLIER, "Disabled"),
+			(map_cheque, "Employee", employee, "Left"),
+			(build_transfer, "Employee", employee, "Left"),
+			(map_security, "Employee", employee, "Left"),
+		):
+			with self.subTest(mapper=mapper.__name__, doctype=doctype):
+				with self.assertRaisesRegex(frappe.ValidationError, f"is {status}"):
+					mapper(doctype, name, company=COMPANY)
+
 	def test_invalid_sources(self):
 		egp = self.data.egp
 		draft = make_purchase_invoice(100, submit=False)
@@ -541,6 +619,97 @@ class TestBatchMapper(DocumentPaymentsTestCase):
 		)
 		with self.assertRaisesRegex(frappe.ValidationError, "does not belong to"):
 			batch.validate_source(other)
+
+	def test_batch_source_needs_read_permission(self):
+		# the source fields are read only in the form only: a user who cannot read the invoice learns nothing
+		# about it through Generate Cheques (its outstanding) or a save (whose it is)
+		ensure_user(TREASURY_USER, ["Treasury User"])  # reads no Sales Invoice
+		ensure_user(TREASURY_READER, ["Treasury User", "Accounts User"])
+		si = make_sales_invoice(3000)
+		values = map_batch("Sales Invoice", si.name)
+		values["gen_first_cheque_no"] = unique_cheque_no() + "1"
+
+		with self.set_user(TREASURY_USER):
+			doc = frappe.get_doc(copy.deepcopy(values))
+			self.assertRaises(frappe.PermissionError, doc.generate_rows)
+			self.assertRaises(frappe.PermissionError, batch.validate_source, doc)
+		with self.set_user(TREASURY_READER):
+			doc = frappe.get_doc(copy.deepcopy(values))
+			self.assertEqual(flt(doc.generate_rows()["allocated"]), 3000)
+			doc.insert()
+
+		# an unchanged source is not checked again on save: another user may still edit the draft ...
+		saved = frappe.get_doc("Cheque Batch", doc.name)
+		saved.load_doc_before_save()  # what `save` does before `validate`
+		with self.set_user(TREASURY_USER):
+			self.assertEqual(batch.validate_source(saved).name, si.name)
+			# ... but Generate Cheques reads the source's outstanding: checked every time
+			self.assertRaises(frappe.PermissionError, saved.generate_rows)
+
+	def test_batch_journal_source_checked_on_save(self):
+		# a Journal Entry source set by hand (API): an open party row, on the party's default account
+		expense = acc("Cost of Goods Sold")
+		self.use_company_settings(auto_select_cheque_book=0)  # rows numbered by hand
+		good = make_party_journal_entry("Supplier", SUPPLIER, 900, expense)
+		other_payable = ensure_account("Treasury Creditors 7c", "Accounts Payable", "Payable")
+		wrong_account = make_party_journal_entry(
+			"Supplier", SUPPLIER, 800, expense, party_account=other_payable
+		)
+		# settled in ERPNext by another Journal Entry against it: the Supplier row is no longer open
+		paid = make_party_journal_entry("Supplier", SUPPLIER, 600, expense)
+		settlement = frappe.get_doc(
+			{
+				"doctype": "Journal Entry",
+				"company": COMPANY,
+				"posting_date": today(),
+				"accounts": [
+					{
+						"account": self.data.payable,
+						"party_type": "Supplier",
+						"party": SUPPLIER,
+						"debit_in_account_currency": 600,
+						"reference_type": "Journal Entry",
+						"reference_name": paid.name,
+						"cost_center": acc("Main"),
+					},
+					{"account": expense, "credit_in_account_currency": 600, "cost_center": acc("Main")},
+				],
+			}
+		).insert()
+		settlement.submit()
+		self.assertEqual(source_documents.get_journal_parties(paid.name), [])
+
+		def batch_from(source_name):
+			doc = frappe.get_doc(map_batch("Journal Entry", good.name))
+			doc.gen_first_cheque_no = unique_cheque_no() + "1"
+			doc.generate_rows()
+			doc.source_name = source_name
+			return doc
+
+		with self.assertRaisesRegex(source_documents.TreasuryPartyAccountError, "uses account"):
+			batch_from(wrong_account.name).insert()
+		with self.assertRaisesRegex(frappe.ValidationError, "is not an open party"):
+			batch_from(paid.name).insert()
+		self.assertEqual(batch_from(good.name).insert().source_name, good.name)
+
+	def test_batch_generate_when_source_covered(self):
+		# the source is already covered by an open cheque: the cheques are still generated, all unallocated
+		# (an advance), with an orange message instead of an error
+		self.use_company_settings(default_installment_count=2)
+		si = make_sales_invoice(3000)
+		doc = frappe.get_doc(map_batch("Sales Invoice", si.name))
+		make_pdc_cheque("Incoming", amount=3000, invoice=si)
+		doc.gen_first_cheque_no = unique_cheque_no() + "1"
+		frappe.local.message_log = []
+
+		result = doc.generate_rows()
+
+		self.assertEqual((result["rows"], flt(result["allocated"])), (2, 0))
+		self.assertTrue(all(not r.reference_name and not flt(r.allocated_amount) for r in doc.cheques))
+		messages = [m for m in frappe.local.message_log if isinstance(m, dict)]
+		self.assertTrue(
+			any("already covered" in str(m.get("message")) and m.get("indicator") == "orange" for m in messages)
+		)
 
 	def test_batch_split_currency_no_allocation(self):
 		usd = self.data.usd
