@@ -176,14 +176,14 @@ def make_installment_batch(drawdown: str) -> dict:
 def validate_batch(batch):
 	"""The Cheque Batch of installment cheques (treasury.pdc.batch.validate_batch; again under the drawdown
 	lock on submit): the drawdown's lender, bank and open installments, each cheque exactly its installment.
-	Its messages show the installments: the user must be able to read the drawdown."""
+	Its messages show the installments: the user must be able to read the drawdown (checked first)."""
+	if not batch.flags.ignore_permissions:
+		frappe.has_permission(DRAWDOWN, "read", batch.facility_drawdown, throw=True)
 	if getattr(batch, "_action", None) == "submit":
 		# a cheque linked by another batch moves `schedule_version` (`link_cheque`): a batch submitted
 		# meanwhile is detected here instead of issuing a second cheque for the same installment
 		repayment.lock_drawdown(batch.facility_drawdown)
 	drawdown = frappe.get_doc(DRAWDOWN, batch.facility_drawdown)
-	if not batch.flags.ignore_permissions:
-		drawdown.check_permission("read")
 	if (
 		drawdown.docstatus != 1
 		or drawdown.repayment_mode != PDC_TO_LENDER

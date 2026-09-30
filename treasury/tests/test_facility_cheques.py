@@ -28,6 +28,7 @@ from treasury.tests.utils import (
 	PE_SETTINGS,
 	SUPPLIER,
 	TreasuryTestMixin,
+	add_user_permission,
 	assert_deductions,
 	assert_gl_entries,
 	ensure_alert_bank,
@@ -47,6 +48,9 @@ D = getdate
 CHEQUE = "PDC Cheque"
 TREASURY_USER = "treasury-7g-cheques-user@example.com"
 ACCOUNTS_USER = "treasury-7g-cheques-accounts@example.com"
+# a Treasury User who reads one drawdown only (User Permission, test_batch_needs_read_on_the_drawdown)
+RESTRICTED_USER = "treasury-7g-cheques-restricted@example.com"
+DRAWDOWN = "Facility Drawdown"
 
 
 class FacilityChequeTestCase(TreasuryTestMixin, IntegrationTestCase):
@@ -56,6 +60,7 @@ class FacilityChequeTestCase(TreasuryTestMixin, IntegrationTestCase):
 		cls.accounts = ensure_facility_accounts()
 		ensure_user(TREASURY_USER, ["Treasury User"])
 		ensure_user(ACCOUNTS_USER, ["Accounts User"])
+		ensure_user(RESTRICTED_USER, ["Treasury User"])
 
 	def setUp(self):
 		super().setUp()
@@ -450,11 +455,20 @@ class TestInstallmentCheques(FacilityChequeTestCase):
 
 	def test_batch_needs_read_on_the_drawdown(self):
 		"""Security review 7g Minor 6: the batch's messages show the installments; validating an installment
-		batch needs read permission on the drawdown."""
+		batch needs read permission on the drawdown. The user may create batches (Treasury User) but reads only
+		another drawdown (a User Permission)."""
 		s = self.loan()
+		other = make_drawdown(make_bank_facility())
 		batch = frappe.get_doc(facility_cheques.make_installment_batch(s.drawdown.name))
-		with self.set_user(ACCOUNTS_USER):
+		add_user_permission(RESTRICTED_USER, DRAWDOWN, other.name, applicable_for=DRAWDOWN)
+		self.addCleanup(frappe.cache.hdel, "user_permissions", RESTRICTED_USER)
+		with self.set_user(RESTRICTED_USER):
+			self.assertTrue(frappe.has_permission("Cheque Batch", "create"))
+			self.assertFalse(frappe.has_permission(DRAWDOWN, "read", s.drawdown.name))
 			self.assertRaises(frappe.PermissionError, facility_cheques.validate_batch, batch)
+		# the same batch validates for a Treasury User who reads the drawdown
+		with self.set_user(TREASURY_USER):
+			facility_cheques.validate_batch(batch)
 
 	def test_manual_repayment_on_cheque_row_refused(self):
 		s = self.loan()

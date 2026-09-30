@@ -73,10 +73,11 @@ class UX7gTestCase(TreasuryTestMixin, IntegrationTestCase):
 
 	@staticmethod
 	def onload(doc, key):
-		"""The `__onload` value `key` of the stored document, as the form gets it."""
+		"""The `__onload` value `key` of the stored document, as the form gets it (None when the controller
+		does not send it: the optional keys are absent when they do not apply, the forms read them with `||`)."""
 		doc = frappe.get_doc(doc.doctype, doc.name)
 		doc.run_method("onload")
-		return doc.get_onload(key)
+		return doc.get_onload().get(key)
 
 	def cheque_drawdown(self, installments=(1, 2), **values):
 		"""A PDC to Lender drawdown whose first installments have delivered cheques."""
