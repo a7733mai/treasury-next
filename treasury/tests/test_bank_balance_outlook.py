@@ -9,6 +9,7 @@ from frappe.utils import fmt_money
 
 from treasury.balance_alerts import dashboard
 from treasury.pdc.report.bank_balance_outlook.bank_balance_outlook import execute
+from treasury.tests.test_bank_positions import add_twin
 from treasury.tests.utils import (
 	COMPANY,
 	OTHER_ABBR,
@@ -23,6 +24,7 @@ from treasury.tests.utils import (
 	fund_bank,
 	make_alert_fixture_e1,
 	make_pdc_cheque,
+	set_thresholds,
 )
 
 USD_ONLY_USER = "treasury-outlook-usd@example.com"
@@ -124,6 +126,26 @@ class TestBankBalanceOutlook(BalanceAlertTestMixin, IntegrationTestCase):
 		with self.set_user(USD_ONLY_USER):
 			_columns, data, *_rest = execute({"company": COMPANY, "horizon_days": 7})
 		self.assertEqual([r.bank_account for r in data], [self.usd.bank_account])
+
+	def test_shared_gl_account_filter(self):
+		"""Review M4: selecting one of two bank accounts on one GL account gives the same row as both: the
+		sibling's flows and thresholds are kept (the GL balance covers both anyway)."""
+		bank = ensure_alert_bank()
+		twin = add_twin(bank)
+		fund_bank(bank, 50000, self.day(-1))
+		cheque = make_pdc_cheque(amount=2000, issue_date=self.today, due_date=self.day(1), bank_account=twin)
+		cheque.deliver(handover_date=self.today)
+		set_thresholds(self, [{"bank_account": twin, "warning_balance": 49500, "minimum_balance": 48500}])
+
+		def row(banks):
+			_columns, data, *_rest = execute({"company": COMPANY, "bank_account": banks, "horizon_days": 3})
+			(only,) = data
+			return (only.bank_account, only.lowest_balance, only.minimum_balance, only.level)
+
+		both = row([bank.bank_account, twin])
+		self.assertEqual(both, (sorted([bank.bank_account, twin])[0], 48000, 48500, "Critical"))
+		self.assertEqual(row([bank.bank_account]), both)
+		self.assertEqual(row([twin]), both)
 
 	def test_low_balance_card(self):
 		card = dashboard.get_low_balance_card({"company": COMPANY, "horizon_days": 7})

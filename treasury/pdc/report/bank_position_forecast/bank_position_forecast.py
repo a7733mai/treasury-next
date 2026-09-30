@@ -225,6 +225,8 @@ class BankPositionForecast:
 			from_date=self.from_date,
 			to_date=self.to_date,
 			currency_view=BANK_CURRENCY if self.bank_view else COMPANY_CURRENCY,
+			# per bank: the sources may leave `amount` (company currency) empty, it is never used
+			per_bank=self.per_bank,
 		)
 
 	def get_hook_flows(self) -> list[frappe._dict]:

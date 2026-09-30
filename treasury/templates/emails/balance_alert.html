@@ -1,5 +1,6 @@
 {#- Critical / warning bank balance alert (design 7e §3.2): inline styles only, table layout, every value
-    escaped. Built by treasury.balance_alerts.notify.render_alert; `start` / `end` follow the text direction. -#}
+    escaped. Built by treasury.balance_alerts.notify.render_alert per recipient (only the payments they may
+    read are listed); `start` / `end` follow the text direction. -#}
 {%- set cell = "padding: 6px 8px; border-bottom: 1px solid #E2E6E9;" -%}
 {%- set num = cell ~ " text-align: " ~ end ~ "; white-space: nowrap;" -%}
 <div dir="{{ dir }}" style="direction: {{ dir }}; text-align: {{ start }}; font-family: Tahoma, Arial, sans-serif; font-size: 13px; color: #1F272E; max-width: 680px;">
@@ -40,7 +41,7 @@
 		</tbody>
 	</table>
 
-	{% if movements %}
+	{% if movements or movements_other %}
 	<p style="margin: 12px 0 4px 0; font-weight: bold;">{{ movements_title | e }}</p>
 	<table cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
 		<thead>
@@ -69,6 +70,12 @@
 				<td style="{{ num }}"><bdi dir="ltr">{{ m.amount | e }}</bdi></td>
 			</tr>
 			{% endfor %}
+			{#- the payments the recipient may not read: their total only -#}
+			{% if movements_other %}
+			<tr class="treasury-other-movements">
+				<td colspan="4" style="{{ cell }} color: #6C757D;">{{ movements_other | e }}</td>
+			</tr>
+			{% endif %}
 		</tbody>
 	</table>
 	{% endif %}

@@ -94,6 +94,7 @@ class ChequeBatch(Document):
 			batch.clear_cancelled_leaves(self)
 
 	def validate(self):
+		guard.reset_override_flag(self)
 		batch.validate_batch(self)
 		self.status = batch.current_status(self)
 

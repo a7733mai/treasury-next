@@ -107,6 +107,7 @@ class BankCharge(Document):
 		self.status = charges.DRAFT
 		self.accounting_status = charges.NOT_POSTED
 		instruments.reset_draft_fields(self, DRAFT_RESET_FIELDS)
+		guard.reset_override_flag(self)
 		self.set_refund_defaults()
 		if not (self.company and self.bank_account and self.category):
 			return  # Frappe's mandatory check names the missing fields

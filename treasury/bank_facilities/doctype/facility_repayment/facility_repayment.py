@@ -84,6 +84,7 @@ class FacilityRepayment(Document):
 			for fieldname in SYSTEM_FIELDS:
 				self.set(fieldname, None)
 			self.submission_seq = 0
+		guard.reset_override_flag(self)
 		drawdown = self.get_drawdown()
 		self.set_drawdown_details(drawdown)
 		self.validate_date(drawdown)

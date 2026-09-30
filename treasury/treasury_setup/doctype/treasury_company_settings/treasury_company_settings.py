@@ -385,15 +385,29 @@ class TreasuryCompanySettings(Document):
 	def get_threshold_banks(self) -> list[dict]:
 		"""Read only (design 7e P3): the company's enabled bank accounts with a GL account, each with the
 		currency of its GL account ([{bank_account, currency}], name order), for "Add All Bank Accounts" and
-		the currency preview of the thresholds grid. Treasury users need not read Bank Account or Account."""
+		the currency preview of the thresholds grid. Treasury users need not read Bank Account or Account, but
+		their User Permissions on Bank Account apply as in the bank position reports and alerts (PDC Cheque):
+		a bank account they may not see there is left out."""
+		from treasury.pdc.report_utils import DOCTYPE as REPORT_DOCTYPE
+		from treasury.pdc.report_utils import is_permitted_value
+
 		doc = frappe.get_doc(self.doctype, self.name)
 		doc.check_permission("read")
-		banks = frappe.get_all(
-			"Bank Account",
-			filters={"company": doc.company, "is_company_account": 1, "disabled": 0, "account": ["is", "set"]},
-			fields=["name", "account"],
-			order_by="name asc",
-		)
+		banks = [
+			b
+			for b in frappe.get_all(
+				"Bank Account",
+				filters={
+					"company": doc.company,
+					"is_company_account": 1,
+					"disabled": 0,
+					"account": ["is", "set"],
+				},
+				fields=["name", "account"],
+				order_by="name asc",
+			)
+			if is_permitted_value("Bank Account", b.name, REPORT_DOCTYPE)
+		]
 		currencies = {}
 		if banks:
 			accounts = frappe.get_all(

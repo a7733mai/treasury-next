@@ -161,6 +161,8 @@ def deliver(name: str, handover_date=None, remarks: str | None = None, allow_low
 		# the cheque was just saved: the override row is inserted in place
 		_log(doc, "Low Balance Override", remarks=text)
 		doc.status_log[-1].db_insert()
+		# the result was built before the override row: it says so too
+		result["low_balance_override"] = text
 	return result
 
 

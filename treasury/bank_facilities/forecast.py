@@ -31,6 +31,14 @@ def _rate(currency: str, company: str, date, cache: dict) -> float:
 	return cache[currency]
 
 
+def company_amount(filters, amount: float, currency: str, company: str, date, cache: dict) -> float | None:
+	"""A flow's `amount` in the company currency; None for the per-bank positions (`per_bank`, treasury.pdc.
+	bank_positions), which use the account currency only: no exchange rate lookup there."""
+	if filters.get("per_bank"):
+		return None
+	return flt(amount * _rate(currency, company, date, cache), get_precision())
+
+
 def get_flows(filters) -> list[dict]:
 	filters = frappe._dict(filters)
 	if not filters.bank_accounts or not frappe.has_permission(DRAWDOWN, "read"):
@@ -87,7 +95,7 @@ def get_flows(filters) -> list[dict]:
 				"date": getdate(r.due_date),
 				"direction": "out",
 				"bank_account": r.bank_account,
-				"amount": flt(unpaid * _rate(r.currency, r.company, today, rates), precision),
+				"amount": company_amount(filters, unpaid, r.currency, r.company, today, rates),
 				"amount_in_account_currency": unpaid,
 				"reference_doctype": DRAWDOWN,
 				"reference_name": r.name,

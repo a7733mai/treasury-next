@@ -43,6 +43,22 @@ def get_thresholds(company: str) -> dict[str, frappe._dict]:
 	}
 
 
+def with_gl_siblings(company: str, banks: list[str]) -> list[str]:
+	"""`banks` and the company bank accounts sharing their GL accounts (one merged position), name order."""
+	accounts = frappe.get_all("Bank Account", filters={"name": ["in", banks]}, pluck="account") if banks else []
+	accounts = [a for a in accounts if a]
+	siblings = (
+		frappe.get_all(
+			"Bank Account",
+			filters={"company": company, "is_company_account": 1, "account": ["in", accounts]},
+			pluck="name",
+		)
+		if accounts
+		else []
+	)
+	return sorted(set(banks) | set(siblings))
+
+
 def alert_settings() -> frappe._dict:
 	"""The Bank Position Alerts values of Treasury Settings; a value never stored takes the field default."""
 	values = frappe._dict()

@@ -432,24 +432,26 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 
 	# ------------------------------------------------------------------ Cheque Batch
 
+	def batch_values(self, **values) -> dict:
+		"""An outgoing batch of 3 cheques of 30,000 due T+1 on the E1 bank."""
+		return {
+			"doctype": "Cheque Batch",
+			"direction": "Outgoing",
+			"company": COMPANY,
+			"party_type": "Supplier",
+			"party": SUPPLIER,
+			"bank_account": self.bank,
+			"issue_date": self.today,
+			"purpose": "Rent",
+			"cheques": [
+				{"due_date": self.day(1), "amount": 30000, "cheque_no": unique_cheque_no()}
+				for _i in range(3)
+			],
+			**values,
+		}
+
 	def make_batch(self, **values):
-		return frappe.get_doc(
-			{
-				"doctype": "Cheque Batch",
-				"direction": "Outgoing",
-				"company": COMPANY,
-				"party_type": "Supplier",
-				"party": SUPPLIER,
-				"bank_account": self.bank,
-				"issue_date": self.today,
-				"purpose": "Rent",
-				"cheques": [
-					{"due_date": self.day(1), "amount": 30000, "cheque_no": unique_cheque_no()}
-					for _i in range(3)
-				],
-				**values,
-			}
-		).insert()
+		return frappe.get_doc(self.batch_values(**values)).insert()
 
 	def test_batch_deliver_all_single_guard(self):
 		self.mode("Block")
@@ -497,6 +499,72 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.attempt(batch.submit)
 		self.assertEqual(batch_statuses(batch.name), ["Delivered"] * 3)
 		self.assertTrue(alert_logs(alert_type="Override", reference_name=batch.name))
+
+	def test_override_flag_reset_for_non_manager(self):
+		"""Security Minor 3: a flag stored on a draft by a non-manager never overrides a Block when a manager
+		submits; only managers can store it."""
+		self.mode("Block")
+		with self.set_user(TREASURY_USER):
+			batch = frappe.get_doc(self.batch_values(handover_date=self.today, allow_low_balance=1))
+			# even a save that skips the permission checks (the permlevel reset) loses the flag
+			batch.insert(ignore_permissions=True)
+			self.assertEqual(frappe.db.get_value("Cheque Batch", batch.name, "allow_low_balance"), 0)
+			batch.reload()
+			batch.allow_low_balance = 1
+			batch.save(ignore_permissions=True)
+			self.assertEqual(frappe.db.get_value("Cheque Batch", batch.name, "allow_low_balance"), 0)
+		with self.set_user(TREASURY_MANAGER):
+			doc = frappe.get_doc("Cheque Batch", batch.name)
+			with self.assertRaises(guard.LowBalanceError):
+				self.attempt(doc.submit)
+		self.assertFalse(alert_logs(alert_type="Override", reference_name=batch.name))
+		self.assertEqual(frappe.db.get_value("Cheque Batch", batch.name, "docstatus"), 0)
+
+		# a manager may store it
+		with self.set_user(TREASURY_MANAGER):
+			doc = frappe.get_doc("Cheque Batch", batch.name)
+			doc.allow_low_balance = 1
+			doc.save()
+		self.assertEqual(frappe.db.get_value("Cheque Batch", batch.name, "allow_low_balance"), 1)
+
+	def test_override_field_permlevel(self):
+		"""Security Minor 3: `allow_low_balance` is permlevel 1, written by Treasury / System Managers only."""
+		for doctype in ("Bank Transfer", "Bank Charge", "Facility Repayment", "Cheque Batch"):
+			with self.subTest(doctype=doctype):
+				meta = frappe.get_meta(doctype)
+				self.assertEqual(meta.get_field("allow_low_balance").permlevel, 1)
+				writers = {p.role for p in meta.permissions if p.permlevel == 1 and p.write}
+				self.assertEqual(writers, {"Treasury Manager", "System Manager"})
+				with self.set_user(TREASURY_USER):
+					self.assertNotIn(1, frappe.new_doc(doctype).get_permlevel_access("write"))
+				with self.set_user(TREASURY_MANAGER):
+					self.assertIn(1, frappe.new_doc(doctype).get_permlevel_access("write"))
+
+	def test_deliver_result_reports_override(self):
+		"""Review M6: the result of a deliver with an override says so."""
+		self.mode("Block")
+		c3 = self.cheque(15000, 4)
+		with self.set_user(TREASURY_MANAGER):
+			result = self.attempt(
+				frappe.get_doc("PDC Cheque", c3.name).deliver, handover_date=self.today, allow_low_balance=1
+			)
+		self.assertEqual(result["operational_status"], "Delivered")
+		c3.reload()
+		self.assertEqual(c3.status_log[-1].event, "Low Balance Override")
+		self.assertEqual(result["low_balance_override"], c3.status_log[-1].remarks)
+		# without an override nothing is added
+		self.mode("Warn")
+		other = self.cheque(100, 20)
+		self.assertNotIn("low_balance_override", other.deliver(handover_date=self.today))
+
+	def test_message_head_closed_tags(self):
+		"""Review M7: each argument of the head line is a closed tag of its own."""
+		self.mode("Warn")
+		cheque = self.cheque(15000, 4)
+		cheque.deliver(handover_date=self.today)
+		(message,) = self.warnings()
+		self.assertIn(f"<b>{escape_html(_('PDC Cheque'))}</b>", message)
+		self.assertIn(f"<b><bdi>{cheque.name}</bdi></b>", message)
 
 	# ------------------------------------------------------------------ Security Cheque
 

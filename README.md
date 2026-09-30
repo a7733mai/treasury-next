@@ -612,21 +612,24 @@ per bank) and warns before a bank runs short. It posts nothing.
   bank accounts their permissions and User Permissions allow, in their own language.
 - **Critical / warning alerts** (hourly and right after every guarded entry): one alert per bank for its
   breached days, with the largest expected payments; a breached day is alerted once per day and again only
-  when it gets worse ("Worse:"), or when a Warning day turns Critical.
+  when it gets worse ("Worse:"), or when a Warning day turns Critical (a Critical day improving to Warning
+  sends nothing that day). Each recipient sees only the payments they may read; the others appear as one
+  "Other payments / receipts" total. An alert nobody could receive is tried again at the next run.
 - **Entry-time check.** Delivering an outgoing cheque (single, Cheque Batch submit / Deliver All, security
   cheque encashment), submitting / sending now / rescheduling a Bank Transfer, submitting a Facility
   Repayment or a Bank Charge compares the bank's projection before and after the entry. A day that the entry
   lowers below the minimum is reported: *Warn* shows a message, *Block* refuses the entry unless a Treasury
-  Manager confirms the override (the *Override Low Balance* box of the document, or the confirmation of the
-  action), which is logged. A batch is checked once and refused as a whole. Bank Charges created from a
+  Manager confirms the override (the *Override Low Balance* box of the document, which only Treasury and
+  System Managers can set, or the confirmation of the action), which is logged. A batch is checked once and refused as a whole. Bank Charges created from a
   statement line only warn (the bank already took the money); scheduled system postings and cancellations
   are never checked.
-- **Treasury Alert Log** keeps the digests, alerts and overrides (the dedupe keys; cleared after 180 days by
-  Log Settings). Report **Bank Balance Outlook** lists every bank's current and lowest projected balance,
+- **Treasury Alert Log** keeps the digests, alerts and overrides (the dedupe keys; digests and alerts are
+  cleared after 180 days by Log Settings, the override logs are kept permanently and cannot be deleted). Report **Bank Balance Outlook** lists every bank's current and lowest projected balance,
   level, first breach and shortfall; number card *Banks Below Minimum (7 days)* and chart *Lowest Projected
   Balance per Bank* are on the workspace.
 - **Manager tools.** Treasury Settings, Treasury Company Settings and the Bank Balance Outlook menu offer
-  *Preview Digest* (exactly what a user would receive: their banks, their language; nothing is sent),
+  *Preview Digest* (what an enabled System User would receive: their banks, limited to the banks you may
+  see yourself, in their language; nothing is sent),
   *Send Test to Me* (the digest e-mailed to yourself, subject "[Test]"; the day's real digest still goes out)
   and *Run Alerts Now* (queues the alert check; alerts already sent today are not repeated). *Add All Bank
   Accounts* on the thresholds grid adds one row per company bank account: type only the minimums.

@@ -10413,6 +10413,12 @@ msgstr "معاينة الملخص لـ {0} ({1})"
 msgid "{0} may not see any bank of {1}."
 msgstr "لا يملك {0} صلاحية رؤية أي بنك في {1}."
 
+msgid "{0} is not an enabled System User."
+msgstr "{0} ليس مستخدم نظام مفعّلًا."
+
+msgid "Low balance override logs are kept permanently and cannot be deleted."
+msgstr "تُحفظ سجلات تجاوز الرصيد المنخفض بشكل دائم ولا يمكن حذفها."
+
 msgid "Test digest sent to {0}."
 msgstr "تم إرسال الملخص التجريبي إلى {0}."
 
@@ -10529,6 +10535,9 @@ msgstr "سند الدفع {0}"
 
 msgid "Largest payment: {0} {1}"
 msgstr "أكبر دفعة: {0} {1}"
+
+msgid "Other payments / receipts {0}"
+msgstr "مدفوعات / مقبوضات أخرى {0}"
 
 msgid "{0}: {1} ({2}, threshold {3})"
 msgstr "{0}: {1} ({2}، الحد {3})"

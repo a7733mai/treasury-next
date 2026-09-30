@@ -5,7 +5,8 @@ its own savepoint (committed per company; a failure is logged once per company a
 - the daily digest, once per recipient, company and day, from the digest hour on (system time zone);
 - the critical / warning alerts: one alert per bank position and run, for its breaches not alerted yet today,
   or alerted with a higher projected balance ("Worse:"). A Warning day turning Critical is a new key, so it is
-  sent at once; a day that recovers sends nothing.
+  sent at once; a day that recovers sends nothing (nor does a Critical day improving to Warning the same day).
+  Each recipient's message lists only the payments they may read. An alert nobody received writes no log.
 `evaluate_company` (also the job the entry-time guard enqueues after a guarded action, digest excluded) locks
 the company's Treasury Company Settings row first, so the hourly job and the event jobs of one company never
 send the same alert twice. Idempotency keys (Treasury Alert Log): Digest (company, user, alert_date); Balance
@@ -19,6 +20,8 @@ from frappe.utils import cint, flt, get_datetime, now_datetime, today
 
 from treasury.balance_alerts import notify, recipients
 from treasury.balance_alerts.positions import (
+	CRITICAL,
+	WARNING,
 	alert_settings,
 	epsilon,
 	evaluate,
@@ -78,6 +81,8 @@ def evaluate_company(company: str, now=None, send_digest: bool = False) -> dict:
 
 def enqueue_evaluation(company: str):
 	"""The event trigger of a guarded action: evaluate the company after the commit (alerts only)."""
+	# `deduplicate` also drops a job enqueued while the same job is *running*: a breach committed during that
+	# run is then reported by the next hourly job (accepted, spec 7e §8.1)
 	frappe.enqueue(
 		"treasury.balance_alerts.scheduler.evaluate_company",
 		queue="short",
@@ -161,7 +166,7 @@ def send_digest_if_due(company: str, positions: list, now) -> list[str]:
 			continue
 		visible = [p for p in positions if p.bank_account in banks]
 
-		def render(visible=visible, user=user):
+		def render(user, visible=visible):
 			return notify.digest_message(company, visible, alert_date, days, zero_days, user)
 
 		outcome = notify.deliver(
@@ -189,20 +194,21 @@ def send_digest_if_due(company: str, positions: list, now) -> list[str]:
 
 
 def due_breaches(company: str, position, alert_date) -> list[frappe._dict]:
-	"""The breaches of the position not alerted yet today, or alerted with a higher balance (escalation)."""
+	"""The breaches of the position not alerted yet today, or alerted with a higher balance (escalation). A
+	Warning day already alerted as Critical today has improved: a day that recovers sends nothing."""
 	eps = epsilon(get_precision())
 	due = []
 	for breach in position.breaches:
-		last = _locked(
-			{
-				"alert_type": BALANCE_ALERT,
-				"company": company,
-				"bank_account": position.bank_account,
-				"projected_date": breach.date,
-				"level": breach.level,
-				"alert_date": alert_date,
-			}
-		)
+		key = {
+			"alert_type": BALANCE_ALERT,
+			"company": company,
+			"bank_account": position.bank_account,
+			"projected_date": breach.date,
+			"alert_date": alert_date,
+		}
+		if breach.level == WARNING and _locked({**key, "level": CRITICAL}):
+			continue
+		last = _locked({**key, "level": breach.level})
 		if not last:
 			due.append(frappe._dict(breach, is_escalation=0))
 		elif flt(breach.closing) < flt(last[0].balance) - eps:
@@ -233,11 +239,12 @@ def send_balance_alerts(company: str, positions: list, now) -> list[str]:
 		escalation = all(b.is_escalation for b in due)
 		link = notify.forecast_route(company, alert_date, days, position.bank_account)
 
-		def render(position=position, due=due, escalation=escalation):
+		# rendered per recipient: each one sees only the payments they may read
+		def render(user, position=position, due=due, escalation=escalation):
 			return (
 				notify.alert_subject(position, due, escalation),
-				notify.render_alert(company, position, due, alert_date, days, escalation),
-				notify.alert_summary(position, due),
+				notify.render_alert(company, position, due, alert_date, days, escalation, user),
+				notify.alert_summary(position, due, user),
 			)
 
 		notified, emailed, reached = False, False, []
@@ -251,6 +258,10 @@ def send_balance_alerts(company: str, positions: list, now) -> list[str]:
 			emailed |= outcome.emailed
 			if outcome.notified or outcome.emailed:
 				reached.append(user)
+		if not reached:
+			# nobody got it (no recipient may see the bank, or no channel worked): no dedupe key, so the
+			# alert goes out as soon as someone can receive it (e.g. after recipients are added)
+			continue
 		# the log keeps the subject in the system language
 		subject = notify.alert_subject(position, due, escalation)
 		for breach in due:

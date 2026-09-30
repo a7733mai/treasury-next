@@ -6,12 +6,13 @@ function in the `treasury_forecast_sources` hook of any app's hooks.py:
 	treasury_forecast_sources = ["treasury.bank_facilities.forecast.get_flows"]
 
 Each function receives the report filters (frappe._dict: company, bank_accounts — the names of the bank
-accounts in scope —, from_date, to_date, currency_view) and returns a list of dicts:
+accounts in scope —, from_date, to_date, currency_view, per_bank) and returns a list of dicts:
 
 	date                        expected date of the flow (overdue when before today)
 	direction                   "in" or "out"
 	bank_account                Bank Account (None: unassigned bank)
-	amount                      amount in the company currency
+	amount                      amount in the company currency (may be None when `per_bank` is set: the
+	                            per-bank positions use the account currency only)
 	amount_in_account_currency  amount in the bank account currency (bank currency view)
 	reference_doctype, reference_name, party, description   optional, shown in the details view
 

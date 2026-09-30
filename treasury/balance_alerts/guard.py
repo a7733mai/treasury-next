@@ -24,7 +24,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, fmt_money, formatdate, getdate, strip_html, today
 
-from treasury.balance_alerts.positions import epsilon, evaluate, get_thresholds, horizon
+from treasury.balance_alerts.positions import epsilon, evaluate, get_thresholds, horizon, with_gl_siblings
 from treasury.bank_transfers import fees
 from treasury.pdc.report_utils import get_precision, report_today
 from treasury.utils.context import elevated, real_user
@@ -56,6 +56,14 @@ def check_override_flag(allow_override):
 		)
 
 
+def reset_override_flag(doc):
+	"""`validate` of a draft with the `allow_low_balance` field: only a Treasury Manager (or System Manager)
+	may store it. The field is permlevel 1 (written by those roles only); this also covers saves that skip the
+	permission checks, so a flag stored by someone else never overrides a Block when a manager submits."""
+	if doc.docstatus == 0 and cint(doc.get("allow_low_balance")) and not has_override_role():
+		doc.allow_low_balance = 0
+
+
 def _scheduler():
 	# imported late: the scheduler reaches the PDC modules, which import this guard
 	from treasury.balance_alerts import scheduler
@@ -67,22 +75,6 @@ def _notify():
 	from treasury.balance_alerts import notify
 
 	return notify
-
-
-def _with_siblings(company: str, banks: list[str]) -> list[str]:
-	"""`banks` and the company bank accounts sharing their GL accounts (one merged position)."""
-	accounts = frappe.get_all("Bank Account", filters={"name": ["in", banks]}, pluck="account")
-	accounts = [a for a in accounts if a]
-	siblings = (
-		frappe.get_all(
-			"Bank Account",
-			filters={"company": company, "is_company_account": 1, "account": ["in", accounts]},
-			pluck="name",
-		)
-		if accounts
-		else []
-	)
-	return sorted(set(banks) | set(siblings))
 
 
 def begin(company: str, bank_accounts: list[str], *, system: bool = False) -> frappe._dict | None:
@@ -99,7 +91,7 @@ def begin(company: str, bank_accounts: list[str], *, system: bool = False) -> fr
 	if mode == IGNORE:
 		_scheduler().enqueue_evaluation(company)
 		return None
-	banks = _with_siblings(company, banks)
+	banks = with_gl_siblings(company, banks)
 	if not any(b in thresholds for b in banks):
 		_scheduler().enqueue_evaluation(company)
 		return None
@@ -172,8 +164,9 @@ def message_html(doctype: str, name: str, found: list, snapshot) -> str:
 		text = f"<bdi>{esc(value)}</bdi>"
 		return f"<b>{text}</b>" if bold else text
 
+	# each argument is a closed tag of its own: a translation may reorder the placeholders
 	head = _("Low projected balance after {0} {1}:").format(
-		f"<b>{esc(_(doctype))}", f"<bdi>{esc(name)}</bdi></b>"
+		f"<b>{esc(_(doctype))}</b>", f"<b><bdi>{esc(name)}</bdi></b>"
 	)
 	items = []
 	for shown, more in _grouped(found):

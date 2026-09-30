@@ -18,7 +18,7 @@ from urllib.parse import urlencode
 import frappe
 from frappe import _
 from frappe.translate import get_user_lang, print_language
-from frappe.utils import add_days, cint, escape_html, flt, fmt_money, formatdate, get_url, getdate
+from frappe.utils import add_days, cint, escape_html, flt, fmt_money, formatdate, get_url, getdate, nowdate
 from frappe.utils.data import get_user_date_format
 
 from treasury.balance_alerts import positions as balance_positions
@@ -323,36 +323,71 @@ def key_sentence(position, breach) -> str:
 	return _("{0}: projected {1}, warning {2}").format(*values)
 
 
-def _movements(position, date) -> list[frappe._dict]:
-	"""The largest payments up to `date`, with the party Payment Entry of a cheque (design 7e P14)."""
+def can_read(doctype: str | None, name: str | None, user: str | None) -> bool:
+	"""`user` (default: the session user) may read the document, User Permissions (party, bank ...)
+	included."""
+	if not (doctype and name):
+		return False
+	return bool(frappe.has_permission(doctype, "read", doc=name, user=user or frappe.session.user))
+
+
+def split_movements(movements: list, user: str | None) -> tuple[list, float]:
+	"""(the movements `user` may read, the total of the others): a recipient never sees the party, document
+	or description of a flow they may not read, only its amount in "Other payments / receipts"."""
+	readable, hidden = [], 0.0
+	for m in movements:
+		if can_read(m.reference_doctype, m.reference_name, user):
+			readable.append(m)
+		else:
+			hidden += flt(m.amount)
+	return readable, hidden
+
+
+def other_movements(amount: float, currency: str) -> str:
+	return _("Other payments / receipts {0}").format(money(amount, currency))
+
+
+def _movements(position, date, user: str | None = None) -> tuple[list[frappe._dict], str | None]:
+	"""The largest payments up to `date` that `user` may read, with the party Payment Entry of a cheque
+	(design 7e P14: a field of the cheque, shown to whoever reads it), and the "Other payments / receipts" line
+	of the rest (None when there is none)."""
 	currency = position.currency
+	readable, hidden = split_movements(balance_positions.top_movements(position, date), user)
 	rows = []
-	for m in balance_positions.top_movements(position, date):
+	for m in readable:
 		payment_entry = None
-		if m.reference_doctype == "PDC Cheque" and m.reference_name:
+		if m.reference_doctype == "PDC Cheque":
 			payment_entry = frappe.db.get_value("PDC Cheque", m.reference_name, "party_payment_entry")
 		rows.append(
 			frappe._dict(
 				m,
 				date=email_date(m.date),
 				amount=money(m.amount, currency),
-				url=form_url(m.reference_doctype, m.reference_name)
-				if m.reference_doctype and m.reference_name
-				else None,
-				label=_(m.reference_doctype) if m.reference_doctype else "",
+				url=form_url(m.reference_doctype, m.reference_name),
+				label=_(m.reference_doctype),
 				payment_entry=_("PE {0}").format(payment_entry) if payment_entry else None,
 				payment_entry_url=form_url("Payment Entry", payment_entry) if payment_entry else None,
 			)
 		)
-	return rows
+	return rows, (other_movements(hidden, currency) if hidden else None)
 
 
-def render_alert(company: str, position, breaches: list, today, horizon: int, escalation: bool = False) -> str:
-	"""The alert HTML (also the e-mail body), in the current language."""
+def render_alert(
+	company: str,
+	position,
+	breaches: list,
+	today,
+	horizon: int,
+	escalation: bool = False,
+	user: str | None = None,
+) -> str:
+	"""The alert HTML (also the e-mail body) for `user` (default: the session user), in the current language.
+	The payments listed are only those the user may read (see `split_movements`)."""
 	currency = position.currency
+	first = min(b.date for b in breaches)
+	movements, movements_other = _movements(position, first, user)
 	headline = headline_breach(breaches)
 	style = level_style(headline.level)
-	first = min(b.date for b in breaches)
 	rows = [
 		frappe._dict(
 			date=email_date(b.date),
@@ -388,15 +423,17 @@ def render_alert(company: str, position, breaches: list, today, horizon: int, es
 			current_balance=money(position.current_balance, currency),
 			rows=rows,
 			movements_title=_("Largest payments up to {0}").format(email_date(first, long=True)),
-			movements=_movements(position, first),
+			movements=movements,
+			movements_other=movements_other,
 			link=get_url(forecast_route(company, today, horizon, position.bank_account)),
 		),
 	)
 
 
-def alert_summary(position, breaches: list) -> str:
-	"""The Notification Log text of an alert: the key sentence, one line per due breach, the largest payment
-	(escaped, HTML line breaks)."""
+def alert_summary(position, breaches: list, user: str | None = None) -> str:
+	"""The Notification Log text of an alert for `user` (default: the session user): the key sentence, one line
+	per due breach, the largest payment (escaped, HTML line breaks). A largest payment the user may not read is
+	shown as "Other payments / receipts" with its amount only."""
 	currency = position.currency
 	headline = headline_breach(breaches)
 	lines = [key_sentence(position, headline)]
@@ -410,10 +447,13 @@ def alert_summary(position, breaches: list) -> str:
 			)
 		)
 	largest = balance_positions.top_movements(position, min(b.date for b in breaches), n=1)
-	if largest:
-		m = largest[0]
-		document = f"{_(m.reference_doctype)} {m.reference_name}" if m.reference_doctype else ""
+	readable, hidden = split_movements(largest, user)
+	if readable:
+		m = readable[0]
+		document = f"{_(m.reference_doctype)} {m.reference_name}"
 		lines.append(_("Largest payment: {0} {1}").format(document, money(m.amount, currency)))
+	elif hidden:
+		lines.append(other_movements(hidden, currency))
 	return "<br>".join(escape_html(line) for line in lines)
 
 
@@ -432,10 +472,10 @@ def outgoing_email_enabled() -> bool:
 
 
 def deliver(user: str, render, document_name: str | None, link: str, email_title: str) -> frappe._dict:
-	"""Render `render()` -> (subject, html, summary) in the user's language and send it through the enabled
-	channels. Returns {subject, notified, emailed}."""
+	"""Render `render(user)` -> (subject, html, summary) for the user (their language, the documents they may
+	read) and send it through the enabled channels. Returns {subject, notified, emailed}."""
 	with print_language(get_user_lang(user)):
-		subject, html, summary = render()
+		subject, html, summary = render(user)
 	options = channels()
 	notified = emailed = False
 	if options.notification:
@@ -459,16 +499,23 @@ def deliver(user: str, render, document_name: str | None, link: str, email_title
 
 
 def send_email(user: str, subject: str, html: str, email_title: str) -> bool:
-	"""E-mail `user`; a failure is logged and never raised."""
+	"""E-mail `user`; a failure is logged (once per title and day) and never raised."""
 	email = frappe.db.get_value("User", user, "email")
 	if not email:
 		return False
 	try:
 		frappe.sendmail(recipients=[email], subject=subject, message=html)
 	except Exception:
-		frappe.log_error(title=email_title)
+		log_email_failure(email_title)
 		return False
 	return True
+
+
+def log_email_failure(title: str):
+	"""One Error Log per title and day: a broken mail setup would otherwise log every recipient every hour."""
+	if frappe.db.exists("Error Log", {"method": title, "creation": [">=", nowdate()]}):
+		return
+	frappe.log_error(title=title)
 
 
 # ---------------------------------------------------------------------------
@@ -482,16 +529,31 @@ def _manager_company(company: str) -> str:
 
 
 def _visible_positions(company: str, user: str, today) -> list:
+	"""The positions `user` would receive, limited to the banks the acting manager may see too: a preview never
+	shows a bank outside the manager's own User Permissions."""
 	with elevated(actor=SYSTEM_USER):
 		positions = balance_positions.evaluate(company, today=today)
-	banks = set(recipients.visible_banks(user, company, [p.bank_account for p in positions]))
+	names = [p.bank_account for p in positions]
+	banks = set(recipients.visible_banks(user, company, names))
+	viewer = frappe.session.user
+	if user != viewer:
+		banks &= set(recipients.visible_banks(viewer, company, names))
 	return [p for p in positions if p.bank_account in banks]
 
 
-def _user_digest(company: str, user: str) -> frappe._dict:
-	"""The digest `user` would receive today (their banks, their language); nothing is sent or logged."""
-	if not frappe.db.exists("User", user):
+def _check_preview_user(user: str):
+	"""The previewed user must be an enabled System User (the only users the digest goes to)."""
+	values = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
+	if not values:
 		frappe.throw(_("{0} {1} does not exist").format(_("User"), user), frappe.DoesNotExistError)
+	if not values.enabled or values.user_type != "System User":
+		frappe.throw(_("{0} is not an enabled System User.").format(user))
+
+
+def _user_digest(company: str, user: str) -> frappe._dict:
+	"""The digest `user` would receive today (their banks, their language; limited to the banks the acting
+	user may see); nothing is sent or logged."""
+	_check_preview_user(user)
 	today = getdate()
 	visible = _visible_positions(company, user, today)
 	if not visible:

@@ -2,9 +2,12 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder import Interval
 from frappe.query_builder.functions import Now
+
+OVERRIDE = "Override"
 
 
 class TreasuryAlertLog(Document):
@@ -39,11 +42,23 @@ class TreasuryAlertLog(Document):
 		user: DF.Link | None
 	# end: auto-generated types
 
+	def on_trash(self):
+		# the overrides are the audit trail of the low balance blocks: kept permanently
+		if self.alert_type == OVERRIDE:
+			frappe.throw(
+				_("Low balance override logs are kept permanently and cannot be deleted."),
+				frappe.PermissionError,
+			)
+
 	@staticmethod
 	def clear_old_logs(days: int = 180):
-		"""Log Settings (hooks.py `default_log_clearing_doctypes`): delete the logs older than `days`."""
+		"""Log Settings (hooks.py `default_log_clearing_doctypes`): delete the digest and alert logs older than
+		`days`. The Override logs (audit trail) are never deleted."""
 		table = frappe.qb.DocType("Treasury Alert Log")
-		frappe.db.delete(table, filters=(table.creation < (Now() - Interval(days=days))))
+		frappe.db.delete(
+			table,
+			filters=((table.creation < (Now() - Interval(days=days))) & (table.alert_type != OVERRIDE)),
+		)
 
 
 def on_doctype_update():

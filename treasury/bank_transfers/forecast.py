@@ -14,7 +14,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from treasury.bank_facilities.forecast import BANK_CURRENCY, _rate
+from treasury.bank_facilities.forecast import BANK_CURRENCY, _rate, company_amount
 from treasury.bank_transfers import lifecycle
 from treasury.pdc.report_utils import get_precision, report_today
 
@@ -60,7 +60,6 @@ def get_flows(filters) -> list[dict]:
 	if not filters.bank_accounts or not frappe.has_permission(DOCTYPE, "read"):
 		return []
 	bank_accounts = set(filters.bank_accounts)
-	precision = get_precision()
 	today = report_today()
 	rates: dict[str, float] = {}
 	flows = []
@@ -73,7 +72,7 @@ def get_flows(filters) -> list[dict]:
 					"date": getdate(row.execution_date),
 					"direction": direction,
 					"bank_account": bank_account,
-					"amount": flt(amount * _rate(currency, row.company, today, rates), precision),
+					"amount": company_amount(filters, amount, currency, row.company, today, rates),
 					"amount_in_account_currency": amount,
 					"reference_doctype": DOCTYPE,
 					"reference_name": row.name,

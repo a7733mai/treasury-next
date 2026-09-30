@@ -15,7 +15,8 @@
   Reschedule, Facility Repayment and Bank Charge submit; a Treasury Manager may override a Block (field
   *Override Low Balance* or the action's confirmation), which is logged. Every guarded entry triggers an
   evaluation after the commit.
-- New **Treasury Alert Log** (digests, alerts, overrides; Log Settings clears it after 180 days), report
+- New **Treasury Alert Log** (digests, alerts, overrides; Log Settings clears digests and alerts after 180
+  days, override logs are kept permanently), report
   **Bank Balance Outlook**, number card *Banks Below Minimum (7 days)*, chart *Lowest Projected Balance per
   Bank*. Patch `set_balance_alert_defaults`. No accounting is posted.
 - Alerts UX (7e-2): Arabic / RTL digest and alert e-mails with level colours and words, weekday dates, the

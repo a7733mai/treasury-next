@@ -16,10 +16,11 @@ import frappe
 from frappe import _
 from frappe.tests import IntegrationTestCase
 from frappe.translate import print_language
-from frappe.utils import fmt_money, formatdate, get_datetime
+from frappe.utils import add_days, escape_html, fmt_money, formatdate, get_datetime, now_datetime
 
 from treasury.balance_alerts import notify, recipients, scheduler
 from treasury.balance_alerts.positions import evaluate, top_movements
+from treasury.treasury_setup.doctype.treasury_alert_log.treasury_alert_log import TreasuryAlertLog
 from treasury.tests.utils import (
 	ALERT_LOG_DOCTYPE,
 	COMPANY,
@@ -49,6 +50,8 @@ NO_ROLE_USER = "treasury-alerts-norole@example.com"
 DISABLED_USER = "treasury-alerts-disabled@example.com"
 ARABIC_USER = "treasury-alerts-ar@example.com"
 ENGLISH_USER = "treasury-alerts-en@example.com"
+# reads PDC Cheque (so the bank is visible) but not Bank Transfer, Facility Drawdown or Payment Entry
+APPROVER = "treasury-alerts-approver@example.com"
 
 
 def ensure_language_user(email: str, language: str) -> str:
@@ -81,6 +84,7 @@ class TestBalanceAlerts(BalanceAlertTestMixin, IntegrationTestCase):
 		frappe.db.set_value("User", DISABLED_USER, "enabled", 0)
 		ensure_language_user(ARABIC_USER, "ar")
 		ensure_language_user(ENGLISH_USER, "en")
+		ensure_user(APPROVER, ["Cheque Approver"])
 		ensure_company(OTHER_COMPANY, OTHER_ABBR)
 		add_user_permission(OTHER_CO_USER, "Company", OTHER_COMPANY)
 
@@ -476,6 +480,145 @@ class TestBalanceAlerts(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual(scheduler.run_hourly(self.at(0, 10)), {})
 		set_alert_settings(self, balance_alert_notification=1, send_balance_digest=0, send_balance_alerts=0)
 		self.assertEqual(scheduler.run_hourly(self.at(0, 10)), {})
+
+	# ------------------------------------------------------------------ review fixes (7e round 2)
+
+	def test_alert_lists_only_readable_payments(self):
+		"""Security Major 1: each recipient sees only the payments they may read, the rest as a total."""
+		e1 = make_alert_fixture_e1(self)
+		set_recipients(self, [{"user": MANAGER}, {"user": APPROVER}])
+		_result, sendmail = self.run_company()
+		(manager_html,) = self.mail_to(sendmail, MANAGER)
+		(approver_html,) = self.mail_to(sendmail, APPROVER)
+		payment_entry = frappe.db.get_value("PDC Cheque", e1.c1, "party_payment_entry")
+		other = notify.other_movements(50020, "EGP")
+
+		# the manager reads every document: nothing is aggregated
+		self.assertIn(notify.form_url("Bank Transfer", e1.tr1), manager_html)
+		self.assertIn(payment_entry, manager_html)
+		self.assertNotIn("treasury-other-movements", manager_html)
+		# the approver reads the cheque (with its Payment Entry, a field of the cheque), not the transfer
+		self.assertIn(notify.form_url("PDC Cheque", e1.c1), approver_html)
+		self.assertIn(payment_entry, approver_html)
+		self.assertNotIn(e1.tr1, approver_html)
+		self.assertNotIn(notify.form_url("Bank Transfer", e1.tr1), approver_html)
+		self.assertIn("treasury-other-movements", approver_html)
+		self.assertIn(other, approver_html)
+
+		# the bell: the largest payment (TR1) is shown as its amount only
+		(content,) = [n.email_content for n in self.notifications(APPROVER, document_name=e1.bank_account)]
+		self.assertNotIn(e1.tr1, content)
+		self.assertIn(escape_html(other), content)
+		(manager_content,) = [
+			n.email_content for n in self.notifications(MANAGER, document_name=e1.bank_account)
+		]
+		self.assertIn(e1.tr1, manager_content)
+		# the same alert reached both
+		(log,) = alert_logs(
+			alert_type="Balance Alert", bank_account=e1.bank_account, projected_date=self.day(3)
+		)
+		self.assertEqual(set(log.recipients.split("\n")), {MANAGER, APPROVER})
+
+	def test_split_movements(self):
+		e1 = make_alert_fixture_e1(self)
+		(position,) = evaluate(COMPANY, [e1.bank_account])
+		movements = top_movements(position, self.day(5))
+		readable, hidden = notify.split_movements(movements, APPROVER)
+		self.assertEqual([m.reference_name for m in readable], [e1.c1])
+		self.assertEqual(hidden, 50020 + 40000)
+		readable, hidden = notify.split_movements(movements, MANAGER)
+		self.assertEqual((len(readable), hidden), (3, 0))
+		self.assertFalse(notify.can_read(None, None, MANAGER))
+
+	def test_no_log_when_nobody_received(self):
+		"""Review M2: an alert nobody received writes no dedupe key, so it goes out once someone can get it."""
+		e1 = make_alert_fixture_e1(self)
+		set_recipients(self, [])
+		result, _sendmail = self.run_company(outgoing=False)
+		self.assertEqual(result["alerts"], [])
+		self.assertFalse(alert_logs(alert_type="Balance Alert", bank_account=e1.bank_account))
+
+		# a recipient who may not see the bank: still nobody reached
+		set_recipients(self, [{"user": NO_ROLE_USER}])
+		result, _sendmail = self.run_company(hour=11, outgoing=False)
+		self.assertEqual(result["alerts"], [])
+
+		set_recipients(self, [{"user": MANAGER}])
+		result, _sendmail = self.run_company(hour=12, outgoing=False)
+		self.assertEqual(len(result["alerts"]), 4)
+		self.assertEqual(len(self.notifications(MANAGER, document_name=e1.bank_account)), 1)
+
+	def test_improved_day_not_realerted(self):
+		"""Review M3: a day alerted as Critical that improves to Warning sends nothing the same day."""
+		e1 = make_alert_fixture_e1(self)
+		self.run_company(outgoing=False)
+		# an inflow on T+5: T+5 / T+6 go from -10,020 (Critical) to 29,980 (Warning)
+		inflow = make_pdc_cheque(
+			"Incoming",
+			amount=40000,
+			issue_date=self.today,
+			due_date=self.day(5),
+			bank_account=e1.bank_account,
+		)
+		inflow.receive(receipt_date=self.today)
+		(position,) = evaluate(COMPANY, [e1.bank_account])
+		self.assertEqual([(b.level, b.closing) for b in position.breaches], [("Warning", 29980)] * 4)
+
+		result, _sendmail = self.run_company(hour=11, outgoing=False)
+		self.assertEqual(result["alerts"], [])
+		self.assertEqual(len(self.notifications(MANAGER, document_name=e1.bank_account)), 1)
+
+		# the next day it is a Warning like any other
+		result, _sendmail = self.run_company(offset=1, outgoing=False)
+		new = {
+			(log.projected_date, log.level)
+			for log in alert_logs(bank_account=e1.bank_account)
+			if log.name in result["alerts"]
+		}
+		self.assertIn((self.day(5), "Warning"), new)
+
+	def test_email_failure_logged_once_a_day(self):
+		"""Review M5: a failing e-mail is logged once per title and day, not per recipient and hour."""
+		make_alert_fixture_e1(self)
+		set_recipients(self, [{"user": MANAGER}, {"user": ENGLISH_USER}])
+		set_alert_settings(self, balance_alert_notification=0, balance_alert_email=1)
+		titles = (
+			_("Bank balance alert e-mail could not be sent"),
+			_("Bank position digest e-mail could not be sent"),
+		)
+		frappe.db.delete("Error Log", {"method": ["in", titles]})
+		for hour in (8, 9):
+			with self.mail() as sendmail:
+				sendmail.side_effect = Exception("SMTP down")
+				result = scheduler.evaluate_company(COMPANY, self.at(0, hour), send_digest=True)
+			# the digest and the alert, to both users
+			self.assertEqual(sendmail.call_count, 4)
+			# nobody received anything: no dedupe key (M2), tried again the next hour
+			self.assertEqual(result, {"digest": [], "alerts": []})
+		for title in titles:
+			self.assertEqual(frappe.db.count("Error Log", {"method": title}), 1, title)
+		self.assertFalse(alert_logs(company=COMPANY))
+
+	def test_override_logs_kept(self):
+		"""Security Minor 5: the log clearing and a manual delete never remove an Override log."""
+		old = add_days(now_datetime(), -200)
+		names = {}
+		for alert_type in ("Digest", "Override"):
+			names[alert_type] = scheduler.insert_log(
+				alert_type=alert_type, company=COMPANY, alert_date=self.day(-200), user=MANAGER
+			)
+			frappe.db.set_value(ALERT_LOG_DOCTYPE, names[alert_type], "creation", old, update_modified=False)
+		TreasuryAlertLog.clear_old_logs(180)
+		self.assertFalse(frappe.db.exists(ALERT_LOG_DOCTYPE, names["Digest"]))
+		self.assertTrue(frappe.db.exists(ALERT_LOG_DOCTYPE, names["Override"]))
+
+		self.assertRaises(frappe.PermissionError, frappe.delete_doc, ALERT_LOG_DOCTYPE, names["Override"])
+		self.assertTrue(frappe.db.exists(ALERT_LOG_DOCTYPE, names["Override"]))
+		recent = scheduler.insert_log(
+			alert_type="Digest", company=COMPANY, alert_date=self.today, user=MANAGER
+		)
+		frappe.delete_doc(ALERT_LOG_DOCTYPE, recent)
+		self.assertFalse(frappe.db.exists(ALERT_LOG_DOCTYPE, recent))
 
 
 def bank_section(html: str, bank_account: str) -> str:

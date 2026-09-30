@@ -639,6 +639,7 @@
    "fieldtype": "Check",
    "label": "Override Low Balance",
    "no_copy": 1,
+   "permlevel": 1,
    "print_hide": 1
   },
   {
@@ -717,6 +718,18 @@
    "read": 1,
    "report": 1,
    "role": "Accounts User"
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "Treasury Manager",
+   "write": 1
   }
  ],
  "search_fields": "party_name,bank_reference,payment_entry",

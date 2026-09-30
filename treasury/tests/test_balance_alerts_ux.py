@@ -19,6 +19,7 @@ from treasury.balance_alerts.positions import apply_thresholds, evaluate
 from treasury.tests.utils import (
 	COMPANY,
 	BalanceAlertTestMixin,
+	add_user_permission,
 	alert_logs,
 	ensure_alert_bank,
 	ensure_user,
@@ -30,7 +31,12 @@ from treasury.tests.utils import (
 
 MANAGER = "treasury-alerts-ux-mgr@example.com"
 USER = "treasury-alerts-ux-user@example.com"
-NO_ROLE_USER = "treasury-alerts-ux-norole@example.com"
+NO_ROLE_USER = "treasury-alerts-ux-norole@example.com"  # no roles: a Website User
+# a System User without read on PDC Cheque
+DESK_USER = "treasury-alerts-ux-desk@example.com"
+# a Treasury Manager limited to one bank account (User Permission for the bank position reports)
+LIMITED_MANAGER = "treasury-alerts-ux-limited@example.com"
+DISABLED_USER = "treasury-alerts-ux-disabled@example.com"
 LEVEL_CTX = "Bank Balance Outlook"
 
 
@@ -41,6 +47,10 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 		ensure_user(MANAGER, ["Treasury Manager"])
 		ensure_user(USER, ["Treasury User"])
 		ensure_user(NO_ROLE_USER, [])
+		ensure_user(DESK_USER, ["Stock User"])
+		ensure_user(LIMITED_MANAGER, ["Treasury Manager"])
+		ensure_user(DISABLED_USER, ["Treasury Manager"])
+		frappe.db.set_value("User", DISABLED_USER, "enabled", 0)
 
 	def setUp(self):
 		super().setUp()
@@ -65,6 +75,13 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 	def mail_to(self, sendmail, user: str) -> list[str]:
 		email = frappe.db.get_value("User", user, "email")
 		return [c.kwargs["message"] for c in sendmail.call_args_list if c.kwargs.get("recipients") == [email]]
+
+	def limit_to_bank(self, bank_account: str):
+		"""LIMITED_MANAGER may see only `bank_account` in the bank position reports (and nothing else of the
+		previous tests of the class)."""
+		for name in frappe.get_all("User Permission", filters={"user": LIMITED_MANAGER}, pluck="name"):
+			frappe.delete_doc("User Permission", name, ignore_permissions=True)
+		add_user_permission(LIMITED_MANAGER, "Bank Account", bank_account, applicable_for="PDC Cheque")
 
 	# ------------------------------------------------------------------ digest
 
@@ -187,7 +204,7 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 		e1 = make_alert_fixture_e1(self)
 		with self.mail() as sendmail, self.set_user(MANAGER):
 			preview = notify.preview_digest(COMPANY, MANAGER)
-			hidden = notify.preview_digest(COMPANY, NO_ROLE_USER)
+			hidden = notify.preview_digest(COMPANY, DESK_USER)
 		sendmail.assert_not_called()
 		self.assertIn(e1.bank_account, preview["html"])
 		self.assertEqual(preview["subject"], notify.digest_subject(COMPANY, self.today, 1, 0))
@@ -199,11 +216,44 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 		# a user who may not see any bank
 		self.assertIsNone(hidden["html"])
 		self.assertEqual(
-			hidden["message"], _("{0} may not see any bank of {1}.").format(NO_ROLE_USER, COMPANY)
+			hidden["message"], _("{0} may not see any bank of {1}.").format(DESK_USER, COMPANY)
 		)
 		# managers only
 		with self.set_user(USER):
 			self.assertRaises(frappe.PermissionError, notify.preview_digest, COMPANY, USER)
+
+	def test_preview_limited_to_manager_banks(self):
+		"""Security Major 2 / review M1: a manager's preview of another user never shows a bank outside the
+		manager's own User Permissions; only enabled System Users can be previewed."""
+		e1 = make_alert_fixture_e1(self)
+		usd = ensure_alert_bank("USD")
+		self.limit_to_bank(usd.bank_account)
+		with self.mail(), self.set_user(MANAGER):
+			full = notify.preview_digest(COMPANY, MANAGER)
+		self.assertIn(e1.bank_account, full["html"])
+		self.assertIn(usd.bank_account, full["html"])
+		with self.mail(), self.set_user(LIMITED_MANAGER):
+			# MANAGER sees every bank; the limited manager only gets the bank they may see
+			limited = notify.preview_digest(COMPANY, MANAGER)
+			own = notify.preview_digest(COMPANY)
+		self.assertIn(usd.bank_account, limited["html"])
+		self.assertNotIn(e1.bank_account, limited["html"])
+		self.assertIn(usd.bank_account, own["html"])
+		self.assertNotIn(e1.bank_account, own["html"])
+
+		with self.set_user(MANAGER):
+			for user in (DISABLED_USER, NO_ROLE_USER):
+				with self.subTest(user=user):
+					self.assertRaisesRegex(
+						frappe.ValidationError,
+						_("{0} is not an enabled System User.").format(user),
+						notify.preview_digest,
+						COMPANY,
+						user,
+					)
+			self.assertRaises(
+				frappe.DoesNotExistError, notify.preview_digest, COMPANY, "nobody-7e@example.com"
+			)
 
 	def test_send_test_digest(self):
 		e1 = make_alert_fixture_e1(self)
@@ -279,6 +329,12 @@ class TestBalanceAlertsUX(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertIn(type(settings).get_threshold_banks, frappe.whitelisted)
 		with self.set_user(NO_ROLE_USER):
 			self.assertRaises(frappe.PermissionError, settings.get_threshold_banks)
+		# security Minor 4: the User Permissions on Bank Account apply
+		self.limit_to_bank(usd.bank_account)
+		with self.set_user(LIMITED_MANAGER):
+			limited =frappe.get_doc("Treasury Company Settings", COMPANY).get_threshold_banks()
+		self.assertEqual([b["bank_account"] for b in limited], [usd.bank_account])
+		self.assertGreater(len(banks), 1)
 
 
 def synthetic_position(bank_account: str) -> frappe._dict:

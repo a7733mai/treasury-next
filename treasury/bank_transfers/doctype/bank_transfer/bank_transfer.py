@@ -144,6 +144,7 @@ class BankTransfer(Document):
 		self.status = lifecycle.DRAFT
 		self.accounting_status = lifecycle.NOT_POSTED
 		instruments.reset_draft_fields(self, DRAFT_RESET_FIELDS)
+		guard.reset_override_flag(self)
 		self.set_defaults()
 		self.validate_bank_accounts()
 		self.validate_party()

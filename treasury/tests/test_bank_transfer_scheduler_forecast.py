@@ -1,10 +1,13 @@
 """Phase 7b: the daily job sending Scheduled transfers, and Bank Transfers in the Bank Position Forecast
 (spec 7b §3.9, §3.10, §7 E)."""
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, flt, getdate, today
 
+from treasury.bank_facilities import forecast as facility_forecast
 from treasury.bank_transfers import forecast
 from treasury.bank_transfers.scheduler import post_scheduled_transfers
 from treasury.pdc.report.bank_position_forecast import bank_position_forecast
@@ -150,6 +153,22 @@ class TestBankTransferForecast(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(
 			[(f["amount_in_account_currency"], f["amount"]) for f in flows],
 			[(100 + fee, flt((100 + fee) * USD_RATE, 2))],
+		)
+
+	def test_per_bank_skips_company_amount(self):
+		"""Review M9 (phase 7e): the per-bank positions use the account currency only: no exchange rate is
+		looked up and `amount` stays empty."""
+		usd = self.data.usd
+		transfer = make_bank_transfer(
+			amount=100, bank_account=usd.bank_account, execution_date=add_days(self.today, 4)
+		)
+		filters = frappe._dict(self.filters([usd.bank_account], currency_view="Bank Currency"), per_bank=1)
+		with patch.object(facility_forecast, "_rate", wraps=facility_forecast._rate) as rate:
+			flows = [f for f in forecast.get_flows(filters) if f["reference_name"] == transfer.name]
+		rate.assert_not_called()
+		self.assertEqual(
+			[(f["amount"], f["amount_in_account_currency"]) for f in flows],
+			[(None, 100 + flt(transfer.fee_amount))],
 		)
 
 	def test_no_read_permission(self):
