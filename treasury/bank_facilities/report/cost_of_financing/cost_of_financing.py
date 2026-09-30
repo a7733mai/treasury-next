@@ -301,7 +301,9 @@ def _expense_rows(company: str, sources: dict, from_date, to_date) -> list[frapp
 def _category(row, facility, drawdown, repayments: dict) -> str:
 	"""The cost category of an expense row (spec 7g §4.9, first matching rule)."""
 	if row.treasury_event == accounting.EVENT_FEES or (
-		row.treasury_source_doctype == DRAWDOWN and drawdown.fees_account and row.account == drawdown.fees_account
+		row.treasury_source_doctype == DRAWDOWN
+		and drawdown.fees_account
+		and row.account == drawdown.fees_account
 	):
 		return "fees"
 	if facility.commission_expense_account and row.account == facility.commission_expense_account:

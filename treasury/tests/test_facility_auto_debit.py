@@ -70,7 +70,14 @@ class AutoDebitTestCase(TreasuryTestMixin, IntegrationTestCase):
 		return frappe.get_all(
 			"Facility Repayment",
 			filters={"drawdown": drawdown, "docstatus": 1},
-			fields=["name", "repayment_date", "settlement", "payment_entry", "bank_transaction", "total_paid"],
+			fields=[
+				"name",
+				"repayment_date",
+				"settlement",
+				"payment_entry",
+				"bank_transaction",
+				"total_paid",
+			],
 			order_by="repayment_date asc",
 		)
 
@@ -179,7 +186,9 @@ class TestAutoDebit(AutoDebitTestCase):
 		s = self.loan()
 		auto_debit.post_due_auto_debits(as_of="2025-03-01")
 		posted = self.repayments(s.drawdown.name)[0]
-		bt = make_bank_transaction(s.bank.bank_account, "2025-02-28", withdrawal=11_104.66, description="DEBIT")
+		bt = make_bank_transaction(
+			s.bank.bank_account, "2025-02-28", withdrawal=11_104.66, description="DEBIT"
+		)
 		tool = self.tool(s.bank.bank_account)
 		tool.get_suggestions()
 		rows = self.installment_rows(tool, s.drawdown.name)
@@ -202,7 +211,13 @@ class TestAutoDebit(AutoDebitTestCase):
 		s = self.loan(bank=bank)
 		set_thresholds(
 			self,
-			[{"bank_account": bank.bank_account, "warning_balance": 10_000_000, "minimum_balance": 10_000_000}],
+			[
+				{
+					"bank_account": bank.bank_account,
+					"warning_balance": 10_000_000,
+					"minimum_balance": 10_000_000,
+				}
+			],
 		)
 		self.enqueue.reset_mock()
 		auto_debit.post_due_auto_debits(as_of="2025-03-01")
@@ -242,9 +257,15 @@ class TestAutoDebit(AutoDebitTestCase):
 		again on the server (withdrawal, currency, amount, posting mode, repayment settlement, paid meanwhile)."""
 		self.use_company_settings(auto_debit_posting="On Bank Statement Match")
 		s = self.loan()
-		deposit = make_bank_transaction(s.bank.bank_account, "2025-03-02", deposit=11_104.66, description="IN")
-		smaller = make_bank_transaction(s.bank.bank_account, "2025-03-02", withdrawal=999, description="DEBIT")
-		exact = make_bank_transaction(s.bank.bank_account, "2025-03-02", withdrawal=11_104.66, description="X")
+		deposit = make_bank_transaction(
+			s.bank.bank_account, "2025-03-02", deposit=11_104.66, description="IN"
+		)
+		smaller = make_bank_transaction(
+			s.bank.bank_account, "2025-03-02", withdrawal=999, description="DEBIT"
+		)
+		exact = make_bank_transaction(
+			s.bank.bank_account, "2025-03-02", withdrawal=11_104.66, description="X"
+		)
 
 		def clear(bank_transaction: str, **values) -> list[str]:
 			tool = self.tool(s.bank.bank_account)
@@ -253,7 +274,9 @@ class TestAutoDebit(AutoDebitTestCase):
 				{
 					"selected": 1,
 					"bank_transaction": bank_transaction,
-					"reference_doctype": "Facility Repayment" if values.get("facility_repayment") else DRAWDOWN,
+					"reference_doctype": "Facility Repayment"
+					if values.get("facility_repayment")
+					else DRAWDOWN,
 					"facility_drawdown": s.drawdown.name,
 					"installment_no": 1,
 					**values,

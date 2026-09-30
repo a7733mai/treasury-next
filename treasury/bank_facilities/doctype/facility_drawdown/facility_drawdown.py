@@ -258,9 +258,9 @@ class FacilityDrawdown(Document):
 			live = facility_cheques.live_cheques(self.name)
 			if live:
 				frappe.throw(
-					_("Drawdown {0} has installment cheques in use ({1}); cancel or replace them first.").format(
-						frappe.bold(self.name), ", ".join(sorted(c.name for c in live.values()))
-					),
+					_(
+						"Drawdown {0} has installment cheques in use ({1}); cancel or replace them first."
+					).format(frappe.bold(self.name), ", ".join(sorted(c.name for c in live.values()))),
 					title=_("Not Allowed"),
 				)
 
@@ -281,7 +281,9 @@ class FacilityDrawdown(Document):
 			for fieldname in STAGE_SYSTEM_FIELDS:
 				new.set(fieldname, old.get(fieldname))
 		if changed:
-			frappe.throw(_("Disbursement stages can only change through Disburse Stage."), title=_("Not Allowed"))
+			frappe.throw(
+				_("Disbursement stages can only change through Disburse Stage."), title=_("Not Allowed")
+			)
 
 	def before_cancel(self):
 		from treasury.bank_facilities import facility_cheques
@@ -448,9 +450,9 @@ class FacilityDrawdown(Document):
 			or self.disbursement_account == self.liability_account
 		):
 			frappe.throw(
-				_("Disbursement Account {0} must be a ledger account of {1} in {2}, not a party account.").format(
-					frappe.bold(self.disbursement_account), frappe.bold(self.company), self.currency
-				)
+				_(
+					"Disbursement Account {0} must be a ledger account of {1} in {2}, not a party account."
+				).format(frappe.bold(self.disbursement_account), frappe.bold(self.company), self.currency)
 			)
 
 	def validate_repayment_mode(self):
@@ -483,7 +485,9 @@ class FacilityDrawdown(Document):
 			if row.amount <= 0:
 				frappe.throw(_("Row #{0}: Amount must be greater than zero.").format(row.idx))
 			if not row.stage_date or getdate(row.stage_date) < getdate(self.drawdown_date):
-				frappe.throw(_("Row #{0}: the Stage Date cannot be before the Drawdown Date.").format(row.idx))
+				frappe.throw(
+					_("Row #{0}: the Stage Date cannot be before the Drawdown Date.").format(row.idx)
+				)
 			if self.resets_system_fields():
 				row.status = STAGE_PENDING
 				row.disbursed_on = row.voucher_type = row.voucher_no = None

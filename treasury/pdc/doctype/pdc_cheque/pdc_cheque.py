@@ -218,9 +218,7 @@ class PDCCheque(Document):
 		"""The installment an installment cheque pays: its number, the drawdown's lender and the repayment /
 		Payment Entry of the current cycle."""
 		installment_no = (
-			frappe.db.get_value(
-				"Facility Repayment Schedule", self.facility_schedule_row, "installment_no"
-			)
+			frappe.db.get_value("Facility Repayment Schedule", self.facility_schedule_row, "installment_no")
 			if self.facility_schedule_row
 			else None
 		)
@@ -649,9 +647,9 @@ class PDCCheque(Document):
 		)
 		if due_date and getdate(self.original_due_date) != getdate(due_date):
 			frappe.throw(
-				_("The Original Due Date of an installment cheque must be its installment's due date {0}.").format(
-					formatdate(due_date)
-				)
+				_(
+					"The Original Due Date of an installment cheque must be its installment's due date {0}."
+				).format(formatdate(due_date))
 			)
 
 	def validate_locked_fields(self):

@@ -65,7 +65,7 @@ def bank_gl_account(bank_account: str) -> str:
 
 
 def voucher_mode(company: str, currency: str) -> str:
-	""""Payment Entry" when the company's `facility_voucher` says so (the default) and the facility is in the
+	""" "Payment Entry" when the company's `facility_voucher` says so (the default) and the facility is in the
 	company currency (spec 7g F2), else "Journal Entry"."""
 	setting = frappe.db.get_value("Treasury Company Settings", company, "facility_voucher")
 	if (setting or PAYMENT_ENTRY_MODE) == PAYMENT_ENTRY_MODE and not _is_foreign(company, currency):
@@ -130,7 +130,9 @@ def post_drawdown(doc) -> frappe._dict:
 	rate = flt(doc.exchange_rate) or 1.0
 	remarks = _("Drawdown {0} of Bank Facility {1}").format(doc.name, doc.facility)
 	if doc.get("disburse_to") == DISBURSE_TO_OTHER:
-		result.journal_entry = _post_other_account(doc, EVENT_DRAWDOWN, 1, doc.amount, doc.drawdown_date, rate)
+		result.journal_entry = _post_other_account(
+			doc, EVENT_DRAWDOWN, 1, doc.amount, doc.drawdown_date, rate
+		)
 		result.fees_journal_entry = post_fees(doc)
 		return result
 	if voucher_mode(doc.company, doc.currency) == PAYMENT_ENTRY_MODE:
@@ -365,7 +367,9 @@ def post_repayment(
 		accounts.append(_row(company, currency, drawdown.liability_account, rate, debit=doc.principal_paid))
 	if flt(doc.accrued_interest_cleared):
 		accounts.append(
-			_row(company, currency, facility.accrued_interest_account, rate, debit=doc.accrued_interest_cleared)
+			_row(
+				company, currency, facility.accrued_interest_account, rate, debit=doc.accrued_interest_cleared
+			)
 		)
 	if flt(doc.interest_expensed):
 		accounts.append(

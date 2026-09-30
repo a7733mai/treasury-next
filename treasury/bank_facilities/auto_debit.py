@@ -211,11 +211,15 @@ def repay_installment(
 		else:
 			voucher = ("Journal Entry", new.journal_entry)
 		reconcile_voucher(bank_transaction, *voucher)
-		posting.set_clearance_date(*voucher, frappe.db.get_value("Bank Transaction", bank_transaction, "date"))
+		posting.set_clearance_date(
+			*voucher, frappe.db.get_value("Bank Transaction", bank_transaction, "date")
+		)
 	return new.name
 
 
-def get_open_installments(company: str, bank_account: str, from_date=None, to_date=None) -> list[frappe._dict]:
+def get_open_installments(
+	company: str, bank_account: str, from_date=None, to_date=None
+) -> list[frappe._dict]:
 	"""The auto-debit installments the PDC Bank Clearing tool may match with a statement debit of the bank
 	account: (a) the Auto Debit repayments posted and not reconciled yet ("reconcile"), (b) with "On Bank
 	Statement Match", the unpaid installments of the Auto Debit drawdowns ("post"). Only for a user who may read

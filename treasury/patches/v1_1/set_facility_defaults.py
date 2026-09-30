@@ -37,7 +37,11 @@ def _fetch_drawdown_lender():
 		frappe.db.set_value(
 			"Facility Drawdown",
 			row.name,
-			{"lender_type": row.lender_type, "lender_name": row.lender_name, "is_islamic": row.is_islamic or 0},
+			{
+				"lender_type": row.lender_type,
+				"lender_name": row.lender_name,
+				"is_islamic": row.is_islamic or 0,
+			},
 			update_modified=False,
 		)
 
@@ -74,7 +78,9 @@ def execute():
 	(
 		frappe.qb.update(schedule)
 		.set(schedule.payment_voucher_type, "Journal Entry")
-		.where((IfNull(schedule.payment_journal, "") != "") & (IfNull(schedule.payment_voucher_type, "") == ""))
+		.where(
+			(IfNull(schedule.payment_journal, "") != "") & (IfNull(schedule.payment_voucher_type, "") == "")
+		)
 		.run()
 	)
 

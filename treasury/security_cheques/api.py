@@ -129,7 +129,9 @@ def _set_facility_values(doc, source):
 	expires, referencing the facility."""
 	if source.status in ("Draft", "Closed"):
 		frappe.throw(
-			_("{0} {1} is {2}.").format(_(FACILITY), frappe.bold(source.name), _(source.status, context=FACILITY))
+			_("{0} {1} is {2}.").format(
+				_(FACILITY), frappe.bold(source.name), _(source.status, context=FACILITY)
+			)
 		)
 	if doc.currency == source.currency:
 		doc.amount = doc.required_amount = flt(source.total_limit)

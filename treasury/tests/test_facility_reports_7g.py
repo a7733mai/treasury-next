@@ -83,7 +83,9 @@ class TestFacilityReports7g(Reports7gTestCase):
 		conventional = make_bank_facility()
 		dd = make_drawdown(conventional, upfront_fees=1200, fees_account=self.accounts.fees)
 		make_repayment(dd, "2025-02-28")
-		self.assertEqual(row(conventional), {**dict.fromkeys(categories, 0), "interest": 1104.66, "fees": 1200})
+		self.assertEqual(
+			row(conventional), {**dict.fromkeys(categories, 0), "interest": 1104.66, "fees": 1200}
+		)
 
 		# Islamic Murabaha (rate): profit
 		murabaha = self.murabaha_facility()
@@ -101,9 +103,7 @@ class TestFacilityReports7g(Reports7gTestCase):
 				}
 			]
 		)
-		dd = make_drawdown(
-			ijarah, limit_type="Ijarah", amount=240_000, tenor_months=24, profit_amount=24_000
-		)
+		dd = make_drawdown(ijarah, limit_type="Ijarah", amount=240_000, tenor_months=24, profit_amount=24_000)
 		make_repayment(dd, "2025-02-28")
 		self.assertEqual(row(ijarah), {**dict.fromkeys(categories, 0), "ijarah": 1000})
 
@@ -115,9 +115,7 @@ class TestFacilityReports7g(Reports7gTestCase):
 		)
 		dd = make_drawdown(charity, limit_type="Murabaha")
 		make_repayment(dd, "2025-03-05", allocation_mode="Selected Row", installment_no=1, penalty=500)
-		self.assertEqual(
-			row(charity), {**dict.fromkeys(categories, 0), "profit": 1104.66, "charity": 500}
-		)
+		self.assertEqual(row(charity), {**dict.fromkeys(categories, 0), "profit": 1104.66, "charity": 500})
 
 		# an installment cheque's interest, and its bounce reversal netting it to 0
 		bank = ensure_alert_bank()
@@ -195,7 +193,9 @@ class TestFacilityReports7g(Reports7gTestCase):
 		lender_name = frappe.db.get_value("Supplier", LENDER, "supplier_name")
 		top, facility_row, *_limits = data
 		self.assertEqual((top.label, top.lender_name), (lender_name, lender_name))
-		self.assertEqual((facility_row.lender_type, facility_row.lender_name), ("Finance Company", lender_name))
+		self.assertEqual(
+			(facility_row.lender_type, facility_row.lender_name), ("Finance Company", lender_name)
+		)
 		self.assertEqual(facility_row.utilised, 50_000)
 
 		_columns, data, *_rest = utilisation_report({"company": COMPANY, "lender_type": "Finance Company"})

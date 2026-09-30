@@ -156,7 +156,9 @@ def allocate(drawdown, repayment) -> frappe._dict:
 		cheque = live.get(row.name)
 		if cheque and not (is_cheque_repayment(repayment) and repayment.get("pdc_cheque") == cheque.name):
 			frappe.throw(
-				_("Installment {0} is settled by cheque {1}.").format(row.installment_no, frappe.bold(cheque.name))
+				_("Installment {0} is settled by cheque {1}.").format(
+					row.installment_no, frappe.bold(cheque.name)
+				)
 			)
 		interest = take(row, "interest", interest, unpaid_interest(row))
 		principal = take(row, "principal", principal, unpaid_principal(row))

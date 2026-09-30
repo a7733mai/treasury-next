@@ -479,9 +479,9 @@ def create_deductions_payment(
 		details_ = _transfer_account(account, company) if account else None
 		if not details_ or details_.account_currency != company_currency:
 			frappe.throw(
-				_("Payment Entry deductions must be in the company currency {0}; use a Journal Entry.").format(
-					company_currency
-				)
+				_(
+					"Payment Entry deductions must be in the company currency {0}; use a Journal Entry."
+				).format(company_currency)
 			)
 	rows = [d for d in deductions or [] if flt(d.get("amount"), precision)]
 	amount = flt(sum(flt(d.get("amount"), precision) for d in rows), precision)

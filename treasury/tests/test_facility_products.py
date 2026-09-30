@@ -422,7 +422,9 @@ class TestInvoiceDiscounting(ProductTestCase):
 		first = self.discounting(facility, 30_000)
 		self.assertEqual(first.status, "Sanctioned")
 		self.assertEqual(used(), 30_000)
-		self.assertEqual(get_voucher_count("Invoice Discounting", first.name), 0)  # ERPNext posts, not Treasury
+		self.assertEqual(
+			get_voucher_count("Invoice Discounting", first.name), 0
+		)  # ERPNext posts, not Treasury
 		self.assertEqual(frappe.db.get_value("Bank Facility", facility.name, "total_utilised"), 30_000)
 		# over the limit
 		second = self.discounting(facility, 25_000, submit=False)
@@ -450,9 +452,7 @@ class TestInvoiceDiscounting(ProductTestCase):
 		self.assertEqual(frappe.db.get_value("Bank Facility", facility.name, "total_utilised"), 0)
 		# a facility without the sub-limit
 		plain = make_bank_facility()
-		self.assert_error(
-			"has no Invoice Discounting sub-limit", self.discounting, plain, 1000, submit=False
-		)
+		self.assert_error("has no Invoice Discounting sub-limit", self.discounting, plain, 1000, submit=False)
 
 
 class TestFinanceCompanyEndToEnd(ProductTestCase):
@@ -486,7 +486,12 @@ class TestFinanceCompanyEndToEnd(ProductTestCase):
 			doc.clear(clearance_date=frappe.utils.add_days(doc.effective_due_date, 3))
 		self.assertEqual(get_utilisation(facility.name).utilised, 100_000)
 		_columns, data, *_rest = cost_of_financing(
-			{"company": COMPANY, "from_date": "2025-01-01", "to_date": "2025-12-31", "facility": facility.name}
+			{
+				"company": COMPANY,
+				"from_date": "2025-01-01",
+				"to_date": "2025-12-31",
+				"facility": facility.name,
+			}
 		)
 		self.assertEqual((data[0].profit, data[0].interest, data[0].total), (1200, 0, 1200))
 		self.assertEqual(data[0].lender_name, frappe.db.get_value("Supplier", LENDER, "supplier_name"))

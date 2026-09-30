@@ -159,7 +159,9 @@ def drawdown_sources(drawdowns: list[str]) -> dict[tuple[str, str], str]:
 	sources = {(DRAWDOWN, name): name for name in drawdowns}
 	if not drawdowns:
 		return sources
-	for row in frappe.get_all(REPAYMENT, filters={"drawdown": ["in", drawdowns]}, fields=["name", "drawdown"]):
+	for row in frappe.get_all(
+		REPAYMENT, filters={"drawdown": ["in", drawdowns]}, fields=["name", "drawdown"]
+	):
 		sources[(REPAYMENT, row.name)] = row.drawdown
 	for row in frappe.get_all(
 		CHEQUE, filters={"facility_drawdown": ["in", drawdowns]}, fields=["name", "facility_drawdown"]

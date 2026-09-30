@@ -50,7 +50,9 @@ def validate(doc, method=None):
 		{"parenttype": "Bank Facility", "parent": doc.treasury_facility, "limit_type": LIMIT_TYPE},
 	):
 		frappe.throw(
-			_("Bank Facility {0} has no Invoice Discounting sub-limit.").format(frappe.bold(doc.treasury_facility))
+			_("Bank Facility {0} has no Invoice Discounting sub-limit.").format(
+				frappe.bold(doc.treasury_facility)
+			)
 		)
 
 
@@ -95,7 +97,8 @@ def on_journal_entry(doc, method=None):
 	if not names or not frappe.get_meta(DOCTYPE).has_field("treasury_facility"):
 		return
 	for facility in sorted(
-		set(frappe.get_all(DOCTYPE, filters={"name": ["in", list(names)]}, pluck="treasury_facility")) - {None, ""}
+		set(frappe.get_all(DOCTYPE, filters={"name": ["in", list(names)]}, pluck="treasury_facility"))
+		- {None, ""}
 	):
 		refresh_utilisation(facility)
 
@@ -106,7 +109,9 @@ def get_invoice_discounting_utilisation(facility, as_on=None) -> list[dict]:
 	if not frappe.get_meta(DOCTYPE).has_field("treasury_facility"):
 		return []
 	filters = {"treasury_facility": facility.name, "docstatus": 1, "status": ["in", OPEN_STATUSES]}
-	rows = frappe.get_all(DOCTYPE, filters=filters, fields=["total_amount", "loan_start_date", "posting_date"])
+	rows = frappe.get_all(
+		DOCTYPE, filters=filters, fields=["total_amount", "loan_start_date", "posting_date"]
+	)
 	amount = sum(
 		flt(r.total_amount)
 		for r in rows

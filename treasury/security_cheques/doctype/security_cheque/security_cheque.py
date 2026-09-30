@@ -189,13 +189,19 @@ class SecurityCheque(Document):
 			return
 		if self.direction != lifecycle.OUTGOING:
 			return
-		facility = frappe.db.get_value("Bank Facility", self.reference_name, ["company", "status"], as_dict=True)
+		facility = frappe.db.get_value(
+			"Bank Facility", self.reference_name, ["company", "status"], as_dict=True
+		)
 		if not facility or facility.company != self.company or facility.status not in ("Active", "Suspended"):
 			return
 		if not frappe.has_permission("Bank Facility", "read", doc=self.reference_name):
 			return
 		row_doctype = "Bank Facility Security Cheque"
-		filters = {"parenttype": "Bank Facility", "parent": self.reference_name, "parentfield": "security_cheques"}
+		filters = {
+			"parenttype": "Bank Facility",
+			"parent": self.reference_name,
+			"parentfield": "security_cheques",
+		}
 		if frappe.db.exists(row_doctype, {**filters, "security_cheque": self.name}):
 			return
 		last = frappe.get_all(row_doctype, filters=filters, pluck="idx", order_by="idx desc", limit=1)

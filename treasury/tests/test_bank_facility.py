@@ -615,7 +615,8 @@ class TestFacilityRepayment(FacilityTestCase):
 		self.assertEqual(get_utilisation(facility.name).utilised, 110000)
 		# idempotent
 		self.assertEqual(
-			accounting.post_repayment(repayment, drawdown, facility), ("Journal Entry", repayment.journal_entry)
+			accounting.post_repayment(repayment, drawdown, facility),
+			("Journal Entry", repayment.journal_entry),
 		)
 		self.assertEqual(get_voucher_count("Facility Repayment", repayment.name), 1)
 

@@ -75,7 +75,9 @@ def installment_info(drawdown) -> dict:
 	info = {
 		"auto_debit_posting": auto_debit.posting_mode(drawdown.company) if drawdown.company else None,
 		"live_statuses": list(LIVE_STATUSES),
-		"cheques": {r.name: cheques[r.pdc_cheque] for r in drawdown.repayment_schedule if r.pdc_cheque in cheques},
+		"cheques": {
+			r.name: cheques[r.pdc_cheque] for r in drawdown.repayment_schedule if r.pdc_cheque in cheques
+		},
 		"has_cheques": bool(
 			names or (drawdown.name and frappe.db.exists(CHEQUE, {"facility_drawdown": drawdown.name}))
 		),
@@ -131,7 +133,9 @@ def make_installment_batch(drawdown: str) -> dict:
 		)
 	rows = _open_rows(doc)
 	if not rows:
-		frappe.throw(_("Drawdown {0} has no installment left without a cheque.").format(frappe.bold(doc.name)))
+		frappe.throw(
+			_("Drawdown {0} has no installment left without a cheque.").format(frappe.bold(doc.name))
+		)
 	from treasury.utils import source_documents
 
 	facility = frappe.get_doc("Bank Facility", doc.facility)
@@ -180,7 +184,11 @@ def validate_batch(batch):
 	drawdown = frappe.get_doc(DRAWDOWN, batch.facility_drawdown)
 	if not batch.flags.ignore_permissions:
 		drawdown.check_permission("read")
-	if drawdown.docstatus != 1 or drawdown.repayment_mode != PDC_TO_LENDER or drawdown.company != batch.company:
+	if (
+		drawdown.docstatus != 1
+		or drawdown.repayment_mode != PDC_TO_LENDER
+		or drawdown.company != batch.company
+	):
 		frappe.throw(
 			_("Drawdown {0} is not repaid by cheques to the lender (Repayment Mode {1}).").format(
 				frappe.bold(drawdown.name), _(drawdown.repayment_mode or "", context=DRAWDOWN)
@@ -189,7 +197,9 @@ def validate_batch(batch):
 	lender = frappe.db.get_value("Bank Facility", drawdown.facility, "lender")
 	if batch.party_type != "Supplier" or not lender or batch.party != lender:
 		frappe.throw(
-			_("The installment cheques must be made out to the lender {0}.").format(frappe.bold(lender or "-"))
+			_("The installment cheques must be made out to the lender {0}.").format(
+				frappe.bold(lender or "-")
+			)
 		)
 	if batch.direction != "Outgoing" or batch.bank_account != drawdown.bank_account:
 		frappe.throw(
@@ -243,7 +253,9 @@ def link_cheque(cheque):
 	"""The installment's schedule row points at its (new) cheque. The drawdown's `schedule_version` moves, so
 	a concurrent batch, repayment or cheque action on the drawdown sees the change (`repayment.lock_drawdown`)."""
 	if cheque.get("facility_schedule_row"):
-		frappe.db.set_value(SCHEDULE, cheque.facility_schedule_row, "pdc_cheque", cheque.name, update_modified=False)
+		frappe.db.set_value(
+			SCHEDULE, cheque.facility_schedule_row, "pdc_cheque", cheque.name, update_modified=False
+		)
 		_bump_version(cheque)
 
 

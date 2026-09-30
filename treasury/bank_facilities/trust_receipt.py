@@ -95,7 +95,9 @@ def create_from_lc(
 			"first_repayment_date": getdate(first_repayment_date)
 			if first_repayment_date
 			else getdate(add_months(date, cint(tenor_months))),
-			"interest_rate": flt(interest_rate) if interest_rate not in (None, "") else flt(limit.interest_rate),
+			"interest_rate": flt(interest_rate)
+			if interest_rate not in (None, "")
+			else flt(limit.interest_rate),
 			"day_count": limit.day_count,
 			"repayment_mode": "Manual",
 			"letter_of_credit": lc.name,

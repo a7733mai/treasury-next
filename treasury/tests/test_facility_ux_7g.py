@@ -337,7 +337,9 @@ class TestReports7gUX(UX7gTestCase):
 		facility.reload()
 		self.assertEqual((top.label, top.lender_name), (facility.lender_name, facility.lender_name))
 		self.assertEqual(top.row_id, f"lender-{facility.lender_name}")
-		self.assertEqual((limit.limit_type, limit.utilised, limit.commitment), ("Istisna'a", 300_000, 200_000))
+		self.assertEqual(
+			(limit.limit_type, limit.utilised, limit.commitment), ("Istisna'a", 300_000, 200_000)
+		)
 		self.assertIn("commitment", [c["fieldname"] for c in columns])
 
 		# a finance company facility is grouped under its lender too

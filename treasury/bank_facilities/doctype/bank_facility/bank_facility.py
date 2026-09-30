@@ -117,7 +117,11 @@ class BankFacility(Document):
 			return None
 		currency = cheques[0].currency or self.currency
 		total = sum(flt(c.amount) for c in cheques if (c.currency or currency) == currency)
-		return {"count": len(cheques), "total": flt(total, self.precision("total_limit")), "currency": currency}
+		return {
+			"count": len(cheques),
+			"total": flt(total, self.precision("total_limit")),
+			"currency": currency,
+		}
 
 	def validate(self):
 		self.validate_protected_fields()
@@ -193,7 +197,9 @@ class BankFacility(Document):
 			self.lender = frappe.db.get_value(self.doctype, self.name, "lender")
 		self.lender_name = None
 		if self.lender:
-			supplier = frappe.db.get_value("Supplier", self.lender, ["supplier_name", "disabled"], as_dict=True)
+			supplier = frappe.db.get_value(
+				"Supplier", self.lender, ["supplier_name", "disabled"], as_dict=True
+			)
 			if not supplier:
 				frappe.throw(_("{0} {1} does not exist").format(_("Supplier"), self.lender))
 			if supplier.disabled:

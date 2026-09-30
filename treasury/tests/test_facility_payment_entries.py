@@ -284,7 +284,9 @@ class TestFacilityPaymentEntries(FacilityPETestCase):
 	def test_late_payment_payable_to_charity(self):
 		s = self.islamic_loan("Payable to Charity")
 		repayment = self.late_repayment(s.drawdown)
-		self.assertEqual((repayment.penalty_treatment, repayment.total_paid), ("Payable to Charity", 11_104.66))
+		self.assertEqual(
+			(repayment.penalty_treatment, repayment.total_paid), ("Payable to Charity", 11_104.66)
+		)
 		assert_gl_entries(
 			self,
 			"Payment Entry",

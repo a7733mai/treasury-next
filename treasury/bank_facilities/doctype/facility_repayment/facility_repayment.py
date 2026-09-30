@@ -192,9 +192,9 @@ class FacilityRepayment(Document):
 	def before_cancel(self):
 		if self.is_cheque_settlement() and not self.flags.treasury_facility_service:
 			frappe.throw(
-				_("Repayment {0} is settled by cheque {1}: bounce, replace or cancel the cheque instead.").format(
-					frappe.bold(self.name), frappe.bold(self.pdc_cheque)
-				),
+				_(
+					"Repayment {0} is settled by cheque {1}: bounce, replace or cancel the cheque instead."
+				).format(frappe.bold(self.name), frappe.bold(self.pdc_cheque)),
 				frappe.ValidationError,
 				title=_("Not Allowed"),
 			)
@@ -312,7 +312,9 @@ class FacilityRepayment(Document):
 		an installment with a live cheque is left to its cheque."""
 		if self.docstatus != 0 or flt(self.principal_paid) or flt(self.interest_paid):
 			return
-		live = {} if self.allocation_mode == repayment.SELECTED_ROW else repayment._live_cheques(drawdown.name)
+		live = (
+			{} if self.allocation_mode == repayment.SELECTED_ROW else repayment._live_cheques(drawdown.name)
+		)
 		rows = sorted(
 			(
 				r
