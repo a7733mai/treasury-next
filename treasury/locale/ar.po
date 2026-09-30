@@ -12715,9 +12715,6 @@ msgstr "القسط {0} من السحب {1} مسدد بالفعل بموجب {2}.
 msgid "The statement amount {0} does not match the unpaid installment {1} ({2})."
 msgstr "مبلغ الكشف {0} لا يطابق القسط غير المسدد {1} ({2})."
 
-msgid "Bank Transaction {0} is not an open withdrawal of this bank account."
-msgstr "حركة البنك {0} ليست سحباً مفتوحاً على هذا الحساب البنكي."
-
 msgid "Bank Transaction {0} is in {1}, but drawdown {2} is in {3}."
 msgstr "حركة البنك {0} بعملة {1}، بينما السحب {2} بعملة {3}."
 
