@@ -224,7 +224,9 @@ class TestSetupChecklist(TreasuryTestMixin, IntegrationTestCase):
 		# checklist stays open while setup is incomplete and folds once it is complete
 		section = frappe.get_meta(SETTINGS).get_field("setup_checklist_section")
 		self.assertEqual(section.collapsible, 1)
-		self.assertEqual(section.collapsible_depends_on, "eval:!(doc.__onload && doc.__onload.setup_complete)")
+		self.assertEqual(
+			section.collapsible_depends_on, "eval:!(doc.__onload && doc.__onload.setup_complete)"
+		)
 
 	def test_naming_rules_only_for_rule_readers(self):
 		rule = frappe.get_doc(
@@ -233,7 +235,9 @@ class TestSetupChecklist(TreasuryTestMixin, IntegrationTestCase):
 				"document_type": "Bank Charge",
 				"prefix": "BCH-SECRET-",
 				"prefix_digits": 4,
-				"conditions": [{"field": "bank_account", "condition": "=", "value": self.data.egp.bank_account}],
+				"conditions": [
+					{"field": "bank_account", "condition": "=", "value": self.data.egp.bank_account}
+				],
 			}
 		).insert(ignore_permissions=True)
 		self.addCleanup(
@@ -256,7 +260,9 @@ class TestSetupChecklist(TreasuryTestMixin, IntegrationTestCase):
 			"Bank Transfer", "naming_series", "options", "BTX-.YYYY.-.#####\nBT-.YYYY.-.#####", "Text"
 		)
 		self.addCleanup(frappe.clear_cache, doctype="Bank Transfer")
-		self.addCleanup(frappe.delete_doc, "Property Setter", setter.name, ignore_permissions=True, force=True)
+		self.addCleanup(
+			frappe.delete_doc, "Property Setter", setter.name, ignore_permissions=True, force=True
+		)
 		frappe.clear_cache(doctype="Bank Transfer")
 		field_default = frappe.get_meta("Bank Transfer").get_field("naming_series").default
 		self.assertEqual(field_default, "BT-.YYYY.-.#####")

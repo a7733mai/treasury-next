@@ -21,11 +21,7 @@ BOUNCED_JS = (
 	APP_PATH / "pdc" / "report" / "bounced_and_postponed_cheques" / "bounced_and_postponed_cheques.js"
 )
 SETTINGS_JS = (
-	APP_PATH
-	/ "treasury_setup"
-	/ "doctype"
-	/ "treasury_company_settings"
-	/ "treasury_company_settings.js"
+	APP_PATH / "treasury_setup" / "doctype" / "treasury_company_settings" / "treasury_company_settings.js"
 )
 
 
@@ -74,7 +70,7 @@ class TestDashboardClient(UnitTestCase):
 	def test_setup_button_hidden_with_its_mobile_entry(self):
 		button = method_body(self.dashboard, "set_setup_button(setup) {")
 		self.assertIn("setup && setup.route", button)
-		self.assertIn("this.setup_menu_item().toggleClass(\"hidden\", !show)", button)
+		self.assertIn('this.setup_menu_item().toggleClass("hidden", !show)', button)
 		self.assertIn("this.page.menu", method_body(self.dashboard, "setup_menu_item() {"))
 
 	def test_bounced_report_refreshes_on_company_change(self):

@@ -426,8 +426,12 @@ class TestTreasuryDashboard(BalanceAlertTestMixin, IntegrationTestCase):
 			start_date=self.day(-30),
 			expiry_date=self.day(365),
 		)
-		late_lg = make_letter_of_guarantee(facility, amount=1000, issue_date=self.today, expiry_date=self.day(60))
-		late_lc = make_letter_of_credit(facility, amount=1000, issue_date=self.today, expiry_date=self.day(60))
+		late_lg = make_letter_of_guarantee(
+			facility, amount=1000, issue_date=self.today, expiry_date=self.day(60)
+		)
+		late_lc = make_letter_of_credit(
+			facility, amount=1000, issue_date=self.today, expiry_date=self.day(60)
+		)
 		make_letter_of_guarantee(facility, amount=1000, issue_date=self.today, expiry_date=self.day(20))
 
 		now = frappe._dict(company=COMPANY, today=self.today, precision=2)
@@ -442,6 +446,8 @@ class TestTreasuryDashboard(BalanceAlertTestMixin, IntegrationTestCase):
 				result = section(later)
 				self.assertIn(late.name, [r.name for r in result.next])
 				first = result.next[0]
-				self.assertEqual(first.days_to_expiry, (getdate(first.effective_expiry_date) - later.today).days)
+				self.assertEqual(
+					first.days_to_expiry, (getdate(first.effective_expiry_date) - later.today).days
+				)
 				dates = [r.effective_expiry_date for r in result.next]
 				self.assertEqual(dates, sorted(dates))
