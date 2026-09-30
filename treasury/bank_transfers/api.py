@@ -86,7 +86,9 @@ def _make_bank_transfer(source_doctype, source_name, method, company, party_type
 	doc.company = company
 	doc.transfer_type = transfer_type
 	doc.method = method or settings.default_transfer_method or "Normal"
-	doc.bank_account = settings.get(TRANSFER_DEFAULT_BANK_FIELDS[doc.method])
+	doc.bank_account = settings.get(TRANSFER_DEFAULT_BANK_FIELDS[doc.method]) or _fallback_bank(
+		company, transfer_type
+	)
 	doc.charge_bearer = settings.default_charge_bearer or fees.SHA
 	doc.request_date = doc.execution_date = today()
 	# without a default bank: the company currency (never `new_doc`'s default currency, the site's global
@@ -284,6 +286,13 @@ def get_fee_preview(
 		"is_manager": is_manager,
 		**defaults,
 	}
+
+
+def _fallback_bank(company: str, transfer_type: str) -> str | None:
+	"""Without a default bank for the method: the default cheque bank of the direction (Pay / Receive from
+	Documents settings), so a transfer made from a document still opens with a bank."""
+	direction = sd.OUTGOING if transfer_type == lifecycle.PARTY_PAYMENT else sd.INCOMING
+	return sd.default_cheque_bank(company, direction, erpnext.get_company_currency(company))
 
 
 def _company_bank(bank_account: str | None) -> frappe._dict:

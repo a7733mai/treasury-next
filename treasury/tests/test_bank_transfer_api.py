@@ -46,6 +46,15 @@ class TestBankTransferAPI(TreasuryTestMixin, IntegrationTestCase):
 		super().setUp()
 		self.use_company_settings(**TRANSFER_SETTINGS, default_normal_bank_account=self.data.egp.bank_account)
 
+	def test_bank_falls_back_to_the_default_cheque_bank(self):
+		# no default bank for the method: the default outgoing cheque bank, so the transfer opens with a bank
+		egp = self.data.egp.bank_account
+		self.use_company_settings(
+			default_fawran_bank_account=None, default_outgoing_cheque_bank_account=egp
+		)
+		pi = make_purchase_invoice(1500)
+		self.assertEqual(build_transfer("Purchase Invoice", pi.name, method="Fawran")["bank_account"], egp)
+
 	def test_from_purchase_invoice(self):
 		fawran_bank = self.data.egp.bank_account
 		self.use_company_settings(default_transfer_method="Fawran", default_fawran_bank_account=fawran_bank)
