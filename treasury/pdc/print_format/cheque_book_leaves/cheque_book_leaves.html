@@ -1,21 +1,47 @@
-{#- Every leaf of a cheque book with its status (treasury.pdc.cheque_leaves). The details of a cheque the user
-    may not read are left blank. -#}
+{#- Every leaf of a cheque book with its status (treasury.pdc.cheque_leaves), design 7f §3. The details of a
+    cheque the user may not read print as "—". The Payment Entry number (the filing key) is bold. -#}
 {%- set direction = treasury_print_direction() -%}
 {%- set register = treasury_cheque_book_leaves(doc) -%}
 {%- set summary = register.summary -%}
+{%- set print_year = frappe.utils.getdate().year -%}
+{%- set digits = doc.leaf_digits or 0 -%}
+{%- macro short_date(value) -%}
+	{%- if value -%}
+		{%- if frappe.utils.getdate(value).year == print_year -%}{{ frappe.utils.formatdate(value, "dd-MM") }}
+		{%- else -%}{{ frappe.utils.formatdate(value) }}{%- endif -%}
+	{%- endif -%}
+{%- endmacro -%}
 <div class="cheque-book-leaves" dir="{{ direction }}" style="text-align: {{ 'right' if direction == 'rtl' else 'left' }};">
 	<style>
-		.cheque-book-leaves table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 0.9em; }
+		.cheque-book-leaves table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
 		.cheque-book-leaves th, .cheque-book-leaves td { border: 1px solid #999; padding: 3px 5px; vertical-align: top; }
 		.cheque-book-leaves th { background: #f5f5f5; }
-		.cheque-book-leaves .cbl-label { width: 20%; font-weight: bold; background: #f5f5f5; }
+		.cheque-book-leaves .cbl-title { text-align: center; margin: 8px 0 4px; }
+		.cheque-book-leaves .cbl-print-date { text-align: center; margin-bottom: 12px; }
+		.cheque-book-leaves .cbl-label { width: 18%; font-weight: bold; background: #f5f5f5; }
+		.cheque-book-leaves .cbl-summary td { text-align: center; width: 20%; padding: 6px 4px; }
+		.cheque-book-leaves .cbl-summary .cbl-count { font-size: 14pt; font-weight: bold; line-height: 1.2; }
+		.cheque-book-leaves .cbl-summary .cbl-count-label { font-size: 8pt; color: #555; }
+		.cheque-book-leaves .cbl-leaves { font-size: 9pt; }
+		.cheque-book-leaves .cbl-leaves thead { display: table-header-group; }
+		.cheque-book-leaves .cbl-leaves tr { page-break-inside: avoid; }
+		.cheque-book-leaves .cbl-nowrap { white-space: nowrap; }
 		.cheque-book-leaves .cbl-number { text-align: {{ 'left' if direction == 'rtl' else 'right' }}; white-space: nowrap; }
-		.cheque-book-leaves .cbl-muted { color: #888; }
-		.cheque-book-leaves .cbl-bounced { color: #c0392b; }
+		.cheque-book-leaves .cbl-pe { white-space: nowrap; font-weight: bold; }
+		.cheque-book-leaves .cbl-muted, .cheque-book-leaves .cbl-muted td { color: #777; }
+		.cheque-book-leaves .cbl-strong { font-weight: bold; }
+		.cheque-book-leaves .cbl-too-many { text-align: center; border: 1px solid #999; padding: 12px; margin: 12px 0; }
+		.cheque-book-leaves .cbl-signatures td { border: none; text-align: center; padding-top: 48px; width: 50%; }
 	</style>
 
+	{% if letter_head and not no_letterhead %}
+	<div class="letter-head">{{ letter_head }}</div>
+	{% else %}
 	<h3 style="text-align: center;">{{ doc.company | e }}</h3>
-	<h2 style="text-align: center;">{{ _("Cheque Book Leaves") }}<br><small>{{ doc.name | e }}</small></h2>
+	{% endif %}
+
+	<h2 class="cbl-title">{{ _("Cheque Book Leaves Register") }}<br><small><bdi>{{ doc.name | e }}</bdi></small></h2>
+	<div class="cbl-print-date"><strong>{{ _("Print Date") }}:</strong> {{ treasury_print_date() }}</div>
 
 	<table class="cbl-header">
 		<tr>
@@ -26,7 +52,7 @@
 		</tr>
 		<tr>
 			<td class="cbl-label">{{ _("Range", context="Treasury Report") }}</td>
-			<td><bdi>{{ doc.start_no }} - {{ doc.end_no }}</bdi></td>
+			<td class="cbl-nowrap"><bdi>{{ (doc.start_no | string).zfill(digits) }} – {{ (doc.end_no | string).zfill(digits) }}</bdi></td>
 			<td class="cbl-label">{{ _("Status", context="Treasury") }}</td>
 			<td>{{ _(doc.status, context="Cheque Book") }}</td>
 		</tr>
@@ -34,28 +60,21 @@
 
 	<table class="cbl-summary">
 		<tr>
-			<th>{{ _("Total Leaves") }}</th>
-			<th>{{ _("Used", context="Treasury Report") }}</th>
-			<th>{{ _("Cancelled Leaves") }}</th>
-			<th>{{ _("Void Leaves") }}</th>
-			<th>{{ _("Remaining", context="Treasury Report") }}</th>
-		</tr>
-		<tr>
-			<td class="cbl-total">{{ summary.total or 0 }}</td>
-			<td class="cbl-used">{{ summary.used or 0 }}</td>
-			<td class="cbl-cancelled">{{ summary.cancelled or 0 }}</td>
-			<td class="cbl-void">{{ summary.void or 0 }}</td>
-			<td class="cbl-remaining">{{ summary.remaining or 0 }}</td>
+			<td><div class="cbl-count"><span class="cbl-total">{{ summary.total or 0 }}</span></div><div class="cbl-count-label">{{ _("Total Leaves") }}</div></td>
+			<td><div class="cbl-count"><span class="cbl-used">{{ summary.used or 0 }}</span></div><div class="cbl-count-label">{{ _("Used", context="Treasury Report") }}</div></td>
+			<td><div class="cbl-count"><span class="cbl-cancelled">{{ summary.cancelled or 0 }}</span></div><div class="cbl-count-label">{{ _("Cancelled Leaves") }}</div></td>
+			<td><div class="cbl-count"><span class="cbl-void">{{ summary.void or 0 }}</span></div><div class="cbl-count-label">{{ _("Void Leaves") }}</div></td>
+			<td><div class="cbl-count"><span class="cbl-remaining">{{ summary.remaining or 0 }}</span></div><div class="cbl-count-label">{{ _("Remaining", context="Treasury Report") }}</div></td>
 		</tr>
 	</table>
 
 	{% if register.too_many %}
-	<p class="cbl-too-many">{{ _("Too many leaves to list.") }}</p>
+	<div class="cbl-too-many">{{ _("Too many leaves to list.") }}</div>
 	{% else %}
 	<table class="cbl-leaves">
 		<thead>
 			<tr>
-				<th>{{ _("Leaf No") }}</th>
+				<th>{{ _("Cheque No") }}</th>
 				<th>{{ _("Status", context="Treasury") }}</th>
 				<th>{{ _("Party", context="Treasury Report") }}</th>
 				<th>{{ _("Amount", context="Treasury") }}</th>
@@ -68,19 +87,48 @@
 		</thead>
 		<tbody>
 			{% for leaf in register.leaves %}
-			<tr class="{{ 'cbl-muted' if leaf.status in ('Void', 'Cancelled Leaf') else ('cbl-bounced' if leaf.status == 'Bounced' else '') }}">
-				<td class="cbl-leaf-no"><bdi>{{ leaf.leaf_no }}</bdi></td>
-				<td>{{ _(leaf.status, context="Cheque Leaf") }}{% if leaf.cancel_reason %}<br><small>{{ leaf.cancel_reason | e }}</small>{% endif %}</td>
+			{%- set unusable = leaf.status in ("Void", "Cancelled Leaf") -%}
+			{%- set muted = unusable or leaf.status == "Unused" -%}
+			{%- set hidden = leaf.restricted -%}
+			<tr class="{{ 'cbl-muted' if muted else '' }}">
+				<td class="cbl-leaf-no cbl-nowrap"><bdi>{% if unusable %}<s>{{ leaf.leaf_no }}</s>{% else %}{{ leaf.leaf_no }}{% endif %}</bdi></td>
+				<td class="{{ 'cbl-strong' if leaf.status in ('Bounced', 'Security Lost') else '' }}">{{ _(leaf.status, context="Cheque Leaf") }}</td>
+				{% if unusable %}
+				<td colspan="2">
+					{%- if leaf.cancel_reason_type %}{{ _(leaf.cancel_reason_type, context="Cheque Book Cancelled Leaf") }}{% if leaf.cancel_reason %}: {% endif %}{% endif -%}
+					{{ (leaf.cancel_reason or "") | e }}
+				</td>
+				{% elif hidden %}
+				<td>—</td>
+				<td>—</td>
+				{% else %}
 				<td>{{ (leaf.party_name or leaf.party or "") | e }}</td>
-				<td class="cbl-number">{% if leaf.amount %}{{ frappe.utils.fmt_money(leaf.amount, currency=leaf.currency) }}{% endif %}</td>
-				<td>{{ frappe.utils.formatdate(leaf.issue_date) if leaf.issue_date else "" }}</td>
-				<td>{{ frappe.utils.formatdate(leaf.due_date or leaf.expiry_date) if (leaf.due_date or leaf.expiry_date) else "" }}</td>
-				<td>{{ frappe.utils.formatdate(leaf.clearance_date) if leaf.clearance_date else "" }}</td>
-				<td><bdi>{{ (leaf.payment_entry or "") | e }}</bdi></td>
-				<td><bdi>{{ (leaf.document or "") | e }}</bdi></td>
+				<td class="cbl-number">
+					{%- if leaf.amount_type in ("Open", "Blank") %}{{ _("Open", context="Cheque Leaf") }}
+					{%- elif leaf.amount %}{{ frappe.utils.fmt_money(leaf.amount, currency=leaf.currency) }}{% endif -%}
+				</td>
+				{% endif %}
+				<td class="cbl-nowrap">{{ "—" if hidden else short_date(leaf.issue_date) }}</td>
+				<td class="cbl-nowrap">
+					{%- if hidden %}—
+					{%- elif leaf.usage == "Security" and leaf.expiry_date %}<span class="cbl-muted">{{ _("exp.") }}</span> {{ short_date(leaf.expiry_date) }}
+					{%- else %}{{ short_date(leaf.due_date) }}{% endif -%}
+				</td>
+				<td class="cbl-nowrap">{{ "—" if hidden else short_date(leaf.clearance_date) }}</td>
+				<td class="cbl-pe">
+					{%- if hidden or not leaf.payment_entry %}—{% else %}<bdi>{{ leaf.payment_entry | e }}</bdi>{% endif -%}
+				</td>
+				<td class="cbl-nowrap">{% if hidden %}—{% else %}<bdi>{{ (leaf.document or "") | e }}</bdi>{% endif %}</td>
 			</tr>
 			{% endfor %}
 		</tbody>
 	</table>
 	{% endif %}
+
+	<table class="cbl-signatures">
+		<tr>
+			<td>{{ _("Prepared by") }}<br>________________</td>
+			<td>{{ _("Reviewed by") }}<br>________________</td>
+		</tr>
+	</table>
 </div>

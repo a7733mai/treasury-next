@@ -523,74 +523,203 @@ frappe.ui.form.on("Cheque Batch", {
 });
 
 // ------------------------------------------------------------------------------------ cheque printing
-// ChequeBatch.print_cheques registers the prints of the printable cheques (all or nothing), then the batch print
-// "Cheque Batch Leaves" opens; without a Cheque Layout the server returns the legacy multi-PDF of the cheques.
-function cheque_batch_print_cheques(frm, options) {
-	options = options || {};
-	const run = (values) => {
-		frm.call({
-			doc: frm.doc,
-			method: "print_cheques",
-			args: {
-				language: values.language,
-				reprint: options.reprint ? 1 : 0,
-				reason: options.reason,
-				only_unprinted: options.only_unprinted ? 1 : 0,
-			},
-			freeze: true,
-			error_handlers: {
-				ChequeAlreadyPrintedError: (r) => cheque_batch_already_printed(frm, values, r),
-			},
-		}).then((r) => {
-			const info = r.message || {};
-			if (info.names) {
-				const params = new URLSearchParams({
-					doctype: info.doctype,
-					name: JSON.stringify(info.names),
-					format: info.print_format,
-					_lang: frappe.boot.lang || "",
-				});
-				window.open(`/api/method/frappe.utils.print_format.download_multi_pdf?${params.toString()}`);
-				return;
-			}
-			if (!(info.printed || []).length) {
-				frappe.msgprint(__("No cheques to print."));
-				return;
-			}
-			const params = new URLSearchParams({
-				doctype: info.doctype,
-				name: info.name,
-				format: info.print_format,
-				_lang: info.language || "",
-			});
-			window.open(`/printview?${params.toString()}`);
-		});
-	};
-	if (options.language) {
-		run({ language: options.language });
+// Design 7f §6.5. ChequeBatch.print_cheques registers the prints of the printable cheques (all or nothing), then
+// the batch print "Cheque Batch Leaves" opens; without a Cheque Layout the server returns the legacy multi-PDF of
+// the cheques. `__onload.cheque_print_summary` (P16) offers "Unprinted only / All" upfront; a print made meanwhile
+// by someone else still ends in ChequeAlreadyPrintedError and its own dialog.
+const CHEQUE_BATCH_LANGUAGES = { Arabic: "ar", English: "en" };
+const CHEQUE_BATCH_MAX_ORDER = 8;
+
+function cheque_batch_print_cheques(frm) {
+	const summary = frm.doc.__onload && frm.doc.__onload.cheque_print_summary;
+	if (!summary || !summary.printable) {
+		frappe.msgprint(__("No cheques to print."));
 		return;
 	}
-	frappe.prompt(
-		[
+	const layout = summary.layout;
+	if (!layout) {
+		// legacy: the cheques' own print format, nothing registered
+		cheque_batch_run_print(frm, {});
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	const blocked = layout.reprint_requires_manager && !frappe.user.has_role("Treasury Manager");
+	const modes = [{ value: "unprinted", label: __("Unprinted only ({0})", [summary.unprinted]) }];
+	if (!blocked) {
+		modes.push({ value: "all", label: __("All, including reprints ({0})", [summary.printable]) });
+	}
+	let dialog = null;
+	const refresh = () => dialog && cheque_batch_print_dialog_refresh(dialog, summary);
+	dialog = new frappe.ui.Dialog({
+		title: __("Print Cheques of {0}", [esc(frm.doc.name)]),
+		fields: [
+			{
+				fieldname: "summary",
+				fieldtype: "HTML",
+				options: `<p>${esc(
+					__("{0} cheques · {1}", [summary.printable, format_currency(summary.total, frm.doc.currency)])
+				)}${
+					summary.printed
+						? `<br><span class="text-muted">${esc(
+								__("{0} not printed yet · {1} already printed", [summary.unprinted, summary.printed])
+						  )}</span>`
+						: ""
+				}</p>`,
+			},
+			{ fieldname: "load_order", fieldtype: "HTML" },
 			{
 				fieldname: "language",
 				fieldtype: "Select",
 				label: __("Language", null, "Cheque Layout"),
-				options: [
-					{ value: "Arabic", label: __("Arabic", null, "Cheque Layout") },
-					{ value: "English", label: __("English", null, "Cheque Layout") },
-				],
-				default: "Arabic",
+				options: Object.keys(CHEQUE_BATCH_LANGUAGES).map((value) => ({
+					value,
+					label: __(value, null, "Cheque Layout"),
+				})),
+				default: cheque_batch_last_language(frm, layout),
 				reqd: 1,
 			},
+			{
+				fieldname: "mode",
+				fieldtype: "Select",
+				label: __("Print", null, "PDC Cheque"),
+				options: modes,
+				default: "unprinted",
+				hidden: summary.printed ? 0 : 1,
+				onchange: refresh,
+			},
+			{
+				fieldname: "manager_note",
+				fieldtype: "HTML",
+				hidden: summary.printed && blocked ? 0 : 1,
+				options: `<p class="text-muted small">${esc(__("Only a Treasury Manager may reprint a cheque."))}</p>`,
+			},
+			{
+				fieldname: "reason",
+				fieldtype: "Small Text",
+				label: __("Reason"),
+				depends_on: "eval:doc.mode==='all'",
+				mandatory_depends_on: "eval:doc.mode==='all'",
+			},
 		],
-		run,
-		__("Print All Cheques"),
-		__("Print", null, "PDC Cheque")
+		primary_action_label: __("Print", null, "PDC Cheque"),
+		primary_action(values) {
+			const all = values.mode === "all";
+			dialog.hide();
+			cheque_batch_remember_language(frm, values.language);
+			cheque_batch_run_print(frm, {
+				language: values.language,
+				only_unprinted: all ? 0 : 1,
+				reprint: all ? 1 : 0,
+				reason: all ? values.reason : "",
+			});
+		},
+	});
+	// kept: the dialog finds its primary button by `.btn-primary`, which a reprint swaps for `.btn-danger`
+	dialog.__cheque_batch_primary = dialog.get_primary_btn();
+	dialog.show();
+	cheque_batch_print_dialog_refresh(dialog, summary);
+}
+
+function cheque_batch_print_dialog_refresh(dialog, summary) {
+	// the button names the number of leaves to load, and turns red for reprints
+	const all = dialog.get_value("mode") === "all";
+	const count = all ? summary.printable : summary.unprinted;
+	const $btn = dialog.__cheque_batch_primary;
+	$btn.text(__("Print {0} Cheques", [count]));
+	$btn.toggleClass("btn-danger", all).toggleClass("btn-primary", !all);
+	const leaves = (all ? summary.leaves : summary.unprinted_leaves) || [];
+	const order =
+		leaves.length > CHEQUE_BATCH_MAX_ORDER ? `${leaves[0]} … ${leaves[leaves.length - 1]}` : leaves.join(", ");
+	dialog.fields_dict.load_order.$wrapper.html(
+		leaves.length
+			? `<p class="text-muted small">${frappe.utils.escape_html(
+					__("Load the leaves in this order: {0}", [order])
+			  )}</p>`
+			: ""
 	);
 }
 
-function cheque_batch_already_printed(frm, values, r) {
+function cheque_batch_last_language(frm, layout) {
+	// [P17] the last language used for this bank account, else the layout's default (shared with PDC Cheque)
+	try {
+		const value = window.localStorage.getItem(`treasury_cheque_lang:${frm.doc.bank_account}`);
+		if (CHEQUE_BATCH_LANGUAGES[value]) {
+			return value;
+		}
+	} catch (e) {
+		// storage blocked: the layout's default
+	}
+	return layout.default_language || "Arabic";
+}
+
+function cheque_batch_remember_language(frm, language) {
+	try {
+		window.localStorage.setItem(`treasury_cheque_lang:${frm.doc.bank_account}`, language);
+	} catch (e) {
+		// storage blocked: nothing remembered
+	}
+}
+
+function cheque_batch_run_print(frm, args) {
+	// called inside a click handler: the print window opens now and is never blocked (design 7f §6.4)
+	const win = treasury.print.open_window();
+	const request = frm.call({
+		doc: frm.doc,
+		method: "print_cheques",
+		args: {
+			language: args.language || "",
+			reprint: args.reprint ? 1 : 0,
+			reason: args.reason || "",
+			only_unprinted: args.only_unprinted ? 1 : 0,
+		},
+		freeze: true,
+		freeze_message: __("Registering the print…"),
+		error_handlers: {
+			ChequeAlreadyPrintedError: (r) => {
+				win.close();
+				cheque_batch_already_printed(frm, args, r);
+			},
+		},
+	});
+	request.fail(() => win.close());
+	request.then((r) => {
+		const info = (r && r.message) || {};
+		if (info.names) {
+			const params = new URLSearchParams({
+				doctype: info.doctype,
+				name: JSON.stringify(info.names),
+				format: info.print_format,
+				_lang: frappe.boot.lang || "",
+			});
+			win.go(`/api/method/frappe.utils.print_format.download_multi_pdf?${params.toString()}`);
+			return;
+		}
+		const printed = (info.printed || []).length;
+		if (!printed) {
+			win.close();
+			frappe.msgprint({ message: __("All cheques of this batch are already printed."), indicator: "blue" });
+			return;
+		}
+		const params = new URLSearchParams({
+			doctype: info.doctype,
+			name: info.name,
+			format: info.print_format,
+			no_letterhead: 1,
+			trigger_print: 1,
+			_lang: info.language || CHEQUE_BATCH_LANGUAGES[args.language] || "",
+		});
+		win.go(`/printview?${params.toString()}`);
+		frappe.show_alert({
+			message: frappe.utils.escape_html(
+				__("{0} cheques registered as printed; {1} skipped.", [printed, (info.skipped || []).length])
+			),
+			indicator: "green",
+		});
+		frm.reload_doc();
+	});
+}
+
+function cheque_batch_already_printed(frm, args, r) {
 	let message = "";
 	try {
 		// the server message as plain text (DOMParser runs no script), escaped again below
@@ -601,32 +730,50 @@ function cheque_batch_already_printed(frm, values, r) {
 		message = "";
 	}
 	const dialog = new frappe.ui.Dialog({
-		title: __("Cheques Already Printed"),
+		title: __("Some cheques are already printed"),
 		fields: [
 			{
 				fieldname: "message",
 				fieldtype: "HTML",
 				options: `<div class="alert alert-warning">${frappe.utils.escape_html(message)}</div>`,
 			},
-			{ fieldname: "reason", fieldtype: "Small Text", label: __("Reason (to reprint all)") },
 		],
 		primary_action_label: __("Print Unprinted Only"),
 		primary_action() {
 			dialog.hide();
-			cheque_batch_print_cheques(frm, { language: values.language, only_unprinted: 1 });
+			cheque_batch_run_print(frm, { language: args.language, only_unprinted: 1 });
 		},
 		secondary_action_label: __("Reprint All"),
 		secondary_action() {
-			const reason = (dialog.get_value("reason") || "").trim();
-			if (!reason) {
-				frappe.msgprint(__("A reason is required to reprint a cheque."));
-				return;
-			}
 			dialog.hide();
-			cheque_batch_print_cheques(frm, { language: values.language, reprint: 1, reason });
+			frappe.prompt(
+				[{ fieldname: "reason", fieldtype: "Small Text", label: __("Reason"), reqd: 1 }],
+				(values) => cheque_batch_run_print(frm, { language: args.language, reprint: 1, reason: values.reason }),
+				__("Reprint All"),
+				__("Reprint All")
+			);
 		},
 	});
+	dialog.get_secondary_btn().removeClass("btn-default btn-secondary").addClass("btn-danger");
 	dialog.show();
+}
+
+// Design 7f §6.4: a print window opened synchronously in the click handler (never blocked as a popup); its URL
+// is set once the server answered. Defined once by whichever print form loads first (there are no bundles).
+frappe.provide("treasury.print");
+if (!treasury.print.open_window) {
+	treasury.print.open_window = function () {
+		const win = window.open("", "_blank");
+		if (win) {
+			win.document.write(
+				`<p style="font-family:sans-serif">${frappe.utils.escape_html(__("Preparing the print…"))}</p>`
+			);
+		}
+		return {
+			go: (url) => (win ? (win.location.href = url) : window.open(url)),
+			close: () => win && win.close(),
+		};
+	};
 }
 
 function cheque_batch_link(doctype, name) {

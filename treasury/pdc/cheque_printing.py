@@ -15,7 +15,7 @@ Nothing here posts anything, and security cheques are not printed on layouts.
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, flt, fmt_money, getdate, today
+from frappe.utils import cint, escape_html, flt, fmt_money, getdate, today
 from markupsafe import Markup
 
 from treasury.utils.amount_in_words import treasury_amount_in_words
@@ -46,6 +46,8 @@ BOXES = (
 	("crossing", "crossing", "crossing_font_size_pt", None),
 	("signature", "signature", None, "signature_height_mm"),
 )
+# Share of the base font size a box without its own size prints in.
+BASE_FONT_SCALE = {"crossing": 0.9, "signature": 0.85}
 
 
 class ChequeAlreadyPrintedError(frappe.ValidationError):
@@ -150,6 +152,11 @@ def _mm(value) -> str:
 	return f"{flt(value, 2):.2f}mm"
 
 
+def _mm_label(value) -> str:
+	"""A layout value as the user typed it (the test grid label "Payee 25,22")."""
+	return f"{flt(value, 1):g}"
+
+
 def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frappe._dict:
 	"""Texts and boxes of one leaf (pure: reads the Currency master only)."""
 	arabic = lang == "ar"
@@ -157,9 +164,10 @@ def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frapp
 
 	date_text = format_cheque_date(date, layout.date_format)
 	guard = layout.figures_guard or ""
-	figures = f"{guard}{fmt_money(amount, precision=currency_decimals(currency))}{guard}"
+	amount_text = fmt_money(amount, precision=currency_decimals(currency))
 	if indic:
-		date_text, figures = date_text.translate(ARABIC_INDIC), figures.translate(ARABIC_INDIC)
+		date_text, amount_text = date_text.translate(ARABIC_INDIC), amount_text.translate(ARABIC_INDIC)
+	figures = f"{guard}{amount_text}{guard}"
 
 	currency_name = (layout.currency_name_ar if arabic else layout.currency_name_en) or None
 	fraction_name = (layout.fraction_name_ar if arabic else layout.fraction_name_en) or None
@@ -191,13 +199,17 @@ def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frapp
 	boxes = {}
 	for name, prefix, font_field, height_field in BOXES:
 		font = flt(layout.get(font_field)) if font_field else 0
+		top, left = flt(layout.get(f"{prefix}_top_mm")), flt(layout.get(f"{prefix}_left_mm"))
 		boxes[name] = frappe._dict(
-			top=_mm(flt(layout.get(f"{prefix}_top_mm")) + flt(layout.nudge_y_mm) + offset_top),
-			left=_mm(flt(layout.get(f"{prefix}_left_mm")) + flt(layout.nudge_x_mm) + offset_left),
+			top=_mm(top + flt(layout.nudge_y_mm) + offset_top),
+			left=_mm(left + flt(layout.nudge_x_mm) + offset_left),
 			width=_mm(layout.get(f"{prefix}_width_mm")),
 			height=_mm(layout.get(height_field)) if height_field else None,
-			font_size=f"{flt(font or base_font, 1)}pt",
+			# the crossing and the signature print smaller than the base size unless a size is set (design §7)
+			font_size=f"{flt(font or base_font * BASE_FONT_SCALE.get(name, 1), 1)}pt",
 			rotation=flt(layout.crossing_rotation_deg) if name == "crossing" else 0,
+			# test grid: "left,top" as typed in the layout, i.e. the numbers to change
+			position=f"{_mm_label(left)},{_mm_label(top)}",
 		)
 
 	page_width, page_height = A4_SIZE if carrier else (layout.leaf_width_mm, layout.leaf_height_mm)
@@ -209,6 +221,8 @@ def build_leaf(layout, *, payee, amount, currency, date, company, lang) -> frapp
 		date_char_spacing=_mm(layout.date_char_spacing_mm) if flt(layout.date_char_spacing_mm) > 0 else None,
 		payee=payee or "",
 		figures=figures,
+		figures_guard=guard,
+		figures_amount=amount_text,
 		words=words,
 		words1=words1,
 		words2=words2,
@@ -246,7 +260,11 @@ def cheque_leaf(layout, cheque, lang: str, test_grid=False) -> Markup:
 
 
 def notice(message: str) -> Markup:
-	return Markup('<div class="treasury-cheque-notice">{0}</div>').format(message)
+	"""Printed instead of the leaf: nothing else prints, so a leaf fed by mistake receives no amount."""
+	return Markup(
+		'<div class="treasury-cheque-notice" style="margin:10mm auto;max-width:150mm;padding:4mm;'
+		'border:1px dashed #777;color:#777;font-size:12pt;text-align:center;">{0}</div>'
+	).format(message)
 
 
 def current_lang() -> str:
@@ -301,8 +319,8 @@ def treasury_batch_cheque_leaves(doc) -> Markup:
 	layout = get_layout(doc.bank_account)
 	if doc.direction != "Outgoing" or not layout:
 		return notice(_('Use "Print Cheque" on the cheque to print it.'))
-	row_idx = {row.name: row.idx for row in doc.cheques}
-	cheques = sorted(
+	cheques = in_row_order(
+		doc,
 		get_batch_cheques(
 			doc.name,
 			fields=[
@@ -322,7 +340,6 @@ def treasury_batch_cheque_leaves(doc) -> Markup:
 			],
 			as_user=True,
 		),
-		key=lambda c: row_idx.get(c.cheque_batch_row, len(row_idx) + 1),
 	)
 	lang = current_lang()
 	pages = [
@@ -366,6 +383,90 @@ def render_test(layout, lang: str) -> Markup:
 
 def wrap_page(html: Markup) -> Markup:
 	return Markup('<div class="treasury-cheque-page">{0}</div>').format(html)
+
+
+def in_row_order(batch, cheques: list) -> list:
+	"""Cheques of a batch in batch row order (a replacement follows its row; stable otherwise)."""
+	row_idx = {row.name: row.idx for row in batch.cheques}
+	return sorted(cheques, key=lambda c: row_idx.get(c.cheque_batch_row, len(row_idx) + 1))
+
+
+def reprint_requires_manager(company: str | None) -> bool:
+	"""Treasury Company Settings: only a Treasury Manager may reprint a cheque (lifecycle.check_reprint)."""
+	return bool(
+		company
+		and cint(frappe.db.get_value("Treasury Company Settings", company, "cheque_reprint_requires_manager"))
+	)
+
+
+def layout_info(layout, company: str | None) -> dict | None:
+	"""What the forms need to offer the print dialog (onload of PDC Cheque and Cheque Batch)."""
+	if not layout:
+		return None
+	return {
+		"name": layout.name,
+		"default_language": layout.default_language,
+		"reprint_requires_manager": reprint_requires_manager(company),
+	}
+
+
+def batch_print_summary(batch) -> dict | None:
+	"""The printable cheques of an outgoing submitted batch the user may read, for the "Print All Cheques"
+	dialog (design 7f P16): the same selection as ChequeBatch.print_cheques, in batch row order."""
+	from treasury.pdc.batch import get_batch_cheques
+
+	if batch.docstatus != 1 or batch.direction != "Outgoing":
+		return None
+	cheques = in_row_order(
+		batch,
+		[
+			c
+			for c in get_batch_cheques(
+				batch.name,
+				fields=["name", "cheque_no", "amount", "operational_status", "print_count", "cheque_batch_row"],
+				as_user=True,
+			)
+			if c.operational_status in PRINTABLE_STATUSES
+		],
+	)
+	unprinted = [c for c in cheques if not cint(c.print_count)]
+	return {
+		"layout": layout_info(get_layout(batch.bank_account), batch.company),
+		"printable": len(cheques),
+		"unprinted": len(unprinted),
+		"printed": len(cheques) - len(unprinted),
+		"total": flt(sum(flt(c.amount) for c in cheques)),
+		"leaves": [c.cheque_no for c in cheques],
+		"unprinted_leaves": [c.cheque_no for c in unprinted],
+	}
+
+
+@frappe.whitelist()
+def get_cheque_text(name: str, language: str | None = None) -> dict:
+	"""The texts a cheque's leaf would print (payee, date, figures, words, crossing), escaped, for the last check
+	in the "Print Cheque" dialog (design 7f P14). Read only: registers nothing."""
+	frappe.has_permission(CHEQUE, "print", doc=name, throw=True)
+	cheque = frappe.get_doc(CHEQUE, name)
+	if error := printable_error(cheque):
+		frappe.throw(error)
+	layout = get_layout(cheque.bank_account)
+	if not layout:
+		frappe.throw(
+			_("Bank Account {0} has no Cheque Layout. Create one first.").format(frappe.bold(cheque.bank_account))
+		)
+	lang = lang_code(language, layout)
+	leaf = build_leaf(
+		layout,
+		payee=cheque.payee_on_cheque or cheque.party_name or cheque.party,
+		amount=cheque.amount,
+		currency=cheque.currency,
+		date=cheque.effective_due_date or cheque.original_due_date,
+		company=cheque.company,
+		lang=lang,
+	)
+	texts = {key: escape_html(leaf[key] or "") for key in ("payee", "date", "figures", "words1", "words2")}
+	texts["crossing"] = escape_html(leaf.crossing if leaf.print_crossing else "")
+	return {**texts, "lang": lang, "dir": leaf.dir}
 
 
 @frappe.whitelist()

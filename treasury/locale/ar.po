@@ -10638,15 +10638,15 @@ msgstr "ضمان – محرر"
 
 msgctxt "Cheque Leaf"
 msgid "Security Issued"
-msgstr "ضمان – مسلم"
+msgstr "ضمان – مسلَّم للطرف"
 
 msgctxt "Cheque Leaf"
 msgid "Security Returned"
-msgstr "ضمان – مرتجع"
+msgstr "ضمان – مردود"
 
 msgctxt "Cheque Leaf"
 msgid "Security Encashed"
-msgstr "ضمان – محصّل"
+msgstr "ضمان – مسيَّل"
 
 msgctxt "Cheque Leaf"
 msgid "Security Lost"
@@ -11327,3 +11327,293 @@ msgstr "التجميع حسب"
 msgctxt "Security Cheque"
 msgid "Movement"
 msgstr "الحركة"
+
+# Phase 7f-2 — cheque books, printing and security reports UX (design 7f)
+# Cheque Book form, Void Leaf dialog
+msgctxt "Cheque Book"
+msgid "Cancelled and Void Leaves"
+msgstr "الأوراق الملغاة والتالفة"
+
+msgid "Active · {0} left"
+msgstr "نشط · متبقٍ {0}"
+
+msgid "{0} leaves · {1} used · {2} cancelled · {3} void · {4} remaining"
+msgstr "{0} ورقة · {1} مستخدمة · {2} ملغاة · {3} تالفة · {4} متبقية"
+
+msgid "Open Leaf Register"
+msgstr "فتح سجل الأوراق"
+
+msgid "A leaf written by mistake and destroyed (spoilt)."
+msgstr "ورقة كُتبت بالخطأ وأُتلفت."
+
+msgctxt "Void Leaf"
+msgid "Void Leaves"
+msgstr "إتلاف أوراق"
+
+msgctxt "Void Leaf"
+msgid "Void"
+msgstr "إتلاف"
+
+msgid "Record leaves that are damaged, misprinted, lost or stolen, so they are never allocated. This cannot be undone."
+msgstr "سجّل الأوراق التالفة أو التي طُبعت خطأً أو المفقودة أو المسروقة حتى لا تُستخدم أبداً. لا يمكن التراجع عن ذلك."
+
+msgid "Leave empty to void one leaf."
+msgstr "اتركه فارغاً لإتلاف ورقة واحدة."
+
+msgid "{0} leaf(s): {1} – {2}"
+msgstr "{0} ورقة: {1} – {2}"
+
+msgid "Void leaves {0}? This cannot be undone."
+msgstr "إتلاف الأوراق {0}؟ لا يمكن التراجع عن ذلك."
+
+msgid "Leaves {0} voided."
+msgstr "تم إتلاف الأوراق {0}."
+
+# Cheque Leaf Register, Cheque Book Usage, Cheque Book Leaves print
+msgid "Leaf Status"
+msgstr "حالة الورقة"
+
+msgid "Issue date of the cheque, or the date a leaf was cancelled or voided."
+msgstr "تاريخ تحرير الشيك، أو تاريخ إلغاء الورقة أو إتلافها."
+
+msgid "Open Cheque Book"
+msgstr "فتح دفتر الشيكات"
+
+msgid "A leaf without a cheque book on its cheque is attributed to the book of the same bank whose range covers the number: an open book first, then the newest."
+msgstr "الورقة التي لا يحدد شيكها دفتراً تُنسب إلى دفتر نفس البنك الذي يشمل نطاقه رقمها: الدفتر المفتوح أولاً ثم الأحدث."
+
+msgid "Restricted"
+msgstr "غير مصرح"
+
+msgid "You do not have access to this document."
+msgstr "ليس لديك صلاحية على هذا المستند."
+
+msgctxt "Cheque Leaf"
+msgid "Open"
+msgstr "مفتوح"
+
+msgid "Used – Payment"
+msgstr "مستخدمة – سداد"
+
+msgid "Used – Security"
+msgstr "مستخدمة – ضمان"
+
+msgid "Cheque Book Leaves Register"
+msgstr "سجل أوراق دفتر الشيكات"
+
+msgid "Prepared by"
+msgstr "أعدّه"
+
+msgid "Reviewed by"
+msgstr "راجعه"
+
+msgid "exp."
+msgstr "انتهاء"
+
+# Cheque Layout form, list, preview and test print
+msgctxt "Cheque Layout"
+msgid "Sample Image"
+msgstr "صورة شيك للمعاينة"
+
+msgid "A scan of a blank cheque of this bank at 100%. Shown behind the preview to place the fields. Never printed."
+msgstr "صورة ممسوحة لشيك فارغ من هذا البنك بمقاس 100%. تظهر خلف المعاينة لضبط أماكن الحقول. لا تُطبع أبداً."
+
+msgid "All positions are millimetres from the top-left corner of the cheque leaf lying face up, whatever the language. The language only changes the text direction inside each box."
+msgstr "كل المواضع بالمليمتر من الركن العلوي الأيسر لورقة الشيك ووجهها لأعلى، أياً كانت اللغة. اللغة تغيّر فقط اتجاه النص داخل كل خانة."
+
+msgid "Longer words continue on line 2."
+msgstr "ما يزيد يُكمل في السطر الثاني."
+
+msgctxt "Cheque Layout"
+msgid "Rotation (°)"
+msgstr "الدوران (°)"
+
+msgid "Printed at the top of the signature area."
+msgstr "يُطبع أعلى مساحة التوقيع."
+
+msgctxt "Cheque Layout"
+msgid "Default"
+msgstr "افتراضي"
+
+msgctxt "Cheque Layout"
+msgid "Enabled"
+msgstr "مفعّل"
+
+msgctxt "Cheque Layout"
+msgid "Zoom"
+msgstr "التكبير"
+
+msgctxt "Cheque Layout"
+msgid "Fit"
+msgstr "ملاءمة"
+
+msgid "Screen millimetres are approximate; use Test Print to check real sizes."
+msgstr "المليمترات على الشاشة تقريبية؛ استخدم الطباعة التجريبية للتحقق من المقاسات الفعلية."
+
+msgid "Keep the preview in view while editing positions"
+msgstr "إبقاء المعاينة ظاهرة أثناء تعديل المواضع"
+
+msgid "Preview of the unsaved values."
+msgstr "معاينة للقيم غير المحفوظة."
+
+msgid "The preview could not be refreshed."
+msgstr "تعذّر تحديث المعاينة."
+
+msgid "↑ Preview"
+msgstr "↑ المعاينة"
+
+msgid "Open Test Print"
+msgstr "فتح الطباعة التجريبية"
+
+msgid "Print on plain paper at 100 % / Actual size — not \"Fit to page\" — with margins None and browser headers and footers off. Hold the print over a blank cheque against the light."
+msgstr "اطبع على ورق عادي بمقاس 100% / الحجم الفعلي، وليس \"ملاءمة للصفحة\"، مع هوامش \"بلا\" وإيقاف رأس وتذييل المتصفح. ضع المطبوع فوق شيك فارغ مقابل الضوء."
+
+msgid "1. Measure a blank cheque and enter its size under Paper. 2. Place each box using the preview. 3. Save and use Test Print on plain paper; hold it over a blank cheque against the light. 4. If every field is shifted the same way, adjust Printer Calibration instead of each box."
+msgstr "1. قِس شيكاً فارغاً وأدخل مقاسه في قسم الورق. 2. حدّد مكان كل خانة باستخدام المعاينة. 3. احفظ واستخدم الطباعة التجريبية على ورق عادي، وضعها فوق شيك فارغ مقابل الضوء. 4. إذا كانت كل الحقول مزاحة بنفس القدر فعدّل معايرة الطابعة بدلاً من كل خانة."
+
+msgid "Cheques of {0} print with this layout ({1} by default)."
+msgstr "شيكات {0} تُطبع بهذا التخطيط ({1} افتراضياً)."
+
+msgid "Not the default: {0} is used for this bank account."
+msgstr "ليس الافتراضي: يُستخدم {0} لهذا الحساب البنكي."
+
+msgid "Disabled: cheques of {0} print with {1}."
+msgstr "معطّل: شيكات {0} تُطبع باستخدام {1}."
+
+msgid "the PDC Account Mapping format"
+msgstr "نموذج الطباعة المحدد في ربط حسابات الشيكات"
+
+msgid "Preparing the print…"
+msgstr "جارٍ تجهيز الطباعة…"
+
+# PDC Cheque: print dialog and indicators
+msgid "Not printed"
+msgstr "لم يُطبع"
+
+msgid "Printed · {0} by {1}"
+msgstr "مطبوع · {0} بواسطة {1}"
+
+msgid "Printed {0}× · last {1} by {2}"
+msgstr "طُبع {0} مرات · آخرها {1} بواسطة {2}"
+
+msgid "Print Cheque {0}"
+msgstr "طباعة الشيك {0}"
+
+msgctxt "Cheque Print Dialog"
+msgid "Payee"
+msgstr "المستفيد"
+
+msgctxt "Cheque Print Dialog"
+msgid "Date"
+msgstr "التاريخ"
+
+msgctxt "Cheque Print Dialog"
+msgid "Amount"
+msgstr "المبلغ"
+
+msgctxt "Cheque Print Dialog"
+msgid "In words"
+msgstr "بالحروف"
+
+msgctxt "Cheque Print Dialog"
+msgid "Leaf"
+msgstr "الورقة"
+
+msgctxt "Cheque Print Dialog"
+msgid "Edit"
+msgstr "تعديل"
+
+msgid "Insert leaf {0} of book {1} face up."
+msgstr "ضع الورقة {0} من الدفتر {1} ووجهها لأعلى."
+
+msgid "Insert leaf {0} face up."
+msgstr "ضع الورقة {0} ووجهها لأعلى."
+
+msgid "If the printed leaf is spoilt, use Actions → Replace to move the cheque to a new leaf instead of reprinting."
+msgstr "إذا تلفت الورقة المطبوعة فاستخدم إجراءات ← استبدال لنقل الشيك إلى ورقة جديدة بدلاً من إعادة الطباعة."
+
+msgid "Only a Treasury Manager may reprint a cheque."
+msgstr "لا يعيد طباعة الشيك إلا مدير الخزينة."
+
+msgid "Reprint"
+msgstr "إعادة الطباعة"
+
+msgid "Registering the print…"
+msgstr "جارٍ تسجيل الطباعة…"
+
+msgid "Cheque {0} registered as printed ({1})."
+msgstr "تم تسجيل طباعة الشيك {0} ({1})."
+
+msgid "Reprints always need a reason and are logged on the cheque."
+msgstr "إعادة الطباعة تتطلب سبباً دائماً وتُسجَّل على الشيك."
+
+# Cheque Batch: Print All Cheques
+msgid "Print Cheques of {0}"
+msgstr "طباعة شيكات {0}"
+
+msgid "{0} cheques · {1}"
+msgstr "{0} شيك · {1}"
+
+msgid "{0} not printed yet · {1} already printed"
+msgstr "{0} لم تُطبع بعد · {1} مطبوعة سابقاً"
+
+msgid "Load the leaves in this order: {0}"
+msgstr "ضع الأوراق بهذا الترتيب: {0}"
+
+msgid "Unprinted only ({0})"
+msgstr "غير المطبوعة فقط ({0})"
+
+msgid "All, including reprints ({0})"
+msgstr "الكل مع إعادة الطباعة ({0})"
+
+msgid "Print {0} Cheques"
+msgstr "طباعة {0} شيك"
+
+msgid "{0} cheques registered as printed; {1} skipped."
+msgstr "تم تسجيل طباعة {0} شيك؛ وتم تخطي {1}."
+
+msgid "Some cheques are already printed"
+msgstr "بعض الشيكات مطبوعة من قبل"
+
+msgid "All cheques of this batch are already printed."
+msgstr "كل شيكات هذا السند مطبوعة من قبل."
+
+# Security Cheques Summary and Security Cheque Movements
+msgctxt "Security Cheques Summary"
+msgid "Group"
+msgstr "المجموعة"
+
+msgctxt "Security Cheques Summary"
+msgid "Fixed"
+msgstr "محدد المبلغ"
+
+msgctxt "Security Cheques Summary"
+msgid "Open / Blank"
+msgstr "مفتوح"
+
+msgctxt "Security Cheques Summary"
+msgid "Party"
+msgstr "الطرف"
+
+msgctxt "Security Cheques Summary"
+msgid "Purpose"
+msgstr "الغرض"
+
+msgctxt "Security Cheques Summary"
+msgid "Status"
+msgstr "الحالة"
+
+msgid "Empty = live cheques (Received, In Custody, Issued)."
+msgstr "فارغ = الشيكات القائمة (مستلم، في الحفظ، مسلَّم للطرف)."
+
+msgid "Ageing Ranges"
+msgstr "فترات التقادم"
+
+msgid "Days to expiry, e.g. 30, 60, 90."
+msgstr "أيام حتى الانتهاء، مثل 30, 60, 90."
+
+msgid "Status Changes"
+msgstr "تغييرات الحالة"
+
+msgid "Custody Moves"
+msgstr "حركات الحفظ"

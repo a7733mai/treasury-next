@@ -237,8 +237,11 @@ any party can be encashed (not one of an *Other* party).
   are printed, in mm from the top-left corner of the physical leaf, with printer calibration, fonts, date
   format (also box dates), Western or Arabic-Indic digits, "only" / currency name / fraction in words or
   figures and the currency / fraction names (e.g. "Fils" for QAR), on a cheque leaf or on an A4 carrier.
-  *Test Print* prints a grid with every box outlined on blank paper; the form shows a live preview.
-  **Print Cheque** (outgoing Created / Delivered cheques) asks for Arabic or English, registers the print
+  *Test Print* prints a grid with every box outlined (with its left,top in mm) on blank paper; the form shows
+  a live, scaled preview in Arabic or English (a click on a box goes to its fields, a box outside the leaf is
+  outlined in red, an optional scan of a blank cheque can be shown behind it — never printed).
+  **Print Cheque** (outgoing Created / Delivered cheques) first shows what will be printed (payee, date,
+  figures, the amount in words on its two lines), asks for Arabic or English, registers the print
   (counter, last printed on / by, status log *Printed*) and opens the *Treasury Cheque* print; a printed
   cheque is printed again only with a reason (status log *Reprinted*) and, by default, only by a Treasury
   Manager (*Only a Treasury Manager may reprint a cheque* in Treasury Company Settings). *Payee Name on

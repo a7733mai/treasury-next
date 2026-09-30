@@ -397,6 +397,7 @@ def _leaf_row(context: frappe._dict, book, number: int) -> frappe._dict:
 		"party_type",
 		"party",
 		"party_name",
+		"amount_type",
 		"amount",
 		"currency",
 		"issue_date",
@@ -473,7 +474,8 @@ def _set_document(context: frappe._dict, row: frappe._dict, doctype: str, name: 
 			print_count=cint(doc.print_count),
 		)
 	else:
-		row.update(expiry_date=doc.expiry_date, return_date=doc.return_date)
+		# Open / Blank security cheques carry no amount (printed "Open")
+		row.update(expiry_date=doc.expiry_date, return_date=doc.return_date, amount_type=doc.amount_type)
 
 
 def activity_in_period(row, from_date=None, to_date=None) -> bool:

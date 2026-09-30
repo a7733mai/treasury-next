@@ -15,7 +15,15 @@ import frappe
 from frappe import _
 
 from treasury.pdc import cheque_leaves
-from treasury.pdc.cheque_leaves import LEAF_STATUSES, MAX_LEAVES, UNUSED, USAGE_PAYMENT, USAGE_SECURITY
+from treasury.pdc.cheque_leaves import (
+	CANCELLED_LEAF,
+	LEAF_STATUSES,
+	MAX_LEAVES,
+	UNUSED,
+	USAGE_PAYMENT,
+	USAGE_SECURITY,
+	VOID,
+)
 from treasury.pdc.report_utils import (
 	CTX,
 	as_list,
@@ -29,6 +37,8 @@ from treasury.pdc.report_utils import (
 BOOK = "Cheque Book"
 BOOK_STATUSES = ("Active", "Exhausted", "Closed")
 VIEW_LEAVES, VIEW_BOOKS = "Leaves", "Books"
+# An Active book with this many leaves left or fewer is flagged (as in Cheque Book Usage).
+LOW_REMAINING = 5
 BOOK_FIELDS = [
 	"name",
 	"bank_account",
@@ -60,12 +70,14 @@ def execute(filters=None):
 
 	books = get_books(filters, company)
 	row_filtered = bool(statuses or filters.usage or filters.party_type or filters.from_date or filters.to_date)
+	chart = None
 	if view == VIEW_BOOKS and not row_filtered:
 		summaries = cheque_leaves.book_summaries(books)
 		data = [header_row(book, summaries[book.name]) for book in books]
 	else:
 		check_size(books)
 		data = []
+		listed_leaves = []
 		leaves_by_book = cheque_leaves.get_leaves(books)
 		for book in books:
 			leaves = leaves_by_book[book.name]
@@ -73,9 +85,12 @@ def execute(filters=None):
 			if row_filtered and not matching:
 				continue
 			data.append(header_row(book, cheque_leaves.summarize(leaves, book.status)))
+			listed_leaves += leaves
 			if view == VIEW_LEAVES:
 				data += matching
-	return get_columns(), data, None, None, get_summary(data)
+		if view == VIEW_LEAVES:
+			chart = get_chart(listed_leaves)
+	return get_columns(one_book=bool(filters.cheque_book)), data, None, chart, get_summary(data)
 
 
 def get_books(filters: frappe._dict, company: str) -> list[frappe._dict]:
@@ -136,6 +151,50 @@ def header_row(book: frappe._dict, summary: dict) -> frappe._dict:
 	)
 
 
+def get_chart(leaves: list) -> dict | None:
+	"""Usage of the listed books' leaves (all of them, whatever the row filters): design 7f P6."""
+	if not leaves:
+		return None
+	counts = {"unused": 0, USAGE_PAYMENT: 0, USAGE_SECURITY: 0, CANCELLED_LEAF: 0, VOID: 0}
+	for row in leaves:
+		if row.status in (CANCELLED_LEAF, VOID):
+			counts[row.status] += 1
+		elif row.usage in (USAGE_PAYMENT, USAGE_SECURITY):
+			counts[row.usage] += 1
+		else:
+			counts["unused"] += 1
+	return {
+		"data": {
+			"labels": [
+				_("Unused", context="Cheque Leaf"),
+				_("Used – Payment"),
+				_("Used – Security"),
+				_("Cancelled Leaves"),
+				_("Void Leaves"),
+			],
+			"datasets": [
+				{
+					"name": _("Leaves", context="Cheque Leaf"),
+					"values": [counts[key] for key in ("unused", USAGE_PAYMENT, USAGE_SECURITY, CANCELLED_LEAF, VOID)],
+				}
+			],
+		},
+		"type": "percentage",
+		"colors": ["#C0C6CC", "#2490EF", "#F68B1F", "#6C7680", "#36414C"],
+		"fieldtype": "Int",
+	}
+
+
+def remaining_indicator(headers: list, remaining: int) -> str:
+	"""Green; Orange when 5 or fewer are left in the one Active book listed; Red when none is left."""
+	if not remaining:
+		return "Red"
+	active = [row for row in headers if row.status == "Active"]
+	if len(active) == 1 and remaining <= LOW_REMAINING:
+		return "Orange"
+	return "Green"
+
+
 def get_summary(data: list) -> list[dict]:
 	headers = [row for row in data if row.get("is_group")]
 
@@ -143,7 +202,7 @@ def get_summary(data: list) -> list[dict]:
 		return sum(row[fieldname] for row in headers)
 
 	return [
-		{"value": total("total_leaves"), "label": _("Total Leaves"), "datatype": "Int"},
+		{"value": total("total_leaves"), "label": _("Total Leaves"), "datatype": "Int", "indicator": "Blue"},
 		{"value": total("used_leaves"), "label": _("Used", context=CTX), "datatype": "Int", "indicator": "Blue"},
 		{
 			"value": total("cancelled_leaves"),
@@ -156,45 +215,55 @@ def get_summary(data: list) -> list[dict]:
 			"value": total("remaining_leaves"),
 			"label": _("Remaining", context=CTX),
 			"datatype": "Int",
-			"indicator": "Green",
+			"indicator": remaining_indicator(headers, total("remaining_leaves")),
 		},
 	]
 
 
-def get_columns() -> list[dict]:
+def get_columns(one_book: bool = False) -> list[dict]:
+	"""The leaf identity first (the tree toggle sits in column 1), the book identity last and left out when
+	one book is selected (design 7f P4 / P5)."""
+	book_columns = (
+		[]
+		if one_book
+		else [
+			column("cheque_book", _("Cheque Book"), "Link", 140, options=BOOK),
+			column("bank_account", _("Bank Account", context="Treasury"), "Link", 180, options="Bank Account"),
+			column("book_no", _("Book No"), width=80),
+		]
+	)
 	return [
-		column("cheque_book", _("Cheque Book"), "Link", 150, options=BOOK),
-		column("bank_account", _("Bank Account", context="Treasury"), "Link", 170, options="Bank Account"),
-		column("book_no", _("Book No"), width=80),
-		column("leaf_no", _("Leaf No"), width=150),
-		column("status", _("Status", context="Treasury"), width=130),
-		column("usage", _("Usage", context="Cheque Leaf"), width=90),
+		column("leaf_no", _("Cheque No"), width=170),
+		column("status", _("Status", context="Treasury"), width=150),
+		column("usage", _("Usage", context="Cheque Leaf"), width=80),
+		column("party_type", _("Party Type"), width=90, hidden=1),
+		column("party", _("Party", context=CTX), "Dynamic Link", 140, options="party_type"),
+		column("party_name", _("Party Name"), width=180),
+		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
+		column("due_date", _("Due Date", context="Treasury"), "Date", 95),
+		{**payment_entry_column(), "width": 170},
 		column(
 			"document_type", _("Document Type", context="Cheque Leaf"), "Link", 100, options="DocType", hidden=1
 		),
-		column("document", _("Document", context="Cheque Leaf"), "Dynamic Link", 160, options="document_type"),
-		column("party_type", _("Party Type"), width=90, hidden=1),
-		column("party", _("Party", context=CTX), "Dynamic Link", 150, options="party_type"),
-		column("party_name", _("Party Name"), width=160),
-		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
-		column("currency", _("Currency"), "Link", 70, options="Currency"),
-		column("issue_date", _("Issue Date", context="Treasury"), "Date", 100),
-		column("handover_date", _("Handover Date"), "Date", 100),
-		column("due_date", _("Due Date", context="Treasury"), "Date", 100),
-		column("clearance_date", _("Clearance Date", context="Cheque Leaf"), "Date", 100),
-		column("expiry_date", _("Expiry Date", context="Treasury"), "Date", 100),
-		column("return_date", _("Return Date"), "Date", 100),
-		column("pdc_cheque", _("PDC Cheque"), "Link", 150, options="PDC Cheque"),
+		column("document", _("Document", context="Cheque Leaf"), "Dynamic Link", 150, options="document_type"),
+		column("clearance_date", _("Clearance Date", context="Cheque Leaf"), "Date", 95),
+		column("issue_date", _("Issue Date", context="Treasury"), "Date", 95),
+		column("handover_date", _("Handover Date"), "Date", 95),
+		column("expiry_date", _("Expiry Date", context="Treasury"), "Date", 95),
+		column("return_date", _("Return Date"), "Date", 95),
+		column("pdc_cheque", _("PDC Cheque"), "Link", 140, options="PDC Cheque"),
 		column("pdc_status", _("PDC Status"), width=100),
-		payment_entry_column(),
 		column("print_count", _("Times Printed"), "Int", 80),
-		column("cancel_reason_type", _("Reason Type", context="Cheque Leaf"), width=110),
-		column("cancel_reason", _("Cancel / Void Reason"), width=180),
-		column("cancelled_on", _("Cancelled / Voided On"), "Date", 100),
-		column("cancelled_by", _("Cancelled / Voided By"), "Link", 140, options="User"),
+		column("cancel_reason_type", _("Reason Type", context="Cheque Leaf"), width=120),
+		column("cancel_reason", _("Cancel / Void Reason"), width=200),
+		column("cancelled_on", _("Cancelled / Voided On"), "Date", 95),
+		column("cancelled_by", _("Cancelled / Voided By"), "Link", 120, options="User"),
+		*book_columns,
 		column("total_leaves", _("Total Leaves"), "Int", 80),
-		column("used_leaves", _("Used", context=CTX), "Int", 70),
-		column("cancelled_leaves", _("Cancelled Leaves"), "Int", 90),
+		column("used_leaves", _("Used", context=CTX), "Int", 80),
+		column("cancelled_leaves", _("Cancelled Leaves"), "Int", 80),
 		column("void_leaves", _("Void Leaves"), "Int", 80),
-		column("remaining_leaves", _("Remaining", context=CTX), "Int", 90),
+		column("remaining_leaves", _("Remaining", context=CTX), "Int", 80),
+		column("currency", _("Currency"), "Link", 70, options="Currency", hidden=1),
+		column("amount_type", _("Amount Type"), width=80, hidden=1),
 	]

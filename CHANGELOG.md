@@ -17,6 +17,13 @@
 - `treasury_amount_in_words`: optional "only", currency name and fraction name overrides, fraction in figures.
 - Reports **Security Cheques Summary** (ageing buckets, chart, cards) and **Security Cheque Movements**.
 - Patch `set_cheque_leaf_defaults`. No accounting in this phase.
+- UX (7f-2): leaf bar and "Active · n left" on the Cheque Book, Void Leaves dialog with a live range check;
+  leaf status pills, book summary rows, usage chart and one-book mode (Print Book / Open Cheque Book) in the
+  Cheque Leaf Register; Cheque Layout form with a scaled preview (language, zoom, pinned while editing, click a
+  box to edit it, out-of-leaf boxes in red, optional scan behind), headline of the layout that prints and a
+  Test Print dialog; Print Cheque dialog with the words preview (`get_cheque_text`), reprint block and the
+  manager rule; Print All Cheques with "Unprinted only / All" and the leaf loading order; print windows open
+  in the click (never blocked); Security Cheques Summary grouped tree and Security Cheque Movements pills.
 
 ### Bank Position Alerts (Phase 7e)
 - Per-bank daily projected positions from the Bank Position Forecast engine (`treasury.pdc.bank_positions`,

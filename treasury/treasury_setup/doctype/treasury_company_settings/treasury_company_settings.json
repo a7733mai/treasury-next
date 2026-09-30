@@ -415,6 +415,7 @@
   },
   {
    "default": "1",
+   "description": "Reprints always need a reason and are logged on the cheque.",
    "fieldname": "cheque_reprint_requires_manager",
    "fieldtype": "Check",
    "label": "Only a Treasury Manager may reprint a cheque"

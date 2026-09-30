@@ -113,7 +113,7 @@
   {
    "fieldname": "cancelled_leaves_section",
    "fieldtype": "Section Break",
-   "label": "Cancelled Leaves"
+   "label": "Cancelled and Void Leaves"
   },
   {
    "fieldname": "cancelled_leaves",

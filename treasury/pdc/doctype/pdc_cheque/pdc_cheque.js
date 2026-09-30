@@ -6,6 +6,8 @@ const PDC_SETTLED = ["Cleared", "Bounced", "Returned", "Endorsed", "Discounted",
 // Accounting details copied to every voucher (PDCCheque ACCOUNTING_FIELDS): locked once the cheque is posted.
 const PDC_ACCOUNTING_FIELDS = ["cost_center", "project", "mode_of_payment", "party_bank_account", "contact_person"];
 const PDC_PAYEE_ROLES = ["Treasury Manager", "Treasury User", "System Manager"];
+// cheque_printing.PRINTABLE_STATUSES
+const PDC_PRINTABLE = ["Created", "Delivered"];
 
 // mirrors pdc_cheque.reference_rules: invoices / orders only for a supplier's outgoing or a customer's
 // incoming cheque; any cheque may settle a Journal Entry of its party
@@ -84,12 +86,15 @@ frappe.ui.form.on("PDC Cheque", {
 		);
 		const layout = frm.doc.__onload && frm.doc.__onload.cheque_layout;
 		if (frm.doc.direction === "Outgoing" && layout) {
-			// the bank's Cheque Layout: the print is registered (counter, status log) before it opens
-			frm.add_custom_button(
-				__("Print Cheque"),
-				() => pdc_print_cheque(frm, layout, frm.doc.print_count > 0),
-				__("Print", null, "PDC Cheque")
-			);
+			// the bank's Cheque Layout: the print is registered (counter, status log) before it opens; a cheque
+			// in another status cannot be printed (the server refuses it): no button (design 7f §6.1)
+			if (PDC_PRINTABLE.includes(frm.doc.operational_status)) {
+				frm.add_custom_button(
+					__("Print Cheque"),
+					() => pdc_print_dialog(frm, layout),
+					__("Print", null, "PDC Cheque")
+				);
+			}
 		} else {
 			// the PDC Account Mapping of the bank may name its own cheque layout
 			const cheque_format = (frm.doc.__onload && frm.doc.__onload.cheque_print_format) || "PDC Cheque Print";
@@ -681,24 +686,35 @@ if (!treasury.low_balance.show) {
 frappe.ui.form.on("PDC Cheque", {
 	refresh(frm) {
 		pdc_low_balance_log(frm);
+		pdc_print_indicator(frm);
+		pdc_payee_placeholder(frm);
+	},
+
+	party_name(frm) {
+		pdc_payee_placeholder(frm);
 	},
 });
 
+// Events shown as a pill in the status log: the low-balance override (7e) and the prints (7f §5.2)
+const PDC_EVENT_PILLS = { "Low Balance Override": "orange", Printed: "blue", Reprinted: "orange" };
+
 function pdc_low_balance_log(frm) {
-	// the override event is an orange pill in the status log, and the latest one a line on the dashboard
+	// the override and print events are pills in the status log; the latest override a line on the dashboard
 	const esc = frappe.utils.escape_html;
 	const event = "Low Balance Override";
 	for (const name of [null, frm.doc.name]) {
 		const df = frappe.meta.get_docfield("PDC Status Log", "event", name);
-		if (df && !(df.formatter && df.formatter.treasury_low_balance)) {
+		if (df && !(df.formatter && df.formatter.treasury_event_pills)) {
 			const base = df.formatter;
 			df.formatter = (value, ...rest) => {
-				if (value === event) {
-					return `<span class="indicator-pill orange">${esc(__(value, null, "PDC Status Log"))}</span>`;
+				if (PDC_EVENT_PILLS[value]) {
+					return `<span class="indicator-pill ${PDC_EVENT_PILLS[value]}">${esc(
+						__(value, null, "PDC Status Log")
+					)}</span>`;
 				}
 				return base ? base(value, ...rest) : esc(value ? __(value, null, "PDC Status Log") : "");
 			};
-			df.formatter.treasury_low_balance = true;
+			df.formatter.treasury_event_pills = true;
 		}
 	}
 	frm.refresh_field("status_log");
@@ -717,66 +733,245 @@ function pdc_low_balance_log(frm) {
 }
 
 // ------------------------------------------------------------------------------------ cheque printing
-// lifecycle.record_print registers the print; a printed cheque is printed again only with a reason (and, when the
-// company says so, by a Treasury Manager). The server is authoritative; `reprint` only opens the reason field.
-function pdc_print_cheque(frm, layout, reprint) {
+// Design 7f §5–§6. lifecycle.record_print registers the print (counter, "Printed" / "Reprinted" in the status log);
+// a printed cheque is printed again only with a reason and, when the company says so, by a Treasury Manager. The
+// server is authoritative: the dialog only mirrors these rules. Printing takes one click plus Enter: the language
+// is defaulted (the last one used for the bank account, else the layout's).
+const PDC_LANGUAGES = { Arabic: "ar", English: "en" };
+
+function pdc_print_indicator(frm) {
+	// design 7f P20: printed or not, at a glance (outgoing cheques printed on a Cheque Layout)
+	const doc = frm.doc;
+	if (frm.is_new() || doc.direction !== "Outgoing" || !(doc.__onload && doc.__onload.cheque_layout)) {
+		return;
+	}
+	const count = cint(doc.print_count);
+	const by = frappe.user.full_name(doc.last_printed_by) || doc.last_printed_by || "";
+	const on = doc.last_printed_on ? frappe.datetime.str_to_user(doc.last_printed_on.split(" ")[0]) : "";
 	const esc = frappe.utils.escape_html;
+	if (!count) {
+		if (PDC_PRINTABLE.includes(doc.operational_status)) {
+			frm.dashboard.add_indicator(esc(__("Not printed")), "orange");
+		}
+	} else if (count === 1) {
+		frm.dashboard.add_indicator(esc(__("Printed · {0} by {1}", [on, by])), "blue");
+	} else {
+		frm.dashboard.add_indicator(esc(__("Printed {0}× · last {1} by {2}", [count, on, by])), "orange");
+	}
+}
+
+function pdc_payee_placeholder(frm) {
+	// an empty "Payee Name on Cheque" visibly means "the party name"
+	const field = frm.fields_dict.payee_on_cheque;
+	field && field.$input && field.$input.attr("placeholder", frm.doc.party_name || frm.doc.party || "");
+}
+
+function pdc_last_language(frm, layout) {
+	// [P17] the last language used for this bank account, else the layout's default
+	try {
+		const value = window.localStorage.getItem(`treasury_cheque_lang:${frm.doc.bank_account}`);
+		if (PDC_LANGUAGES[value]) {
+			return value;
+		}
+	} catch (e) {
+		// storage blocked: the layout's default
+	}
+	return layout.default_language || "Arabic";
+}
+
+function pdc_remember_language(frm, language) {
+	try {
+		window.localStorage.setItem(`treasury_cheque_lang:${frm.doc.bank_account}`, language);
+	} catch (e) {
+		// storage blocked: nothing remembered
+	}
+}
+
+function pdc_server_text(r) {
+	// the server messages as plain text (DOMParser runs no script); escaped again where shown
+	try {
+		return JSON.parse(r._server_messages || "[]")
+			.map((m) => new DOMParser().parseFromString(JSON.parse(m).message || "", "text/html").body.textContent)
+			.join(" ");
+	} catch (e) {
+		return "";
+	}
+}
+
+function pdc_print_dialog(frm, layout, notice) {
+	const doc = frm.doc;
+	const esc = frappe.utils.escape_html;
+	const reprint = cint(doc.print_count) > 0;
+	// [P15] a user who may not reprint gets no dead end: the reason and the button are hidden
+	const blocked = reprint && layout.reprint_requires_manager && !frappe.user.has_role("Treasury Manager");
+	const row = (label, value) =>
+		`<tr><th class="text-muted" style="width:25%;font-weight:normal;white-space:nowrap">${esc(
+			__(label, null, "Cheque Print Dialog")
+		)}</th><td>${value}</td></tr>`;
+	const payee = esc(doc.payee_on_cheque || doc.party_name || doc.party || "");
+	const leaf = doc.cheque_book
+		? __("Insert leaf {0} of book {1} face up.", [doc.cheque_no, doc.cheque_book])
+		: __("Insert leaf {0} face up.", [doc.cheque_no]);
+	const summary = `<table class="table table-sm" style="margin-bottom:8px">
+		${row("Payee", `<b class="pdc-print-payee">${payee}</b> &nbsp; <a class="pdc-print-edit small">${esc(
+			__("Edit", null, "Cheque Print Dialog")
+		)} ↗</a>`)}
+		${row("Date", `<bdi class="pdc-print-date">${esc(frappe.datetime.str_to_user(doc.effective_due_date) || "")}</bdi>`)}
+		${row(
+			"Amount",
+			`<b><bdi class="pdc-print-figures">${esc(format_currency(doc.amount, doc.currency))}</bdi></b> <span class="text-muted">${esc(
+				doc.currency || ""
+			)}</span>`
+		)}
+		${row("In words", `<div class="pdc-print-words"></div>`)}
+		${row("Leaf", `<span class="text-muted">${esc(leaf)}</span>`)}
+	</table>`;
+	const reprint_block = reprint
+		? `<div class="alert alert-warning small" style="margin-bottom:8px">${esc(
+				__("Printed {0} times, last by {1} on {2}.", [
+					doc.print_count,
+					frappe.user.full_name(doc.last_printed_by) || doc.last_printed_by || "",
+					frappe.datetime.str_to_user(doc.last_printed_on) || "",
+				])
+		  )}<br>${esc(
+				__(
+					"If the printed leaf is spoilt, use Actions → Replace to move the cheque to a new leaf instead of reprinting."
+				)
+		  )}</div>${
+				blocked
+					? `<p class="text-danger small">${esc(__("Only a Treasury Manager may reprint a cheque."))}</p>`
+					: ""
+		  }`
+		: "";
+	let dialog = null;
 	const fields = [
+		...(notice
+			? [{ fieldname: "notice", fieldtype: "HTML", options: `<div class="alert alert-warning small">${esc(notice)}</div>` }]
+			: []),
+		{ fieldname: "summary", fieldtype: "HTML", options: summary },
 		{
 			fieldname: "language",
 			fieldtype: "Select",
 			label: __("Language", null, "Cheque Layout"),
-			options: [
-				{ value: "Arabic", label: __("Arabic", null, "Cheque Layout") },
-				{ value: "English", label: __("English", null, "Cheque Layout") },
-			],
-			default: layout.default_language || "Arabic",
+			options: Object.keys(PDC_LANGUAGES).map((value) => ({ value, label: __(value, null, "Cheque Layout") })),
+			default: pdc_last_language(frm, layout),
 			reqd: 1,
+			// the dialog may set its default before it exists
+			onchange: () => dialog && pdc_print_preview_text(frm, dialog),
 		},
+		...(reprint ? [{ fieldname: "reprint_block", fieldtype: "HTML", options: reprint_block }] : []),
+		...(reprint && !blocked ? [{ fieldname: "reason", fieldtype: "Small Text", label: __("Reason"), reqd: 1 }] : []),
 	];
-	if (reprint) {
-		fields.push(
-			{
-				fieldname: "warning",
-				fieldtype: "HTML",
-				options: `<div class="alert alert-warning">${esc(
-					__("Printed {0} times, last by {1} on {2}.", [
-						frm.doc.print_count || 1,
-						frappe.user.full_name(frm.doc.last_printed_by) || frm.doc.last_printed_by || "",
-						frappe.datetime.str_to_user(frm.doc.last_printed_on) || "",
-					])
-				)}</div>`,
-			},
-			{ fieldname: "reason", fieldtype: "Small Text", label: __("Reason"), reqd: 1 }
-		);
-	}
-	frappe.prompt(
+	dialog = new frappe.ui.Dialog({
+		title: __("Print Cheque {0}", [esc(doc.cheque_no || doc.name)]),
 		fields,
-		(values) => {
-			frm.call({
-				doc: frm.doc,
-				method: "print_cheque",
-				args: { language: values.language, reprint: reprint ? 1 : 0, reason: values.reason },
-				freeze: true,
-				error_handlers: {
-					// printed meanwhile by someone else: ask again as a reprint
-					ChequeAlreadyPrintedError: () => frm.reload_doc().then(() => pdc_print_cheque(frm, layout, true)),
-				},
-			}).then((r) => {
-				const result = r.message || {};
-				const params = new URLSearchParams({
-					doctype: frm.doctype,
-					name: frm.doc.name,
-					format: result.print_format || "Treasury Cheque",
-					_lang: result.language || "",
-				});
-				window.open(`/printview?${params.toString()}`);
-				frm.reload_doc();
-			});
+	});
+	if (blocked) {
+		dialog.set_primary_action(__("Close"), () => dialog.hide());
+	} else {
+		dialog.set_primary_action(reprint ? __("Reprint") : __("Print", null, "PDC Cheque"), (values) =>
+			pdc_register_print(frm, layout, dialog, values, reprint)
+		);
+		// the colour is the confirmation of a reprint: no second confirm
+		reprint && dialog.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
+	}
+	dialog.fields_dict.summary.$wrapper.find(".pdc-print-edit").on("click", () => {
+		dialog.hide();
+		frm.scroll_to_field("payee_on_cheque");
+	});
+	dialog.show();
+	pdc_print_preview_text(frm, dialog);
+}
+
+function pdc_print_preview_text(frm, dialog) {
+	// [P14] the treasurer's last check of the words ("فقط … لا غير") before a leaf is used; registers nothing
+	const $summary = dialog.fields_dict.summary.$wrapper;
+	frappe
+		.call({
+			method: "treasury.pdc.cheque_printing.get_cheque_text",
+			args: { name: frm.doc.name, language: dialog.get_value("language") },
+			type: "GET",
+		})
+		.then((r) => {
+			const text = r.message;
+			if (!text) {
+				return;
+			}
+			// every value is escaped by the server
+			$summary.find(".pdc-print-payee").html(text.payee);
+			$summary.find(".pdc-print-date").html(text.date);
+			$summary.find(".pdc-print-figures").html(text.figures);
+			$summary
+				.find(".pdc-print-words")
+				.attr("dir", text.dir)
+				.css("text-align", text.dir === "rtl" ? "right" : "left")
+				.html(`<div>${text.words1}</div>${text.words2 ? `<div>${text.words2}</div>` : ""}`);
+		});
+}
+
+function pdc_register_print(frm, layout, dialog, values, reprint) {
+	// opened inside the click handler (a user gesture), so the browser does not block it (design 7f §6.4)
+	const win = treasury.print.open_window();
+	dialog.hide();
+	const request = frm.call({
+		doc: frm.doc,
+		method: "print_cheque",
+		args: { language: values.language, reprint: reprint ? 1 : 0, reason: values.reason || "" },
+		freeze: true,
+		freeze_message: __("Registering the print…"),
+		error_handlers: {
+			// printed meanwhile by someone else: ask again, as a reprint, with the server's message on top
+			ChequeAlreadyPrintedError: (r) => {
+				win.close();
+				const notice = pdc_server_text(r);
+				frm.reload_doc().then(() =>
+					pdc_print_dialog(frm, (frm.doc.__onload && frm.doc.__onload.cheque_layout) || layout, notice)
+				);
+			},
 		},
-		reprint ? __("Reprint Cheque") : __("Print Cheque"),
-		__("Print", null, "PDC Cheque")
-	);
+	});
+	request.fail(() => win.close());
+	request.then((r) => {
+		const result = (r && r.message) || {};
+		const params = new URLSearchParams({
+			doctype: frm.doctype,
+			name: frm.doc.name,
+			format: result.print_format || "Treasury Cheque",
+			no_letterhead: 1,
+			trigger_print: 1,
+			_lang: result.language || PDC_LANGUAGES[values.language] || "",
+		});
+		win.go(`/printview?${params.toString()}`);
+		pdc_remember_language(frm, values.language);
+		frappe.show_alert({
+			message: frappe.utils.escape_html(
+				__("Cheque {0} registered as printed ({1}).", [
+					frm.doc.cheque_no || frm.doc.name,
+					__(values.language, null, "Cheque Layout"),
+				])
+			),
+			indicator: "green",
+		});
+		frm.reload_doc();
+	});
+}
+
+// Design 7f §6.4: a print window opened synchronously in the click handler (never blocked as a popup); its URL
+// is set once the server answered. Defined once by whichever print form loads first (there are no bundles).
+frappe.provide("treasury.print");
+if (!treasury.print.open_window) {
+	treasury.print.open_window = function () {
+		const win = window.open("", "_blank");
+		if (win) {
+			win.document.write(
+				`<p style="font-family:sans-serif">${frappe.utils.escape_html(__("Preparing the print…"))}</p>`
+			);
+		}
+		return {
+			go: (url) => (win ? (win.location.href = url) : window.open(url)),
+			close: () => win && win.close(),
+		};
+	};
 }
 
 function pdc_replace(frm) {

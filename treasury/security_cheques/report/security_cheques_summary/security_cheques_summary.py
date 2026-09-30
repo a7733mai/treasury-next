@@ -78,6 +78,8 @@ def execute(filters=None):
 			group_row(key, group_by, items, converter, as_on, ranges, buckets)
 			for key, items in sorted(groups.items(), key=lambda item: sort_key(item[0]))
 		]
+		for row in rows:
+			row.direction = direction
 		data.append(header_row(direction, label, rows, buckets, converter.company_currency))
 		data += rows
 	return (
@@ -149,13 +151,15 @@ def sort_key(key: tuple) -> tuple:
 
 def group_row(key, group_by, cheques, converter, as_on, ranges, buckets) -> frappe._dict:
 	precision = get_precision()
-	row = frappe._dict(indent=1, company_currency=converter.company_currency)
+	row = frappe._dict(indent=1, company_currency=converter.company_currency, group_by=group_by)
+	# group_label: the readable first column (design 7f P18); purpose and status are translated by the script
 	if group_by == GROUP_PURPOSE:
-		row.purpose = key[0]
+		row.purpose = row.group_label = key[0]
 	elif group_by == GROUP_STATUS:
-		row.status = key[0]
+		row.status = row.group_label = key[0]
 	else:
 		row.party_type, row.party, row.party_name = key[0], key[1] or None, key[2]
+		row.group_label = key[2] or key[1] or ""
 	row.fixed_count = len([c for c in cheques if not is_open(c)])
 	row.open_count = len([c for c in cheques if is_open(c)])
 	for fieldname, _label in buckets:
@@ -182,6 +186,7 @@ def header_row(direction: str, label: str, rows: list, buckets, company_currency
 		indent=0,
 		direction=direction,
 		exposure=label,
+		group_label=label,
 		company_currency=company_currency,
 		fixed_count=sum(cint(r.fixed_count) for r in rows),
 		open_count=sum(cint(r.open_count) for r in rows),
@@ -200,6 +205,8 @@ def get_chart(data: list, buckets) -> dict:
 	return {
 		"data": {"labels": [label for _f, label in buckets], "datasets": datasets},
 		"type": "bar",
+		"colors": ["#2490EF", "#F68B1F"],
+		"barOptions": {"spaceRatio": 0.4},
 		"fieldtype": "Currency",
 	}
 
@@ -209,6 +216,8 @@ def get_summary(cheques: list, data: list, converter: AmountConverter, as_on) ->
 	live = [c for c in cheques if c.status in LIVE_STATUSES and c.expiry_date]
 	days = [date_diff(getdate(c.expiry_date), as_on) for c in live]
 	currency = converter.company_currency
+	expired = len([d for d in days if d < 0])
+	expiring = len([d for d in days if 0 <= d <= 30])
 	return [
 		{
 			"value": flt(headers[INCOMING].amount) if INCOMING in headers else 0,
@@ -225,33 +234,39 @@ def get_summary(cheques: list, data: list, converter: AmountConverter, as_on) ->
 			"indicator": "Orange",
 		},
 		{
-			"value": len([d for d in days if d < 0]),
+			"value": expired,
 			"label": _("Expired Not Returned"),
 			"datatype": "Int",
-			"indicator": "Red",
+			"indicator": "Red" if expired else "Green",
 		},
 		{
-			"value": len([d for d in days if 0 <= d <= 30]),
+			"value": expiring,
 			"label": _("Expiring in 30 Days"),
 			"datatype": "Int",
-			"indicator": "Orange",
+			"indicator": "Orange" if expiring else "Green",
 		},
 	]
 
 
 def get_columns(buckets) -> list[dict]:
+	"""`group_label` first (the tree toggle and a readable label: Held from / Given to Others, the party, the
+	purpose or the status); the keys stay as hidden columns for export (design 7f P18)."""
 	return [
-		column("exposure", _("Security", context="Cheque Leaf"), width=140),
+		column("group_label", _("Group", context="Security Cheques Summary"), width=240),
+		column("fixed_count", _("Fixed", context="Security Cheques Summary"), "Int", 70),
+		column("open_count", _("Open / Blank", context="Security Cheques Summary"), "Int", 90),
+		column("amount", _("Amount (Company Currency)"), "Currency", 140, options="company_currency"),
+		*[
+			column(f, label, "Currency", 120 if f == "expired" else 110, options="company_currency")
+			for f, label in buckets
+		],
+		column("closed_amount", _("Closed Amount"), "Currency", 120, options="company_currency"),
+		column("exposure", _("Security", context="Cheque Leaf"), width=140, hidden=1),
 		column("direction", _("Direction"), width=90, hidden=1),
 		column("party_type", _("Party Type"), width=90, hidden=1),
-		column("party", _("Party", context=CTX), "Dynamic Link", 150, options="party_type"),
-		column("party_name", _("Party Name"), width=160),
-		column("purpose", _("Purpose", context="Security Cheque"), width=130),
-		column("status", _("Status", context="Treasury"), width=100),
-		column("fixed_count", _("Fixed Cheques"), "Int", 80),
-		column("open_count", _("Open / Blank Cheques"), "Int", 90),
-		column("amount", _("Amount (Company Currency)"), "Currency", 140, options="company_currency"),
-		*[column(f, label, "Currency", 110, options="company_currency") for f, label in buckets],
-		column("closed_amount", _("Closed Amount"), "Currency", 120, options="company_currency"),
+		column("party", _("Party", context=CTX), "Dynamic Link", 150, options="party_type", hidden=1),
+		column("party_name", _("Party Name"), width=160, hidden=1),
+		column("purpose", _("Purpose", context="Security Cheque"), width=130, hidden=1),
+		column("status", _("Status", context="Treasury"), width=100, hidden=1),
 		company_currency_column(),
 	]

@@ -87,6 +87,8 @@ class ChequeBatch(Document):
 			self.set_onload("cheques", batch.get_dashboard(self))
 			# design 7e P17: "Submitted with a low-balance override by ..." on the form
 			self.set_onload("low_balance_override", guard.latest_override(self.doctype, self.name))
+			# design 7f P16: printable / printed cheques for the "Print All Cheques" dialog (outgoing only)
+			self.set_onload("cheque_print_summary", cheque_printing.batch_print_summary(self))
 
 	def before_insert(self):
 		self.naming_series = NAMING_SERIES.get(self.direction, NAMING_SERIES["Outgoing"])

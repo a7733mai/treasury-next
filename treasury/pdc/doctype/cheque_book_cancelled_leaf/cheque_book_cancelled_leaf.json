@@ -18,6 +18,7 @@
  ],
  "fields": [
   {
+   "columns": 2,
    "fieldname": "cheque_no",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -36,6 +37,7 @@
    "read_only": 1
   },
   {
+   "columns": 2,
    "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
@@ -44,6 +46,7 @@
    "read_only": 1
   },
   {
+   "columns": 2,
    "fieldname": "reason_type",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -52,6 +55,7 @@
    "read_only": 1
   },
   {
+   "columns": 3,
    "fieldname": "reason",
    "fieldtype": "Small Text",
    "in_list_view": 1,

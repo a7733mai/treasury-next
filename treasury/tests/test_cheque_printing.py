@@ -15,6 +15,7 @@ from treasury.pdc.cheque_printing import (
 	build_leaf,
 	currency_decimals,
 	format_cheque_date,
+	get_cheque_text,
 	preview_layout,
 	render_leaf,
 	split_words,
@@ -357,7 +358,11 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(self.cheque.get_onload().cheque_print_format, FORMAT_CHEQUE)
 		self.assertEqual(
 			self.cheque.get_onload().cheque_layout,
-			{"name": self.layout.name, "default_language": "Arabic"},
+			{
+				"name": self.layout.name,
+				"default_language": "Arabic",
+				"reprint_requires_manager": True,  # setUp
+			},
 		)
 
 		# a disabled layout is no layout: back to the legacy format
@@ -505,3 +510,67 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, preview_layout, {"doctype": CHEQUE}, "en")
 		with self.set_user(NO_ACCESS_USER):
 			self.assertRaises(frappe.PermissionError, preview_layout, values, "en")
+
+	# ------------------------------------------------------------------ 7f-2: dialogs and test grid
+
+	def test_cheque_text(self):
+		"""The texts of the "Print Cheque" dialog: what build_leaf prints, escaped; nothing registered."""
+		before = self.state(self.cheque)
+		text = get_cheque_text(self.cheque.name, "English")
+		self.assertEqual((text["lang"], text["dir"], text["figures"]), ("en", "ltr", "#1,250.50#"))
+		self.assertEqual(text["words1"], self.leaf("en").words1)
+		self.assertEqual(text["crossing"], "A/C Payee Only")
+		self.assertEqual(get_cheque_text(self.cheque.name)["dir"], "rtl")  # the layout's default language
+		self.assertEqual(self.state(self.cheque), before)
+		self.assertEqual(frappe.db.get_value(CHEQUE, self.cheque.name, "print_count"), 0)
+
+		doc = frappe.get_doc(CHEQUE, self.cheque.name)
+		doc.payee_on_cheque = "Tom's \"ACME\" & Co"  # no "<": stored as typed (Frappe sanitizes HTML only)
+		doc.save()
+		self.assertEqual(
+			get_cheque_text(self.cheque.name, "en")["payee"], "Tom&apos;s &quot;ACME&quot; &amp; Co"
+		)
+
+		cancelled = make_pdc_cheque()
+		cancelled.cancel_cheque(reason="Wrong payee")
+		self.assertRaises(frappe.ValidationError, get_cheque_text, cancelled.name, "en")
+		self.assertRaises(frappe.ValidationError, get_cheque_text, self.cheque.name, "French")
+		with self.set_user(NO_ACCESS_USER):
+			self.assertRaises(frappe.PermissionError, get_cheque_text, self.cheque.name, "en")
+
+	def test_batch_print_summary(self):
+		batch = self.make_batch([1000, 2000, 3000])
+		first, second, third = (row.pdc_cheque for row in batch.cheques)
+		frappe.get_doc(CHEQUE, first).cancel_cheque(reason="Not needed")
+		frappe.get_doc(CHEQUE, second).print_cheque(language="en")
+		leaves = [frappe.db.get_value(CHEQUE, name, "cheque_no") for name in (second, third)]
+
+		batch.run_method("onload")
+		summary = batch.get_onload().cheque_print_summary
+		self.assertEqual(
+			(summary["printable"], summary["printed"], summary["unprinted"], summary["total"]), (2, 1, 1, 5000)
+		)
+		self.assertEqual((summary["leaves"], summary["unprinted_leaves"]), (leaves, leaves[1:]))
+		self.assertEqual(
+			summary["layout"],
+			{"name": self.layout.name, "default_language": "Arabic", "reprint_requires_manager": True},
+		)
+
+		incoming = self.make_batch([500], direction="Incoming", party_type="Customer", party=CUSTOMER)
+		incoming.run_method("onload")
+		self.assertIsNone(incoming.get_onload().cheque_print_summary)
+
+	def test_test_grid_labels_and_fonts(self):
+		leaf = self.leaf("en")
+		self.assertEqual((leaf.boxes.payee.position, leaf.boxes.date.position), ("25,22", "130,10"))
+		self.assertEqual((leaf.figures_guard, leaf.figures_amount), ("#", fmt_money(1250.50, precision=2)))
+		self.assertEqual((leaf.boxes.payee.font_size, leaf.boxes.crossing.font_size), ("11.0pt", "9.9pt"))
+		layout = frappe.copy_doc(self.layout)
+		layout.crossing_font_size_pt = 12
+		self.assertEqual(self.leaf("en", layout).boxes.crossing.font_size, "12.0pt")
+
+		html = str(render_leaf(self.layout, leaf, test_grid=True))
+		self.assertIn("25,22", html)
+		html = str(render_leaf(self.layout, leaf))
+		self.assertNotIn("tcl-label", html)
+		self.assertNotIn("tcl-grid", html)

@@ -40,6 +40,20 @@ EVENTS = (
 	"Expiry Extended",
 	CUSTODY_MOVED,
 )
+# Summary cards: (event, indicator) in the order of the event pills of the report script.
+EVENT_CARDS = (
+	("Created", "Grey"),
+	("Received", "Blue"),
+	("Stored", "Blue"),
+	("Custody Transferred", "Blue"),
+	(CUSTODY_MOVED, "Blue"),
+	("Issued", "Orange"),
+	("Returned", "Green"),
+	("Encashed", "Purple"),
+	("Lost", "Red"),
+	("Cancelled", "Grey"),
+	("Expiry Extended", "Yellow"),
+)
 MOVEMENT_STATUS, MOVEMENT_CUSTODY = "Status", "Custody"
 CHUNK = 1000
 CHEQUE_FIELDS = [
@@ -196,37 +210,45 @@ def matches(row: frappe._dict, filters: frappe._dict, events: list[str]) -> bool
 
 
 def get_summary(rows: list) -> list[dict]:
+	"""One card per event of the period, in the order and colour of the event pills (design 7f §10.4)."""
 	counts: dict[str, int] = {}
 	for row in rows:
 		counts[row.event] = counts.get(row.event, 0) + 1
 	return [
-		{"value": counts[event], "label": _(event, context=DOCTYPE), "datatype": "Int"}
-		for event in EVENTS
+		{
+			"value": counts[event],
+			"label": _(event, context=DOCTYPE),
+			"datatype": "Int",
+			"indicator": indicator,
+		}
+		for event, indicator in EVENT_CARDS
 		if event in counts
 	]
 
 
 def get_columns() -> list[dict]:
+	"""Read as a sentence: date – cheque – party – what happened – from → to – who (design 7f §10.2)."""
 	return [
-		column("movement_date", _("Date", context="Treasury"), "Date", 100),
-		column("datetime", _("Date and Time"), "Datetime", 150),
-		column("security_cheque", _("Security Cheque"), "Link", 160, options=DOCTYPE),
-		column("direction", _("Direction"), width=90),
+		column("movement_date", _("Date", context="Treasury"), "Date", 95),
+		column("security_cheque", _("Security Cheque"), "Link", 140, options=DOCTYPE),
+		column("cheque_no", _("Cheque No"), width=100),
+		column("direction", _("Direction"), width=80),
 		column("party_type", _("Party Type"), width=90, hidden=1),
 		column("party", _("Party", context=CTX), "Dynamic Link", 150, options="party_type"),
-		column("party_name", _("Party Name"), width=160),
-		column("purpose", _("Purpose", context="Security Cheque"), width=130),
-		column("cheque_no", _("Cheque No")),
-		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
-		column("currency", _("Currency"), "Link", 70, options="Currency"),
-		column("event", _("Event", context="Security Cheque"), width=140),
+		column("party_name", _("Party Name"), width=170),
+		column("event", _("Event", context="Security Cheque"), width=150),
 		column("from_status", _("From Status"), width=100),
 		column("to_status", _("To Status"), width=100),
-		column("from_location", _("From Location"), "Link", 130, options="Custody Location"),
-		column("to_location", _("To Location"), "Link", 130, options="Custody Location"),
-		column("from_custodian", _("From Custodian"), "Link", 130, options="User"),
-		column("to_custodian", _("To Custodian"), "Link", 130, options="User"),
-		column("pdc_cheque", _("PDC Cheque"), "Link", 150, options="PDC Cheque"),
-		column("user", _("User", context=CTX), "Link", 130, options="User"),
-		column("remarks", _("Remarks", context="Treasury"), width=200),
+		column("from_location", _("From Location"), "Link", 120, options="Custody Location"),
+		column("to_location", _("To Location"), "Link", 120, options="Custody Location"),
+		column("from_custodian", _("From Custodian"), "Link", 120, options="User"),
+		column("to_custodian", _("To Custodian"), "Link", 120, options="User"),
+		column("amount", _("Amount", context="Treasury"), "Currency", 120, options="currency"),
+		column("currency", _("Currency"), "Link", 60, options="Currency"),
+		column("purpose", _("Purpose", context="Security Cheque"), width=120),
+		column("pdc_cheque", _("PDC Cheque"), "Link", 140, options="PDC Cheque"),
+		column("user", _("User", context=CTX), "Link", 120, options="User"),
+		column("datetime", _("Date and Time"), "Datetime", 150),
+		column("remarks", _("Remarks", context="Treasury"), width=250),
+		column("amount_type", _("Amount Type"), width=80, hidden=1),
 	]

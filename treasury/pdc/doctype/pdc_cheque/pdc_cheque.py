@@ -190,10 +190,8 @@ class PDCCheque(Document):
 			layout = (
 				cheque_printing.get_layout(self.bank_account) if self.direction == lifecycle.OUTGOING else None
 			)
-			self.set_onload(
-				"cheque_layout",
-				{"name": layout.name, "default_language": layout.default_language} if layout else None,
-			)
+			# {name, default_language, reprint_requires_manager}: the "Print Cheque" dialog (design 7f §6.2)
+			self.set_onload("cheque_layout", cheque_printing.layout_info(layout, self.company))
 
 	def get_cheque_print_format(self) -> str | None:
 		"""The print format of the cheque leaf: an outgoing cheque's bank Cheque Layout ("Treasury Cheque"),

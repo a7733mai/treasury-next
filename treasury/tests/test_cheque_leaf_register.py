@@ -287,6 +287,49 @@ class TestChequeLeafRegister(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual((header.total_leaves, header.used_leaves, header.remaining_leaves), (10, 1, 9))
 		self.assertEqual(header.leaf_no, f"{self.leaf(book, 0)} - {self.leaf(book, 9)}")
 
+	def test_one_book_columns_and_chart(self):
+		"""Design 7f P4 / P5 / P6: the leaf number first, the book columns only when several books may be
+		listed, and the usage chart over all the leaves of the listed books (Leaves view only)."""
+		book = self.book(size=10)
+		make_pdc_cheque(cheque_book=book.name)
+		security = self.security(book)
+		void_leaf(book.name, self.leaf(book, 5), reason_type="Other", reason="Test")
+
+		columns, _data, _message, chart, cards = leaf_register({"company": COMPANY, "cheque_book": book.name})
+		fieldnames = [c["fieldname"] for c in columns]
+		self.assertEqual(fieldnames[0], "leaf_no")
+		self.assertFalse({"cheque_book", "bank_account", "book_no"} & set(fieldnames))
+		self.assertEqual(chart["type"], "percentage")
+		# unused, used – payment, used – security, cancelled, void
+		self.assertEqual(chart["data"]["datasets"][0]["values"], [7, 1, 1, 0, 1])
+		self.assertEqual(cards[-1]["indicator"], "Green")  # 7 left
+		self.assertEqual(
+			self.row(book, 1).amount_type, frappe.db.get_value("Security Cheque", security.name, "amount_type")
+		)
+
+		# a status filter changes the rows, not the chart of the book
+		_columns, _data, _message, filtered, _cards = leaf_register(
+			{"company": COMPANY, "cheque_book": book.name, "status": ["Void"]}
+		)
+		self.assertEqual(filtered["data"]["datasets"][0]["values"], [7, 1, 1, 0, 1])
+
+		columns, *_rest = leaf_register({"company": COMPANY, "bank_account": book.bank_account})
+		self.assertEqual({"cheque_book", "bank_account", "book_no"} - {c["fieldname"] for c in columns}, set())
+		_columns, _data, _message, chart, _cards = leaf_register(
+			{"company": COMPANY, "cheque_book": book.name, "view": "Books"}
+		)
+		self.assertIsNone(chart)
+
+	def test_remaining_card_indicator(self):
+		book = self.book(size=3)
+		make_pdc_cheque(cheque_book=book.name)
+		_header, cards = self.header(book)
+		self.assertEqual((cards[-1]["value"], cards[-1]["indicator"]), (2, "Orange"))
+		book.reload()  # the allocation wrote next_no
+		book.close()
+		_header, cards = self.header(book)
+		self.assertEqual((cards[-1]["value"], cards[-1]["indicator"]), (0, "Red"))
+
 	def test_max_leaves(self):
 		book = self.book(size=MAX_LEAVES + 1)
 		with self.assertRaises(frappe.ValidationError) as ctx:

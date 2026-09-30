@@ -610,6 +610,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.payee_on_cheque",
    "depends_on": "eval:doc.direction==='Outgoing'",
    "fieldname": "printing_section",
    "fieldtype": "Section Break",

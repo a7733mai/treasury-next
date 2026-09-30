@@ -38,6 +38,20 @@ frappe.query_reports["Cheque Book Usage"] = {
 		},
 	],
 
+	onload: function (report) {
+		// design 7f P19: from the book summary to its leaves in one click
+		report.page.add_inner_button(__("Leaf Register"), function () {
+			const options = { company: report.get_filter_value("company") };
+			if (report.get_filter_value("bank_account")) {
+				options.bank_account = report.get_filter_value("bank_account");
+			}
+			if (report.get_filter_value("status")) {
+				options.book_status = report.get_filter_value("status");
+			}
+			frappe.set_route("query-report", "Cheque Leaf Register", options);
+		});
+	},
+
 	formatter: function (value, row, column, data, default_formatter) {
 		// every Payment Entry of the comma list is a link (export and print keep the plain list)
 		if (column.fieldname === "payment_entry" && data && value) {
@@ -47,6 +61,9 @@ frappe.query_reports["Cheque Book Usage"] = {
 		}
 		if (data && column.fieldname === "status") {
 			value = value ? __(value) : value;
+		}
+		if (data && column.fieldname === "void_leaves") {
+			return `<span class="text-muted">${default_formatter(value, row, column, data)}</span>`;
 		}
 		let formatted = default_formatter(value, row, column, data);
 		if (data && column.fieldname === "remaining_leaves" && data.status === "Active" && value <= 5) {

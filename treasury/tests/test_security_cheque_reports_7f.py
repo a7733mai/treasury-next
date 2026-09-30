@@ -122,6 +122,15 @@ class TestSecurityChequeReports7f(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(labels, ["0-30", "31-60", "61-90", "91+"])
 		self.assertEqual([r.direction for r in data if r.get("is_group")], ["Incoming", "Outgoing"])
 
+		# design 7f P18: a readable first column; group rows know their side
+		self.assertEqual(columns[0]["fieldname"], "group_label")
+		self.assertEqual((held.group_label, given.group_label), ("Held from Others", "Given to Others"))
+		self.assertEqual(
+			(customer_row.group_label, customer_row.direction),
+			(customer_row.party_name or CUSTOMER, "Incoming"),
+		)
+		self.assertEqual(supplier_row.direction, "Outgoing")
+
 	def test_summary_ranges(self):
 		columns, data, *_rest = self.run_summary(ageing_ranges="15, 60")
 		labels = [c["label"] for c in columns if c["fieldname"].startswith("range_")]
@@ -213,6 +222,18 @@ class TestSecurityChequeReports7f(TreasuryTestMixin, IntegrationTestCase):
 		self.assertTrue(all(getdate(r.movement_date) == self.today for r in data))
 		self.assertNotIn("Custody Moved", [r.event for r in data])
 		self.assertEqual({card["label"]: card["value"] for card in cards}["Returned"], 1)
+		# design 7f §10.4: one card per event, in the pill order, in the pill colour
+		self.assertEqual(
+			[(card["label"], card["indicator"]) for card in cards],
+			[
+				("Created", "Grey"),
+				("Received", "Blue"),
+				("Stored", "Blue"),
+				("Custody Transferred", "Blue"),
+				("Returned", "Green"),
+				("Expiry Extended", "Yellow"),
+			],
+		)
 
 	def test_movements_filters(self):
 		dates = (add_days(self.today, -5), add_days(self.today, -3), add_days(self.today, -1))

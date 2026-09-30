@@ -87,6 +87,7 @@ class ChequeLayout(Document):
 		payee_width_mm: DF.Float
 		preview_html: DF.HTML | None
 		print_crossing: DF.Check
+		sample_image: DF.AttachImage | None
 		show_currency_name: DF.Check
 		signature_height_mm: DF.Float
 		signature_label: DF.Literal["None", "Company Name", "Custom Text"]
