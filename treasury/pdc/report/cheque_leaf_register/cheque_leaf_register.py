@@ -136,7 +136,9 @@ def matches(row: frappe._dict, filters: frappe._dict, statuses: list[str]) -> bo
 		if filters.party and row.party != filters.party:
 			return False
 	# only the leaves of PDC Cheques the user may read carry a timing (unused, security and void leaves never)
-	if filters.cheque_timing and (row.restricted or row.cheque_timing != filters.cheque_timing):
+	if filters.cheque_timing and (
+		row.restricted or row.status in (CANCELLED_LEAF, VOID) or row.cheque_timing != filters.cheque_timing
+	):
 		return False
 	if filters.from_date or filters.to_date:
 		if row.status == UNUSED:

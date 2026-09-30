@@ -46,7 +46,7 @@ def get_cheque_total(filters: str | dict | None = None) -> dict:
 	if filters.direction not in CARD_STATUSES:
 		frappe.throw(_("Direction must be one of: {0}.").format(", ".join((_(OUTGOING), _(INCOMING)))))
 	if filters.scope not in (DUE_7_DAYS, OUTSTANDING):
-		frappe.throw(_("Invalid scope: {0}").format(filters.scope))
+		frappe.throw(_("Invalid scope: {0}").format(frappe.utils.escape_html(str(filters.scope))))
 	company = filters.company or erpnext.get_default_company()
 	if not company:
 		return {"value": 0, "fieldtype": "Currency"}

@@ -114,7 +114,9 @@ def get_filters(filters: frappe._dict, company: str) -> list:
 
 	date_field = DATE_FIELDS.get(filters.date_based_on or "Effective Due Date")
 	if not date_field:
-		frappe.throw(_("Invalid Date Based On: {0}").format(filters.date_based_on))
+		frappe.throw(
+			_("Invalid Date Based On: {0}").format(frappe.utils.escape_html(str(filters.date_based_on)))
+		)
 	if filters.date_based_on != FORECAST_DATE:
 		if filters.from_date:
 			conditions.append([date_field, ">=", getdate(filters.from_date)])
