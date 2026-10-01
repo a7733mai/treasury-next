@@ -12,6 +12,8 @@ from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.utils import add_days, flt, getdate, today
 
 from treasury.patches.v1_2 import set_cheque_timing
+from treasury.pdc.cheque_leaves import CANCELLED_LEAF, VOID, WRITTEN
+from treasury.pdc.doctype.cheque_book.cheque_book import void_leaf
 from treasury.pdc.doctype.pdc_cheque.pdc_cheque import PROTECTED_FIELDS
 from treasury.pdc.overview import get_overview
 from treasury.pdc.page.treasury_dashboard.treasury_dashboard import get_dashboard_data
@@ -26,6 +28,7 @@ from treasury.tests.utils import (
 	TreasuryTestMixin,
 	add_user_permission,
 	assert_gl_entries,
+	bank_account_name,
 	day,
 	ensure_alert_bank,
 	ensure_user,
@@ -95,6 +98,11 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 		for bad in ("Current", "post-dated", "X"):
 			with self.subTest(value=bad):
 				self.assertRaisesRegex(frappe.ValidationError, "Invalid Cheque Timing", validate_timing, bad)
+		# the rejected value is shown escaped (a filter value comes from the URL)
+		with self.assertRaises(frappe.ValidationError) as raised:
+			validate_timing("<b>x</b>")
+		self.assertIn("&lt;b&gt;x&lt;/b&gt;", str(raised.exception))
+		self.assertNotIn("<b>", str(raised.exception))
 
 	def test_same_day_is_current(self):
 		for direction in ("Outgoing", "Incoming"):
@@ -135,6 +143,38 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(getdate(cheque.original_due_date), day(-10))
 		self.assertEqual(cheque.cheque_timing, CURRENT)
 
+	def test_represent_keeps_timing(self):
+		cheque = make_pdc_cheque(issue_date=day(-20), due_date=day(-20))
+		cheque.deliver(handover_date=day(-20))
+		cheque.bounce(bounce_date=day(-15), reason="Insufficient funds")
+		cheque.represent(represent_date=day(-10), new_due_date=day(0))
+		cheque.reload()
+		self.assertEqual((cheque.operational_status, cheque.cheque_timing), ("Delivered", CURRENT))
+		self.assertEqual(getdate(cheque.effective_due_date), day(0))
+		self.assertEqual(getdate(cheque.original_due_date), day(-20))
+		self.assertEqual(frappe.db.get_value(DOCTYPE, cheque.name, "cheque_timing"), CURRENT)
+
+	def test_cheque_batch_sets_timing(self):
+		batch = frappe.get_doc(
+			{
+				"doctype": "Cheque Batch",
+				"direction": "Outgoing",
+				"company": COMPANY,
+				"party_type": "Supplier",
+				"party": SUPPLIER,
+				"bank_account": bank_account_name("EGP"),
+				"issue_date": day(-10),
+				"purpose": "Rent",
+			}
+		)
+		for due_date in (day(-10), day(20)):
+			batch.append("cheques", {"due_date": due_date, "amount": 1000, "cheque_no": unique_cheque_no()})
+		batch.insert()
+		batch.submit()
+		batch.reload()
+		timings = [frappe.db.get_value(DOCTYPE, row.pdc_cheque, "cheque_timing") for row in batch.cheques]
+		self.assertEqual(timings, [CURRENT, POST_DATED])
+
 	def test_replacement_has_its_own_timing(self):
 		cheque = make_pdc_cheque(issue_date=day(-20), due_date=day(10))
 		self.assertEqual(cheque.cheque_timing, POST_DATED)
@@ -171,15 +211,15 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 		current = make_pdc_cheque(issue_date=day(-3), due_date=day(-3))
 		post = make_pdc_cheque("Incoming", issue_date=day(-3), due_date=day(20))
 		empty = make_pdc_cheque(issue_date=day(-3), due_date=day(40))
-		kept = make_pdc_cheque(issue_date=day(-3), due_date=day(-3))
+		wrong = make_pdc_cheque(issue_date=day(-3), due_date=day(-3))
 		cheque = frappe.qb.DocType(DOCTYPE)
 		frappe.qb.update(cheque).set(cheque.cheque_timing, None).where(
 			cheque.name.isin([current.name, post.name])
 		).run()
 		frappe.qb.update(cheque).set(cheque.cheque_timing, "").where(cheque.name == empty.name).run()
-		# a row that already has a timing is not touched (only empty values are filled)
-		frappe.qb.update(cheque).set(cheque.cheque_timing, POST_DATED).where(cheque.name == kept.name).run()
-		names = [current.name, post.name, empty.name, kept.name]
+		# a full recompute: a wrong stored value is corrected too
+		frappe.qb.update(cheque).set(cheque.cheque_timing, POST_DATED).where(cheque.name == wrong.name).run()
+		names = [current.name, post.name, empty.name, wrong.name]
 		modified = {
 			r.name: r.modified
 			for r in frappe.get_all(DOCTYPE, filters={"name": ["in", names]}, fields=["name", "modified"])
@@ -197,7 +237,7 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 		}
 		self.assertEqual(
 			{name: rows[name].cheque_timing for name in names},
-			{current.name: CURRENT, post.name: POST_DATED, empty.name: POST_DATED, kept.name: POST_DATED},
+			{current.name: CURRENT, post.name: POST_DATED, empty.name: POST_DATED, wrong.name: CURRENT},
 		)
 		self.assertEqual({name: rows[name].modified for name in names}, modified)
 
@@ -241,6 +281,65 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 			"PDC Maturity",
 			{"company": COMPANY, "direction": "Outgoing", **filters, "cheque_timing": "X"},
 		)
+
+	def test_pdc_maturity_filter_incoming(self):
+		bank = ensure_alert_bank()
+		values = {"bank_account": bank.bank_account}
+		current = make_pdc_cheque("Incoming", amount=1200, issue_date=day(-10), due_date=day(-10), **values)
+		post = make_pdc_cheque("Incoming", amount=3400, issue_date=day(-10), due_date=day(10), **values)
+		self.assertEqual((current.cheque_timing, post.cheque_timing), (CURRENT, POST_DATED))
+		filters = {"direction": "Incoming", **values}
+		self.assertEqual(self.maturity_total(filters), (4600.0, 2))
+		self.assertEqual(self.maturity_total({**filters, "cheque_timing": CURRENT}), (1200.0, 1))
+		self.assertEqual(self.maturity_total({**filters, "cheque_timing": POST_DATED}), (3400.0, 1))
+		# the outgoing side of the same bank holds nothing
+		self.assertEqual(self.maturity_total({**values, "cheque_timing": POST_DATED}), (0.0, 0))
+
+	def test_cheque_leaf_register_released_leaves_and_books_view(self):
+		"""A cancelled or void leaf never matches a timing, even with a Post-dated cheque behind it; the Books
+		view lists only the books with a matching leaf, and no leaf row."""
+		bank = ensure_alert_bank()
+		values = {"bank_account": bank.bank_account, "leaf_digits": 8}
+		start = unique_leaf_start(6)
+		book = make_cheque_book(start, start + 5, **values)
+		other_start = unique_leaf_start(3)
+		other = make_cheque_book(other_start, other_start + 2, **values)
+		dates = {"bank_account": bank.bank_account, "issue_date": day(-10)}
+		post = make_pdc_cheque(cheque_book=book.name, due_date=day(10), **dates)
+		cancelled = make_pdc_cheque(cheque_book=book.name, due_date=day(10), **dates)
+		voided = make_pdc_cheque(cheque_book=book.name, due_date=day(10), **dates)
+		make_pdc_cheque(cheque_book=other.name, due_date=day(-10), **dates)  # Current-dated only
+		self.assertEqual(
+			[c.cheque_no for c in (post, cancelled, voided)], [str(start + i).zfill(8) for i in range(3)]
+		)
+		cancelled.cancel_cheque(reason="Written wrongly")
+		voided.cancel_cheque(reason="Torn")
+		void_leaf(book.name, str(start + 3).zfill(8), reason_type="Damaged", reason="Torn")
+		# a void row on the leaf of a Post-dated cheque (void_leaf itself only takes unused leaves)
+		frappe.db.set_value(
+			"Cheque Book Cancelled Leaf",
+			{"parenttype": "Cheque Book", "parent": book.name, "cheque_no": voided.cheque_no},
+			"kind",
+			"Void",
+		)
+
+		rows = leaf_rows({"cheque_book": book.name})
+		self.assertEqual(
+			[(rows[start + i].status, rows[start + i].cheque_timing) for i in range(4)],
+			[(WRITTEN, POST_DATED), (CANCELLED_LEAF, POST_DATED), (VOID, POST_DATED), (VOID, None)],
+		)
+		self.assertEqual(set(leaf_rows({"cheque_book": book.name, "cheque_timing": POST_DATED})), {start})
+		self.assertEqual(leaf_rows({"cheque_book": book.name, "cheque_timing": CURRENT}), {})
+
+		def books_view(timing=None):
+			filters = {"company": COMPANY, "bank_account": bank.bank_account, "view": "Books"}
+			data = run_report("Cheque Leaf Register", {**filters, "cheque_timing": timing})[1]
+			self.assertTrue(all(row.get("is_group") for row in data), "the Books view lists no leaf")
+			return [row.cheque_book for row in data]
+
+		self.assertEqual(sorted(books_view()), sorted([book.name, other.name]))
+		self.assertEqual(books_view(POST_DATED), [book.name])
+		self.assertEqual(books_view(CURRENT), [other.name])
 
 	def test_cheque_leaf_register_filter(self):
 		start = unique_leaf_start(5)
@@ -293,24 +392,59 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 	# ------------------------------------------------------------------ dashboard
 
 	def test_dashboard_timing(self):
+		# the incoming cheques are only received / deposited: no voucher is needed for the in-hand figures
+		self.use_company_settings(incoming_party_posting="Manual", incoming_under_collection="Disabled")
 		bank = ensure_alert_bank()
 		now = getdate(today())
 		values = {"bank_account": bank.bank_account}
 		make_pdc_cheque(amount=1000, issue_date=now, due_date=now, **values)  # current, due this week
 		make_pdc_cheque(amount=2000, issue_date=add_days(now, -5), due_date=add_days(now, 3), **values)
 		make_pdc_cheque(amount=4000, issue_date=now, due_date=add_days(now, 20), **values)
+		received = make_pdc_cheque("Incoming", amount=1500, issue_date=now, due_date=now, **values)
+		received.receive(receipt_date=now)
+		deposited = make_pdc_cheque(
+			"Incoming", amount=2500, issue_date=add_days(now, -5), due_date=add_days(now, 3), **values
+		)
+		deposited.receive(receipt_date=add_days(now, -5))
+		deposited.deposit(deposit_date=add_days(now, -4))
+		later = make_pdc_cheque(
+			"Incoming", amount=3500, issue_date=now, due_date=add_days(now, 20), **values
+		)
+		later.receive(receipt_date=now)
+		incoming = (received, deposited, later)
+		self.assertEqual(
+			[frappe.db.get_value(DOCTYPE, c.name, "operational_status") for c in incoming],
+			["Received", "Deposited", "Received"],
+		)
+		self.assertEqual([c.cheque_timing for c in incoming], [CURRENT, POST_DATED, POST_DATED])
 
 		plain = get_overview(COMPANY, [bank.bank_account], 7)
 		expected = {
-			None: {"issued": (3, 7000), "due_out": (2, 3000)},
-			POST_DATED: {"issued": (2, 6000), "due_out": (1, 2000)},
-			CURRENT: {"issued": (1, 1000), "due_out": (1, 1000)},
+			None: {
+				"issued": (3, 7000),
+				"due_out": (2, 3000),
+				"in_hand": (3, 7500),
+				"due_in": (2, 4000),
+			},
+			POST_DATED: {
+				"issued": (2, 6000),
+				"due_out": (1, 2000),
+				"in_hand": (2, 6000),
+				"due_in": (1, 2500),
+			},
+			CURRENT: {
+				"issued": (1, 1000),
+				"due_out": (1, 1000),
+				"in_hand": (1, 1500),
+				"due_in": (1, 1500),
+			},
 		}
+		cards_by_timing = {}
 		for timing, cards in expected.items():
 			with self.subTest(timing=timing):
 				overview = get_overview(COMPANY, [bank.bank_account], 7, cheque_timing=timing)
 				self.assertEqual(overview.cheque_timing, timing or "")
-				cheques = overview.sections.cheques
+				cheques = cards_by_timing[timing] = overview.sections.cheques
 				for key, (count, amount) in cards.items():
 					kpi = cheques[key]
 					self.assertEqual((kpi.count, flt(kpi.amount, 2)), (count, amount), key)
@@ -321,6 +455,13 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 				# not filtered: the positions and this month's bounces (their reports have no timing filter)
 				self.assertEqual(overview.sections.positions, plain.sections.positions)
 				self.assertEqual(cheques.bounced_month, plain.sections.cheques.bounced_month)
+
+		# every open cheque has a timing: Current-dated + Post-dated = all, for each of the four KPIs
+		for key in ("issued", "due_out", "in_hand", "due_in"):
+			with self.subTest(kpi=key):
+				every, current, post = (cards_by_timing[t][key] for t in (None, CURRENT, POST_DATED))
+				self.assertEqual(every.count, current.count + post.count)
+				self.assertEqual(flt(every.amount, 2), flt(current.amount + post.amount, 2))
 
 		self.assertRaisesRegex(
 			frappe.ValidationError, "Invalid Cheque Timing", get_dashboard_data, COMPANY, None, "7", "bad"

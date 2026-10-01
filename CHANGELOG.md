@@ -10,8 +10,8 @@ changes.
 
 ### Upgrading from 1.1.0
 1. `bench migrate` runs the new patch `set_cheque_timing` (`[post_model_sync]`, after `set_facility_defaults`):
-   every existing PDC Cheque without a Cheque Timing gets one from its issue and original due dates. It only
-   fills empty values and does not change `modified`.
+   every existing PDC Cheque with both dates gets its Cheque Timing recomputed from its issue and original due
+   dates (a missing or wrong value is corrected). It is safe to run twice and does not change `modified`.
 2. `bench compile-po-to-mo --app treasury` builds the new English catalogue (`en.mo`) next to the Arabic one;
    without it English screens keep showing "PDC".
 3. `bench --site <site> clear-cache`, so the desk loads the new wording, sidebar and workspace.

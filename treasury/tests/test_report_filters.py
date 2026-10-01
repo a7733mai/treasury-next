@@ -32,6 +32,22 @@ MOMENT_CALL = r"\.(?:hours|minutes|seconds|format|add|subtract|diff|isBefore|isA
 ASSIGNED_TO = re.compile(r"(?:const|let|var)\s+(\w+)\s*=\s*$")
 # a required filter the user must choose: the report shows "Please set filters" until then
 NO_DEFAULT_NEEDED = {("projected_party_statement", "party")}
+# Phase 8 (spec 8 §4.3): the Cheque Timing filter of the cheque reports, its options and translated labels
+# report -> the filter it follows (None: no position required)
+TIMING_REPORTS = {
+	"pdc_register": "accounting_status",
+	"pdc_maturity": "bank_account",
+	"cheque_leaf_register": None,
+}
+TIMING_FILTER_PARTS = (
+	re.compile(r'\blabel:\s*__\(\s*"Cheque Timing"\s*\)'),
+	re.compile(r'\bfieldtype:\s*"Select"'),
+	re.compile(
+		r"""\boptions:\s*\[\s*\{\s*value:\s*"",\s*label:\s*""\s*\},\s*"""
+		r"""\{\s*value:\s*"Current-dated",\s*label:\s*__\(\s*"Current-dated"\s*\)\s*\},\s*"""
+		r"""\{\s*value:\s*"Post-dated",\s*label:\s*__\(\s*"Post-dated"\s*\)\s*\},?\s*\]"""
+	),
+)
 
 
 def report_dirs():
@@ -138,6 +154,30 @@ class TestReportFilters(UnitTestCase):
 				seen.setdefault(name, relative)
 		self.assertEqual(duplicates, [])
 		self.assertGreater(len(seen), 100)
+
+	def test_cheque_timing_filters(self):
+		"""The Cheque Timing filter (empty / Current-dated / Post-dated, labels through `__()`) sits where the
+		spec puts it, and the stored English value is translated when shown."""
+		for name, after in TIMING_REPORTS.items():
+			with self.subTest(report=name):
+				report_dir = next(d for d in report_dirs() if d.name == name)
+				filters = report_filters(report_dir)
+				self.assertIn("cheque_timing", filters)
+				for part in TIMING_FILTER_PARTS:
+					self.assertRegex(filters["cheque_timing"], part)
+				if after:
+					fieldnames = list(filters)
+					self.assertEqual(fieldnames.index("cheque_timing"), fieldnames.index(after) + 1)
+
+		reports = APP_PATH / "pdc" / "report"
+		register = (reports / "pdc_register" / "pdc_register.js").read_text(encoding="utf-8")
+		register = register.split("formatter:", 1)[1]
+		translated = re.search(r"\[([^\]]*)\]\.includes\(column\.fieldname\)\s*\)\s*\{([^}]*)\}", register)
+		self.assertTrue(translated, "the formatter's translated fields")
+		self.assertIn('"cheque_timing"', translated.group(1))
+		self.assertIn("__(value)", translated.group(2))
+		leaf = (reports / "cheque_leaf_register" / "cheque_leaf_register.js").read_text(encoding="utf-8")
+		self.assertRegex(leaf, r'case "cheque_timing":\s*return value \? esc\(__\(value\)\) : "";')
 
 	def test_frappe_date_objects_are_not_used_as_moments(self):
 		"""`frappe.datetime.now_datetime(true)` & co. return a JS Date: `.hours()` / `.format()` do not exist

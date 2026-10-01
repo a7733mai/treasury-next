@@ -754,3 +754,20 @@ class TestTranslations(IntegrationTestCase):
 			if e["msgid"] not in self.contexts_by_msgid and e["msgid"] not in core
 		]
 		self.assertEqual(missing, [])
+
+	def test_english_labels_at_runtime(self):
+		"""Risk R3: once en.mo is compiled (`bench compile-po-to-mo --app treasury`), English `_()` shows the
+		"Cheque" wording. Skipped on a checkout where en.mo was never compiled."""
+		from frappe.gettext.translate import get_mo_path
+		from frappe.translate import MERGED_TRANSLATION_KEY
+
+		if not get_mo_path("treasury", "en").exists():
+			self.skipTest("en.mo of treasury is not compiled (bench compile-po-to-mo --app treasury)")
+		# a merged catalogue cached before the compile would hide the new entries
+		frappe.cache.hdel(MERGED_TRANSLATION_KEY, "en")
+		self.addCleanup(frappe.cache.hdel, MERGED_TRANSLATION_KEY, "en")
+		previous = frappe.local.lang
+		self.addCleanup(setattr, frappe.local, "lang", previous)
+		frappe.local.lang = "en"
+		self.assertEqual(frappe._("PDC Register"), "Cheque Register")
+		self.assertEqual(frappe._("Current-dated"), "Current")

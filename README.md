@@ -126,8 +126,9 @@ bench compile-po-to-mo --app treasury       # builds en.mo (the "Cheque" wording
 bench --site <site> clear-cache
 ```
 
-- `treasury.patches.v1_2.set_cheque_timing` gives every existing cheque without a Cheque Timing the one of its
-  dates (issue date vs original due date). It only fills empty values and does not change `modified`.
+- `treasury.patches.v1_2.set_cheque_timing` recomputes the Cheque Timing of every existing cheque from its
+  dates (issue date vs original due date), correcting a missing or wrong value. It is safe to run twice and does
+  not change `modified`.
 - Without `compile-po-to-mo`, English screens keep showing "PDC …"; without `clear-cache`, the old sidebar and
   wording may stay in the desk until the cache expires.
 - Nothing else changes: no setting, no voucher, no internal name.
