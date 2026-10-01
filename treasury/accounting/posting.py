@@ -236,7 +236,9 @@ def rule_field_refusal(meta, fieldname: str) -> str | None:
 	of another app is accepted: never a standard field (amounts, accounts, party, references ...), a Treasury
 	field or an Accounting Dimension, which the posting service owns."""
 	df = meta.get_field(fieldname)
-	if not df:
+	# `is None`, not falsiness: a standard field whose definition has no custom flag (an empty-looking dict) is
+	# an existing field and gets the refusal below, not "no field"
+	if df is None:
 		return _("Payment Entry has no field {0}.").format(frappe.bold(fieldname))
 	if (
 		not df.get("is_custom_field")

@@ -643,3 +643,173 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		self.assertEqual(context["pay"]["amount"], 0)
 		self.assertIn("Open cheques or transfers already cover", context["pay"]["reason"])
 		self.assertTrue(context["pay"]["blocked"])
+
+	# ------------------------------------------------------------------ phase 9 QA gaps
+
+	def test_return_unspent_request(self):
+		"""QA gap 1: nothing settled, the whole payout comes back by cheque (Return)."""
+		egp = self.data.egp
+		req = self.request()
+		self.delivered(req)
+		data = mapped_cheque(req.name, "Incoming")
+		self.assertEqual((flt(data["amount"]), data["direction"]), (10000, "Incoming"))
+
+		cheque = cheque_from_request(req.name, "Incoming")
+		cheque.receive(receipt_date=today())
+		self.assert_status(cheque, "Received", "Party Posted")
+		pe = get_pe(cheque.party_payment_entry)
+		self.assertEqual((pe.payment_type, pe.custody_request, pe.custody_purpose), ("Receive", req.name, "Return"))
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			pe.name,
+			[(egp.pdc_receivable, 10000, 0, None, today()), (self.cus, 0, 10000, req.custodian, today())],
+		)
+		assert_request(
+			self, req.name, returned_amount=10000, balance_amount=0, status="Closed", is_closed=1
+		)
+
+	def test_partial_return(self):
+		"""QA gap 2: 3,000 left after the settlement, 1,000 of it returned by cheque: 2,000 can still be."""
+		req = self.request()
+		self.delivered(req)
+		make_settlement(req.name, 7000)
+		cheque = cheque_from_request(req.name, "Incoming", amount=1000)
+		cheque.receive(receipt_date=today())
+		self.assert_status(cheque, "Received", "Party Posted")
+		assert_request(self, req.name, returned_amount=1000, balance_amount=2000, is_closed=0)
+
+		self.assertEqual(flt(mapped_cheque(req.name, "Incoming")["amount"]), 2000)
+		self.assert_refused(
+			lambda: build_cheque(req, "Incoming", amount=2000.01).insert(),
+			_("At most {0} can still be returned on Custody Request {1}.").format(
+				fmt_money(2000, currency="EGP"), frappe.bold(req.name)
+			),
+		)
+		self.assertEqual(
+			frappe.get_all(DOCTYPE, filters={"source_name": req.name, "direction": "Incoming"}, pluck="name"),
+			[cheque.name],
+		)
+
+	def test_reimbursement_purpose(self):
+		"""QA gap 3: overspent (12,000 settled on 10,000 paid): the Outgoing cheque reimburses 2,000, a
+		wind-down for custody (the custodian is checked as for a return)."""
+		from unittest.mock import patch
+
+		use_custody_settings(self, allow_overspend=1)
+		req = self.request()
+		self.delivered(req)
+		make_settlement(req.name, 12000)
+		assert_request(self, req.name, balance_amount=-2000)
+
+		usable = compat.assert_custodian_usable
+		with patch.object(documents.compat, "assert_custodian_usable", wraps=usable) as check:
+			data = mapped_cheque(req.name)
+			self.assertEqual(flt(data["amount"]), 2000)
+			check.assert_called_with(req.custodian, winddown=True)
+			self.assertEqual({c.kwargs["winddown"] for c in check.call_args_list}, {True})
+		context = api.get_payment_context(req.name)
+		self.assertEqual((context["pay"]["amount"], context["pay"]["purpose"]), (2000, "Reimbursement"))
+
+		cheque = self.delivered(req)
+		self.assertEqual(flt(cheque.amount), 2000)
+		pe = get_pe(cheque.party_payment_entry)
+		self.assertEqual(
+			(pe.payment_type, pe.custody_request, pe.custody_purpose), ("Pay", req.name, "Reimbursement")
+		)
+		assert_gl_entries(self, "Payment Entry", pe.name, self.e1(req, 2000))
+		assert_request(self, req.name, balance_amount=0, status="Closed", is_closed=1)
+
+	def test_closing_return_purpose(self):
+		"""QA gap 3: a float being closed returns its balance as a Closing Return."""
+		from custody.custody.permanent import request_close
+
+		use_custody_settings(
+			self, enable_permanent_custody=1, replenishment_mode="Manual", replenishment_threshold_percent=25
+		)
+		req = self.request(5000, custody_type="Permanent", float_amount=5000)
+		self.delivered(req)
+		make_settlement(req.name, 3900)
+		request_close(req.name, "Treasury test closing")
+		assert_request(self, req.name, closing_requested=1, balance_amount=1100, is_closed=0)
+
+		context = api.get_payment_context(req.name)
+		self.assertEqual((context["receive"]["amount"], context["receive"]["purpose"]), (1100, "Closing Return"))
+		cheque = cheque_from_request(req.name, "Incoming")
+		self.assertEqual(flt(cheque.amount), 1100)
+		cheque.receive(receipt_date=today())
+		pe = get_pe(cheque.party_payment_entry)
+		self.assertEqual((pe.payment_type, pe.custody_purpose), ("Receive", "Closing Return"))
+		assert_gl_entries(
+			self,
+			"Payment Entry",
+			pe.name,
+			[(self.data.egp.pdc_receivable, 1100, 0, None), (self.cus, 0, 1100, req.custodian)],
+		)
+		assert_request(self, req.name, balance_amount=0, is_closed=1)
+
+	def test_context_states(self):
+		"""QA gap 13: a draft request, a closed request, and the open documents (3 newest, the rest counted)."""
+		_employee, custodian = make_custodian()
+		draft = frappe.get_doc(
+			{
+				"doctype": REQUEST,
+				"custody_type": "Temporary",
+				"custodian": custodian,
+				"company": COMPANY,
+				"posting_date": today(),
+				"purpose": "Treasury test custody",
+				"requested_amount": 1000,
+			}
+		).insert(ignore_permissions=True)
+		not_approved = _("Custody Request {0} is not approved.").format(frappe.bold(draft.name))
+		context = api.get_payment_context(draft.name)
+		for side in ("pay", "receive"):
+			self.assertEqual((context[side]["amount"], context[side]["reason"]), (0, not_approved), side)
+		self.assertEqual((context["open_documents"], context["more_documents"]), ([], 0))
+
+		closed = self.request()
+		self.delivered(closed)
+		make_settlement(closed.name, 10000)
+		assert_request(self, closed.name, is_closed=1)
+		is_closed = _("Custody Request {0} is closed.").format(frappe.bold(closed.name))
+		context = api.get_payment_context(closed.name)
+		for side in ("pay", "receive"):
+			self.assertEqual((context[side]["amount"], context[side]["reason"]), (0, is_closed), side)
+
+		req = self.request()
+		cheques = [cheque_from_request(req.name, amount=2500) for _i in range(4)]
+		cheques[2].deliver(handover_date=today())
+		cheques[2].reload()
+		self.assertTrue(cheques[2].party_payment_entry)
+		context = api.get_payment_context(req.name)
+		self.assertEqual(context["more_documents"], 1)
+		rows = context["open_documents"]
+		self.assertEqual(
+			[(row["doctype"], row["name"], row["status"], row["payment_entry"]) for row in rows],
+			[
+				(DOCTYPE, cheques[3].name, "Created", None),
+				(DOCTYPE, cheques[2].name, "Delivered", cheques[2].party_payment_entry),
+				(DOCTYPE, cheques[1].name, "Created", None),
+			],
+		)
+		self.assertEqual([flt(row["amount"]) for row in rows], [2500, 2500, 2500])
+
+	def test_replace_created(self):
+		"""QA gap 17: a Created (not posted) cheque replaced: the new one keeps the request, reserves its own
+		amount only (the old one is Replaced, no longer reserved), nothing is posted."""
+		req = self.request()
+		cheque = cheque_from_request(req.name, amount=4000)
+		self.assertEqual(documents.reserved(req.name, "Outgoing"), 4000)
+		result = cheque.replace(
+			new_cheque_values={"cheque_no": unique_cheque_no(), "amount": 6000, "reason": "Damaged"}
+		)
+		self.assert_status(cheque, "Replaced", "Not Posted")
+		new = frappe.get_doc(DOCTYPE, result["replaced_by"])
+		self.assertEqual((new.source_doctype, new.source_name, new.replaces), (REQUEST, req.name, cheque.name))
+		self.assertEqual((new.operational_status, new.accounting_status), ("Created", "Not Posted"))
+		self.assertEqual(flt(new.amount), 6000)
+		self.assertEqual(documents.reserved(req.name, "Outgoing"), 6000)
+		self.assertEqual(custody_payment_entries(req.name), [])
+		assert_request(self, req.name, paid_amount=0, remaining_to_pay=10000)
+		self.assertEqual(api.get_payment_context(req.name)["pay"]["amount"], 4000)

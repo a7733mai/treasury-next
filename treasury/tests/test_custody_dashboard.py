@@ -12,15 +12,18 @@ from unittest.mock import patch
 import frappe
 from frappe import _
 from frappe.desk.notifications import get_open_count
-from frappe.utils import flt
+from frappe.utils import add_days, flt, today
 
 from treasury.integrations.custody import REQUEST, dashboard
 from treasury.pdc import overview
 from treasury.tests.custody_utils import (
 	as_user,
+	assert_request,
 	cheque_from_request,
 	make_custodian,
 	make_request,
+	make_settlement,
+	use_custody_settings,
 )
 from treasury.tests.test_custody_cheques import TREASURY_ONLY, CustodyChequeTestCase
 from treasury.tests.test_release import CUSTODY_SIDEBAR_ITEMS
@@ -81,6 +84,60 @@ class TestCustodyDashboard(CustodyChequeTestCase):
 		self.assertEqual(section.replenishment_due.route_options["status"], "Replenishment Due")
 		self.assertIn("extra", section.permanent)
 		self.assertTrue(unpaid.name)
+
+	def test_permanent_and_replenishment_figures(self):
+		"""QA gap 11: a float of 5,000 funded, then 3,900 settled (Replenishment Due)."""
+		use_custody_settings(
+			self, enable_permanent_custody=1, replenishment_mode="Manual", replenishment_threshold_percent=25
+		)
+		before = self.figures()
+		extra = flt(self.section().permanent.extra)
+		req = self.request(5000, custody_type="Permanent", float_amount=5000)
+		self.delivered(req)
+		funded = self.figures()
+		self.assertEqual(
+			self.delta(before, funded),
+			{
+				"open": (1, 5000),
+				"overdue": (0, 0),
+				"to_pay": (0, 0),
+				"permanent": (1, 5000),
+				"replenishment_due": (0, 0),
+			},
+		)
+		self.assertEqual(flt(self.section().permanent.extra - extra, 2), 5000)
+
+		make_settlement(req.name, 3900)
+		assert_request(self, req.name, status="Replenishment Due", replenishment_amount=3900)
+		self.assertEqual(
+			self.delta(funded, self.figures()),
+			{
+				"open": (0, -3900),
+				"overdue": (0, 0),
+				"to_pay": (0, 0),
+				"permanent": (0, -3900),
+				"replenishment_due": (1, 3900),
+			},
+		)
+
+	def test_overdue_figures(self):
+		"""QA gap 11: a temporary request paid and past its expected settlement date is overdue."""
+		before = self.figures()
+		req = self.request(
+			1000, posting_date=add_days(today(), -40), expected_settlement_date=add_days(today(), -10)
+		)
+		self.delivered(req)
+		assert_request(self, req.name, is_overdue=1, balance_amount=1000)
+		self.assertEqual(
+			self.delta(before, self.figures()),
+			{
+				"open": (1, 1000),
+				"overdue": (1, 1000),
+				"to_pay": (0, 0),
+				"permanent": (0, 0),
+				"replenishment_due": (0, 0),
+			},
+		)
 
 	def test_hidden_without_custody_read(self):
 		with as_user(ensure_user(TREASURY_ONLY, ["Treasury User"])):

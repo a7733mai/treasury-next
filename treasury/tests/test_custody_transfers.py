@@ -21,6 +21,8 @@ from treasury.tests.custody_utils import (
 	custody_payment_entries,
 	make_custodian,
 	make_request,
+	make_settlement,
+	use_custody_settings,
 )
 from treasury.tests.test_custody_cheques import TREASURY_ONLY, CustodyChequeTestCase
 from treasury.tests.utils import (
@@ -278,6 +280,61 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 				self.assertIn(("Voucher Cancelled", fee_voucher), events)
 				self.assertIn(("Cancelled", pe), events)
 				assert_request(self, req.name, paid_amount=0, remaining_to_pay=10000, status="Approved")
+
+	def test_return_refused_by_custody(self):
+		"""QA gap 4: custody refuses to cancel the custodian's Payment Entry (custody already used): the
+		transfer stays Sent / Posted, both vouchers stay, no fee is refunded."""
+		use_custody_settings(self, allow_overspend=0)
+		self.use_company_settings(refund_fees_on_return=1)
+		req = self.request()
+		transfer = self.transfer(req)
+		pe, fee_voucher = transfer.payment_entry, transfer.fee_voucher
+		self.assertTrue(fee_voucher)
+		make_settlement(req.name, 4000)
+		frappe.clear_messages()
+		with self.assertRaises(frappe.ValidationError):
+			transfer.mark_returned(return_date=today(), reason="Wrong IBAN")
+		self.assertIn("Custody Already Used", self.messages())
+		self.assertIn("could not be cancelled (see the message above)", self.messages())
+		transfer.reload()
+		self.assertEqual((transfer.status, transfer.accounting_status), ("Sent", "Posted"))
+		self.assertEqual(frappe.db.get_value("Payment Entry", pe, "docstatus"), 1)
+		self.assertEqual(frappe.db.get_value(transfer.fee_voucher_type, fee_voucher, "docstatus"), 1)
+		self.assertFalse(
+			frappe.get_all(
+				"Journal Entry",
+				filters={
+					"treasury_source_doctype": DOCTYPE,
+					"treasury_source_name": transfer.name,
+					"treasury_event": transfer_lifecycle.EVENT_FEE_REVERSAL,
+				},
+			)
+		)
+		assert_request(self, req.name, paid_amount=10000)
+
+	def test_cancel_scheduled(self):
+		"""QA gap 5 (E11 of a Scheduled transfer): nothing was posted, nothing is cancelled; the request may be
+		paid again."""
+		req = self.request()
+		transfer = self.transfer(req, execution_date=add_days(today(), 3))
+		self.assertEqual(transfer.status, "Scheduled")
+		self.assertEqual(api.get_payment_context(req.name)["pay"]["amount"], 0)
+		self.assertEqual(self.vouchers(transfer), ([], []))
+		transfer.cancel()
+		transfer.reload()
+		self.assertEqual(transfer.status, "Cancelled")
+		self.assertFalse(transfer.payment_entry or transfer.fee_voucher)
+		self.assertEqual(self.vouchers(transfer), ([], []))
+		self.assertEqual(api.get_payment_context(req.name)["pay"]["amount"], 10000)
+		assert_request(self, req.name, paid_amount=0, remaining_to_pay=10000, status="Approved")
+
+	def vouchers(self, transfer) -> tuple[list, list]:
+		"""(Payment Entries, Journal Entries) of the transfer, whatever their docstatus."""
+		filters = {"treasury_source_doctype": DOCTYPE, "treasury_source_name": transfer.name}
+		return (
+			frappe.get_all("Payment Entry", filters=filters, pluck="name"),
+			frappe.get_all("Journal Entry", filters=filters, pluck="name"),
+		)
 
 	# ------------------------------------------------------------------ refusals
 

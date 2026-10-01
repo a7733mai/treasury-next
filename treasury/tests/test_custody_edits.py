@@ -19,15 +19,28 @@ from treasury.tests.custody_utils import (
 	make_request,
 )
 from treasury.tests.test_custody_transfers import CustodyTransferTestCase
-from treasury.tests.utils import SUPPLIER, assert_gl_entries, bank_account_name, ensure_user
+from treasury.tests.utils import (
+	OTHER_ABBR,
+	OTHER_COMPANY,
+	SUPPLIER,
+	assert_gl_entries,
+	bank_account_name,
+	ensure_company,
+	ensure_user,
+)
 
 CHEQUE = "PDC Cheque"
 TRANSFER = "Bank Transfer"
 TREASURY_USER = "trs-edit-user@treasury.test"
-NOT_CHANGED = "cannot be changed on a"
 
 
 class TestCustodyEdits(CustodyTransferTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		# a real other company: the change of company is refused for being frozen, not for a missing link
+		ensure_company(OTHER_COMPANY, OTHER_ABBR)
+
 	def at_most(self, req, amount) -> str:
 		return _("At most {0} can still be paid on Custody Request {1}.").format(
 			fmt_money(amount, currency="EGP"), frappe.bold(req.name)
@@ -64,32 +77,54 @@ class TestCustodyEdits(CustodyTransferTestCase):
 		self.assert_status(cheque, "Delivered", "Party Posted")
 		assert_request(self, req.name, paid_amount=7000, remaining_to_pay=3000)
 
+	def frozen_message(self, doc, *fieldnames) -> str:
+		labels = ", ".join(_(doc.meta.get_label(f)) for f in fieldnames)
+		return _("{0} cannot be changed on a {1} created from Custody Request {2}.").format(
+			labels, _(doc.doctype), frappe.bold(doc.source_name)
+		)
+
+	def assert_identity_frozen(self, doc, cases: tuple[tuple[dict, tuple], ...]):
+		"""Every change in `cases` ({values}, frozen fieldnames) is refused: through a form save (the controller
+		may refuse it before custody, e.g. a bank of another company) and by custody's check itself, with its
+		exact message. The stored identity never moves. The expected values are read before any edit: a
+		refused save leaves its values on the in-memory document."""
+		fieldnames = [f for f in documents.FROZEN_FIELDS if doc.meta.has_field(f)]
+		original = frappe.db.get_value(doc.doctype, doc.name, fieldnames, as_dict=True)
+		self.assertTrue(original.bank_account and original.company)
+		for values, frozen in cases:
+			with self.subTest(values=values):
+				with self.assertRaises(frappe.ValidationError):
+					self.saved(doc, **values)
+				self.assertEqual(frappe.db.get_value(doc.doctype, doc.name, fieldnames, as_dict=True), original)
+
+				changed = frappe.get_doc(doc.doctype, doc.name)
+				changed.update(values)
+				with self.assertRaises(frappe.ValidationError) as cm:
+					documents.validate(changed)
+				self.assertEqual(str(cm.exception), self.frozen_message(changed, *frozen))
+		doc.reload()
+		self.assertEqual({f: doc.get(f) for f in fieldnames}, original)
+		return original
+
 	def test_cheque_identity_frozen(self):
 		req = self.request()
 		cheque = cheque_from_request(req.name, amount=1000)
 		_employee, other = make_custodian()
-		for values in (
-			{"party": other},
-			{"party_type": "Supplier", "party": SUPPLIER},
-			{"bank_account": bank_account_name("USD")},
-			{"company": "_Test Treasury Co 2"},
-			{"direction": "Incoming"},
-		):
-			with self.subTest(values=values):
-				self.assert_refused(lambda values=values: self.saved(cheque, **values), "")
-				fieldnames = ["party_type", "party", "bank_account", "company", "direction"]
-				stored = frappe.db.get_value(CHEQUE, cheque.name, fieldnames, as_dict=True)
-				self.assertEqual(
-					(stored.party_type, stored.party, stored.bank_account, stored.company, stored.direction),
-					("Custodian", req.custodian, cheque.bank_account, cheque.company, "Outgoing"),
-				)
-		# the custody check itself (the controller may refuse some of them first)
-		changed = frappe.get_doc(CHEQUE, cheque.name)
-		changed.party = other
-		self.assert_refused(lambda: documents.validate(changed), NOT_CHANGED)
-		changed.reload()
-		changed.bank_account = bank_account_name("USD")
-		self.assert_refused(lambda: documents.validate(changed), NOT_CHANGED)
+		original = self.assert_identity_frozen(
+			cheque,
+			(
+				({"party": other}, ("party",)),
+				({"party_type": "Supplier", "party": SUPPLIER}, ("party_type", "party")),
+				({"bank_account": bank_account_name("USD")}, ("bank_account",)),
+				({"company": OTHER_COMPANY}, ("company",)),
+				({"direction": "Incoming"}, ("direction",)),
+			),
+		)
+		self.assertEqual(
+			(original.party_type, original.party, original.company, original.direction),
+			("Custodian", req.custodian, req.company, "Outgoing"),
+		)
+		self.assertNotEqual(original.bank_account, bank_account_name("USD"))
 
 	def test_cheque_references_refused_on_edit(self):
 		req = self.request()
@@ -131,17 +166,16 @@ class TestCustodyEdits(CustodyTransferTestCase):
 		req = self.request()
 		transfer = self.transfer(req, "Normal", submit=False, amount=1000)
 		_employee, other = make_custodian()
-		for values in (
-			{"party": other},
-			{"bank_account": bank_account_name("USD")},
-		):
-			with self.subTest(values=values):
-				self.assert_refused(lambda values=values: self.saved(transfer, **values), "")
-				stored = frappe.db.get_value(TRANSFER, transfer.name, ["party", "bank_account"], as_dict=True)
-				self.assertEqual((stored.party, stored.bank_account), (req.custodian, transfer.bank_account))
-		changed = frappe.get_doc(TRANSFER, transfer.name)
-		changed.party = other
-		self.assert_refused(lambda: documents.validate(changed), NOT_CHANGED)
+		original = self.assert_identity_frozen(
+			transfer,
+			(
+				({"party": other}, ("party",)),
+				({"bank_account": bank_account_name("USD")}, ("bank_account",)),
+				({"company": OTHER_COMPANY}, ("company",)),
+			),
+		)
+		self.assertEqual((original.party, original.company), (req.custodian, req.company))
+		self.assertNotEqual(original.bank_account, bank_account_name("USD"))
 
 	def test_transfer_method_rechecked(self):
 		req = self.request()

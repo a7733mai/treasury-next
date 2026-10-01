@@ -154,7 +154,9 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 				"other_app_link": frappe._dict(is_custom_field=1),
 				"treasury_source_name": frappe._dict(is_custom_field=1),
 				"branch": frappe._dict(is_custom_field=1),
+				# a standard field: no custom flag (an empty definition is still a field, not "no field")
 				"paid_to": frappe._dict(),
+				"paid_amount": frappe._dict(fieldname="paid_amount", is_custom_field=0),
 			}
 
 			def get_field(self, fieldname):
@@ -162,7 +164,7 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 
 		with patch.object(posting, "_all_dimension_fieldnames", return_value=["branch"]):
 			self.assertIsNone(posting.rule_field_refusal(Meta(), "other_app_link"))
-			for fieldname in ("treasury_source_name", "branch", "paid_to"):
+			for fieldname in ("treasury_source_name", "branch", "paid_to", "paid_amount"):
 				self.assertIn("Party rules cannot set field", posting.rule_field_refusal(Meta(), fieldname))
 			self.assertIn("has no field", posting.rule_field_refusal(Meta(), "nothing"))
 
