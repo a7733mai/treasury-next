@@ -119,7 +119,7 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 				self.assertNotIn(name, {link_to for _type, link_to in linked | workspace_linked})
 				self.assertNotIn(name, shortcuts)
 
-		setup ={item["link_to"] for item in self.sections[SETUP]}
+		setup = {item["link_to"] for item in self.sections[SETUP]}
 		section_of = {}
 		for label, rows in self.sections.items():
 			for row in rows:

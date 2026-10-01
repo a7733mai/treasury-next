@@ -16,7 +16,6 @@ from frappe import _
 from frappe.utils import cint, date_diff, flt, getdate
 
 from treasury.pdc.lifecycle import FINAL_STATUSES
-from treasury.pdc.timing import validate_timing
 from treasury.pdc.report_utils import (
 	ALL_OPERATIONAL_STATUSES,
 	BANK_POSTED,
@@ -41,6 +40,7 @@ from treasury.pdc.report_utils import (
 	validate_company,
 	validate_date_range,
 )
+from treasury.pdc.timing import validate_timing
 
 FORECAST_DATE = "Forecast Date"
 DATE_FIELDS = {

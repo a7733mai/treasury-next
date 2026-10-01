@@ -89,7 +89,13 @@ class TestRelease(IntegrationTestCase):
 		self.assertTrue(re.search(r"^#### Cheques$", text, re.M))
 		self.assertFalse(re.search(r"^#+ PDC Cheques$", text, re.M))
 		# the naming note: screens say "Cheque", internal names and series stay "PDC"
-		for name in ("Cheque Register", "Cheque Bank Clearing", "PDC Register", "PDC Bank Clearing", "PDC-OUT-"):
+		for name in (
+			"Cheque Register",
+			"Cheque Bank Clearing",
+			"PDC Register",
+			"PDC Bank Clearing",
+			"PDC-OUT-",
+		):
 			self.assertIn(name, text)
 		self.assertIn("Cheque Timing", text)
 		self.assertIn("set_cheque_timing", text)
@@ -183,7 +189,14 @@ class TestRelease(IntegrationTestCase):
 		items = sidebar["items"]
 		self.assertEqual((items[1]["link_type"], items[1]["link_to"]), ("Page", PAGE))
 		sections = [i["label"] for i in items if i["type"] == "Section Break"]
-		expected = ("Cheques", "Transfers & Charges", "Security Cheques", "Bank Facilities", "Reports", "Setup")
+		expected = (
+			"Cheques",
+			"Transfers & Charges",
+			"Security Cheques",
+			"Bank Facilities",
+			"Reports",
+			"Setup",
+		)
 		for section in expected:
 			self.assertIn(section, sections)
 

@@ -349,9 +349,7 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 		make_security_cheque(
 			"Outgoing", amount=500, cheque_book=book.name, issue_date=day(-30), expiry_date=day(200)
 		)
-		self.assertEqual(
-			(current.cheque_no, post.cheque_no), (str(start).zfill(8), str(start + 1).zfill(8))
-		)
+		self.assertEqual((current.cheque_no, post.cheque_no), (str(start).zfill(8), str(start + 1).zfill(8)))
 
 		rows = leaf_rows({"cheque_book": book.name})
 		self.assertEqual(len(rows), 5)
@@ -364,7 +362,8 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 
 		# the book header plus only the matching leaf (security and unused leaves never match)
 		result = run_report(
-			"Cheque Leaf Register", {"company": COMPANY, "cheque_book": book.name, "cheque_timing": POST_DATED}
+			"Cheque Leaf Register",
+			{"company": COMPANY, "cheque_book": book.name, "cheque_timing": POST_DATED},
 		)
 		data = result[1]
 		self.assertEqual(len(data), 2)
@@ -407,9 +406,7 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 		)
 		deposited.receive(receipt_date=add_days(now, -5))
 		deposited.deposit(deposit_date=add_days(now, -4))
-		later = make_pdc_cheque(
-			"Incoming", amount=3500, issue_date=now, due_date=add_days(now, 20), **values
-		)
+		later = make_pdc_cheque("Incoming", amount=3500, issue_date=now, due_date=add_days(now, 20), **values)
 		later.receive(receipt_date=now)
 		incoming = (received, deposited, later)
 		self.assertEqual(
@@ -451,7 +448,9 @@ class TestChequeTiming(TreasuryTestMixin, IntegrationTestCase):
 					self.assertEqual(kpi.route_options.get("cheque_timing"), timing)
 					_columns, data = run_report("PDC Register", kpi.route_options)
 					total = data[-1]
-					self.assertEqual((total.cheque_count, flt(total.base_amount, 2)), (kpi.count, amount), key)
+					self.assertEqual(
+						(total.cheque_count, flt(total.base_amount, 2)), (kpi.count, amount), key
+					)
 				# not filtered: the positions and this month's bounces (their reports have no timing filter)
 				self.assertEqual(overview.sections.positions, plain.sections.positions)
 				self.assertEqual(cheques.bounced_month, plain.sections.cheques.bounced_month)

@@ -207,7 +207,12 @@ class TestChequeBook(TreasuryTestMixin, IntegrationTestCase):
 		# a range reaching a used leaf (a security cheque's leaf included) is refused as a whole
 		make_security_cheque("Outgoing", cheque_no=self.leaf(book, 10))
 		self.assert_error(
-			"Cheque or a Security Cheque", void_leaf, book.name, self.leaf(book, 8), self.leaf(book, 12), **args
+			"Cheque or a Security Cheque",
+			void_leaf,
+			book.name,
+			self.leaf(book, 8),
+			self.leaf(book, 12),
+			**args,
 		)
 		book.reload()
 		self.assertEqual([r.cheque_no for r in book.cancelled_leaves], [self.leaf(book, 1)])
