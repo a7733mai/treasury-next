@@ -3,6 +3,7 @@ hook `treasury_party_payment_hooks`), the generic "Created From" link (treasury.
 custody bridge being inert without the custody app. Runs with or without custody: the rules come from a fake
 hook patched into `posting._party_rule_methods` (spec 9 §8, 9a)."""
 
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import frappe
@@ -155,7 +156,7 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 		"""Only a custom field of another app is accepted (custody's `custody_request` is one)."""
 
 		class Meta:
-			fields = {
+			fields: ClassVar[dict] = {
 				"other_app_link": frappe._dict(is_custom_field=1),
 				"treasury_source_name": frappe._dict(is_custom_field=1),
 				"branch": frappe._dict(is_custom_field=1),

@@ -234,7 +234,7 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		vouchers stay in sync."""
 		from unittest.mock import patch
 
-		req, cheque = self.returned()
+		_req, cheque = self.returned()
 		cheque.deposit(deposit_date=today())
 		cheque.reload()
 		party_pe = cheque.party_payment_entry
@@ -749,6 +749,7 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		cheque = cheque_from_request(req.name, "Incoming")
 		self.assertEqual(flt(cheque.amount), 1100)
 		cheque.receive(receipt_date=today())
+		cheque.reload()
 		pe = get_pe(cheque.party_payment_entry)
 		self.assertEqual((pe.payment_type, pe.custody_purpose), ("Receive", "Closing Return"))
 		assert_gl_entries(
