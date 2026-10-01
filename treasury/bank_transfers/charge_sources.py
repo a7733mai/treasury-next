@@ -10,7 +10,8 @@ from treasury.utils.voucher_summary import REVERSAL_SUFFIX
 
 SOURCES = {
 	"Bank Charges": ("Bank Charge", ("bank_charge",)),
-	"Transfer Fees": ("Bank Transfer", ("bt_transfer",)),
+	# bt_fee: the fee on its own voucher (a party that refuses deductions, e.g. a custodian)
+	"Transfer Fees": ("Bank Transfer", ("bt_transfer", "bt_fee")),
 	"Cheque Clearance Charges": ("PDC Cheque", ("pdc_bank_posting", "pdc_bank_charges")),
 	"Bounce Charges Recovered": ("PDC Cheque", ("pdc_bounce_charges",)),
 	"LG Commissions": ("Letter of Guarantee", ("lg_commission", "lg_extension_commission")),

@@ -163,3 +163,15 @@ def expense_claim(data):
 
 def employee_advance(data):
 	return _extend(data, HRMS_ITEMS)
+
+
+def custody_request(data):
+	"""The custody app's request (hook registered with the bridge, treasury.integrations.custody; never called
+	without custody): its cheques and transfers ("Created From", filtered on the source doctype too) and the
+	custodian Payment Entries custody links to it."""
+	return _extend(
+		data,
+		{"PDC Cheque": "source_name", "Bank Transfer": "source_name", "Payment Entry": "custody_request"},
+		dynamic_links={"source_name": ["Custody Request", "source_doctype"]},
+		fieldname="custody_request",
+	)

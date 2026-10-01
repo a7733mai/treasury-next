@@ -66,6 +66,12 @@
   "default_installment_frequency",
   "tender_bond_percent",
   "performance_bond_percent",
+  "custody_section",
+  "custody_default_method",
+  "custody_bank_account",
+  "custody_cheque_book",
+  "column_break_custody",
+  "include_custody_replenishment_in_forecast",
   "facilities_section",
   "accrue_facility_interest",
   "column_break_facilities",
@@ -470,6 +476,47 @@
    "fieldname": "performance_bond_percent",
    "fieldtype": "Percent",
    "label": "Performance Bond %"
+  },
+  {
+   "collapsible": 1,
+   "description": "Used by the Treasury buttons on Custody Requests (Custody app).",
+   "fieldname": "custody_section",
+   "fieldtype": "Section Break",
+   "label": "Employee Custody"
+  },
+  {
+   "default": "Cheque",
+   "description": "Which Treasury button comes first on a Custody Request.",
+   "fieldname": "custody_default_method",
+   "fieldtype": "Select",
+   "label": "Default Custody Payout Method",
+   "options": "Cheque\nBank Transfer\nFawran"
+  },
+  {
+   "description": "Company currency only. Empty: the default outgoing cheque / transfer bank.",
+   "fieldname": "custody_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Bank for Custody Payouts",
+   "options": "Bank Account"
+  },
+  {
+   "depends_on": "eval:doc.custody_bank_account",
+   "description": "Empty: the bank's active cheque book.",
+   "fieldname": "custody_cheque_book",
+   "fieldtype": "Link",
+   "label": "Default Cheque Book for Custody Payouts",
+   "options": "Cheque Book"
+  },
+  {
+   "fieldname": "column_break_custody",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Floats due for replenishment are added to the bank position forecast and the low balance alerts.",
+   "fieldname": "include_custody_replenishment_in_forecast",
+   "fieldtype": "Check",
+   "label": "Include custody replenishment in forecast"
   },
   {
    "fieldname": "facilities_section",

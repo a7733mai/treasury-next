@@ -1,5 +1,5 @@
-"""Releases 1.1.0 (spec 7h §3.7, §5, §6, §7 E) and 1.2.0 (spec 8 §6, §7): version, CHANGELOG, README, the patch
-order and the workspace / sidebar records."""
+"""Releases 1.1.0 (spec 7h §3.7, §5, §6, §7 E), 1.2.0 (spec 8 §6, §7) and 1.3.0 (spec 9 §8, §9): version,
+CHANGELOG, README, the patch order and the workspace / sidebar records."""
 
 import importlib
 import json
@@ -10,6 +10,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 import treasury
+from treasury.integrations import custody
 
 APP_PATH = Path(frappe.get_app_path("treasury"))
 REPO_PATH = APP_PATH.parent
@@ -24,6 +25,16 @@ PATCHES = [
 	"treasury.patches.v1_2.set_cheque_timing",
 ]
 PAGE = "treasury-dashboard"
+# the sidebar's "Employee Custody" section (custody app records: they exist only with custody)
+CUSTODY_SIDEBAR_ITEMS = (
+	("DocType", "Custody Request"),
+	("DocType", "Custody Settlement"),
+	("Page", "custody-dashboard"),
+	("Report", "Custody Balances"),
+	("Report", "Custody Aging"),
+	("Report", "Permanent Custody Register"),
+	("Report", "Custodian Statement"),
+)
 
 
 def read_json(*parts) -> dict:
@@ -32,14 +43,26 @@ def read_json(*parts) -> dict:
 
 class TestRelease(IntegrationTestCase):
 	def test_version(self):
-		self.assertEqual(treasury.__version__, "1.2.0")
+		self.assertEqual(treasury.__version__, "1.3.0")
 
 	def test_changelog(self):
 		lines = (REPO_PATH / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
 		self.assertEqual(lines[0], "# Changelog")
 		headings = [(i, line) for i, line in enumerate(lines) if line.startswith("## ")]
-		self.assertRegex(headings[0][1], r"^## 1\.2\.0 — \d{4}-\d{2}-\d{2}$")
+		self.assertEqual(headings[0][1], "## 1.3.0 — 2026-10-01")
 		self.assertFalse([line for line in lines if "Unreleased" in line])
+
+		# 1.3.0: the upgrade steps, then the Phase 9 section
+		section = lines[headings[0][0] : headings[1][0]]
+		subheadings = [line for line in section if line.startswith("### ")]
+		self.assertEqual(subheadings[0], "### Upgrading from 1.2.0")
+		self.assertIn("### Custody integration (Phase 9)", subheadings)
+		upgrade = "\n".join(section)
+		for step in ("migrate", "compile-po-to-mo --app treasury", "clear-cache", "v1.3.0"):
+			self.assertIn(step, upgrade)
+
+		self.assertRegex(headings[1][1], r"^## 1\.2\.0 — \d{4}-\d{2}-\d{2}$")
+		headings = headings[1:]
 
 		# 1.2.0: the upgrade steps, then the three Phase 8 sections
 		section = lines[headings[0][0] : headings[1][0]]
@@ -75,9 +98,12 @@ class TestRelease(IntegrationTestCase):
 
 	def test_readme(self):
 		text = (REPO_PATH / "README.md").read_text(encoding="utf-8")
-		self.assertIn("Version 1.2.0", text)
-		self.assertNotIn("Version 1.1.0", text)
+		self.assertIn("Version 1.3.0", text)
+		self.assertNotIn("Version 1.2.0", text)
 		for heading in (
+			"What's new in 1.3",
+			"Upgrading from 1.2",
+			"Custody integration",
 			"What's new in 1.2",
 			"Upgrading from 1.1",
 			"What's new in 1.1",
@@ -102,6 +128,9 @@ class TestRelease(IntegrationTestCase):
 		self.assertIn("post_scheduled_transfers", text)
 		self.assertIn(PAGE, text)
 		self.assertNotIn("No warning when an outgoing cheque would make the", text)
+		# the custody integration's limits and the rollback note
+		for phrase in ("SWIFT", "v1.2.0", "Administrator"):
+			self.assertIn(phrase, text)
 
 	def test_patches_order(self):
 		text = (APP_PATH / "patches.txt").read_text(encoding="utf-8")
@@ -200,8 +229,20 @@ class TestRelease(IntegrationTestCase):
 		for section in expected:
 			self.assertIn(section, sections)
 
+		# the custody section (spec 9 §6.3): its records exist only with the custody app (Frappe hides the
+		# missing ones, and the empty section, from every user but Administrator)
+		self.assertIn("Employee Custody", sections)
+		self.assertLess(sections.index("Employee Custody"), sections.index("Reports"))
+		linked = {(i["link_type"], i["link_to"]) for i in items if i.get("link_to")}
+		for link_type, name in CUSTODY_SIDEBAR_ITEMS:
+			with self.subTest(custody=name):
+				self.assertIn((link_type, name), linked)
+				if custody.is_installed():
+					self.assertTrue(frappe.db.exists(link_type, name), name)
+		custody_reports = {name for link_type, name in CUSTODY_SIDEBAR_ITEMS if link_type == "Report"}
+
 		reports = {link["link_to"] for link in links if link.get("link_type") == "Report"}
 		reports |= {i["link_to"] for i in items if i.get("link_type") == "Report"}
-		for report in sorted(reports):
+		for report in sorted(reports - custody_reports):
 			self.assertTrue(frappe.db.exists("Report", report), report)
 		self.assertTrue(frappe.db.exists("Page", PAGE))

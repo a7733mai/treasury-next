@@ -13345,13 +13345,13 @@ msgid "Payment Entry has no field {0}."
 msgstr "سند الدفع لا يحتوي على الحقل {0}."
 
 msgid "A payment to {0} {1} cannot be allocated to references."
-msgstr "لا يمكن تخصيص دفعة إلى {0} {1} على مستندات مرجعية."
+msgstr "لا يمكن تخصيص الصرف إلى {0} {1} على مستندات مرجعية."
 
 msgid "The charges of a payment to {0} {1} must be posted on their own voucher."
-msgstr "يجب ترحيل مصاريف الدفعة إلى {0} {1} في سند مستقل."
+msgstr "يجب ترحيل مصاريف الصرف إلى {0} {1} في سند مستقل."
 
 msgid "{0} {1} cannot be posted by a Journal Entry."
-msgstr "لا يمكن الترحيل إلى {0} {1} بقيد يومية."
+msgstr "لا يمكن ترحيل {0} {1} بقيد يومية."
 
 msgid "Bounce charges cannot be charged to {0} {1}."
 msgstr "لا يمكن تحميل مصاريف الارتداد على {0} {1}."
@@ -13359,24 +13359,31 @@ msgstr "لا يمكن تحميل مصاريف الارتداد على {0} {1}."
 # "Created From" (treasury.utils.document_sources)
 msgctxt "PDC Cheque"
 msgid "Created From Type"
-msgstr "نوع المستند المصدر"
+msgstr "نوع مصدر الإنشاء"
 
 msgctxt "PDC Cheque"
 msgid "Created From"
 msgstr "أُنشئ من"
 
 msgid "Created From cannot be changed."
-msgstr "لا يمكن تغيير حقل «أُنشئ من»."
+msgstr "لا يمكن تغيير \"أُنشئ من\"."
 
 msgid "Created From needs both the document type and the document."
 msgstr "يتطلب حقل «أُنشئ من» نوع المستند والمستند معاً."
 
-# Custody bridge (treasury.integrations.custody)
+# Custody bridge (treasury.integrations.custody). The Treasury buttons of a Custody Request use the context
+# "Custody Request": a custody payout is "صرف" (the invoice button "Pay by Cheque" stays "سداد بشيك").
+msgctxt "Custody Request"
+msgid "Pay by Cheque"
+msgstr "صرف بشيك"
+
+msgctxt "Custody Request"
 msgid "Pay by Transfer"
 msgstr "صرف بتحويل"
 
+msgctxt "Custody Request"
 msgid "Receive Cheque"
-msgstr "استلام شيك"
+msgstr "استلام شيك رد"
 
 msgid "Custody payout of {0}"
 msgstr "صرف عهدة {0}"
@@ -13385,7 +13392,7 @@ msgid "Custody returned on {0}"
 msgstr "رد عهدة {0}"
 
 msgid "The Custody app is not installed."
-msgstr "تطبيق العُهد غير مثبت."
+msgstr "تطبيق العهد غير مثبَّت."
 
 msgid "Direction must be Outgoing or Incoming."
 msgstr "يجب أن يكون الاتجاه صادراً أو وارداً."
@@ -13394,22 +13401,22 @@ msgid "A cheque or transfer to a custodian must be created from its Custody Requ
 msgstr "يجب إنشاء الشيك أو التحويل لأمين العهدة من طلب العهدة الخاص به."
 
 msgid "A payment to custodian {0} must be made from its Custody Request (Treasury buttons on the request)."
-msgstr "يجب أن يتم الصرف لأمين العهدة {0} من طلب العهدة الخاص به (أزرار الخزينة في الطلب)."
+msgstr "يجب صرف المبلغ لأمين العهدة {0} من طلب العهدة الخاص به (أزرار الخزينة في الطلب)."
 
 msgid "Custody Request {0} belongs to another custodian or company."
-msgstr "طلب العهدة {0} يخص أمين عهدة آخر أو شركة أخرى."
+msgstr "طلب العهدة {0} يخص أمين عهدة أو شركة أخرى."
 
 msgid "Custody Request {0} is not approved."
 msgstr "طلب العهدة {0} غير معتمد."
 
 msgid "Custody Request {0} is closed."
-msgstr "طلب العهدة {0} مغلق."
+msgstr "طلب العهدة {0} مُقفَل."
 
 msgid "Draft Replenishment Exists"
 msgstr "يوجد تعويض في حالة مسودة"
 
 msgid "Payment Entry {0} is a draft replenishment of {1}. Submit or delete it first, then pay by cheque or transfer."
-msgstr "سند الدفع {0} تعويض في حالة مسودة للعهدة {1}. اعتمده أو احذفه أولاً، ثم اصرف بشيك أو تحويل."
+msgstr "سند الدفع {0} مسودة تعويض للعهدة {1}. اعتمده أو احذفه أولاً، ثم اصرف بشيك أو تحويل."
 
 msgid "Open cheques or transfers already cover what is left on Custody Request {0}."
 msgstr "الشيكات أو التحويلات المفتوحة تغطي بالفعل المتبقي على طلب العهدة {0}."
@@ -13427,16 +13434,211 @@ msgid "At most {0} can still be returned on Custody Request {1}."
 msgstr "الحد الأقصى المتبقي للرد على طلب العهدة {1} هو {0}."
 
 msgid "{0} must be paid to custodian {1} of company {2}."
-msgstr "يجب أن يكون {0} لأمين العهدة {1} في الشركة {2}."
+msgstr "يجب صرف {0} لأمين العهدة {1} التابع للشركة {2}."
 
 msgid "A payment to a custodian cannot have references."
-msgstr "لا يمكن أن تتضمن الدفعة لأمين العهدة مستندات مرجعية."
+msgstr "لا يمكن ربط الصرف لأمين العهدة بمستندات مرجعية."
 
 msgid "Custody is paid in the company currency only: choose a Bank Account in {0}."
 msgstr "تُصرف العهدة بعملة الشركة فقط: اختر حساباً بنكياً بعملة {0}."
 
 msgid "A custody return by transfer is recorded as a Payment Entry in Custody."
-msgstr "يُسجَّل رد العهدة بتحويل كسند دفع في تطبيق العُهد."
+msgstr "رد العهدة بتحويل يُسجَّل كسند دفع من تطبيق العهد."
 
 msgid "SWIFT transfers to custodians are not supported."
-msgstr "تحويلات SWIFT لأمناء العهد غير مدعومة."
+msgstr "تحويلات سويفت لأمناء العهد غير مدعومة."
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 9b: custody bridge — transfers with a separate fee, forecast, dashboard, sidebar, settings
+# ("Employee Custody" is the Treasury word for custody's section; the bare "Custody" / "Custodian" stay the
+# security cheque safekeeping terms)
+# ---------------------------------------------------------------------------------------------------------
+
+msgid "Employee Custody"
+msgstr "عهد الموظفين"
+
+msgctxt "Treasury Dashboard"
+msgid "Employee Custody"
+msgstr "عهد الموظفين"
+
+# Custody Request form (public/js/custody_request_treasury.js)
+msgid "Pay Custody by Transfer"
+msgstr "صرف العهدة بتحويل"
+
+msgid "Create Transfer"
+msgstr "إنشاء التحويل"
+
+msgid "Amount {0} to {1} · {2}"
+msgstr "المبلغ {0} إلى {1} · {2}"
+
+msgid "Fee {0} via {1}, posted separately. Bank debit {2}."
+msgstr "عمولة {0} عبر {1}، تُقيَّد في سند مستقل. الخصم من البنك {2}."
+
+msgid "No fee on {0}."
+msgstr "لا عمولة على {0}."
+
+msgid "No default bank for this method: you choose it on the transfer."
+msgstr "لا يوجد بنك افتراضي لهذه الطريقة: اختره في التحويل."
+
+msgid "The transfer opens as a draft: check the IBAN and save. For a custodian, the fee is posted on its own voucher."
+msgstr "يُفتح التحويل كمسودة: راجع رقم الآيبان واحفظ. عمولة التحويل لأمين العهدة تُقيَّد في سند مستقل."
+
+msgid "Treasury: {0}"
+msgstr "الخزينة: {0}"
+
+msgid "Cheque {0} · {1} · {2}"
+msgstr "شيك {0} · {1} · {2}"
+
+msgid "Transfer {0} · {1} · {2}"
+msgstr "تحويل {0} · {1} · {2}"
+
+msgid "PE {0}"
+msgstr "سند {0}"
+
+# PDC Cheque / Bank Transfer forms
+msgid "Custody {0} ({1}): {2}. Check the due date and save; the cheque number is taken from cheque book {3}."
+msgstr "عهدة {0} ({1}): {2}. راجع تاريخ الاستحقاق واحفظ؛ يُؤخذ رقم الشيك من دفتر الشيكات {3}."
+
+msgid "Custody {0} ({1}): {2}. Type the cheque number and save."
+msgstr "عهدة {0} ({1}): {2}. أدخل رقم الشيك واحفظ."
+
+msgid "Custody {0} ({1}): {2}. Choose a bank account in the company currency and type the cheque number."
+msgstr "عهدة {0} ({1}): {2}. اختر حساباً بنكياً بعملة الشركة وأدخل رقم الشيك."
+
+msgid "Tip: set \"Default Bank for Custody Payouts\" in Treasury Company Settings."
+msgstr "تلميح: حدِّد \"البنك الافتراضي لصرف العهد\" في إعدادات الخزينة للشركة."
+
+msgid "Custody return {0}: {1}. Type the cheque number and the due date, then save."
+msgstr "رد عهدة {0}: {1}. أدخل رقم الشيك وتاريخ الاستحقاق ثم احفظ."
+
+msgid "Custody {0} ({1}): {2}. Check the beneficiary IBAN and save."
+msgstr "عهدة {0} ({1}): {2}. راجع آيبان المستفيد واحفظ."
+
+msgid "On submit: Payment Entry dated {0} for {1} to the custodian; the fee {2} is posted on its own voucher."
+msgstr "عند الاعتماد: سند دفع بتاريخ {0} بمبلغ {1} لأمين العهدة؛ وتُقيَّد العمولة {2} في سند مستقل."
+
+msgid "The custody Payment Entry {0} will be cancelled (not reversed); its date's period must be open."
+msgstr "سيُلغى سند صرف العهدة {0} (ولن يُعكس)؛ يجب أن تكون فترة تاريخه مفتوحة."
+
+msgid "The custody Payment Entry {0} will be cancelled."
+msgstr "سيُلغى سند صرف العهدة {0}."
+
+# Bank Transfer: the fee on its own voucher (treasury.bank_transfers.lifecycle)
+msgctxt "Bank Transfer"
+msgid "Created From Type"
+msgstr "نوع مصدر الإنشاء"
+
+msgctxt "Bank Transfer"
+msgid "Created From"
+msgstr "أُنشئ من"
+
+msgctxt "Bank Transfer"
+msgid "Fee Voucher Type"
+msgstr "نوع سند العمولة"
+
+msgctxt "Bank Transfer"
+msgid "Fee Voucher"
+msgstr "سند العمولة"
+
+msgid "The fee posted on its own voucher (payments to custodians: custody refuses deductions)."
+msgstr "العمولة المقيَّدة في سند مستقل (الصرف لأمناء العهد: تطبيق العهد لا يقبل الخصومات)."
+
+msgid "Fee of Bank Transfer {0}"
+msgstr "عمولة التحويل البنكي {0}"
+
+msgctxt "Treasury Voucher"
+msgid "Transfer Fee"
+msgstr "عمولة التحويل"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Fee Posted"
+msgstr "قُيِّدت العمولة"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Fee Refunded"
+msgstr "رُدَّت العمولة"
+
+msgctxt "Bank Transfer Status Log"
+msgid "Voucher Cancelled"
+msgstr "تم إلغاء السند"
+
+# Treasury Company Settings: Employee Custody section
+msgctxt "Treasury Company Settings"
+msgid "Employee Custody"
+msgstr "عهد الموظفين"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Custody Payout Method"
+msgstr "طريقة صرف العهد الافتراضية"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Bank for Custody Payouts"
+msgstr "البنك الافتراضي لصرف العهد"
+
+msgctxt "Treasury Company Settings"
+msgid "Default Cheque Book for Custody Payouts"
+msgstr "دفتر الشيكات الافتراضي لصرف العهد"
+
+msgctxt "Treasury Company Settings"
+msgid "Include custody replenishment in forecast"
+msgstr "إدراج تعويض العهد الدائمة في توقعات الرصيد"
+
+msgctxt "Treasury Company Settings"
+msgid "Cheque"
+msgstr "شيك"
+
+msgctxt "Treasury Company Settings"
+msgid "Bank Transfer"
+msgstr "تحويل بنكي"
+
+msgid "Default Custody Payout Method"
+msgstr "طريقة صرف العهد الافتراضية"
+
+msgid "Default Bank for Custody Payouts"
+msgstr "البنك الافتراضي لصرف العهد"
+
+msgid "Used by the Treasury buttons on Custody Requests (Custody app)."
+msgstr "تستخدمها أزرار الخزينة في طلبات العهدة (تطبيق العهد)."
+
+msgid "Which Treasury button comes first on a Custody Request."
+msgstr "زر الخزينة الذي يظهر أولاً في طلب العهدة."
+
+msgid "Company currency only. Empty: the default outgoing cheque / transfer bank."
+msgstr "بعملة الشركة فقط. إن تُرك فارغاً: البنك الافتراضي للشيكات الصادرة / التحويلات."
+
+msgid "Empty: the bank's active cheque book."
+msgstr "إن تُرك فارغاً: دفتر الشيكات النشط للبنك."
+
+msgid "Floats due for replenishment are added to the bank position forecast and the low balance alerts."
+msgstr "تُضاف العهد الدائمة المستحقة التعويض إلى توقعات رصيد البنك وتنبيهات انخفاض الرصيد."
+
+msgid "{0} must be in the company currency {1}."
+msgstr "يجب أن يكون {0} بعملة الشركة {1}."
+
+# Forecast and Treasury Dashboard (treasury.integrations.custody.forecast / dashboard)
+msgid "Custody Request ({0})"
+msgstr "طلب عهدة ({0})"
+
+msgid "Open Custody"
+msgstr "العهد المفتوحة"
+
+msgid "Overdue Custody"
+msgstr "عهد متأخرة التسوية"
+
+msgid "Approved, Not Paid"
+msgstr "معتمدة لم تُصرف"
+
+msgid "Permanent Custody"
+msgstr "العهد الدائمة"
+
+msgid "Replenishments Due"
+msgstr "تعويضات مستحقة"
+
+msgid "{0} request(s)"
+msgstr "{0} طلب"
+
+msgid "{0} float(s)"
+msgstr "{0} عهدة دائمة"
+
+msgid "Floats {0} · {1} request(s)"
+msgstr "السقوف {0} · {1} طلب"

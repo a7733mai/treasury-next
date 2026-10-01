@@ -18,7 +18,7 @@ Journal Entry; no ERPNext or Frappe file is changed.
 المستندية، وخصم الأوراق التجارية)، ومعاهم تقرير مركز البنك المتوقع و**لوحة الخزينة** وطباعة عربي وإنجليزي.
 كل القيود بتطلع كـ Payment Entry أو Journal Entry قياسية، ومن غير أي تعديل على كود ERPNext أو Frappe.
 
-Version 1.2.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
+Version 1.3.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
 
 > [!NOTE]
 > **Naming.** The screens say **Cheque**, **Cheque Register**, **Cheque Maturity** and **Cheque Bank
@@ -31,25 +31,40 @@ Version 1.2.0 — Frappe 16 / ERPNext 16, Python 3.14. License: MIT.
 
 ### Contents
 
-1. [What's new in 1.2](#whats-new-in-12)
-2. [What's new in 1.1](#whats-new-in-11)
-3. [Installation](#installation)
-4. [Upgrading from 1.1](#upgrading-from-11)
-5. [Upgrading from 1.0](#upgrading-from-10)
-6. [Setup guide](#setup-guide)
-7. [Configuration](#configuration)
-8. [Modules](#modules): [Cheques](#cheques), [Cheque Batch](#cheque-batch-multi-cheque-voucher),
-   [Security Cheques](#security-cheques), [Bank Facilities](#bank-facilities), [Bank Transfers](#bank-transfers),
-   [Bank Charges](#bank-charges), [Bank Position Alerts](#bank-position-alerts),
-   [Pay or receive from any screen](#pay-or-receive-from-any-screen), [Treasury Dashboard](#treasury-dashboard)
-9. [Reports and workspace](#reports-and-workspace)
-10. [Roles and permissions](#roles-and-permissions)
-11. [Scheduled jobs](#scheduled-jobs)
-12. [Known limitations and follow-ups](#known-limitations-and-follow-ups)
-13. [Uninstall](#uninstall-what-is-kept)
-14. [Testing](#testing)
+1. [What's new in 1.3](#whats-new-in-13)
+2. [What's new in 1.2](#whats-new-in-12)
+3. [What's new in 1.1](#whats-new-in-11)
+4. [Installation](#installation)
+5. [Upgrading from 1.2](#upgrading-from-12)
+6. [Upgrading from 1.1](#upgrading-from-11)
+7. [Upgrading from 1.0](#upgrading-from-10)
+8. [Setup guide](#setup-guide)
+9. [Configuration](#configuration)
+10. [Modules](#modules): [Cheques](#cheques), [Cheque Batch](#cheque-batch-multi-cheque-voucher),
+    [Security Cheques](#security-cheques), [Bank Facilities](#bank-facilities), [Bank Transfers](#bank-transfers),
+    [Bank Charges](#bank-charges), [Bank Position Alerts](#bank-position-alerts),
+    [Pay or receive from any screen](#pay-or-receive-from-any-screen), [Treasury Dashboard](#treasury-dashboard),
+    [Custody integration](#custody-integration)
+11. [Reports and workspace](#reports-and-workspace)
+12. [Roles and permissions](#roles-and-permissions)
+13. [Scheduled jobs](#scheduled-jobs)
+14. [Known limitations and follow-ups](#known-limitations-and-follow-ups)
+15. [Uninstall](#uninstall-what-is-kept)
+16. [Testing](#testing)
 
 ---
+
+### What's new in 1.3
+
+- **Custody integration** (only with the `custody` app): pay a Custody Request by cheque or bank transfer and
+  receive custody back by cheque from the request's *Treasury* buttons; custodian vouchers are always
+  cancelled, never reversed; a transfer's fee to a custodian is posted on its own voucher; an optional
+  forecast of custody replenishments, an *Employee Custody* dashboard group, sidebar section and settings
+  ([Custody integration](#custody-integration)).
+- **Created From**: PDC Cheques and Bank Transfers keep a read-only link to the document they were created
+  from (here the Custody Request), and Bank Transfers a *Fee Voucher* when their fee is posted separately.
+
+Without custody nothing changes: the accounting of every cheque and transfer is exactly the one of 1.2.
 
 ### What's new in 1.2
 
@@ -117,6 +132,20 @@ bench compile-po-to-mo --app treasury      # Arabic and English wording (locale/
   customisations of the app's own doctypes (see [Uninstall](#uninstall-what-is-kept)). The three roles and
   their assignment to users are kept on purpose (without the app they grant nothing); delete them in *Role*
   if they are not wanted. The vouchers created by Treasury stay ordinary Payment / Journal Entries.
+
+### Upgrading from 1.2
+
+```bash
+cd apps/treasury && git fetch --tags && git checkout v1.3.0 && cd ../..   # or: bench get-app $URL --branch v1.3.0
+bench --site <site> migrate                 # no patch: new columns only
+bench compile-po-to-mo --app treasury
+bench --site <site> clear-cache
+```
+
+- No patch: *Include custody replenishment in forecast* starts off, an empty *Default Custody Payout Method*
+  reads as Cheque, and the new PDC Cheque / Bank Transfer columns (*Created From*, *Fee Voucher*) are empty.
+- The custody integration needs the `custody` app (which needs `hrms`); install it whenever you want, before
+  or after this upgrade. See [Custody integration](#custody-integration), including its rollback note.
 
 ### Upgrading from 1.1
 
@@ -989,6 +1018,69 @@ when clicked (with the same filters).
   System Manager. A section whose DocType the user may not read for the company (or that a User Permission
   forbids, e.g. on a Bank Account) is left out; a user who may read none gets a permission error. Amounts in the
   company currency use today's rate.
+
+#### Custody integration
+
+Treasury pays and receives back the employee custody of the **Custody** app (`custody` 2.0, Custody Requests
+and their permanent floats) by cheque or bank transfer. It works **only when the `custody` app is installed**;
+there is no dependency (`required_apps` stays ERPNext), and without custody Treasury behaves exactly as 1.2:
+the bridge (`treasury.integrations.custody`) imports custody lazily, the buttons and the dashboard section do
+not exist, the forecast source returns nothing and the sidebar items are hidden.
+
+- **Buttons** (Custody Request, submitted and open; group *Treasury*): **Pay by Cheque** (صرف بشيك), **Pay by
+  Transfer** (صرف بتحويل: Normal or Fawran, with a fee preview) and **Receive Cheque** (استلام شيك رد). Each
+  opens a new, unsaved PDC Cheque / Bank Transfer for the custodian with what the request still accepts
+  (custody's allowance less the open cheques and transfers of the request), its accounting details and a
+  read-only **Created From** link to the request. A second block on the request lists its open cheques /
+  transfers with their Payment Entry numbers. A cheque or transfer to a custodian can only be created this way.
+- **Settings** (Treasury Company Settings, section *Employee Custody*, shown only with custody): *Default
+  Custody Payout Method* (which button comes first), *Default Bank for Custody Payouts* (a mapped bank in the
+  company currency), *Default Cheque Book for Custody Payouts* and **Include custody replenishment in
+  forecast** (default off).
+- **Forecast**: approved, unpaid temporary requests (on their posting date) and floats awaiting funding are
+  outflows of the custody bank in the Bank Position Forecast and the low balance alerts; floats due for
+  replenishment only with the option above (dated today). Open cheques and Scheduled transfers of the request
+  are subtracted (they are flows of their own). Overspent requests (owed to the custodian) are not forecast.
+- **Dashboard and sidebar**: an *Employee Custody* group on the Treasury Dashboard (Open / Overdue Custody,
+  Approved Not Paid, Permanent Custody, Replenishments Due, opening custody's reports) for users who may read
+  Custody Requests; an *Employee Custody* section in the sidebar (Custody Request, Custody Settlement, Custody
+  Dashboard and four custody reports); the cheques, transfers and custodian Payment Entries in the request's
+  Connections.
+
+Accounting (CUS = the request's custody account, PAY / REC / UC = the bank's PDC accounts):
+
+| # | Event | Voucher |
+|---|---|---|
+| E1 | Outgoing cheque, party posting (per *Outgoing Party Posting*) | Payment Entry Pay: Dr CUS / Cr PAY, `custody_request` set, no references or deductions (custody sets the purpose) |
+| E2 | Its clearance | unchanged (Internal Transfer PAY → bank, or Bank Entry) |
+| E3 | Bounce / replace of a posted outgoing cheque | the E1 Payment Entry is **cancelled**, whatever *On Bounce* says |
+| E4 | Incoming (return) cheque, party posting | Payment Entry Receive: Dr REC / Cr CUS |
+| E5 | Its deposit / clearance | unchanged |
+| E6 | Its bounce | the under-collection voucher follows *On Bounce*; the E4 Payment Entry is cancelled |
+| E7 | Transfer sent (Normal / Fawran) | Payment Entry Pay: Dr CUS / Cr Bank, **without the fee** |
+| E8 | Its fee | its own voucher, as a Bank Charge (*Bank Charge Voucher*): Payment Entry to the Bank's Supplier with the fee as a deduction, or Bank Entry Dr Fee / Cr Bank |
+| E9 | Transfer completed | both E7 and E8 cleared |
+| E10 | Transfer returned | E7 cancelled; E8 kept, or reversed by a Journal Entry when the bank refunds fees |
+
+A cancelled transfer (Scheduled or Sent) cancels E8 then E7.
+
+**Limits:**
+- SWIFT transfers and Party Receipt transfers from custodians are out of scope (a custody return by transfer is
+  a Payment Entry in custody); no Cheque Batches, installments or bounce charges for custodians.
+- Custody's *Auto* replenishment mode creates a draft replenishment Payment Entry: submit or delete it before
+  paying the float by cheque or transfer (use the Manual mode when floats are paid by cheque).
+- Custody only accepts the cancellation of a custodian Payment Entry (never a reversal Journal Entry), so a
+  bounced cheque or returned transfer cancels it: the GL moves back on the original date, its **accounting
+  period must be open**, and a matched bank statement line must be re-matched by hand. Custody refuses the
+  cancellation when the custodian already spent the money (settle or cancel in custody first).
+- Amending a cancelled transfer drops *Created From*: create it again from the request.
+- Administrator sees the custody sidebar links even without custody (Frappe does not filter them for
+  Administrator).
+
+**Rollback to 1.2.0** (`git checkout v1.2.0`, `bench migrate`): the new columns stay, unused. Before rolling
+back, settle, cancel or return every open custodian cheque and transfer: under 1.2.0 a custodian bounce in
+*Reverse by Journal Entry* mode or any custodian transfer return fails on custody's Journal Entry rule, and a
+custodian transfer cancel leaves its separate fee voucher to be cancelled by hand.
 
 ### Reports and workspace
 

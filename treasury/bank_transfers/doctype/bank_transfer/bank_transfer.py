@@ -18,7 +18,7 @@ from treasury.treasury_setup.doctype.treasury_company_settings.treasury_company_
 	TRANSFER_DEFAULT_BANK_FIELDS,
 	validate_expense_account,
 )
-from treasury.utils import references, voucher_summary
+from treasury.utils import document_sources, references, voucher_summary
 from treasury.utils.party import can_read_party, get_party_name, validate_party_type
 
 # Written only by treasury.bank_transfers.lifecycle (on submit, or by the actions with `treasury_lifecycle`).
@@ -34,6 +34,9 @@ LIFECYCLE_FIELDS = (
 	"return_reason",
 	"base_fee_amount",
 	"fees_refunded",
+	# the fee posted on its own voucher (a party that refuses deductions, e.g. a custodian)
+	"fee_voucher_type",
+	"fee_voucher",
 )
 # Allowed on submit, changed only through Send Now / Reschedule.
 LIFECYCLE_ON_SUBMIT_EDITABLE = ("execution_date",)
@@ -90,6 +93,8 @@ class BankTransfer(Document):
 		fee_override_reason: DF.SmallText | None
 		fee_rule: DF.Data | None
 		fee_summary_html: DF.HTML | None
+		fee_voucher: DF.DynamicLink | None
+		fee_voucher_type: DF.Link | None
 		fees_refunded: DF.Check
 		method: DF.Literal["Normal", "Fawran", "SWIFT"]
 		mode_of_payment: DF.Link | None
@@ -110,6 +115,8 @@ class BankTransfer(Document):
 		reversal_journal: DF.Link | None
 		reversal_payment_entry: DF.Link | None
 		scope: DF.Literal["Same Bank", "Other Bank", "International"]
+		source_doctype: DF.Link | None
+		source_name: DF.DynamicLink | None
 		status: DF.Literal["Draft", "Scheduled", "Sent", "Completed", "Returned", "Cancelled"]
 		status_log: DF.Table[BankTransferStatusLog]
 		title: DF.Data | None
@@ -148,6 +155,8 @@ class BankTransfer(Document):
 		self.set_defaults()
 		self.validate_bank_accounts()
 		self.validate_party()
+		# "Created From" (e.g. a Custody Request): the app of the source checks it in its doc_events
+		document_sources.validate(self)
 		self.validate_amounts()
 		self.set_fee()
 		self.log_fee_override()

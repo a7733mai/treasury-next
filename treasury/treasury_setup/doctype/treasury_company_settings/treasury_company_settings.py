@@ -69,6 +69,9 @@ class TreasuryCompanySettings(Document):
 		bounce_charges_account: DF.Link | None
 		cheque_reprint_requires_manager: DF.Check
 		company: DF.Link
+		custody_bank_account: DF.Link | None
+		custody_cheque_book: DF.Link | None
+		custody_default_method: DF.Literal["Cheque", "Bank Transfer", "Fawran"]
 		default_charge_bearer: DF.Literal["OUR", "SHA", "BEN"]
 		default_fawran_bank_account: DF.Link | None
 		default_incoming_cheque_bank_account: DF.Link | None
@@ -81,6 +84,7 @@ class TreasuryCompanySettings(Document):
 		default_swift_bank_account: DF.Link | None
 		default_transfer_method: DF.Literal["Normal", "Fawran", "SWIFT"]
 		facility_voucher: DF.Literal["Payment Entry", "Journal Entry"]
+		include_custody_replenishment_in_forecast: DF.Check
 		incoming_bank_posting: DF.Literal["On Actual Clearance", "On Bank Transaction Date", "Manual"]
 		incoming_party_posting: DF.Literal["On Receipt", "On Cheque Date", "Manual"]
 		incoming_under_collection: DF.Literal["On Deposit", "Disabled"]
@@ -126,6 +130,10 @@ class TreasuryCompanySettings(Document):
 			},
 		)
 		self.set_setup_onload()
+		# the Employee Custody section is shown only with the custody app (treasury.integrations.custody)
+		from treasury.integrations import custody
+
+		self.set_onload("custody_installed", custody.is_installed())
 
 	def set_setup_onload(self):
 		"""Spec 7h §3.4 / §3.5: the Setup Checklist and the Naming Series overview (read only)."""
@@ -153,6 +161,7 @@ class TreasuryCompanySettings(Document):
 		self.validate_payment_modes()
 		self.validate_transfer_settings()
 		self.validate_document_settings()
+		self.validate_custody_settings()
 		self.validate_balance_thresholds()
 
 	# ------------------------------------------------------------------ bank balance alerts
@@ -203,6 +212,37 @@ class TreasuryCompanySettings(Document):
 			frappe.throw(_("Tender Bond % must be between 0 and 100."))
 		if not 0 <= flt(self.performance_bond_percent) <= 100:
 			frappe.throw(_("Performance Bond % must be between 0 and 100."))
+
+	# ------------------------------------------------------------------ employee custody (custody app)
+
+	def validate_custody_settings(self):
+		"""The custody payout bank: a company bank with a PDC Accounts row, in the company currency (custody is
+		paid in it); its cheque book belongs to the company and to that bank."""
+		bank_account = self.custody_bank_account
+		if not bank_account:
+			self.custody_cheque_book = None
+			return
+		label = _(self.meta.get_label("custody_bank_account"))
+		gl_account = self.validate_bank_account(frappe._dict(idx=0, bank_account=bank_account), label)
+		if bank_account not in {row.bank_account for row in self.get("pdc_accounts")}:
+			frappe.throw(_("{0} {1} needs a row in PDC Accounts.").format(label, frappe.bold(bank_account)))
+		company_currency = erpnext.get_company_currency(self.company)
+		if get_account_currency(gl_account) != company_currency:
+			frappe.throw(
+				_("{0} must be in the company currency {1}.").format(
+					f"{label} {frappe.bold(bank_account)}", company_currency
+				)
+			)
+		if self.custody_cheque_book:
+			book = frappe.db.get_value(
+				"Cheque Book", self.custody_cheque_book, ["company", "bank_account"], as_dict=True
+			)
+			if not book or book.company != self.company or book.bank_account != bank_account:
+				frappe.throw(
+					_("Cheque Book {0} does not belong to Bank Account {1}.").format(
+						frappe.bold(self.custody_cheque_book), frappe.bold(bank_account)
+					)
+				)
 
 	# ------------------------------------------------------------------ bank transfers
 

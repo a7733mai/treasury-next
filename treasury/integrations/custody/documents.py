@@ -16,6 +16,7 @@ from treasury.utils import source_documents as sd
 
 SOURCE_DOCTYPES = ("PDC Cheque", "Bank Transfer")
 OPEN_CHEQUE_STATUSES = ("Created", "Delivered", "Received", "Deposited")
+OPEN_TRANSFER_STATUSES = ("Draft", "Scheduled", "Sent")
 OUTGOING, INCOMING = "Outgoing", "Incoming"
 PAYMENT_TYPE = {OUTGOING: "Pay", INCOMING: "Receive"}
 # custody purpose of a Pay to a custodian who is owed money (a wind-down, F1)
@@ -63,6 +64,47 @@ def reserved(request: str, direction: str, exclude: str | None = None) -> float:
 				flt(amount) for amount in frappe.get_all(TRANSFER, filters={**base, **extra}, pluck="amount")
 			)
 	return flt(total, _precision())
+
+
+def open_documents(request: str, limit: int) -> tuple[list[dict], int]:
+	"""([{doctype, name, amount, status, payment_entry}], number not listed): the open cheques (posted or not)
+	and the draft / scheduled / sent transfers of the request the user may read, newest first, for the Treasury
+	block of the request form."""
+	cheques = frappe.get_list(
+		"PDC Cheque",
+		filters={
+			"source_doctype": REQUEST,
+			"source_name": request,
+			"operational_status": ["in", OPEN_CHEQUE_STATUSES],
+		},
+		fields=["name", "amount", "operational_status", "party_payment_entry", "creation"],
+	)
+	rows = [
+		frappe._dict(
+			doctype="PDC Cheque",
+			name=row.name,
+			amount=row.amount,
+			status=row.operational_status,
+			payment_entry=row.party_payment_entry,
+			creation=row.creation,
+		)
+		for row in cheques
+	]
+	if frappe.get_meta(TRANSFER).has_field("source_name"):
+		transfers = frappe.get_list(
+			TRANSFER,
+			filters={
+				"source_doctype": REQUEST,
+				"source_name": request,
+				"docstatus": ["<", 2],
+				"status": ["in", OPEN_TRANSFER_STATUSES],
+			},
+			fields=["name", "amount", "status", "payment_entry", "creation"],
+		)
+		rows += [frappe._dict(row, doctype=TRANSFER) for row in transfers]
+	rows.sort(key=lambda r: r.creation, reverse=True)
+	shown = [{k: v for k, v in row.items() if k != "creation"} for row in rows[:limit]]
+	return shown, max(len(rows) - limit, 0)
 
 
 def available(req, direction: str, exclude: str | None = None) -> frappe._dict:

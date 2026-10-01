@@ -11,7 +11,8 @@ report it drills down to:
 - transfers awaiting the bank's confirmation, this month's bank charges (Bank Charges Analysis);
 - company-wide (not per bank account): security cheques (Security Exposure), facilities (Facility
   Utilisation, at most MAX_FACILITIES), installments (the facility cards), expiring Letters of Guarantee /
-  Credit (LG / LC Register).
+  Credit (LG / LC Register);
+- with the custody app only: Employee Custody (treasury.integrations.custody.dashboard).
 
 A section is left out (and listed in `hidden`) when the user may not read its DocType for the company, or when
 it raises a PermissionError (e.g. a User Permission on a Bank Account). Amounts in the company currency are
@@ -74,6 +75,8 @@ SECTIONS = {  # section key -> DocType whose read permission (and Company user p
 	"credits": "Letter of Credit",
 }
 SETTINGS = "Treasury Company Settings"
+# the custody bridge's section (custody app only, see `_add_custody_section`)
+CUSTODY = "custody"
 OUTLOOK = ["query-report", "Bank Balance Outlook"]
 FORECAST = ["query-report", "Bank Position Forecast"]
 # maturities chart: flow category by source document (PDC Cheque: by direction)
@@ -155,7 +158,30 @@ def get_overview(
 		except frappe.PermissionError:
 			clear_last_message()
 			result.hidden.append(key)
+	_add_custody_section(ctx, result)
 	return result
+
+
+def _add_custody_section(ctx, result):
+	"""The Employee Custody section (treasury.integrations.custody), only with the custody app: nothing at all
+	without it. Not in `readable_sections`: custody alone never opens the Treasury Dashboard."""
+	from treasury.integrations import custody
+
+	if not custody.is_installed():
+		return
+	if not (
+		frappe.has_permission(custody.REQUEST, "read")
+		and is_permitted_value("Company", ctx.company, custody.REQUEST)
+	):
+		result.hidden.append(CUSTODY)
+		return
+	from treasury.integrations.custody import dashboard as custody_dashboard
+
+	try:
+		result.sections[CUSTODY] = custody_dashboard.custody_section(ctx)
+	except frappe.PermissionError:
+		clear_last_message()
+		result.hidden.append(CUSTODY)
 
 
 def _rate(ctx, currency: str | None) -> float:

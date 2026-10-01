@@ -80,9 +80,27 @@ frappe.ui.form.on("Treasury Company Settings", {
 		frm.set_query("expense_account", "transfer_fee_rules", () => ({
 			filters: { company: frm.doc.company, root_type: "Expense", is_group: 0 },
 		}));
+		// Employee Custody (custody app): a mapped bank (validate_custody_settings) and its active cheque books
+		frm.set_query("custody_bank_account", () => {
+			const filters = { company: frm.doc.company, is_company_account: 1 };
+			const mapped = (frm.doc.pdc_accounts || []).map((row) => row.bank_account).filter(Boolean);
+			if (mapped.length) {
+				filters.name = ["in", mapped];
+			}
+			return { filters };
+		});
+		frm.set_query("custody_cheque_book", () => ({
+			filters: { company: frm.doc.company, bank_account: frm.doc.custody_bank_account, status: "Active" },
+		}));
+	},
+
+	custody_bank_account(frm) {
+		frm.set_value("custody_cheque_book", null);
 	},
 
 	refresh(frm) {
+		// shown only with the custody app (an onload value: `depends_on` cannot see it)
+		frm.toggle_display("custody_section", !!(frm.doc.__onload && frm.doc.__onload.custody_installed));
 		frm.events.render_vouchers_help(frm);
 		frm.events.mark_unregistered_series(frm);
 		frm.events.set_series_headline(frm);

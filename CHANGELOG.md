@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.3.0 — 2026-10-01
+
+Treasury 1.3 pays and receives back the employee custody of the **Custody** app by cheque or bank transfer.
+The integration is active only when the `custody` app is installed; without it nothing changes.
+
+### Upgrading from 1.2.0
+1. `bench get-app` (or `git checkout v1.3.0` in `apps/treasury`).
+2. `bench --site <site> migrate`: no patch, new columns only (*Created From*, *Fee Voucher*, the *Employee
+   Custody* settings; *Include custody replenishment in forecast* starts off).
+3. `bench compile-po-to-mo --app treasury` for the new Arabic wording.
+4. `bench --site <site> clear-cache`, so the desk loads the new sidebar section and form scripts.
+
+Rollback to 1.2.0 (`git checkout v1.2.0`, `migrate`): the columns stay unused. Settle, cancel or return every
+open custodian cheque or transfer first (see the README).
+
+### Custody integration (Phase 9)
+- Cheque, transfer and return paths: *Pay by Cheque*, *Pay by Transfer* (Normal / Fawran) and *Receive Cheque*
+  on a Custody Request open a prepared PDC Cheque / Bank Transfer for the custodian, within what the request
+  still accepts, with a read-only *Created From* link; a cheque or transfer to a custodian can only be created
+  this way. The custodian's Payment Entry is posted on the request's custody account with `custody_request`.
+- Fee posted separately for custodians (custody refuses deductions): its own voucher, keyed `bt_fee`, as a
+  Bank Charge (Payment Entry to the Bank's Supplier or Bank Entry), cleared with the transfer, kept or refunded
+  on return; shown as *Fee Voucher* and counted once in Transfer Fees / Bank Charges Analysis.
+- Custodian vouchers are always cancelled, never reversed: bounce, replace, transfer return and cancel cancel
+  the custodian Payment Entry (custody refuses any Journal Entry row of a custodian). A generic party-payment
+  extension point in the posting service (`treasury_party_payment_hooks`) carries these rules.
+- Forecast option (*Include custody replenishment in forecast*, default off), approved-unpaid requests in the
+  Bank Position Forecast and the low balance alerts, an *Employee Custody* group on the Treasury Dashboard, an
+  *Employee Custody* sidebar section, the cheques / transfers / Payment Entries in the request's Connections,
+  and the *Employee Custody* settings (default payout method, bank and cheque book).
+
 ## 1.2.0 — 2026-10-01
 
 Treasury 1.2 speaks of cheques, not PDCs: the screens say "Cheque", "Cheque Register" and "Cheque Bank

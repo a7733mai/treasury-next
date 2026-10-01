@@ -7,6 +7,10 @@ dated the execution date and keyed (Bank Transfer, name, bt_transfer, 1):
 - Party Receipt: Receive, the bank receives amount - fee, the party is settled with the amount;
 - Internal Transfer: amount + fee leave the source bank, the amount (or the received amount of a transfer
   between two currencies) reaches the target bank, the fee is the flagged deduction row.
+A party whose rules refuse deductions (posting.get_party_rules, e.g. a custodian) gets the amount alone; the
+fee is then posted on its own voucher (keyed bt_fee) like a Bank Charge: a Payment Entry to the Bank's Supplier
+or a Bank Entry, per the company's Bank Charge Voucher setting. Such a party's Payment Entry is cancelled, never
+reversed, on return; the separate fee voucher is kept, or reversed when the bank refunds it.
 The transfer is then Sent / Posted, and Completed (its Payment Entry cleared) when the bank confirms it (Mark
 Completed, PDC Bank Clearing), or at once per the company's Transfer Completion setting.
 
@@ -28,14 +32,21 @@ from frappe.utils import flt, fmt_money, formatdate, getdate, now_datetime, toda
 
 from treasury.accounting import dimensions, payment_modes, posting
 from treasury.balance_alerts import guard
+from treasury.bank_facilities import accounting as facility_accounting
 from treasury.bank_facilities import instruments
-from treasury.bank_transfers import fees
+from treasury.bank_transfers import bank_supplier, fees
 from treasury.utils.context import SYSTEM_USER, elevated, real_user
 from treasury.utils.protected_fields import insert_log_row
 
 DOCTYPE = "Bank Transfer"
 EVENT_TRANSFER = "bt_transfer"
 EVENT_TRANSFER_REVERSAL = "bt_transfer_reversal"
+# the fee on its own voucher (a party whose rules refuse deductions, e.g. a custodian) and its refund
+EVENT_FEE = "bt_fee"
+EVENT_FEE_REVERSAL = "bt_fee_reversal"
+# Method of the Modes of Payment map of that fee voucher (as a Bank Charge)
+FEE_MODE_METHOD = "Bank Charge"
+PAYMENT_ENTRY, JOURNAL_ENTRY = "Payment Entry", "Journal Entry"
 USER_ROLES = ("Treasury User", "Treasury Manager", "System Manager")
 MANAGER_ROLES = ("Treasury Manager", "System Manager")
 # Method of the Modes of Payment map (treasury.accounting.payment_modes.METHODS) per transfer method.
@@ -300,7 +311,14 @@ def on_submit(doc):
 		_write_in_place(
 			doc,
 			first_new_row,
-			("payment_entry", "base_fee_amount", "completion_date", "bank_transaction_date"),
+			(
+				"payment_entry",
+				"base_fee_amount",
+				"fee_voucher_type",
+				"fee_voucher",
+				"completion_date",
+				"bank_transaction_date",
+			),
 		)
 	first_new_row = len(doc.status_log)
 	if finish_balance_guard(doc, doc.flags.pop("balance_snapshot", None), doc.get("allow_low_balance")):
@@ -323,8 +341,13 @@ def before_cancel(doc):
 
 
 def on_cancel(doc):
-	"""Cancel the transfer's Payment Entry (before Frappe's check for submitted back links)."""
+	"""Cancel the transfer's fee voucher, if any, then its Payment Entry (before Frappe's check for submitted
+	back links)."""
 	first_new_row = len(doc.status_log)
+	fee_voucher = _fee_voucher(doc)
+	if fee_voucher and frappe.db.get_value(*fee_voucher, "docstatus") == 1:
+		_cancel_voucher(*fee_voucher)
+		log(doc, "Voucher Cancelled", voucher=fee_voucher)
 	voucher = None
 	if doc.payment_entry and frappe.db.get_value("Payment Entry", doc.payment_entry, "docstatus") == 1:
 		_cancel_voucher("Payment Entry", doc.payment_entry)
@@ -333,9 +356,16 @@ def on_cancel(doc):
 	_write_in_place(doc, first_new_row)
 
 
-def _cancel_voucher(doctype: str, name: str):
+def _fee_voucher(doc) -> tuple[str, str] | None:
+	"""(doctype, name) of the fee posted on its own voucher, if any."""
+	if doc.get("fee_voucher_type") and doc.get("fee_voucher"):
+		return (doc.fee_voucher_type, doc.fee_voucher)
+	return None
+
+
+def _cancel_voucher(doctype: str, name: str, ignore_linked_doctypes: tuple[str, ...] = ()):
 	try:
-		posting.cancel_voucher(doctype, name)
+		posting.cancel_voucher(doctype, name, ignore_linked_doctypes=ignore_linked_doctypes)
 	except frappe.ValidationError:
 		frappe.throw(
 			_("{0} {1} could not be cancelled (see the message above).").format(
@@ -436,6 +466,7 @@ def _send(doc, date, remarks=None):
 		"details": _details(doc),
 	}
 	fee = flt(doc.fee_amount)
+	split = fee > 0 and fee_on_own_voucher(doc)
 	if doc.transfer_type == INTERNAL:
 		same_currency = doc.currency == doc.to_currency
 		payment_entry = posting.create_internal_transfer(
@@ -466,12 +497,16 @@ def _send(doc, date, remarks=None):
 				}
 				for ref in doc.references
 			],
-			charges=fee,
-			charges_account=doc.fee_account if fee else None,
+			charges=0 if split else fee,
+			charges_account=doc.fee_account if fee and not split else None,
 		)
 	doc.payment_entry = payment_entry
-	doc.base_fee_amount = _booked_fee(payment_entry, doc.fee_account)
 	log(doc, "Sent", SENT, POSTED, ("Payment Entry", payment_entry), remarks=remarks, event_date=date)
+	if split:
+		_post_fee(doc, date)
+		doc.base_fee_amount = _booked_fee_voucher(doc)
+	else:
+		doc.base_fee_amount = _booked_fee(payment_entry, doc.fee_account)
 
 	completion = _settings(doc).transfer_completion
 	if completion == ON_SEND or (completion == ON_SEND_FOR_FAWRAN and doc.method == FAWRAN):
@@ -488,6 +523,117 @@ def _booked_fee(payment_entry: str, fee_account: str | None) -> float:
 		pluck="amount",
 	)
 	return flt(sum(flt(a) for a in amounts), frappe.get_precision(DOCTYPE, "base_fee_amount"))
+
+
+def fee_on_own_voucher(doc) -> bool:
+	"""Whether the party's rules refuse a deduction on its Payment Entry (e.g. a custodian, whose custody
+	refuses deductions): the fee is then posted on its own voucher (party transfers only)."""
+	if doc.transfer_type == INTERNAL or not doc.get("party_type"):
+		return False
+	rules = posting.get_party_rules(
+		source_doctype=DOCTYPE,
+		source_name=doc.name,
+		company=doc.company,
+		party_type=doc.party_type,
+		party=doc.party,
+		action="check",
+	)
+	return not rules.allow_deductions
+
+
+def _post_fee(doc, date):
+	"""Post the fee on its own voucher, dated `date`, keyed (Bank Transfer, name, bt_fee, 1), in the shape of
+	the company's Bank Charge Voucher setting (as a Bank Charge): a Payment Entry to the Bank's Supplier with
+	the whole fee as a deduction on the fee account (no party row), or a Bank Entry Dr Fee / Cr Bank."""
+	fee = flt(doc.fee_amount)
+	bank_gl = _bank_gl(doc.bank_account)
+	rate = flt(doc.exchange_rate) or 1.0
+	cost_center = doc.cost_center or erpnext.get_default_cost_center(doc.company)
+	common = {
+		"source_doctype": DOCTYPE,
+		"source_name": doc.name,
+		"event": EVENT_FEE,
+		"cycle": 1,
+		"company": doc.company,
+		"posting_date": date,
+		"remarks": _("Fee of Bank Transfer {0}").format(doc.name),
+	}
+	if _settings(doc).bank_charge_voucher == JOURNAL_ENTRY:
+		precision = frappe.get_precision("Journal Entry Account", "debit") or 2
+		meta = frappe.get_meta("Journal Entry Account")
+		expense = {
+			"account": doc.fee_account,
+			"debit_in_account_currency": flt(fee * rate, precision),
+			"cost_center": cost_center,
+			"project": doc.project,
+		}
+		for fieldname, value in dimensions.get_dimension_values(doc).items():
+			if value and meta.has_field(fieldname):
+				expense[fieldname] = value
+		bank = facility_accounting._row(doc.company, doc.currency, bank_gl, rate, credit=fee)
+		voucher = (
+			JOURNAL_ENTRY,
+			posting.create_journal_entry(
+				**common,
+				voucher_type="Bank Entry",
+				accounts=[expense, bank],
+				cheque_no=doc.bank_reference or doc.name,
+				cheque_date=date,
+				balance_exchange_difference=True,
+			),
+		)
+	else:
+		bank = frappe.db.get_value("Bank Account", doc.bank_account, "bank")
+		if not bank:
+			frappe.throw(
+				_(
+					"Bank Account {0} has no Bank: set its Bank, or book bank charges by Journal Entry (Treasury Company Settings)."
+				).format(frappe.bold(doc.bank_account))
+			)
+		mode = payment_modes.resolve(doc.company, doc.bank_account, FEE_MODE_METHOD)
+		voucher = (
+			PAYMENT_ENTRY,
+			posting.create_bank_charge_payment(
+				**common,
+				payment_type="Pay",
+				party_type="Supplier",
+				party=bank_supplier.ensure_bank_supplier(bank),
+				amount=fee,
+				bank_account_head=bank_gl,
+				expense_account=doc.fee_account,
+				currency=doc.currency,
+				exchange_rate=doc.exchange_rate,
+				reference_no=doc.bank_reference or doc.name,
+				reference_date=date,
+				details={
+					"mode_of_payment": mode.mode_of_payment,
+					"naming_series": mode.naming_series,
+					"cost_center": cost_center,
+					"project": doc.project,
+					"bank_account": doc.bank_account,
+					"dimensions": dimensions.get_dimension_values(doc),
+				},
+			),
+		)
+	doc.fee_voucher_type, doc.fee_voucher = voucher
+	log(doc, "Fee Posted", voucher=voucher, event_date=date)
+
+
+def _booked_fee_voucher(doc) -> float:
+	"""The fee booked on the transfer's own fee voucher (company currency)."""
+	voucher = _fee_voucher(doc)
+	if not voucher or not doc.fee_account:
+		return 0.0
+	if voucher[0] == PAYMENT_ENTRY:
+		return _booked_fee(voucher[1], doc.fee_account)
+	amounts = frappe.get_all(
+		"Journal Entry Account",
+		filters={"parenttype": JOURNAL_ENTRY, "parent": voucher[1], "account": doc.fee_account},
+		fields=["debit", "credit"],
+	)
+	return flt(
+		sum(flt(a.debit) - flt(a.credit) for a in amounts), frappe.get_precision(DOCTYPE, "base_fee_amount")
+	)
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +668,8 @@ def _complete(doc, date, bank_transaction_date, remarks=None):
 	doc.completion_date = getdate(date)
 	doc.bank_transaction_date = getdate(bank_transaction_date) if bank_transaction_date else None
 	posting.set_clearance_date("Payment Entry", doc.payment_entry, doc.bank_transaction_date or date)
+	if fee_voucher := _fee_voucher(doc):
+		posting.set_clearance_date(*fee_voucher, doc.bank_transaction_date or date)
 	log(doc, "Completed", COMPLETED, remarks=remarks, event_date=date)
 
 
@@ -547,26 +695,42 @@ def return_transfer(name: str, return_date=None, reason=None) -> dict:
 
 	fee = flt(doc.fee_amount)
 	refund = bool(_settings(doc).refund_fees_on_return)
-	kept = None
-	if fee and not refund:
-		kept = {
-			"account": doc.fee_account,
-			"bank_account_head": _bank_gl(doc.bank_account),
-			"amount_in_account_currency": fee,
-		}
-	voucher_type, voucher = posting.reverse_voucher(
-		"Payment Entry",
-		doc.payment_entry,
-		date,
-		EVENT_TRANSFER_REVERSAL,
-		remarks=_("Return of Bank Transfer {0}: {1}").format(doc.name, reason),
-		cycle=1,
-		kept_charges=kept,
-	)
-	if voucher_type == "Payment Entry":
-		doc.reversal_payment_entry = voucher
+	remarks = _("Return of Bank Transfer {0}: {1}").format(doc.name, reason)
+	fee_voucher = _fee_voucher(doc)
+	if posting.must_cancel(PAYMENT_ENTRY, doc.payment_entry):
+		# a party that may only be undone by cancelling (e.g. a custodian: custody refuses a reversal
+		# Journal Entry); the submitted transfer links its Payment Entry by design
+		_cancel_voucher(PAYMENT_ENTRY, doc.payment_entry, ignore_linked_doctypes=(DOCTYPE,))
+		log(doc, "Voucher Cancelled", voucher=(PAYMENT_ENTRY, doc.payment_entry), event_date=date)
+		voucher_type, voucher = PAYMENT_ENTRY, doc.payment_entry
+		# the transfer keeps its (now cancelled) Payment Entry as the record of what was sent: Frappe would
+		# refuse to save a submitted document linking a cancelled one
+		doc.flags.ignore_links = True
 	else:
-		doc.reversal_journal = voucher
+		kept = None
+		if fee and not refund and not fee_voucher:
+			kept = {
+				"account": doc.fee_account,
+				"bank_account_head": _bank_gl(doc.bank_account),
+				"amount_in_account_currency": fee,
+			}
+		voucher_type, voucher = posting.reverse_voucher(
+			PAYMENT_ENTRY,
+			doc.payment_entry,
+			date,
+			EVENT_TRANSFER_REVERSAL,
+			remarks=remarks,
+			cycle=1,
+			kept_charges=kept,
+		)
+		if voucher_type == PAYMENT_ENTRY:
+			doc.reversal_payment_entry = voucher
+		else:
+			doc.reversal_journal = voucher
+	if fee_voucher and refund:
+		# the fee on its own voucher, refunded by the bank: reversed on the return date (a Journal Entry)
+		refund_voucher = posting.reverse_voucher(*fee_voucher, date, EVENT_FEE_REVERSAL, remarks=remarks, cycle=1)
+		log(doc, "Fee Refunded", voucher=refund_voucher, event_date=date)
 	doc.return_date = date
 	doc.return_reason = reason
 	doc.fees_refunded = 1 if refund and fee else 0

@@ -61,8 +61,9 @@ doctype_js = {
 	"Employee": "public/js/treasury_payment_buttons.js",
 	"Expense Claim": "public/js/treasury_payment_buttons.js",
 	"Employee Advance": "public/js/treasury_payment_buttons.js",
-	# custody bridge (treasury.integrations.custody): never loaded without the custody app
-	"Custody Request": "public/js/custody_request_treasury.js",
+	# custody bridge (treasury.integrations.custody): never loaded without the custody app; it opens the
+	# documents with `treasury.payment_buttons.open` (loaded first)
+	"Custody Request": ["public/js/treasury_payment_buttons.js", "public/js/custody_request_treasury.js"],
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -251,6 +252,8 @@ treasury_forecast_sources = [
 	"treasury.bank_facilities.forecast.get_flows",
 	"treasury.bank_facilities.lc.get_flows",
 	"treasury.bank_transfers.forecast.get_flows",
+	# custody bridge: approved, unpaid Custody Requests (nothing without the custody app)
+	"treasury.integrations.custody.forecast.get_flows",
 ]
 treasury_forecast_summary_sources = [
 	"treasury.bank_facilities.forecast.get_summary",
@@ -326,6 +329,8 @@ override_doctype_dashboards = {
 	"Supplier Quotation": "treasury.overrides.dashboards.supplier_quotation",
 	"Expense Claim": "treasury.overrides.dashboards.expense_claim",
 	"Employee Advance": "treasury.overrides.dashboards.employee_advance",
+	# custody bridge: never called without the custody app
+	"Custody Request": "treasury.overrides.dashboards.custody_request",
 }
 
 # exempt linked doctypes from being automatically cancelled

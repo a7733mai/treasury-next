@@ -632,6 +632,25 @@ class TestTranslations(IntegrationTestCase):
 				missing.append(msgid)
 		self.assertEqual(missing, [])
 
+	def test_custody_bridge_terms(self):
+		"""Phase 9 (design 9 §0): the custody section is "Employee Custody" (the bare "Custody" / "Custodian" stay
+		the safekeeping terms of security cheques, with a context only); the Custody Request buttons say
+		"صرف" under the context "Custody Request" while the invoice button keeps its own wording."""
+		by_key = {(e.get("msgctxt"), e["msgid"]): e["msgstr"] for e in self.messages}
+		self.assertEqual(by_key[(None, "Employee Custody")], "عهد الموظفين")
+		self.assertEqual(by_key[("Treasury Dashboard", "Employee Custody")], "عهد الموظفين")
+		self.assertEqual(by_key[("Custody Request", "Pay by Cheque")], "صرف بشيك")
+		self.assertEqual(by_key[("Custody Request", "Pay by Transfer")], "صرف بتحويل")
+		self.assertEqual(by_key[("Custody Request", "Receive Cheque")], "استلام شيك رد")
+		self.assertEqual(by_key[(None, "Pay by Cheque")], "سداد بشيك")
+		for msgid in ("Custody", "Custodian", "Pay by Transfer", "Receive Cheque", "Custody Dashboard"):
+			self.assertNotIn((None, msgid), by_key, msgid)
+		for msgid in ("Fee Posted", "Fee Refunded", "Voucher Cancelled"):
+			self.assertIn(("Bank Transfer Status Log", msgid), by_key)
+		self.assertIn(("Treasury Voucher", "Transfer Fee"), by_key)
+		sidebar = {i["label"] for i in read_json(SIDEBAR_FILE)["items"] if i["type"] == "Section Break"}
+		self.assertIn("Employee Custody", sidebar)
+
 	def test_extraction_helpers(self):
 		"""The static extraction understands the call styles used in the app."""
 		py = APP_DIR / "utils" / "amount_in_words.py"

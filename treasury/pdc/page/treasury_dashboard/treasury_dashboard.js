@@ -693,6 +693,8 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 		}
 
 		const security = has("security") ? [this.render_security(s.security)] : [];
+		// only with the custody app (treasury.integrations.custody.dashboard)
+		const custody = has("custody") ? [this.render_custody(s.custody)] : [];
 		const group = (title, blocks) => {
 			const html = blocks.filter(Boolean).join("");
 			return html
@@ -704,7 +706,8 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 			this.render_setup_banner(data.setup) +
 				group(__("Cash Position", null, TD_CTX), cash) +
 				group(__("Coming Up", null, TD_CTX), coming) +
-				group(__("Security Cheques", null, TD_CTX), security)
+				group(__("Security Cheques", null, TD_CTX), security) +
+				group(__("Employee Custody", null, TD_CTX), custody)
 		);
 		this.$footer.html(
 			hidden.size ? this.esc(__("Some sections are hidden because of your permissions.")) : ""
@@ -1361,6 +1364,54 @@ treasury.TreasuryDashboard = class TreasuryDashboard {
 				}),
 				this.kpi({ label: __("Open Held", null, TD_CTX), count: s.open_held, target: target("Incoming") }),
 				this.kpi({ label: __("Open Given", null, TD_CTX), count: s.open_given, target: target("Outgoing") }),
+			]),
+		});
+	}
+
+	// ------------------------------------------------------------------ group D: employee custody (custody app)
+
+	render_custody(c) {
+		// five cards, zeros included (design 9 §3); the report titles are custody's own (translated by custody)
+		const requests = (kpi) => __("{0} request(s)", [cint(kpi.count)]);
+		const warning = (kpi) => (cint(kpi.count) > 0 ? "warning" : null);
+		return this.section({
+			key: "custody",
+			span: 12,
+			title: __(c.open.route[1]),
+			target: c.open,
+			company_wide: true,
+			view: true,
+			body: this.kpis([
+				this.kpi({ label: __("Open Custody"), amount: c.open.amount, sub: requests(c.open), target: c.open }),
+				this.kpi({
+					label: __("Overdue Custody"),
+					amount: c.overdue.amount,
+					sub: requests(c.overdue),
+					status: warning(c.overdue),
+					target: c.overdue,
+				}),
+				this.kpi({
+					label: __("Approved, Not Paid"),
+					amount: c.to_pay.amount,
+					sub: requests(c.to_pay),
+					target: c.to_pay,
+				}),
+				this.kpi({
+					label: __("Permanent Custody"),
+					amount: c.permanent.amount,
+					sub: __("Floats {0} · {1} request(s)", [
+						format_currency(flt(c.permanent.extra), this.data.company_currency),
+						cint(c.permanent.count),
+					]),
+					target: c.permanent,
+				}),
+				this.kpi({
+					label: __("Replenishments Due"),
+					amount: c.replenishment_due.amount,
+					sub: __("{0} float(s)", [cint(c.replenishment_due.count)]),
+					status: warning(c.replenishment_due),
+					target: c.replenishment_due,
+				}),
 			]),
 		});
 	}

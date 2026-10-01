@@ -8,6 +8,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import flt
 
+from treasury.integrations import custody
 from treasury.pdc import overview as overview_module
 from treasury.pdc.overview import SECTIONS, get_overview
 from treasury.tests.test_bank_positions import add_twin
@@ -62,8 +63,10 @@ class TestTreasuryDashboardPermissions(BalanceAlertTestMixin, IntegrationTestCas
 		with self.set_user(APPROVER):
 			overview = get_overview(COMPANY, None, 7)
 		self.assertEqual(set(overview.sections), {"positions", "cheques"})
-		self.assertEqual(set(overview.hidden), set(SECTIONS) - {"positions", "cheques"})
-		self.assertEqual(len(overview.hidden), 7)
+		# with the custody app, its section is hidden too (a Cheque Approver cannot read Custody Request)
+		custody_hidden = {overview_module.CUSTODY} if custody.is_installed() else set()
+		self.assertEqual(set(overview.hidden), set(SECTIONS) - {"positions", "cheques"} | custody_hidden)
+		self.assertEqual(len(overview.hidden), 7 + len(custody_hidden))
 
 	def test_company_user_permission(self):
 		with self.set_user(OTHER_CO_USER):

@@ -54,6 +54,7 @@ EVENT_LABELS = {
 	"lc_document_charges": "Document Charges",
 	"lc_settlement": "Settlement",
 	"bt_transfer": "Transfer",
+	"bt_fee": "Transfer Fee",
 	"bank_charge": "Bank Charge",
 }
 

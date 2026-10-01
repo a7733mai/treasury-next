@@ -14,6 +14,8 @@ const BT_PAYMENT = "Party Payment";
 const BT_RECEIPT = "Party Receipt";
 const BT_INTERNAL = "Internal Transfer";
 const BT_SWIFT = "SWIFT";
+// the custody app's party (treasury.integrations.custody): the fee on its own voucher, cancelled on return
+const BT_CUSTODIAN = "Custodian";
 const BT_INDICATORS = {
 	Draft: "gray",
 	Scheduled: "purple",
@@ -874,6 +876,7 @@ function bt_set_source_intro(frm) {
 	const ref = (doc.references || [])[0];
 	const from =
 		doc.__treasury_from ||
+		(doc.source_doctype && doc.source_name ? { doctype: doc.source_doctype, name: doc.source_name } : null) ||
 		(ref && ref.reference_doctype && ref.reference_name
 			? { doctype: ref.reference_doctype, name: ref.reference_name }
 			: null);
@@ -884,6 +887,20 @@ function bt_set_source_intro(frm) {
 	const route = `/app/${frappe.router.slug(from.doctype)}/${encodeURIComponent(from.name)}`;
 	const link = `<a href="${route}">${bt_esc(__(from.doctype))} <b><bdi>${bt_esc(from.name)}</bdi></b></a>`;
 	// the values are escaped; the sentences are our own translations
+	if (from.doctype === "Custody Request") {
+		// from a Custody Request's Treasury buttons (public/js/custody_request_treasury.js); `purpose` is
+		// custody's own word (translated by custody)
+		const what = bt_esc(__(from.purpose || from.doctype));
+		frm.set_intro(
+			__("Custody {0} ({1}): {2}. Check the beneficiary IBAN and save.", [
+				link,
+				what,
+				bt_money(doc.amount, doc.currency),
+			]),
+			"blue"
+		);
+		return;
+	}
 	if (!ref && !flt(doc.amount)) {
 		frm.set_intro(__("For {0}: type the amount, then save.", [link]), "blue");
 		return;
@@ -930,6 +947,12 @@ function bt_set_intro(frm) {
 					money(fee),
 			  ])
 			: __("On submit: Payment Entry dated {0}. Bank credit {1}.", [bt_esc(date), money(doc.bank_amount)]);
+	} else if (fee && doc.party_type === BT_CUSTODIAN) {
+		// custody refuses deductions: the fee goes on its own voucher (bank_transfers.lifecycle._post_fee)
+		text = __(
+			"On submit: Payment Entry dated {0} for {1} to the custodian; the fee {2} is posted on its own voucher.",
+			[bt_esc(date), money(doc.amount), money(fee)]
+		);
 	} else {
 		text = fee
 			? __("On submit: Payment Entry dated {0}. Bank debit {1} ({2} + fee {3}).", [
@@ -1200,9 +1223,13 @@ function bt_add_actions(frm) {
 	if (["Sent", "Completed"].includes(doc.status) && !receipt && frappe.user.has_role(BT_MANAGER_ROLES)) {
 		const fee = flt(doc.fee_amount);
 		const refund = !!(frm._bt_settings && frm._bt_settings.refund_fees_on_return);
-		let html = bt_esc(
-			__("A reversal voucher is posted on the return date. Linked invoices become outstanding again.")
-		);
+		// a custodian's Payment Entry is cancelled, never reversed (custody refuses a reversal Journal Entry)
+		let html =
+			doc.party_type === BT_CUSTODIAN && doc.payment_entry
+				? bt_esc(__("The custody Payment Entry {0} will be cancelled.", [doc.payment_entry]))
+				: bt_esc(
+						__("A reversal voucher is posted on the return date. Linked invoices become outstanding again.")
+				  );
 		if (fee > 0) {
 			const amount = format_currency(fee, doc.currency);
 			html +=

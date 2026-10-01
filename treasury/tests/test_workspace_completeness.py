@@ -1,7 +1,8 @@
 """Phase 8a: the Treasury sidebar and workspace are complete (spec 8 §3.3, §7).
 
 - the sidebar links every non-child DocType, every Report and the Page of the app, grouped in the six sections
-  "Cheques", "Transfers & Charges", "Security Cheques", "Bank Facilities", "Reports", "Setup";
+  "Cheques", "Transfers & Charges", "Security Cheques", "Bank Facilities", "Reports", "Setup" (plus, sidebar
+  only, the custody app's "Employee Custody" section before "Reports", spec 9 §6.3);
 - the workspace cards hold the same links under the same labels, with correct link counts, and every content
   block names an existing widget;
 - no link is dangling, the section / card labels are translated and both records were re-synced (`modified`).
@@ -12,6 +13,8 @@ import json
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from treasury.integrations import custody
+from treasury.tests.test_release import CUSTODY_SIDEBAR_ITEMS
 from treasury.tests.test_translations import (
 	APP_DIR,
 	PO_FILE,
@@ -24,6 +27,10 @@ from treasury.tests.test_translations import (
 )
 
 SECTIONS = ["Cheques", "Transfers & Charges", "Security Cheques", "Bank Facilities", "Reports", "Setup"]
+# Sidebar only (spec 9 §6.3): the custody app's records, before Reports. Frappe hides the items whose record is
+# missing and the then empty section, so it is static and needs no install code; it is not a workspace card.
+CUSTODY_SECTION = "Employee Custody"
+SIDEBAR_SECTIONS = [*SECTIONS[:4], CUSTODY_SECTION, *SECTIONS[4:]]
 SETUP = "Setup"
 REPORTS = "Reports"
 SETUP_ONLY = ("Treasury Settings", "Treasury Company Settings", "Treasury Alert Log")
@@ -44,6 +51,8 @@ FORBIDDEN_CORE = frozenset({"Bank Reconciliation Tool", "Bank Clearance"})
 TOOL_SINGLES = frozenset({"PDC Bank Clearing"})
 PAGE = "treasury-dashboard"
 PREVIOUS_MODIFIED = "2026-10-26 12:00:00"
+# the sidebar was changed again in 1.3.0 (the custody section)
+PREVIOUS_SIDEBAR_MODIFIED = "2026-11-01 12:00:00"
 LINK_TYPES = ("DocType", "Report", "Page")
 # content block type -> (its data key, the workspace table holding the widget)
 BLOCK_WIDGETS = {
@@ -132,7 +141,11 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 			self.assertIn(name, setup)
 
 	def test_sidebar_sections(self):
-		self.assertEqual([i["label"] for i in self.items if i["type"] == "Section Break"], SECTIONS)
+		self.assertEqual([i["label"] for i in self.items if i["type"] == "Section Break"], SIDEBAR_SECTIONS)
+		self.assertEqual(
+			set(ordered_targets(self.sections[CUSTODY_SECTION])),
+			set(CUSTODY_SIDEBAR_ITEMS),
+		)
 		self.assertEqual((self.items[0]["link_type"], self.items[0]["link_to"]), ("Workspace", "Treasury"))
 		self.assertEqual((self.items[1]["link_type"], self.items[1]["link_to"]), ("Page", PAGE))
 		for item in self.items:
@@ -156,6 +169,9 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 			for shortcut in self.workspace["shortcuts"]
 			if shortcut.get("link_to")
 		]
+		if not custody.is_installed():
+			# the custody section links custody's records: hidden by Frappe without the app
+			rows = [row for row in rows if (row[0], row[1]) not in CUSTODY_SIDEBAR_ITEMS]
 		dangling = [
 			f"{where}: {link_type} {name}"
 			for link_type, name, where in rows
@@ -176,7 +192,7 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 					rows = rows[1:]
 				# same links in the same order as the sidebar section
 				self.assertEqual(ordered_targets(rows), ordered_targets(self.sections[card["label"]]))
-		self.assertEqual(targets(self.workspace["links"]), targets(self.items))
+		self.assertEqual(targets(self.workspace["links"]), targets(self.items) - set(CUSTODY_SIDEBAR_ITEMS))
 
 		labels = {
 			"card": {card["label"] for card, _rows in cards},
@@ -206,5 +222,5 @@ class TestWorkspaceCompleteness(IntegrationTestCase):
 		self.assertEqual(missing, [])
 
 	def test_modified_bumped(self):
-		self.assertGreater(self.sidebar["modified"], PREVIOUS_MODIFIED)
+		self.assertGreater(self.sidebar["modified"], PREVIOUS_SIDEBAR_MODIFIED)
 		self.assertGreater(self.workspace["modified"], PREVIOUS_MODIFIED)

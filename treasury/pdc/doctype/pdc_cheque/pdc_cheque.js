@@ -8,6 +8,8 @@ const PDC_ACCOUNTING_FIELDS = ["cost_center", "project", "mode_of_payment", "par
 const PDC_PAYEE_ROLES = ["Treasury Manager", "Treasury User", "System Manager"];
 // cheque_printing.PRINTABLE_STATUSES
 const PDC_PRINTABLE = ["Created", "Delivered"];
+// the custody app's party (treasury.integrations.custody): its party Payment Entry is cancelled, never reversed
+const PDC_CUSTODIAN = "Custodian";
 
 // mirrors pdc_cheque.reference_rules: invoices / orders only for a supplier's outgoing or a customer's
 // incoming cheque; any cheque may settle a Journal Entry of its party
@@ -377,16 +379,23 @@ frappe.ui.form.on("PDC Cheque", {
 				remarks,
 			]);
 			if (is_manager) {
-				pdc_action(frm, "bounce", __("Bounce"), [
-					date("bounce_date", __("Bounce Date")),
-					reason,
-					{
-						fieldname: "charges",
-						label: __("Bounce Charges"),
-						fieldtype: "Currency",
-						hidden: outgoing ? 1 : 0,
-					},
-				]);
+				pdc_action(
+					frm,
+					"bounce",
+					__("Bounce"),
+					[
+						date("bounce_date", __("Bounce Date")),
+						reason,
+						{
+							fieldname: "charges",
+							label: __("Bounce Charges"),
+							fieldtype: "Currency",
+							// no bounce charges on a custodian (custody refuses Journal Entry rows of a custodian)
+							hidden: outgoing || doc.party_type === PDC_CUSTODIAN ? 1 : 0,
+						},
+						pdc_custody_cancel_note(doc),
+					].filter(Boolean)
+				);
 			}
 		}
 
@@ -495,6 +504,7 @@ function pdc_set_source_intro(frm) {
 	const ref = (doc.references || [])[0];
 	const from =
 		doc.__treasury_from ||
+		(doc.source_doctype && doc.source_name ? { doctype: doc.source_doctype, name: doc.source_name } : null) ||
 		(ref && ref.reference_doctype && ref.reference_name
 			? { doctype: ref.reference_doctype, name: ref.reference_name }
 			: null);
@@ -504,6 +514,10 @@ function pdc_set_source_intro(frm) {
 	}
 	const esc = frappe.utils.escape_html;
 	const link = pdc_source_link(from.doctype, from.name);
+	if (from.doctype === "Custody Request") {
+		pdc_set_custody_intro(frm, link, from.purpose || from.doctype);
+		return;
+	}
 	if (PDC_PARTY_MASTERS.includes(from.doctype) && !ref) {
 		frm.set_intro(
 			__("For {0}: type the amount and the cheque number, then save. The cheque is an advance (not allocated).", [
@@ -540,6 +554,40 @@ function pdc_set_source_intro(frm) {
 		);
 	} else {
 		frm.set_intro(__("From {0}: {1}. Type the cheque number and save.", [link, amount]), "blue");
+	}
+}
+
+function pdc_set_custody_intro(frm, link, purpose) {
+	// a new cheque from a Custody Request's Treasury buttons (public/js/custody_request_treasury.js); `purpose`
+	// is custody's (translated by custody), passed client only with `__treasury_from` (else the doctype)
+	const doc = frm.doc;
+	const esc = frappe.utils.escape_html;
+	const amount = `<bdi>${esc(format_currency(doc.amount, doc.currency))}</bdi>`;
+	const what = esc(__(purpose));
+	// the values are escaped above; the sentences are our own translations
+	if (doc.direction === "Incoming") {
+		frm.set_intro(
+			__("Custody return {0}: {1}. Type the cheque number and the due date, then save.", [link, amount]),
+			"blue"
+		);
+	} else if (!doc.bank_account) {
+		frm.set_intro(
+			`${__(
+				"Custody {0} ({1}): {2}. Choose a bank account in the company currency and type the cheque number.",
+				[link, what, amount]
+			)} ${esc(__('Tip: set "Default Bank for Custody Payouts" in Treasury Company Settings.'))}`,
+			"orange"
+		);
+	} else if (doc.cheque_book) {
+		frm.set_intro(
+			__(
+				"Custody {0} ({1}): {2}. Check the due date and save; the cheque number is taken from cheque book {3}.",
+				[link, what, amount, `<b><bdi>${esc(doc.cheque_book)}</bdi></b>`]
+			),
+			"blue"
+		);
+	} else {
+		frm.set_intro(__("Custody {0} ({1}): {2}. Type the cheque number and save.", [link, what, amount]), "blue");
 	}
 }
 
@@ -1026,6 +1074,22 @@ if (!treasury.print.open_window) {
 	};
 }
 
+function pdc_custody_cancel_note(doc) {
+	// a custodian's party Payment Entry is cancelled, never reversed (treasury.integrations.custody): a muted
+	// line in the bounce / replace dialogs
+	if (doc.party_type !== PDC_CUSTODIAN || !doc.party_payment_entry) {
+		return null;
+	}
+	const text = __("The custody Payment Entry {0} will be cancelled (not reversed); its date's period must be open.", [
+		doc.party_payment_entry,
+	]);
+	return {
+		fieldname: "custody_note",
+		fieldtype: "HTML",
+		options: `<p class="text-muted small">${frappe.utils.escape_html(text)}</p>`,
+	};
+}
+
 function pdc_replace(frm) {
 	const doc = frm.doc;
 	frappe.prompt(
@@ -1059,7 +1123,8 @@ function pdc_replace(frm) {
 				reqd: 1,
 			},
 			{ fieldname: "reason", label: __("Reason"), fieldtype: "Small Text", reqd: 1 },
-		],
+			pdc_custody_cancel_note(doc),
+		].filter(Boolean),
 		(values) => {
 			frm.call({ doc: frm.doc, method: "replace", args: { new_cheque_values: values }, freeze: true }).then((r) => {
 				if (r.message && r.message.replaced_by) {
