@@ -205,7 +205,7 @@ def validate(doc, method=None):
 		return
 	if not is_installed():
 		frappe.throw(_("The Custody app is not installed."))
-	if not doc.is_new():
+	if doc.name and not doc.is_new():
 		# the link never changes (set_only_once, treasury.utils.document_sources)
 		return
 	req = frappe.get_doc(REQUEST, doc.source_name)
