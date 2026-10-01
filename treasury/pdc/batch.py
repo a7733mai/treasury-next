@@ -348,6 +348,10 @@ def transient_cheque(batch, row=None):
 def validate_batch(batch):
 	header = transient_cheque(batch)
 	header.validate_party()
+	# a cheque to a custodian is made only from its Custody Request, never by a batch (spec 9 §1)
+	from treasury.integrations.custody import documents as custody_documents
+
+	custody_documents.validate(header)
 	batch.party_name = header.party_name
 	validate_source(batch)
 	header.validate_bank_account()

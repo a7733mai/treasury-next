@@ -1,0 +1,178 @@
+"""Treasury buttons of a Custody Request (spec 9 §3.5): read-only, like the mappers of `treasury.pdc.api`.
+
+They return a new, unsaved document that the client opens with `frappe.model.sync` + `set_route`; nothing is
+written until the user saves it through the normal insert path, where `documents.validate` checks it again.
+"""
+
+import erpnext
+import frappe
+from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_account
+from frappe import _
+from frappe.utils import today
+
+from treasury.accounting import payment_modes, posting
+from treasury.integrations.custody import PARTY_TYPE, REQUEST, documents, is_installed
+from treasury.pdc.doctype.pdc_cheque.pdc_cheque import NAMING_SERIES as CHEQUE_NAMING_SERIES
+from treasury.utils import source_documents as sd
+from treasury.utils.party import can_read_party, get_party_name
+
+CHEQUE = "PDC Cheque"
+TRANSFER = "Bank Transfer"
+OUTGOING, INCOMING = documents.OUTGOING, documents.INCOMING
+TREASURY_ROLES = ("Treasury User", "Treasury Manager", "System Manager")
+DEFAULT_METHOD = "Cheque"
+
+
+@frappe.whitelist()
+def get_payment_context(custody_request: str) -> dict:
+	"""What the Treasury buttons of the request may offer: {pay: {amount, purpose, reason}, receive: {...},
+	can_cheque, can_transfer, default_method, currency}. Amounts are net of the open cheques / transfers."""
+	with sd.treasury_refusals():
+		_require_installed()
+		req = _get_request(custody_request)
+		pay = _side(req, OUTGOING)
+		receive = _side(req, INCOMING)
+		has_role = _has_treasury_role()
+		return {
+			"pay": pay,
+			"receive": receive,
+			"can_cheque": bool(has_role and frappe.has_permission(CHEQUE, "create")),
+			"can_transfer": bool(has_role and frappe.has_permission(TRANSFER, "create")),
+			"default_method": _settings_value(req.company, "custody_default_method") or DEFAULT_METHOD,
+			"currency": erpnext.get_company_currency(req.company),
+		}
+
+
+@frappe.whitelist()
+def make_pdc_cheque(custody_request: str, direction: str) -> dict:
+	"""A new PDC Cheque (not inserted) paying (Outgoing) or receiving back (Incoming) what the request still
+	accepts: the custodian, the request's accounting details and its "Created From" link."""
+	with sd.treasury_refusals():
+		return _make_pdc_cheque(custody_request, direction)
+
+
+def _make_pdc_cheque(custody_request: str, direction: str) -> dict:
+	_require_installed()
+	if direction not in (OUTGOING, INCOMING):
+		frappe.throw(_("Direction must be Outgoing or Incoming."))
+	req = _get_request(custody_request)
+	sd.check_create_permission(CHEQUE, req.company)
+	_require_treasury_role()
+	posting.get_company_settings(req.company)
+	a = documents.check_request(req, direction)
+
+	doc = frappe.new_doc(CHEQUE)
+	doc.naming_series = CHEQUE_NAMING_SERIES[direction]
+	doc.company = req.company
+	doc.direction = direction
+	doc.party_type = PARTY_TYPE
+	doc.party = req.custodian
+	doc.party_name = req.get("custodian_name") or get_party_name(PARTY_TYPE, req.custodian)
+	doc.issue_date = today()
+	doc.original_due_date = today()
+	doc.bank_account = _cheque_bank(req.company, direction)
+	doc.currency = erpnext.get_company_currency(req.company)
+	doc.exchange_rate = 1
+	if doc.bank_account:
+		method = payment_modes.CHEQUE_METHOD[direction]
+		doc.mode_of_payment = payment_modes.resolve(req.company, doc.bank_account, method).mode_of_payment
+	if direction == OUTGOING:
+		doc.cheque_book = _cheque_book(req.company, doc.bank_account)
+	doc.cheque_no = None
+	doc.amount = a.amount
+	label = _("Custody payout of {0}") if direction == OUTGOING else _("Custody returned on {0}")
+	doc.remarks = label.format(req.name)
+	doc.source_doctype, doc.source_name = REQUEST, req.name
+	sd.copy_accounting(req, doc)
+	if can_read_party(PARTY_TYPE, req.custodian):
+		doc.party_bank_account = get_party_bank_account(PARTY_TYPE, req.custodian)
+	return doc.as_dict()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _require_installed():
+	if not is_installed():
+		frappe.throw(_("The Custody app is not installed."))
+
+
+def _get_request(name: str):
+	if not name or not frappe.db.exists(REQUEST, name):
+		frappe.throw(_("{0} {1} does not exist").format(_(REQUEST), name or "-"), frappe.DoesNotExistError)
+	req = frappe.get_doc(REQUEST, name)
+	req.check_permission("read")
+	return req
+
+
+def _has_treasury_role() -> bool:
+	return bool(set(TREASURY_ROLES) & set(frappe.get_roles()))
+
+
+def _require_treasury_role():
+	if not _has_treasury_role():
+		frappe.throw(
+			_("This action requires one of the roles: {0}.").format(", ".join(_(r) for r in TREASURY_ROLES)),
+			frappe.PermissionError,
+			title=_("Not Permitted"),
+		)
+
+
+def _side(req, direction: str) -> dict:
+	"""{amount, purpose, reason, blocked} of one direction; amount 0 with the reason when nothing can be made
+	now. `blocked`: custody would still accept a payment, but a draft replenishment or the open cheques /
+	transfers stand in the way (the form says so)."""
+	a, reason = documents.refusal(req, direction)
+	return {
+		"amount": 0 if reason else a.amount,
+		"purpose": a.purpose if a else None,
+		"reason": reason,
+		"blocked": bool(reason and a and a.allowance > 0),
+	}
+
+
+def _settings_value(company: str, fieldname: str):
+	"""A Treasury Company Settings value, None when the settings or the field (a later release) are missing."""
+	if not frappe.db.exists("Treasury Company Settings", company):
+		return None
+	if not frappe.get_meta("Treasury Company Settings").has_field(fieldname):
+		return None
+	return frappe.db.get_value("Treasury Company Settings", company, fieldname)
+
+
+def _in_company_currency(bank_account: str | None, company: str) -> bool:
+	return bool(bank_account) and sd.bank_currency(bank_account) == erpnext.get_company_currency(company)
+
+
+def _cheque_bank(company: str, direction: str) -> str | None:
+	"""Outgoing: the custody bank of the settings, else the default outgoing cheque bank, else the first mapped
+	bank, in the company currency. Incoming: the default incoming cheque bank when in the company currency."""
+	company_currency = erpnext.get_company_currency(company)
+	if direction == INCOMING:
+		bank = _settings_value(company, sd.DEFAULT_CHEQUE_BANK_FIELDS[INCOMING])
+		return bank if _in_company_currency(bank, company) else None
+	candidates = [
+		_settings_value(company, "custody_bank_account"),
+		sd.default_cheque_bank(company, OUTGOING, company_currency),
+	]
+	settings = posting.get_company_settings(company)
+	candidates += [row.bank_account for row in sorted(settings.get("pdc_accounts"), key=lambda r: r.idx)]
+	return next((bank for bank in candidates if _in_company_currency(bank, company)), None)
+
+
+def _cheque_book(company: str, bank_account: str | None) -> str | None:
+	"""The custody cheque book of the settings when it is active, of the chosen bank and has a free leaf; else
+	the default cheque book of the bank."""
+	if not bank_account:
+		return None
+	book = _settings_value(company, "custody_cheque_book")
+	if book:
+		from treasury.pdc import batch
+
+		values = frappe.db.get_value("Cheque Book", book, ["status", "bank_account"], as_dict=True)
+		if values and values.status == "Active" and values.bank_account == bank_account:
+			if batch.preview_leaves(book, 1):
+				return book
+	return sd.default_cheque_book(company, bank_account)

@@ -41,6 +41,18 @@ ORDER_DOCTYPES = ("Sales Order", "Purchase Order")
 REFERENCE_DOCTYPES = (*INVOICE_DOCTYPES, *ORDER_DOCTYPES, "Journal Entry")
 # Largest company-currency rounding gap a charges deduction row absorbs (see `_absorb_rounding`).
 ROUNDING_TOLERANCE = 0.05
+# Party payment extension point (`get_party_rules`): hooks of other apps (e.g. the custody bridge) that decide
+# how a party is paid; Treasury itself has no knowledge of any of them.
+PARTY_PAYMENT_HOOK = "treasury_party_payment_hooks"
+RULE_DEFAULTS = {
+	"party_account": None,
+	"fields": {},
+	"allow_references": True,
+	"allow_deductions": True,
+	"undo_by_cancel": False,
+	"allow_journal_entry": True,
+}
+RULE_ACTIONS = ("payment", "journal", "undo", "check")
 
 
 def _system_context(fn):
@@ -99,6 +111,120 @@ def get_account_mapping(company: str, bank_account: str) -> frappe._dict:
 def get_party_account(party_type: str, party: str, company: str) -> str:
 	"""ERPNext's party account of `party` in `company`, independent of the user's Account permission."""
 	return erpnext_get_party_account(party_type, party, company)
+
+
+# ---------------------------------------------------------------------------
+# Party payment rules (extension point)
+# ---------------------------------------------------------------------------
+
+
+def _party_rule_methods() -> list:
+	"""The `treasury_party_payment_hooks` of every installed app, in hook order."""
+	return [frappe.get_attr(method) for method in frappe.get_hooks(PARTY_PAYMENT_HOOK)]
+
+
+def get_party_rules(
+	*,
+	source_doctype: str,
+	source_name: str,
+	company: str,
+	party_type: str | None,
+	party: str | None,
+	action: str,
+	payment_type: str | None = None,
+) -> frappe._dict:
+	"""Merged answers of the `treasury_party_payment_hooks` of every installed app for a party.
+
+	`action`: "payment" (a party Payment Entry is about to be built), "journal" (a Treasury Journal Entry row),
+	"undo" (a voucher must be undone), "check" (what a caller must do, e.g. split charges).
+	Each hook: fn(ctx: frappe._dict) -> dict | None, ctx = the keyword arguments. Merge: party_account — the
+	single non-empty value (two different → throw); fields — dict.update in hook order; allow_* — AND;
+	undo_by_cancel — OR. No party_type → RULE_DEFAULTS without calling hooks."""
+	rules = frappe._dict(RULE_DEFAULTS, fields={})
+	if not party_type:
+		return rules
+	if action not in RULE_ACTIONS:
+		frappe.throw(_("Invalid party rule action {0}.").format(action))
+	ctx = frappe._dict(
+		source_doctype=source_doctype,
+		source_name=source_name,
+		company=company,
+		party_type=party_type,
+		party=party,
+		action=action,
+		payment_type=payment_type,
+	)
+	for method in _party_rule_methods():
+		answer = method(frappe._dict(ctx))
+		if not answer:
+			continue
+		account = answer.get("party_account")
+		if account:
+			if rules.party_account and rules.party_account != account:
+				frappe.throw(
+					_("Conflicting party accounts for {0} {1}: {2} and {3}.").format(
+						_(party_type), frappe.bold(party), frappe.bold(rules.party_account), frappe.bold(account)
+					)
+				)
+			rules.party_account = account
+		rules.fields.update(answer.get("fields") or {})
+		for key in ("allow_references", "allow_deductions", "allow_journal_entry"):
+			if key in answer:
+				rules[key] = rules[key] and bool(answer[key])
+		rules.undo_by_cancel = rules.undo_by_cancel or bool(answer.get("undo_by_cancel"))
+	return rules
+
+
+def must_cancel(doctype: str, name: str) -> bool:
+	"""A Treasury voucher whose party may only be undone by cancelling it (rules.undo_by_cancel): the PE's own
+	party, or any party row of a JE (action "undo")."""
+	if doctype not in VOUCHER_DOCTYPES:
+		return False
+	fields = ["company", "treasury_source_doctype", "treasury_source_name"]
+	if doctype == "Payment Entry":
+		fields += ["party_type", "party"]
+	voucher = frappe.db.get_value(doctype, name, fields, as_dict=True)
+	if not voucher:
+		return False
+	if doctype == "Payment Entry":
+		parties = [(voucher.party_type, voucher.party)] if voucher.party_type else []
+	else:
+		parties = {
+			(row.party_type, row.party)
+			for row in frappe.get_all(
+				"Journal Entry Account",
+				filters={"parenttype": "Journal Entry", "parent": name, "party_type": ["is", "set"]},
+				fields=["party_type", "party"],
+			)
+		}
+	return any(
+		get_party_rules(
+			source_doctype=voucher.treasury_source_doctype,
+			source_name=voucher.treasury_source_name,
+			company=voucher.company,
+			party_type=party_type,
+			party=party,
+			action="undo",
+		).undo_by_cancel
+		for party_type, party in parties
+	)
+
+
+def _check_cancel_only(doctype: str, name: str):
+	"""Defensive guard of the reversal creators: such a voucher is undone by cancelling it (`must_cancel`)."""
+	if must_cancel(doctype, name):
+		frappe.throw(
+			_("{0} {1} can only be undone by cancelling it.").format(_(doctype), frappe.bold(name)),
+			title=_("Reversal Not Possible"),
+		)
+
+
+def _apply_rule_fields(pe: Document, fields: dict | None):
+	"""Field values the party rules require on the Payment Entry (e.g. a link another app needs)."""
+	for fieldname, value in (fields or {}).items():
+		if not pe.meta.has_field(fieldname):
+			frappe.throw(_("Payment Entry has no field {0}.").format(frappe.bold(fieldname)))
+		pe.set(fieldname, value)
 
 
 def get_cheque_exchange_rate(currency: str, company: str, posting_date) -> float:
@@ -269,6 +395,9 @@ def create_payment_entry(
 	`charges` (bank currency, e.g. a transfer fee) on `charges_account` (company currency): `amount` stays the
 	principal settled with the party; the bank moves `amount + charges` (Pay) or `amount - charges`
 	(Receive), and the charges are a normal deduction row (see `_charges_row`).
+
+	The party rules of the installed apps (`get_party_rules`, action "payment") may give the party account and
+	Payment Entry fields, and refuse references or charges (e.g. a payment to a custodian).
 	"""
 	if clearance_date and not submit:
 		frappe.throw(_("Clearance Date can only be set on a submitted Payment Entry."))
@@ -285,6 +414,27 @@ def create_payment_entry(
 		frappe.throw(_("Payment Type must be Pay or Receive."))
 
 	precision = frappe.get_precision("Payment Entry", "paid_amount")
+	rules = get_party_rules(
+		source_doctype=source_doctype,
+		source_name=source_name,
+		company=company,
+		party_type=party_type,
+		party=party,
+		action="payment",
+		payment_type=payment_type,
+	)
+	if references and not rules.allow_references:
+		frappe.throw(
+			_("A payment to {0} {1} cannot be allocated to references.").format(
+				_(party_type), frappe.bold(party)
+			)
+		)
+	if flt(charges, precision) and not rules.allow_deductions:
+		frappe.throw(
+			_("The charges of a payment to {0} {1} must be posted on their own voucher.").format(
+				_(party_type), frappe.bold(party)
+			)
+		)
 	charges = _validate_charges(company, amount, charges, charges_account, payment_type, precision)
 	principal = flt(amount, precision)
 	bank_amount = principal + charges if payment_type == "Pay" else principal - charges
@@ -297,6 +447,7 @@ def create_payment_entry(
 		bank_account_head=bank_account_head,
 		currency=currency,
 		exchange_rate=exchange_rate,
+		party_account=rules.party_account,
 	)
 	# the party is settled with the principal only (without charges: the same as `amounts.party_amount`)
 	if amounts.party_currency == amounts.bank_currency:
@@ -324,6 +475,7 @@ def create_payment_entry(
 	if charges:
 		pe.append("deductions", _charges_row(company, charges_account, charges * amounts.bank_rate, details))
 	_apply_details(pe, details)
+	_apply_rule_fields(pe, rules.fields)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
 	pe.flags.ignore_permissions = True  # see module docstring
 	pe.insert()
@@ -920,8 +1072,11 @@ def _get_payment_amounts(
 	bank_account_head: str,
 	currency: str | None,
 	exchange_rate: float | None,
+	party_account: str | None = None,
 ) -> frappe._dict:
-	"""Split a cheque amount into the bank side and the party side of a Payment Entry."""
+	"""Split a cheque amount into the bank side and the party side of a Payment Entry.
+
+	`party_account`: the account the party rules require (`get_party_rules`), else ERPNext's party account."""
 	precision = frappe.get_precision("Payment Entry", "paid_amount")
 	company_currency = erpnext.get_company_currency(company)
 	bank_currency = get_account_currency(bank_account_head)
@@ -932,7 +1087,10 @@ def _get_payment_amounts(
 			)
 		)
 
-	party_account = get_party_account(party_type, party, company)
+	if party_account:
+		_transfer_account(party_account, company)
+	else:
+		party_account = get_party_account(party_type, party, company)
 	if not party_account:
 		frappe.throw(_("No party account found for {0} {1}.").format(_(party_type), frappe.bold(party)))
 	party_currency = get_account_currency(party_account)
@@ -1149,6 +1307,7 @@ def create_journal_entry(
 
 	if not accounts:
 		frappe.throw(_("At least one account row is required."))
+	_check_journal_parties(source_doctype, source_name, company, accounts)
 
 	if balance_exchange_difference and (row := _exchange_difference_row(company, accounts)):
 		accounts = [*accounts, row]
@@ -1180,6 +1339,28 @@ def create_journal_entry(
 			_set_clearance_date(je.name, clearance_date)
 	_stamp_user("Journal Entry", je.name, owner=True)
 	return je.name
+
+
+def _check_journal_parties(source_doctype: str, source_name: str, company: str, accounts: list[dict]):
+	"""Every party of the rows may be posted by a Journal Entry (party rules, action "journal")."""
+	parties = []
+	for row in accounts:
+		key = (row.get("party_type"), row.get("party"))
+		if key[0] and key not in parties:
+			parties.append(key)
+	for party_type, party in parties:
+		rules = get_party_rules(
+			source_doctype=source_doctype,
+			source_name=source_name,
+			company=company,
+			party_type=party_type,
+			party=party,
+			action="journal",
+		)
+		if not rules.allow_journal_entry:
+			frappe.throw(
+				_("{0} {1} cannot be posted by a Journal Entry.").format(_(party_type), frappe.bold(party))
+			)
 
 
 def _exchange_difference_row(company: str, accounts: list[dict]) -> dict | None:
@@ -1295,6 +1476,7 @@ def make_reversal(
 		frappe.throw(_("{0} {1} must be submitted to be reversed.").format(_(doctype), name))
 	if not original.get("treasury_source_name"):
 		frappe.throw(_("{0} {1} is not managed by Treasury.").format(_(doctype), name))
+	_check_cancel_only(doctype, name)
 
 	source_doctype, source_name = original.treasury_source_doctype, original.treasury_source_name
 	cycle = _validate_cycle(cycle)
@@ -1440,6 +1622,7 @@ def reverse_voucher(
 	either doctype, is returned as it is."""
 	if doctype not in VOUCHER_DOCTYPES:
 		frappe.throw(_("Only Payment Entries and Journal Entries can be reversed here."))
+	_check_cancel_only(doctype, name)
 	source = frappe.db.get_value(
 		doctype, name, ["treasury_source_doctype", "treasury_source_name"], as_dict=True
 	)

@@ -14,7 +14,7 @@ from treasury.accounting import dimensions, payment_modes, posting
 from treasury.pdc import cheque_printing, lifecycle
 from treasury.pdc.doctype.cheque_book.cheque_book import allocate_next_cheque_no, lock_covering_books
 from treasury.pdc.timing import get_cheque_timing
-from treasury.utils import references, voucher_summary
+from treasury.utils import document_sources, references, voucher_summary
 from treasury.utils.party import get_party_name, validate_party_type
 from treasury.utils.protected_fields import changed_fields, changed_tables
 from treasury.utils.references import reference_rules
@@ -188,6 +188,8 @@ class PDCCheque(Document):
 		reversal_journal: DF.Link | None
 		reversal_payment_entry: DF.Link | None
 		security_cheque: DF.Link | None
+		source_doctype: DF.Link | None
+		source_name: DF.DynamicLink | None
 		status_log: DF.Table[PDCStatusLog]
 		under_collection_journal: DF.Link | None
 		under_collection_payment_entry: DF.Link | None
@@ -272,6 +274,8 @@ class PDCCheque(Document):
 		# first: later steps (validate_dates) legitimately derive effective_due_date
 		self.validate_protected_fields()
 		self.validate_party()
+		# "Created From" (e.g. a Custody Request): the app of the source checks it in its doc_events
+		document_sources.validate(self)
 		self.validate_bank_account()
 		self.validate_accounting_details()
 		self.set_currency_and_rate()

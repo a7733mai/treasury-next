@@ -13326,3 +13326,117 @@ msgstr "توقيت شيك غير صالح: {0}"
 msgctxt "Treasury Dashboard"
 msgid "All Cheques"
 msgstr "كل الشيكات"
+
+# ---------------------------------------------------------------------------------------------------------
+# Phase 9a: custody bridge — party payment rules, "Created From", cheques from a Custody Request
+# ---------------------------------------------------------------------------------------------------------
+
+# Party payment rules (treasury.accounting.posting)
+msgid "Invalid party rule action {0}."
+msgstr "إجراء قاعدة الطرف {0} غير صالح."
+
+msgid "Conflicting party accounts for {0} {1}: {2} and {3}."
+msgstr "حسابات متعارضة للطرف {0} {1}: {2} و{3}."
+
+msgid "{0} {1} can only be undone by cancelling it."
+msgstr "لا يمكن التراجع عن {0} {1} إلا بإلغائه."
+
+msgid "Payment Entry has no field {0}."
+msgstr "سند الدفع لا يحتوي على الحقل {0}."
+
+msgid "A payment to {0} {1} cannot be allocated to references."
+msgstr "لا يمكن تخصيص دفعة إلى {0} {1} على مستندات مرجعية."
+
+msgid "The charges of a payment to {0} {1} must be posted on their own voucher."
+msgstr "يجب ترحيل مصاريف الدفعة إلى {0} {1} في سند مستقل."
+
+msgid "{0} {1} cannot be posted by a Journal Entry."
+msgstr "لا يمكن الترحيل إلى {0} {1} بقيد يومية."
+
+msgid "Bounce charges cannot be charged to {0} {1}."
+msgstr "لا يمكن تحميل مصاريف الارتداد على {0} {1}."
+
+# "Created From" (treasury.utils.document_sources)
+msgctxt "PDC Cheque"
+msgid "Created From Type"
+msgstr "نوع المستند المصدر"
+
+msgctxt "PDC Cheque"
+msgid "Created From"
+msgstr "أُنشئ من"
+
+msgid "Created From cannot be changed."
+msgstr "لا يمكن تغيير حقل «أُنشئ من»."
+
+msgid "Created From needs both the document type and the document."
+msgstr "يتطلب حقل «أُنشئ من» نوع المستند والمستند معاً."
+
+# Custody bridge (treasury.integrations.custody)
+msgid "Pay by Transfer"
+msgstr "صرف بتحويل"
+
+msgid "Receive Cheque"
+msgstr "استلام شيك"
+
+msgid "Custody payout of {0}"
+msgstr "صرف عهدة {0}"
+
+msgid "Custody returned on {0}"
+msgstr "رد عهدة {0}"
+
+msgid "The Custody app is not installed."
+msgstr "تطبيق العُهد غير مثبت."
+
+msgid "Direction must be Outgoing or Incoming."
+msgstr "يجب أن يكون الاتجاه صادراً أو وارداً."
+
+msgid "A cheque or transfer to a custodian must be created from its Custody Request."
+msgstr "يجب إنشاء الشيك أو التحويل لأمين العهدة من طلب العهدة الخاص به."
+
+msgid "A payment to custodian {0} must be made from its Custody Request (Treasury buttons on the request)."
+msgstr "يجب أن يتم الصرف لأمين العهدة {0} من طلب العهدة الخاص به (أزرار الخزينة في الطلب)."
+
+msgid "Custody Request {0} belongs to another custodian or company."
+msgstr "طلب العهدة {0} يخص أمين عهدة آخر أو شركة أخرى."
+
+msgid "Custody Request {0} is not approved."
+msgstr "طلب العهدة {0} غير معتمد."
+
+msgid "Custody Request {0} is closed."
+msgstr "طلب العهدة {0} مغلق."
+
+msgid "Draft Replenishment Exists"
+msgstr "يوجد تعويض في حالة مسودة"
+
+msgid "Payment Entry {0} is a draft replenishment of {1}. Submit or delete it first, then pay by cheque or transfer."
+msgstr "سند الدفع {0} تعويض في حالة مسودة للعهدة {1}. اعتمده أو احذفه أولاً، ثم اصرف بشيك أو تحويل."
+
+msgid "Open cheques or transfers already cover what is left on Custody Request {0}."
+msgstr "الشيكات أو التحويلات المفتوحة تغطي بالفعل المتبقي على طلب العهدة {0}."
+
+msgid "Nothing is left to pay on Custody Request {0}."
+msgstr "لا يتبقى شيء للصرف على طلب العهدة {0}."
+
+msgid "Nothing is left to return on Custody Request {0}."
+msgstr "لا يتبقى شيء للرد على طلب العهدة {0}."
+
+msgid "At most {0} can still be paid on Custody Request {1}."
+msgstr "الحد الأقصى المتبقي للصرف على طلب العهدة {1} هو {0}."
+
+msgid "At most {0} can still be returned on Custody Request {1}."
+msgstr "الحد الأقصى المتبقي للرد على طلب العهدة {1} هو {0}."
+
+msgid "{0} must be paid to custodian {1} of company {2}."
+msgstr "يجب أن يكون {0} لأمين العهدة {1} في الشركة {2}."
+
+msgid "A payment to a custodian cannot have references."
+msgstr "لا يمكن أن تتضمن الدفعة لأمين العهدة مستندات مرجعية."
+
+msgid "Custody is paid in the company currency only: choose a Bank Account in {0}."
+msgstr "تُصرف العهدة بعملة الشركة فقط: اختر حساباً بنكياً بعملة {0}."
+
+msgid "A custody return by transfer is recorded as a Payment Entry in Custody."
+msgstr "يُسجَّل رد العهدة بتحويل كسند دفع في تطبيق العُهد."
+
+msgid "SWIFT transfers to custodians are not supported."
+msgstr "تحويلات SWIFT لأمناء العهد غير مدعومة."

@@ -61,6 +61,8 @@ doctype_js = {
 	"Employee": "public/js/treasury_payment_buttons.js",
 	"Expense Claim": "public/js/treasury_payment_buttons.js",
 	"Employee Advance": "public/js/treasury_payment_buttons.js",
+	# custody bridge (treasury.integrations.custody): never loaded without the custody app
+	"Custody Request": "public/js/custody_request_treasury.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -200,7 +202,17 @@ doc_events = {
 		"before_cancel": "treasury.bank_facilities.invoice_discounting.before_cancel",
 		"on_cancel": "treasury.bank_facilities.invoice_discounting.refresh",
 	},
+	# custody bridge: a cheque / transfer to a custodian only from its Custody Request, within what the request
+	# still accepts (treasury.integrations.custody.documents; inert without the custody app)
+	"PDC Cheque": {"validate": "treasury.integrations.custody.documents.validate"},
+	"Bank Transfer": {"validate": "treasury.integrations.custody.documents.validate"},
 }
+
+# Party payment rules of other apps (treasury.accounting.posting.get_party_rules): the custodian's account,
+# Payment Entry fields, no references / deductions / Journal Entries, undo by cancelling.
+treasury_party_payment_hooks = ["treasury.integrations.custody.rules.party_rules"]
+# Doctypes a PDC Cheque / Bank Transfer may be "Created From" (treasury.utils.document_sources)
+treasury_document_sources = ["Custody Request"]
 
 # Scheduled Tasks
 # ---------------

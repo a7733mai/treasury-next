@@ -364,6 +364,10 @@ def bounce(name: str, bounce_date=None, reason: str | None = None, charges=0) ->
 		frappe.throw(_("Bounce charges cannot be negative."))
 	if flt(charges) and doc.direction != INCOMING:
 		frappe.throw(_("Bounce charges can only be charged on incoming cheques."))
+	if flt(charges) and not _bounce_charges_allowed(doc):
+		frappe.throw(
+			_("Bounce charges cannot be charged to {0} {1}.").format(_(doc.party_type), frappe.bold(doc.party))
+		)
 	date = _date(bounce_date)
 	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date", "discount_date"))
 
@@ -1019,6 +1023,18 @@ def _post_bank_charges(doc, mapping, bank_gl: str, posting_date, bank_rate: floa
 	_log(doc, "Bank Charges Posted", voucher=("Journal Entry", journal), event_date=posting_date)
 
 
+def _bounce_charges_allowed(doc) -> bool:
+	"""The bounce charges Journal Entry debits the party: its party rules must accept a Journal Entry row."""
+	return posting.get_party_rules(
+		source_doctype=DOCTYPE,
+		source_name=doc.name,
+		company=doc.company,
+		party_type=doc.party_type,
+		party=doc.party,
+		action="journal",
+	).allow_journal_entry
+
+
 def _post_bounce_charges(doc, posting_date, charges):
 	"""Incoming bounce charges recovered from the party: Dr Party / Cr Bounce Charges Account."""
 	settings = _settings(doc)
@@ -1070,7 +1086,10 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 	"""Undo the current cycle's postings, newest first, as `on_bounce` says: cancel them, or reverse them
 	dated `posting_date` — an Internal Transfer Payment Entry (no deductions) by a reverse Payment Entry, the
 	party Payment Entry and any Journal Entry by a Journal Entry (`posting.reverse_voucher`: the kind follows
-	each voucher, not the current settings). Nothing to do if nothing was posted (edge rule)."""
+	each voucher, not the current settings). Nothing to do if nothing was posted (edge rule).
+
+	A voucher whose party may only be undone by cancelling it (`posting.must_cancel`, e.g. a payment to a
+	custodian) is cancelled whatever `on_bounce` says; the other vouchers of the cheque follow `on_bounce`."""
 	if doc.accounting_status in (NOT_POSTED, REVERSED):
 		return
 	if doc.get("facility_drawdown"):
@@ -1084,8 +1103,9 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 		if v.docstatus == 1 and cint(v.treasury_cycle) == _cycle(doc) and v.treasury_event in UNDOABLE_EVENTS
 	]
 	for voucher in reversed(vouchers):
-		if cancel:
-			_cancel_voucher(voucher.doctype, voucher.name)
+		forced = not cancel and posting.must_cancel(voucher.doctype, voucher.name)
+		if cancel or forced:
+			_cancel_voucher(voucher.doctype, voucher.name, hint=not forced)
 			_log(
 				doc,
 				"Voucher Cancelled",
@@ -1118,10 +1138,19 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 	_log(doc, "Reversed", accounting=REVERSED, remarks=remarks, event_date=posting_date)
 
 
-def _cancel_voucher(doctype: str, name: str):
+def _cancel_voucher(doctype: str, name: str, hint: bool = True):
+	"""`hint`: the failure message suggests the On Bounce setting; not for a voucher that may only be cancelled
+	(`posting.must_cancel`), whose own refusal (e.g. custody's "Custody Already Used") is shown above it."""
 	try:
 		posting.cancel_voucher(doctype, name)
 	except frappe.ValidationError:
+		if not hint:
+			frappe.throw(
+				_("{0} {1} could not be cancelled (see the message above).").format(
+					_(doctype), frappe.bold(name)
+				),
+				title=_("Cancellation Failed"),
+			)
 		frappe.throw(
 			_(
 				"{0} {1} could not be cancelled (see the message above). If its accounting period is closed, set On Bounce to 'Reverse by Journal Entry' in Treasury Company Settings."
@@ -1335,6 +1364,9 @@ def _make_replacement(doc, values: frappe._dict, date):
 		"cheque_batch",
 		"cheque_batch_row",
 		"security_cheque",
+		# "Created From" (e.g. a Custody Request): the replacement pays the same source
+		"source_doctype",
+		"source_name",
 		*ACCOUNTING_FIELDS,
 	):
 		new.set(fieldname, doc.get(fieldname))

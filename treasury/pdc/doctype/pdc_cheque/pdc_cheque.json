@@ -20,6 +20,8 @@
   "cheque_batch",
   "cheque_batch_row",
   "security_cheque",
+  "source_doctype",
+  "source_name",
   "cheque_discounting",
   "amount_section",
   "amount",
@@ -246,6 +248,28 @@
    "options": "Security Cheque",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "depends_on": "eval:doc.source_name",
+   "fieldname": "source_doctype",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Created From Type",
+   "no_copy": 1,
+   "options": "DocType",
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "depends_on": "eval:doc.source_name",
+   "fieldname": "source_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Created From",
+   "no_copy": 1,
+   "options": "source_doctype",
+   "read_only": 1,
+   "search_index": 1,
+   "set_only_once": 1
   },
   {
    "depends_on": "eval:doc.cheque_discounting",
