@@ -152,7 +152,9 @@ def mapped_cheque(request: str, direction: str = "Outgoing") -> dict:
 	return data
 
 
-def cheque_from_request(request: str, direction: str = "Outgoing", amount=None, insert: bool = True, **values):
+def cheque_from_request(
+	request: str, direction: str = "Outgoing", amount=None, insert: bool = True, **values
+):
 	"""A PDC Cheque of the request through the mapper (`amount`: else what the request still accepts)."""
 	data = mapped_cheque(request, direction)
 	if not data.get("bank_account"):

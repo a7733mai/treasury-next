@@ -164,7 +164,10 @@ def get_party_rules(
 			if rules.party_account and rules.party_account != account:
 				frappe.throw(
 					_("Conflicting party accounts for {0} {1}: {2} and {3}.").format(
-						_(party_type), frappe.bold(party), frappe.bold(rules.party_account), frappe.bold(account)
+						_(party_type),
+						frappe.bold(party),
+						frappe.bold(rules.party_account),
+						frappe.bold(account),
 					)
 				)
 			rules.party_account = account

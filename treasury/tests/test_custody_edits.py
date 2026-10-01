@@ -95,7 +95,9 @@ class TestCustodyEdits(CustodyTransferTestCase):
 			with self.subTest(values=values):
 				with self.assertRaises(frappe.ValidationError):
 					self.saved(doc, **values)
-				self.assertEqual(frappe.db.get_value(doc.doctype, doc.name, fieldnames, as_dict=True), original)
+				self.assertEqual(
+					frappe.db.get_value(doc.doctype, doc.name, fieldnames, as_dict=True), original
+				)
 
 				changed = frappe.get_doc(doc.doctype, doc.name)
 				changed.update(values)

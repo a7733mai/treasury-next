@@ -30,9 +30,7 @@ class CustodyForecastMixin:
 	def setUp(self):
 		super().setUp()
 		self.bank = bank_account_name("EGP")
-		self.use_company_settings(
-			custody_bank_account=self.bank, include_custody_replenishment_in_forecast=0
-		)
+		self.use_company_settings(custody_bank_account=self.bank, include_custody_replenishment_in_forecast=0)
 
 	def flows(self, banks=None) -> list[dict]:
 		return forecast.get_flows({"company": COMPANY, "bank_accounts": banks or [self.bank]})

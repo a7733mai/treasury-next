@@ -120,7 +120,9 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 				self.assertEqual((flt(transfer.fee_amount), flt(transfer.bank_amount)), (FEE, 10000 + FEE))
 
 				pe = get_pe(transfer.payment_entry)
-				self.assertEqual((pe.payment_type, pe.party_type, pe.party), ("Pay", "Custodian", req.custodian))
+				self.assertEqual(
+					(pe.payment_type, pe.party_type, pe.party), ("Pay", "Custodian", req.custodian)
+				)
 				self.assertEqual((pe.custody_request, pe.custody_purpose), (req.name, "Disbursement"))
 				self.assertEqual((pe.paid_from, pe.paid_to), (self.data.egp.bank_gl, self.cus))
 				self.assertEqual((flt(pe.paid_amount), flt(pe.received_amount)), (10000, 10000))
@@ -151,7 +153,8 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 				rows = self.charges_of(transfer)
 				# the Detail view shows the event's label (bt_fee → "Transfer Fee")
 				self.assertEqual(
-					[(r.event, flt(r.amount)) for r in rows], [(event_label(transfer_lifecycle.EVENT_FEE), FEE)]
+					[(r.event, flt(r.amount)) for r in rows],
+					[(event_label(transfer_lifecycle.EVENT_FEE), FEE)],
 				)
 
 	def test_normal_no_fee(self):
@@ -253,7 +256,10 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 						self,
 						"Journal Entry",
 						refunds[0],
-						[(self.data.egp.bank_gl, FEE, 0, None, today()), (self.fee_account, 0, FEE, None, today())],
+						[
+							(self.data.egp.bank_gl, FEE, 0, None, today()),
+							(self.fee_account, 0, FEE, None, today()),
+						],
 					)
 				else:
 					self.assertEqual(refunds, [])
@@ -351,7 +357,8 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 		)
 		without_source = _("A cheque or transfer to a custodian must be created from its Custody Request.")
 		self.assert_refused(
-			lambda: make_bank_transfer(submit=False, party_type="Custodian", party=req.custodian), without_source
+			lambda: make_bank_transfer(submit=False, party_type="Custodian", party=req.custodian),
+			without_source,
 		)
 
 	def test_amount_above_available(self):
@@ -373,7 +380,9 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 		with as_user(treasury_only):
 			self.assertRaises(frappe.PermissionError, api.make_bank_transfer, req.name, "Normal")
 			# a REST insert of a transfer of a request the user cannot read
-			self.assert_refused(rest_doc.insert, "does not exist or you may not read it", frappe.PermissionError)
+			self.assert_refused(
+				rest_doc.insert, "does not exist or you may not read it", frappe.PermissionError
+			)
 		self.assertFalse(frappe.get_all(DOCTYPE, filters={"source_name": req.name}))
 
 		custody_user = ensure_user(f"trs-custody-{frappe.generate_hash(length=6)}@treasury.test", [])

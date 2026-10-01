@@ -108,7 +108,12 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 		hook = MagicMock(return_value={"allow_references": False})
 		with hooks(hook):
 			result = posting.get_party_rules(
-				source_doctype=DOCTYPE, source_name="x", company=COMPANY, party_type=None, party=None, action="payment"
+				source_doctype=DOCTYPE,
+				source_name="x",
+				company=COMPANY,
+				party_type=None,
+				party=None,
+				action="payment",
 			)
 		hook.assert_not_called()
 		self.assertEqual(dict(result), posting.RULE_DEFAULTS)
@@ -245,7 +250,9 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 					action="payment",
 				)
 		# the same account twice is no conflict; allow_* are ANDed, undo_by_cancel ORed, fields merged
-		third = for_party("Customer", {"party_account": self.alt_debtors, "fields": {"a": 1}, "undo_by_cancel": 1})
+		third = for_party(
+			"Customer", {"party_account": self.alt_debtors, "fields": {"a": 1}, "undo_by_cancel": 1}
+		)
 		fourth = for_party("Customer", {"allow_journal_entry": False, "fields": {"b": 2}})
 		with hooks(first, third, fourth):
 			merged = posting.get_party_rules(
@@ -407,5 +414,7 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 				make_pdc_cheque(amount=1000, issue_date=day(-10), due_date=day(10), source_doctype="Customer")
 		# a saved link stays valid when its app is gone (the cheque can still be worked)
 		cheque.deliver(handover_date=day(-9))
-		values = frappe.db.get_value(DOCTYPE, cheque.name, ["operational_status", "source_name"], as_dict=True)
+		values = frappe.db.get_value(
+			DOCTYPE, cheque.name, ["operational_status", "source_name"], as_dict=True
+		)
 		self.assertEqual((values.operational_status, values.source_name), ("Delivered", CUSTOMER))

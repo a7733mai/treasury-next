@@ -50,9 +50,7 @@ class TestCustodyDashboard(CustodyChequeTestCase):
 		return {key: (section[key].count, flt(section[key].amount)) for key in KEYS}
 
 	def delta(self, before: dict, after: dict) -> dict:
-		return {
-			key: (after[key][0] - before[key][0], flt(after[key][1] - before[key][1], 2)) for key in KEYS
-		}
+		return {key: (after[key][0] - before[key][0], flt(after[key][1] - before[key][1], 2)) for key in KEYS}
 
 	# ------------------------------------------------------------------ the section
 

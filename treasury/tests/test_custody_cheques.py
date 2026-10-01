@@ -141,7 +141,9 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		self.assertFalse(pe.deductions)
 		self.assertEqual((pe.reference_no, getdate(pe.reference_date)), (cheque.cheque_no, getdate(today())))
 		assert_gl_entries(self, "Payment Entry", pe.name, self.e1(req))
-		assert_request(self, req.name, paid_amount=10000, remaining_to_pay=0, balance_amount=10000, status="Paid")
+		assert_request(
+			self, req.name, paid_amount=10000, remaining_to_pay=0, balance_amount=10000, status="Paid"
+		)
 		assert_party_balance(self, "Custodian", req.custodian, today(), 10000)
 
 	def test_party_posting_modes(self):
@@ -371,7 +373,9 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		cheque.receive(receipt_date=today())
 		self.assert_status(cheque, "Received", "Party Posted")
 		pe = get_pe(cheque.party_payment_entry)
-		self.assertEqual((pe.payment_type, pe.custody_request, pe.custody_purpose), ("Receive", req.name, "Return"))
+		self.assertEqual(
+			(pe.payment_type, pe.custody_request, pe.custody_purpose), ("Receive", req.name, "Return")
+		)
 		assert_gl_entries(
 			self,
 			"Payment Entry",
@@ -456,7 +460,9 @@ class TestCustodyCheques(CustodyChequeTestCase):
 			reversals[0],
 			[(egp.pdc_receivable, 3000, 0, None, today()), (egp.under_collection, 0, 3000, None, today())],
 		)
-		self.assertEqual(frappe.db.get_value("Journal Entry", cheque.under_collection_journal, "docstatus"), 1)
+		self.assertEqual(
+			frappe.db.get_value("Journal Entry", cheque.under_collection_journal, "docstatus"), 1
+		)
 		self.assertEqual(frappe.db.get_value("Payment Entry", party_pe, "docstatus"), 2)
 		self.assertFalse(cheque.reversal_journal)
 		events = [(r.event, r.voucher_no) for r in cheque.status_log]
@@ -540,7 +546,8 @@ class TestCustodyCheques(CustodyChequeTestCase):
 
 		without_source = _("A cheque or transfer to a custodian must be created from its Custody Request.")
 		self.assert_refused(
-			lambda: build_cheque(req, amount=100, source_doctype=None, source_name=None).insert(), without_source
+			lambda: build_cheque(req, amount=100, source_doctype=None, source_name=None).insert(),
+			without_source,
 		)
 		batch = frappe.get_doc(
 			{
@@ -577,7 +584,9 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		req, cheque = self.returned()
 		self.assert_refused(
 			lambda: cheque.bounce(bounce_date=today(), reason="Bounced", charges=50),
-			_("Bounce charges cannot be charged to {0} {1}.").format(_("Custodian"), frappe.bold(req.custodian)),
+			_("Bounce charges cannot be charged to {0} {1}.").format(
+				_("Custodian"), frappe.bold(req.custodian)
+			),
 		)
 		self.assert_status(cheque, "Received", "Party Posted")
 
@@ -658,16 +667,16 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		cheque.receive(receipt_date=today())
 		self.assert_status(cheque, "Received", "Party Posted")
 		pe = get_pe(cheque.party_payment_entry)
-		self.assertEqual((pe.payment_type, pe.custody_request, pe.custody_purpose), ("Receive", req.name, "Return"))
+		self.assertEqual(
+			(pe.payment_type, pe.custody_request, pe.custody_purpose), ("Receive", req.name, "Return")
+		)
 		assert_gl_entries(
 			self,
 			"Payment Entry",
 			pe.name,
 			[(egp.pdc_receivable, 10000, 0, None, today()), (self.cus, 0, 10000, req.custodian, today())],
 		)
-		assert_request(
-			self, req.name, returned_amount=10000, balance_amount=0, status="Closed", is_closed=1
-		)
+		assert_request(self, req.name, returned_amount=10000, balance_amount=0, status="Closed", is_closed=1)
 
 	def test_partial_return(self):
 		"""QA gap 2: 3,000 left after the settlement, 1,000 of it returned by cheque: 2,000 can still be."""
@@ -734,7 +743,9 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		assert_request(self, req.name, closing_requested=1, balance_amount=1100, is_closed=0)
 
 		context = api.get_payment_context(req.name)
-		self.assertEqual((context["receive"]["amount"], context["receive"]["purpose"]), (1100, "Closing Return"))
+		self.assertEqual(
+			(context["receive"]["amount"], context["receive"]["purpose"]), (1100, "Closing Return")
+		)
 		cheque = cheque_from_request(req.name, "Incoming")
 		self.assertEqual(flt(cheque.amount), 1100)
 		cheque.receive(receipt_date=today())
@@ -806,7 +817,9 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		)
 		self.assert_status(cheque, "Replaced", "Not Posted")
 		new = frappe.get_doc(DOCTYPE, result["replaced_by"])
-		self.assertEqual((new.source_doctype, new.source_name, new.replaces), (REQUEST, req.name, cheque.name))
+		self.assertEqual(
+			(new.source_doctype, new.source_name, new.replaces), (REQUEST, req.name, cheque.name)
+		)
 		self.assertEqual((new.operational_status, new.accounting_status), ("Created", "Not Posted"))
 		self.assertEqual(flt(new.amount), 6000)
 		self.assertEqual(documents.reserved(req.name, "Outgoing"), 6000)

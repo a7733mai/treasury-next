@@ -729,7 +729,9 @@ def return_transfer(name: str, return_date=None, reason=None) -> dict:
 			doc.reversal_journal = voucher
 	if fee_voucher and refund:
 		# the fee on its own voucher, refunded by the bank: reversed on the return date (a Journal Entry)
-		refund_voucher = posting.reverse_voucher(*fee_voucher, date, EVENT_FEE_REVERSAL, remarks=remarks, cycle=1)
+		refund_voucher = posting.reverse_voucher(
+			*fee_voucher, date, EVENT_FEE_REVERSAL, remarks=remarks, cycle=1
+		)
 		log(doc, "Fee Refunded", voucher=refund_voucher, event_date=date)
 	doc.return_date = date
 	doc.return_reason = reason

@@ -366,7 +366,9 @@ def bounce(name: str, bounce_date=None, reason: str | None = None, charges=0) ->
 		frappe.throw(_("Bounce charges can only be charged on incoming cheques."))
 	if flt(charges) and not _bounce_charges_allowed(doc):
 		frappe.throw(
-			_("Bounce charges cannot be charged to {0} {1}.").format(_(doc.party_type), frappe.bold(doc.party))
+			_("Bounce charges cannot be charged to {0} {1}.").format(
+				_(doc.party_type), frappe.bold(doc.party)
+			)
 		)
 	date = _date(bounce_date)
 	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date", "discount_date"))
