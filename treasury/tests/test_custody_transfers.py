@@ -61,8 +61,9 @@ class CustodyTransferTestCase(CustodyChequeTestCase):
 
 	# ------------------------------------------------------------------ helpers
 
-	def transfer(self, req, method="Fawran", submit=True, amount=None, **values):
-		"""A Bank Transfer of the request through the mapper (the client's path), to an IBAN at the Other Bank."""
+	def transfer_doc(self, req, method="Fawran", amount=None, **values):
+		"""A Bank Transfer of the request through the mapper (the client's path), to an IBAN at the Other Bank,
+		not inserted."""
 		data = api.make_bank_transfer(req.name, method)
 		for key in ("name", "__islocal", "__unsaved", "owner", "creation", "modified", "modified_by"):
 			data.pop(key, None)
@@ -70,7 +71,10 @@ class CustodyTransferTestCase(CustodyChequeTestCase):
 		if amount is not None:
 			data["amount"] = amount
 		data.update(values)
-		doc = frappe.get_doc(data)
+		return frappe.get_doc(data)
+
+	def transfer(self, req, method="Fawran", submit=True, amount=None, **values):
+		doc = self.transfer_doc(req, method, amount, **values)
 		doc.insert()
 		if submit:
 			doc.submit()
@@ -209,12 +213,18 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 	# ------------------------------------------------------------------ E10, E11: return and cancel
 
 	def test_return_keeps_or_refunds_fee(self):
-		for refund in (0, 1):
-			with self.subTest(refund_fees_on_return=refund):
-				self.use_company_settings(refund_fees_on_return=refund)
+		for voucher, refund in (
+			("Payment Entry", 0),
+			("Payment Entry", 1),
+			("Journal Entry", 0),
+			("Journal Entry", 1),
+		):
+			with self.subTest(bank_charge_voucher=voucher, refund_fees_on_return=refund):
+				self.use_company_settings(bank_charge_voucher=voucher, refund_fees_on_return=refund)
 				req = self.request()
 				transfer = self.transfer(req)
 				pe, fee_voucher = transfer.payment_entry, transfer.fee_voucher
+				self.assertEqual(transfer.fee_voucher_type, voucher)
 				transfer.mark_returned(return_date=today(), reason="Wrong IBAN")
 				transfer.reload()
 				self.assertEqual((transfer.status, transfer.accounting_status), ("Returned", "Reversed"))
@@ -222,7 +232,8 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 				self.assertFalse(transfer.reversal_journal)
 				self.assertFalse(transfer.reversal_payment_entry)
 				self.assertEqual(transfer.payment_entry, pe)
-				self.assertEqual(frappe.db.get_value("Payment Entry", fee_voucher, "docstatus"), 1)
+				# the fee voucher stays (a refund is a separate reversal, from the JE rows in Journal Entry mode)
+				self.assertEqual(frappe.db.get_value(voucher, fee_voucher, "docstatus"), 1)
 				self.assertEqual(transfer.fees_refunded, refund)
 				refunds = frappe.get_all(
 					"Journal Entry",
@@ -250,18 +261,23 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 				assert_request(self, req.name, paid_amount=0, remaining_to_pay=10000, status="Approved")
 
 	def test_cancel_sent_cancels_both(self):
-		req = self.request()
-		transfer = self.transfer(req)
-		pe, fee_voucher = transfer.payment_entry, transfer.fee_voucher
-		transfer.cancel()
-		transfer.reload()
-		self.assertEqual(transfer.status, "Cancelled")
-		self.assertEqual(frappe.db.get_value("Payment Entry", pe, "docstatus"), 2)
-		self.assertEqual(frappe.db.get_value("Payment Entry", fee_voucher, "docstatus"), 2)
-		events = [(r.event, r.voucher_no) for r in transfer.status_log]
-		self.assertIn(("Voucher Cancelled", fee_voucher), events)
-		self.assertIn(("Cancelled", pe), events)
-		assert_request(self, req.name, paid_amount=0, remaining_to_pay=10000, status="Approved")
+		for voucher in ("Payment Entry", "Journal Entry"):
+			with self.subTest(bank_charge_voucher=voucher):
+				self.use_company_settings(bank_charge_voucher=voucher)
+				req = self.request()
+				transfer = self.transfer(req)
+				pe, fee_voucher = transfer.payment_entry, transfer.fee_voucher
+				self.assertEqual(transfer.fee_voucher_type, voucher)
+				transfer.cancel()
+				transfer.reload()
+				self.assertEqual(transfer.status, "Cancelled")
+				self.assertEqual(frappe.db.get_value("Payment Entry", pe, "docstatus"), 2)
+				# the fee voucher is cancelled through its dynamic link (fee_voucher_type)
+				self.assertEqual(frappe.db.get_value(voucher, fee_voucher, "docstatus"), 2)
+				events = [(r.event, r.voucher_no) for r in transfer.status_log]
+				self.assertIn(("Voucher Cancelled", fee_voucher), events)
+				self.assertIn(("Cancelled", pe), events)
+				assert_request(self, req.name, paid_amount=0, remaining_to_pay=10000, status="Approved")
 
 	# ------------------------------------------------------------------ refusals
 
@@ -295,8 +311,13 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 	def test_permissions(self):
 		req = self.request()
 		treasury_only = ensure_user(TREASURY_ONLY, ["Treasury User"])
+		# the document a REST insert would post (built with the mapper's data, as a user who may read the request)
+		rest_doc = self.transfer_doc(req, "Normal", amount=100)
 		with as_user(treasury_only):
 			self.assertRaises(frappe.PermissionError, api.make_bank_transfer, req.name, "Normal")
+			# a REST insert of a transfer of a request the user cannot read
+			self.assert_refused(rest_doc.insert, "does not exist or you may not read it", frappe.PermissionError)
+		self.assertFalse(frappe.get_all(DOCTYPE, filters={"source_name": req.name}))
 
 		custody_user = ensure_user(f"trs-custody-{frappe.generate_hash(length=6)}@treasury.test", [])
 		_employee, custodian = make_custodian(user=custody_user)

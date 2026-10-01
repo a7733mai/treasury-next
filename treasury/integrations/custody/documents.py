@@ -284,13 +284,16 @@ def _changed(doc, before, fieldnames) -> list[str]:
 
 
 def lock_request(name: str):
-	"""Lock the request row: two documents saved at the same time cannot both take what is still available."""
-	frappe.db.get_value(REQUEST, name, "name", for_update=True)
+	"""Lock the custodian, then the request row (custody's lock order), and return the request read under the
+	lock: two documents saved at the same time cannot both take what is still available."""
+	compat.lock_custodian(frappe.db.get_value(REQUEST, name, "custodian"))
+	return frappe.get_doc(REQUEST, name, for_update=True)
 
 
 def check_saved(doc, req, exclude: str | None = None):
-	"""The checks of a document of the request (spec 9 §3.2): open request, document, available amount."""
-	lock_request(req.name)
+	"""The checks of a document of the request (spec 9 §3.2): open request, document, available amount. They
+	run on the request read under the lock, not on `req` (loaded before it)."""
+	req = lock_request(req.name)
 	_check_open(req)
 	_check_document(doc, req)
 	_check_amount(req, _direction(doc), doc.amount, exclude)
@@ -332,7 +335,7 @@ def recheck(doc):
 	req = get_request(doc.source_name)
 	if not req:
 		request_not_permitted(doc.source_name)
-	lock_request(req.name)
+	req = lock_request(req.name)
 	check_request(req, _direction(doc), doc.amount, exclude=doc.name)
 
 
@@ -354,6 +357,9 @@ def validate(doc, method=None):
 	if is_new:
 		req = get_request(doc.source_name)
 		_check_request_access(doc, req)
+		if not req:
+			# a replacement whose request no longer exists: refused like a request the user may not read
+			request_not_permitted(doc.source_name)
 		check_saved(doc, req)
 		return
 	if doc.flags.treasury_lifecycle:

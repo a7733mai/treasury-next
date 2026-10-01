@@ -12,6 +12,13 @@ def request_totals(name: str, for_update: bool = False):
 	return get_request_totals(name, for_update=for_update)
 
 
+def lock_custodian(custodian: str | None):
+	"""Row lock on the Custodian: custody locks it before its requests, so Treasury does too (no deadlock)."""
+	from custody.custody.balances import lock_custodians
+
+	lock_custodians(custodian)
+
+
 def payment_allowance(req, payment_type: str, totals) -> float:
 	"""Most a custodian Payment Entry (Pay / Receive) may move on the request now (F5)."""
 	from custody.custody.balances import get_payment_allowance

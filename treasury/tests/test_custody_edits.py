@@ -220,27 +220,48 @@ class TestCustodyEdits(CustodyTransferTestCase):
 		"""The request row is locked (FOR UPDATE) before what it still accepts is read, on insert and edit."""
 		from unittest.mock import patch
 
+		from treasury.integrations.custody import compat
+
 		req = self.request()
 		calls = []
-		lock, available = documents.lock_request, documents.available
+		lock, available, lock_custodian = documents.lock_request, documents.available, compat.lock_custodian
 
 		def record_lock(name):
 			calls.append(("lock", name))
 			return lock(name)
 
+		def record_custodian(custodian):
+			calls.append(("custodian", custodian))
+			return lock_custodian(custodian)
+
 		def record_available(*args, **kwargs):
 			calls.append(("available", args[0].name))
 			return available(*args, **kwargs)
 
+		# the custodian is locked before the request (custody's order, review 9b minor 1)
+		expected = [("lock", req.name), ("custodian", req.custodian), ("available", req.name)]
 		with (
 			patch.object(documents, "lock_request", side_effect=record_lock),
+			patch.object(compat, "lock_custodian", side_effect=record_custodian),
 			patch.object(documents, "available", side_effect=record_available),
 		):
 			cheque = cheque_from_request(req.name, amount=1000)
-			self.assertEqual(calls[-2:], [("lock", req.name), ("available", req.name)])
+			self.assertEqual(calls[-3:], expected)
 			calls.clear()
 			self.saved(cheque, amount=2000)
-			self.assertEqual(calls, [("lock", req.name), ("available", req.name)])
+			self.assertEqual(calls, expected)
+
+	def test_checks_read_request_under_lock(self):
+		"""The checks run on the request read under the lock, not on the copy loaded before it (9b minor 2)."""
+		from unittest.mock import patch
+
+		req = self.request()
+		cheque = cheque_from_request(req.name, amount=1000, insert=False)
+		stale = frappe.get_doc("Custody Request", req.name)
+		frappe.db.set_value("Custody Request", req.name, "is_closed", 1)
+		with patch.object(documents, "get_request", return_value=stale):
+			self.assert_refused(cheque.insert, "is closed")
+		self.assertFalse(frappe.get_all(CHEQUE, filters={"source_name": req.name}))
 
 	# ------------------------------------------------------------------ read-only APIs (review minor 5)
 
