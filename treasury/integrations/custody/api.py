@@ -122,6 +122,8 @@ def make_bank_transfer(custody_request: str, method: str | None = None) -> dict:
 
 def _make_bank_transfer(custody_request: str, method: str | None) -> dict:
 	_require_installed()
+	if method == "SWIFT":
+		frappe.throw(_("SWIFT transfers to custodians are not supported."))
 	if method and method not in TRANSFER_METHOD_CHOICES:
 		frappe.throw(_("Unknown method {0}.").format(frappe.bold(method)))
 	req = _get_request(custody_request)

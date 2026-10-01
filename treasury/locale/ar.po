@@ -13507,9 +13507,6 @@ msgstr "شيك {0} · {1} · {2}"
 msgid "Transfer {0} · {1} · {2}"
 msgstr "تحويل {0} · {1} · {2}"
 
-msgid "PE {0}"
-msgstr "سند {0}"
-
 # PDC Cheque / Bank Transfer forms
 msgid "Custody {0} ({1}): {2}. Check the due date and save; the cheque number is taken from cheque book {3}."
 msgstr "عهدة {0} ({1}): {2}. راجع تاريخ الاستحقاق واحفظ؛ يُؤخذ رقم الشيك من دفتر الشيكات {3}."

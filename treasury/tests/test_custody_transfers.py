@@ -43,6 +43,7 @@ from treasury.tests.utils import (
 	set_bank_suppliers,
 	set_fee_rules,
 )
+from treasury.utils.voucher_summary import event_label
 
 DOCTYPE = "Bank Transfer"
 FEE = 5
@@ -142,7 +143,10 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 				# the fee counts once in both fee reports
 				self.assertEqual(flt(self.transfer_fees() - before, 2), FEE)
 				rows = self.charges_of(transfer)
-				self.assertEqual([(r.event, flt(r.amount)) for r in rows], [(transfer_lifecycle.EVENT_FEE, FEE)])
+				# the Detail view shows the event's label (bt_fee → "Transfer Fee")
+				self.assertEqual(
+					[(r.event, flt(r.amount)) for r in rows], [(event_label(transfer_lifecycle.EVENT_FEE), FEE)]
+				)
 
 	def test_normal_no_fee(self):
 		req = self.request()
@@ -267,11 +271,11 @@ class TestCustodyTransfers(CustodyTransferTestCase):
 			lambda: self.transfer(req, submit=False, transfer_type="Party Receipt"),
 			_("A custody return by transfer is recorded as a Payment Entry in Custody."),
 		)
+		# the mapper refuses SWIFT with the custody message (the document check: test_custody_edits)
 		self.assert_refused(
-			lambda: self.transfer(req, submit=False, method="SWIFT"),
+			lambda: api.make_bank_transfer(req.name, "SWIFT"),
 			_("SWIFT transfers to custodians are not supported."),
 		)
-		self.assert_refused(lambda: api.make_bank_transfer(req.name, "SWIFT"), "SWIFT")
 		without_source = _("A cheque or transfer to a custodian must be created from its Custody Request.")
 		self.assert_refused(
 			lambda: make_bank_transfer(submit=False, party_type="Custodian", party=req.custodian), without_source

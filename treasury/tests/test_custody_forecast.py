@@ -19,6 +19,9 @@ from treasury.tests.custody_utils import (
 from treasury.tests.test_custody_cheques import TREASURY_ONLY, CustodyChequeTestCase
 from treasury.tests.utils import COMPANY, bank_account_name, ensure_user
 
+# assert_flow's bank when not given: the custody bank of the test (None means an unassigned flow)
+DEFAULT = object()
+
 
 class TestCustodyForecast(CustodyChequeTestCase):
 	def setUp(self):
@@ -34,12 +37,12 @@ class TestCustodyForecast(CustodyChequeTestCase):
 	def flow_of(self, req, banks=None) -> dict | None:
 		return next((f for f in self.flows(banks) if f["reference_name"] == req.name), None)
 
-	def assert_flow(self, req, amount, date=None, bank=None):
+	def assert_flow(self, req, amount, date=None, bank=DEFAULT):
 		flow = self.flow_of(req)
 		self.assertIsNotNone(flow, f"no forecast flow for {req.name}")
 		self.assertEqual(
 			(flow["direction"], flow["bank_account"], getdate(flow["date"])),
-			("out", bank or self.bank, getdate(date or req.posting_date)),
+			("out", self.bank if bank is DEFAULT else bank, getdate(date or req.posting_date)),
 		)
 		self.assertEqual((flt(flow["amount"]), flt(flow["amount_in_account_currency"])), (amount, amount))
 		self.assertEqual((flow["reference_doctype"], flow["party"]), (REQUEST, req.custodian_name))

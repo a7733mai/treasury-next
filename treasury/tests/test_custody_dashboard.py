@@ -156,17 +156,18 @@ class TestCustodyDashboard(CustodyChequeTestCase):
 		egp, usd = bank_account_name("EGP"), bank_account_name("USD")
 		self.settings(custody_bank_account=egp).validate_custody_settings()
 
+		# the site's translations apply (en.mo words "PDC" as "Cheque"): compare with the translated messages
+		label = _(frappe.get_meta(SETTINGS).get_label("custody_bank_account"))
 		unmapped = ensure_other_company_bank().bank_account
-		self.assertRaisesRegex(
-			frappe.ValidationError,
-			"needs a row in PDC Accounts",
-			self.settings(custody_bank_account=unmapped).validate_custody_settings,
-		)
-		self.assertRaisesRegex(
-			frappe.ValidationError,
-			"must be in the company currency EGP",
-			self.settings(custody_bank_account=usd).validate_custody_settings,
-		)
+		cases = {
+			unmapped: _("{0} {1} needs a row in PDC Accounts.").format(label, frappe.bold(unmapped)),
+			usd: _("{0} must be in the company currency {1}.").format(f"{label} {frappe.bold(usd)}", "EGP"),
+		}
+		for bank, message in cases.items():
+			with self.subTest(bank=bank):
+				with self.assertRaises(frappe.ValidationError) as cm:
+					self.settings(custody_bank_account=bank).validate_custody_settings()
+				self.assertIn(message, str(cm.exception))
 
 		start = unique_leaf_start(10)
 		usd_book = make_cheque_book(start, start + 9, currency="USD")
