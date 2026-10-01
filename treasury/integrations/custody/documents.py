@@ -168,7 +168,23 @@ def refusal(req, direction: str) -> tuple[frappe._dict | None, str | None]:
 	reason = draft_refusal(req, direction, a)
 	if not reason and a.amount <= 0:
 		reason = nothing_left(req, direction, a)
-	return a, reason
+	return a, reason or custodian_refusal(req, direction, a)
+
+
+def _winddown(direction: str, a: frappe._dict) -> bool:
+	return direction == INCOMING or a.purpose == REIMBURSEMENT
+
+
+def custodian_refusal(req, direction: str, a: frappe._dict) -> str | None:
+	"""Custody's refusal of the custodian (e.g. inactive), without throwing: the mapper would refuse it too."""
+	shown = len(frappe.local.message_log)
+	try:
+		compat.assert_custodian_usable(req.custodian, winddown=_winddown(direction, a))
+	except (frappe.ValidationError, frappe.PermissionError) as e:
+		# the message becomes the reason of the button, not a dialog
+		del frappe.local.message_log[shown:]
+		return str(e) or _("Custodian {0} cannot be paid now.").format(frappe.bold(req.custodian))
+	return None
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +203,11 @@ def check_request(req, direction: str, amount=None, exclude: str | None = None) 
 	the document's amount; None (a mapper) takes the whole available amount, refused when it is 0. Returns the
 	`available` result with the `amount` to use."""
 	_check_open(req)
+	return _check_amount(req, direction, amount, exclude)
+
+
+def _check_amount(req, direction: str, amount=None, exclude: str | None = None) -> frappe._dict:
+	"""`check_request` of a request already checked open (`_check_open`)."""
 	a = available(req, direction, exclude)
 	if reason := draft_refusal(req, direction, a):
 		frappe.throw(reason, title=_("Draft Replenishment Exists"))
@@ -202,9 +223,7 @@ def check_request(req, direction: str, amount=None, exclude: str | None = None) 
 		)
 		currency = erpnext.get_company_currency(req.company)
 		frappe.throw(message.format(fmt_money(a.amount, currency=currency), frappe.bold(req.name)))
-	compat.assert_custodian_usable(
-		req.custodian, winddown=direction == INCOMING or a.purpose == REIMBURSEMENT
-	)
+	compat.assert_custodian_usable(req.custodian, winddown=_winddown(direction, a))
 	return frappe._dict(a, amount=flt(amount, _precision()))
 
 
@@ -237,23 +256,131 @@ def _check_document(doc, req):
 			frappe.throw(_("SWIFT transfers to custodians are not supported."))
 
 
+# a saved document of a request: these never change (its custodian, company and bank were checked on insert;
+# a bank may still be chosen when there was none)
+FROZEN_FIELDS = ("party_type", "party", "company", "direction", "bank_account")
+# ... and these re-run the checks of the request when they change
+RECHECK_FIELDS = ("amount", "transfer_type", "method")
+
+
+def _is_new(doc) -> bool:
+	return not doc.name or doc.is_new()
+
+
+def _before(doc):
+	"""The saved values of `doc` (the document before this save)."""
+	return doc.get_doc_before_save() or frappe.get_doc(doc.doctype, doc.name)
+
+
+def _rows(doc) -> list[tuple]:
+	rows = doc.get("references") or []
+	return [(r.reference_doctype, r.reference_name, flt(r.allocated_amount)) for r in rows]
+
+
+def _changed(doc, before, fieldnames) -> list[str]:
+	return [
+		f for f in fieldnames if doc.meta.has_field(f) and (doc.get(f) or None) != (before.get(f) or None)
+	]
+
+
+def lock_request(name: str):
+	"""Lock the request row: two documents saved at the same time cannot both take what is still available."""
+	frappe.db.get_value(REQUEST, name, "name", for_update=True)
+
+
+def check_saved(doc, req, exclude: str | None = None):
+	"""The checks of a document of the request (spec 9 §3.2): open request, document, available amount."""
+	lock_request(req.name)
+	_check_open(req)
+	_check_document(doc, req)
+	_check_amount(req, _direction(doc), doc.amount, exclude)
+
+
+def _check_request_access(doc, req):
+	"""Read on the request; a replacement (lifecycle) may instead come from a user who may write the cheque it
+	replaces. One error whether the request is missing or not permitted."""
+	if req and frappe.has_permission(REQUEST, "read", req):
+		return
+	replaces = doc.get("replaces") if doc.flags.treasury_lifecycle else None
+	if replaces and frappe.has_permission(doc.doctype, "write", replaces):
+		return
+	request_not_permitted(doc.source_name)
+
+
+def request_not_permitted(name: str | None):
+	frappe.throw(
+		_("Custody Request {0} does not exist or you may not read it.").format(frappe.bold(name or "-")),
+		frappe.PermissionError,
+		title=_("Not Permitted"),
+	)
+
+
+def get_request(name: str | None):
+	"""The Custody Request, or None when it does not exist."""
+	if not name or not frappe.db.exists(REQUEST, name):
+		return None
+	return frappe.get_doc(REQUEST, name)
+
+
+def recheck(doc):
+	"""A lifecycle action that makes a document of the request reserve its amount again (re-presenting a bounced
+	cheque): the request must still accept it."""
+	if doc.get("source_doctype") != REQUEST:
+		return
+	if not is_installed():
+		frappe.throw(_("The Custody app is not installed."))
+	req = get_request(doc.source_name)
+	if not req:
+		request_not_permitted(doc.source_name)
+	lock_request(req.name)
+	check_request(req, _direction(doc), doc.amount, exclude=doc.name)
+
+
 def validate(doc, method=None):
 	"""doc_events "validate" of PDC Cheque and Bank Transfer (runs after the controller's own validate)."""
 	source_doctype = doc.get("source_doctype")
+	is_new = _is_new(doc)
 	if doc.get("party_type") == PARTY_TYPE and source_doctype != REQUEST:
-		# also without custody: the Party Type "Custodian" only exists with it
-		frappe.throw(_("A cheque or transfer to a custodian must be created from its Custody Request."))
+		# also without custody: the Party Type "Custodian" only exists with it. Only for a new document or a
+		# changed party: a custodian cheque of 1.2 (made before the rule) can still be worked and cancelled
+		if is_new or (
+			not doc.flags.treasury_lifecycle and _changed(doc, _before(doc), ("party_type", "party"))
+		):
+			frappe.throw(_("A cheque or transfer to a custodian must be created from its Custody Request."))
 	if source_doctype != REQUEST:
 		return
 	if not is_installed():
 		frappe.throw(_("The Custody app is not installed."))
-	if doc.name and not doc.is_new():
-		# the link never changes (set_only_once, treasury.utils.document_sources)
+	if is_new:
+		req = get_request(doc.source_name)
+		_check_request_access(doc, req)
+		check_saved(doc, req)
 		return
-	req = frappe.get_doc(REQUEST, doc.source_name)
-	if not doc.flags.treasury_lifecycle:
-		# a replacement (lifecycle) pays the request of the cheque it replaces
-		req.check_permission("read")
-	_check_open(req)
-	_check_document(doc, req)
-	check_request(req, _direction(doc), doc.amount)
+	if doc.flags.treasury_lifecycle:
+		# the link never changes (set_only_once, treasury.utils.document_sources); the actions check the rest
+		return
+	_validate_edit(doc)
+
+
+def _validate_edit(doc):
+	"""A saved document of the request edited through the form / REST (still Created / a draft): its custodian,
+	company and bank never change; a new amount (or references, method ...) is checked against the request."""
+	before = _before(doc)
+	frozen = _changed(doc, before, FROZEN_FIELDS)
+	if "bank_account" in frozen and not before.get("bank_account"):
+		# a bank chosen after the insert (e.g. a cheque received back): checked like on insert below
+		frozen.remove("bank_account")
+	if frozen:
+		labels = ", ".join(_(doc.meta.get_label(f)) for f in frozen)
+		frappe.throw(
+			_("{0} cannot be changed on a {1} created from Custody Request {2}.").format(
+				labels, _(doc.doctype), frappe.bold(doc.source_name)
+			),
+			title=_("Not Allowed"),
+		)
+	if not _changed(doc, before, (*RECHECK_FIELDS, "bank_account")) and _rows(doc) == _rows(before):
+		return
+	req = get_request(doc.source_name)
+	if not req:
+		request_not_permitted(doc.source_name)
+	check_saved(doc, req, exclude=doc.name)

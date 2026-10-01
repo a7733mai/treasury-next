@@ -517,6 +517,11 @@ def represent(name: str, represent_date=None, new_due_date=None, remarks: str | 
 		_facility_cheques().check_can_represent(doc)
 	date = _date(represent_date)
 	_not_before(doc, date, None, _latest_date(doc, "handover_date", "deposit_date"))
+	# a bounced cheque reserves nothing on its "Created From" request (e.g. a Custody Request): it must still
+	# accept the cheque before it is open again
+	from treasury.integrations.custody import documents as custody_documents
+
+	custody_documents.recheck(doc)
 
 	doc.cycle = cint(doc.cycle) + 1
 	for fieldname in CYCLE_FIELDS:
@@ -1103,9 +1108,10 @@ def _undo_postings(doc, posting_date, remarks: str | None = None):
 		if v.docstatus == 1 and cint(v.treasury_cycle) == _cycle(doc) and v.treasury_event in UNDOABLE_EVENTS
 	]
 	for voucher in reversed(vouchers):
-		forced = not cancel and posting.must_cancel(voucher.doctype, voucher.name)
-		if cancel or forced:
-			_cancel_voucher(voucher.doctype, voucher.name, hint=not forced)
+		cancel_only = posting.must_cancel(voucher.doctype, voucher.name)
+		if cancel or cancel_only:
+			# switching On Bounce to "Reverse" cannot help a voucher that may only be cancelled
+			_cancel_voucher(voucher.doctype, voucher.name, hint=not cancel_only)
 			_log(
 				doc,
 				"Voucher Cancelled",

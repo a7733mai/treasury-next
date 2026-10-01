@@ -20,6 +20,7 @@ from treasury.tests.utils import (
 	assert_gl_entries,
 	day,
 	ensure_account,
+	ensure_branch_dimension,
 	ensure_customer,
 	get_pe,
 	make_pdc_cheque,
@@ -48,6 +49,7 @@ def for_party(party_type: str, answer: dict):
 class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
+		cls.branch_field = ensure_branch_dimension()  # persistent fixture (DDL) before any test data
 		super().setUpClass()
 		cls.alt_debtors = ensure_account(ALT_DEBTORS, "Accounts Receivable", "Receivable")
 		cls.root_cost_center = frappe.db.get_value("Cost Center", {"company": COMPANY, "is_group": 1}, "name")
@@ -125,10 +127,72 @@ class TestPartyPaymentHooks(TreasuryTestMixin, IntegrationTestCase):
 			[(self.data.egp.pdc_receivable, 1000, 0, None), (self.alt_debtors, 0, 1000, CUSTOMER)],
 		)
 
-	def test_rule_fields_applied(self):
-		with hooks(for_party("Customer", {"fields": {"cost_center": self.alt_cost_center}})):
-			cheque = self.received()
-		self.assertEqual(get_pe(cheque.party_payment_entry).cost_center, self.alt_cost_center)
+	def test_posting_owned_fields_refused(self):
+		"""A hook can never set a field the posting service owns: standard fields (accounts, amounts, party,
+		cost center ...), Treasury's own fields and the Accounting Dimensions."""
+		for fieldname, value in (
+			("paid_to", self.alt_debtors),
+			("paid_amount", 1),
+			("party", OTHER_CUSTOMER),
+			("cost_center", self.alt_cost_center),
+			("treasury_event", "forged"),
+			(self.branch_field, "x"),
+		):
+			with self.subTest(fieldname=fieldname):
+				cheque = make_pdc_cheque("Incoming", amount=1000, issue_date=day(-10), due_date=day(10))
+				with hooks(for_party("Customer", {"fields": {fieldname: value}})):
+					with self.assertRaisesRegex(frappe.ValidationError, "Party rules cannot set field"):
+						cheque.receive(receipt_date=day(-9))
+				self.assertFalse(frappe.db.get_value(DOCTYPE, cheque.name, "party_payment_entry"))
+				self.assertEqual(frappe.db.get_value(DOCTYPE, cheque.name, "operational_status"), "Created")
+
+	def test_rule_field_refusal(self):
+		"""Only a custom field of another app is accepted (custody's `custody_request` is one)."""
+
+		class Meta:
+			fields = {
+				"other_app_link": frappe._dict(is_custom_field=1),
+				"treasury_source_name": frappe._dict(is_custom_field=1),
+				"branch": frappe._dict(is_custom_field=1),
+				"paid_to": frappe._dict(),
+			}
+
+			def get_field(self, fieldname):
+				return self.fields.get(fieldname)
+
+		with patch.object(posting, "_all_dimension_fieldnames", return_value=["branch"]):
+			self.assertIsNone(posting.rule_field_refusal(Meta(), "other_app_link"))
+			for fieldname in ("treasury_source_name", "branch", "paid_to"):
+				self.assertIn("Party rules cannot set field", posting.rule_field_refusal(Meta(), fieldname))
+			self.assertIn("has no field", posting.rule_field_refusal(Meta(), "nothing"))
+
+	def test_conflicting_rule_fields_throw(self):
+		first = for_party("Customer", {"fields": {"other_app_link": "A"}})
+		kwargs = dict(
+			source_doctype=DOCTYPE,
+			source_name="x",
+			company=COMPANY,
+			party_type="Customer",
+			party=CUSTOMER,
+			action="payment",
+		)
+		with hooks(first, for_party("Customer", {"fields": {"other_app_link": "B"}})):
+			with self.assertRaisesRegex(frappe.ValidationError, "Conflicting values for field"):
+				posting.get_party_rules(**kwargs)
+		# the same value twice is no conflict
+		with hooks(first, for_party("Customer", {"fields": {"other_app_link": "A"}})):
+			self.assertEqual(posting.get_party_rules(**kwargs).fields, {"other_app_link": "A"})
+
+	def test_invalid_action_without_party(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Invalid party rule action"):
+			posting.get_party_rules(
+				source_doctype=DOCTYPE,
+				source_name="x",
+				company=COMPANY,
+				party_type=None,
+				party=None,
+				action="x",
+			)
 
 	def test_unknown_field_throws(self):
 		cheque = make_pdc_cheque("Incoming", amount=1000, issue_date=day(-10), due_date=day(10))

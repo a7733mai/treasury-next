@@ -30,6 +30,14 @@ open custodian cheque or transfer first (see the README).
   Bank Position Forecast and the low balance alerts, an *Employee Custody* group on the Treasury Dashboard, an
   *Employee Custody* sidebar section, the cheques / transfers / Payment Entries in the request's Connections,
   and the *Employee Custody* settings (default payout method, bank and cheque book).
+- Saved custody cheques / transfers: the custodian, party type, company, direction and bank cannot be changed
+  by a form or REST save; a new amount, method or references is checked against the request again (the
+  request row is locked first). Re-presenting a bounced custody cheque checks the request again too.
+- Party rules of other apps may set only their own custom fields of the Payment Entry, never a field the
+  posting service sets; two apps setting different values of one field is refused.
+- The request's Treasury buttons use GET-only read APIs and show nothing (and return no Treasury details)
+  to a user without a Treasury role. A custodian cheque made under 1.2 without *Created From* can still be
+  worked and cancelled.
 
 ## 1.2.0 — 2026-10-01
 

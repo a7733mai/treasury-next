@@ -138,13 +138,14 @@ def get_party_rules(
 	`action`: "payment" (a party Payment Entry is about to be built), "journal" (a Treasury Journal Entry row),
 	"undo" (a voucher must be undone), "check" (what a caller must do, e.g. split charges).
 	Each hook: fn(ctx: frappe._dict) -> dict | None, ctx = the keyword arguments. Merge: party_account — the
-	single non-empty value (two different → throw); fields — dict.update in hook order; allow_* — AND;
-	undo_by_cancel — OR. No party_type → RULE_DEFAULTS without calling hooks."""
+	single non-empty value (two different → throw); fields — merged, two different values of one field → throw
+	(only custom fields of other apps are applied, see `_apply_rule_fields`); allow_* — AND; undo_by_cancel —
+	OR. No party_type → RULE_DEFAULTS without calling hooks."""
+	if action not in RULE_ACTIONS:
+		frappe.throw(_("Invalid party rule action {0}.").format(action))
 	rules = frappe._dict(RULE_DEFAULTS, fields={})
 	if not party_type:
 		return rules
-	if action not in RULE_ACTIONS:
-		frappe.throw(_("Invalid party rule action {0}.").format(action))
 	ctx = frappe._dict(
 		source_doctype=source_doctype,
 		source_name=source_name,
@@ -167,7 +168,18 @@ def get_party_rules(
 					)
 				)
 			rules.party_account = account
-		rules.fields.update(answer.get("fields") or {})
+		for fieldname, value in (answer.get("fields") or {}).items():
+			if fieldname in rules.fields and rules.fields[fieldname] != value:
+				frappe.throw(
+					_("Conflicting values for field {0} of the payment to {1} {2}: {3} and {4}.").format(
+						frappe.bold(fieldname),
+						_(party_type),
+						frappe.bold(party),
+						frappe.bold(rules.fields[fieldname]),
+						frappe.bold(value),
+					)
+				)
+			rules.fields[fieldname] = value
 		for key in ("allow_references", "allow_deductions", "allow_journal_entry"):
 			if key in answer:
 				rules[key] = rules[key] and bool(answer[key])
@@ -219,11 +231,35 @@ def _check_cancel_only(doctype: str, name: str):
 		)
 
 
+def rule_field_refusal(meta, fieldname: str) -> str | None:
+	"""Why the party rules may not set `fieldname` of a Payment Entry, None when they may. Only a custom field
+	of another app is accepted: never a standard field (amounts, accounts, party, references ...), a Treasury
+	field or an Accounting Dimension, which the posting service owns."""
+	df = meta.get_field(fieldname)
+	if not df:
+		return _("Payment Entry has no field {0}.").format(frappe.bold(fieldname))
+	if (
+		not df.get("is_custom_field")
+		or fieldname.startswith("treasury_")
+		or fieldname in _all_dimension_fieldnames()
+	):
+		return _("Party rules cannot set field {0} of Payment Entry: the posting service sets it.").format(
+			frappe.bold(fieldname)
+		)
+	return None
+
+
+def _all_dimension_fieldnames() -> list[str]:
+	"""The fields of every Accounting Dimension, disabled ones included (their custom fields stay)."""
+	return frappe.get_all("Accounting Dimension", pluck="fieldname")
+
+
 def _apply_rule_fields(pe: Document, fields: dict | None):
-	"""Field values the party rules require on the Payment Entry (e.g. a link another app needs)."""
+	"""Field values the party rules require on the Payment Entry (e.g. a link another app needs): custom fields
+	of other apps only (`rule_field_refusal`)."""
 	for fieldname, value in (fields or {}).items():
-		if not pe.meta.has_field(fieldname):
-			frappe.throw(_("Payment Entry has no field {0}.").format(frappe.bold(fieldname)))
+		if reason := rule_field_refusal(pe.meta, fieldname):
+			frappe.throw(reason)
 		pe.set(fieldname, value)
 
 

@@ -9,7 +9,7 @@ import unittest
 import frappe
 from frappe import _
 from frappe.tests import IntegrationTestCase
-from frappe.utils import flt, fmt_money, getdate, today
+from frappe.utils import cint, flt, fmt_money, getdate, today
 
 from treasury.accounting import posting
 from treasury.integrations.custody import REQUEST, api, compat, documents, is_installed
@@ -205,17 +205,109 @@ class TestCustodyCheques(CustodyChequeTestCase):
 				)
 
 	def test_bounce_refused_when_custody_used(self):
+		"""Custody refuses the cancel in both On Bounce modes; the message never suggests switching On Bounce
+		(a custodian's Payment Entry can only be cancelled)."""
+		use_custody_settings(self, allow_overspend=0)
+		for on_bounce in ("Cancel Payment Entry", "Reverse by Journal Entry"):
+			with self.subTest(on_bounce=on_bounce):
+				self.use_company_settings(on_bounce=on_bounce)
+				req = self.request()
+				cheque = self.delivered(req)
+				make_settlement(req.name, 4000)
+				frappe.clear_messages()
+				with self.assertRaises(frappe.ValidationError):
+					cheque.bounce(bounce_date=today(), reason="Bounced")
+				self.assertIn("Custody Already Used", self.messages())
+				self.assertIn("could not be cancelled (see the message above)", self.messages())
+				self.assertNotIn("On Bounce", self.messages())
+				self.assert_status(cheque, "Delivered", "Party Posted")
+				self.assertEqual(
+					frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "docstatus"), 1
+				)
+
+	def test_refused_cancel_rolls_back_earlier_reversal(self):
+		"""Bounce of a deposited return cheque (On Bounce = Reverse): the Under Collection transfer is reversed
+		first, then the party Payment Entry cannot be cancelled. Rolled back to its savepoint (as a web request,
+		the batch and the scheduler do), the reversal is gone and the cheque is still Deposited: status and
+		vouchers stay in sync."""
+		from unittest.mock import patch
+
+		req, cheque = self.returned()
+		cheque.deposit(deposit_date=today())
+		cheque.reload()
+		party_pe = cheque.party_payment_entry
+		cancel_voucher = posting.cancel_voucher
+		seen = {}
+
+		def refuse(doctype, name, **kwargs):
+			if name == party_pe:
+				seen["reversals"] = self.vouchers_of(cheque, lifecycle.EVENT_UNDER_COLLECTION + "_reversal")
+				frappe.throw("Refused by custody (test)", title="Custody Already Used")
+			return cancel_voucher(doctype, name, **kwargs)
+
+		frappe.db.savepoint("treasury_bounce")
+		with patch.object(posting, "cancel_voucher", side_effect=refuse):
+			with self.assertRaises(frappe.ValidationError):
+				cheque.bounce(bounce_date=today(), reason="Bounced")
+		frappe.db.rollback(save_point="treasury_bounce")
+
+		self.assertEqual(len(seen["reversals"]), 1, "the reversal was posted before the refused cancel")
+		self.assertEqual(self.vouchers_of(cheque, lifecycle.EVENT_UNDER_COLLECTION + "_reversal"), [])
+		self.assert_status(cheque, "Deposited", "Under Collection Posted")
+		self.assertEqual(frappe.db.get_value("Payment Entry", party_pe, "docstatus"), 1)
+		self.assertEqual(
+			frappe.db.get_value("Payment Entry", cheque.under_collection_payment_entry, "docstatus"), 1
+		)
+		self.assertFalse(cheque.reversal_payment_entry)
+
+	def vouchers_of(self, cheque, event: str) -> list[str]:
+		"""Submitted Payment Entries / Journal Entries of the cheque with `event`."""
+		filters = {
+			"treasury_source_doctype": DOCTYPE,
+			"treasury_source_name": cheque.name,
+			"treasury_event": event,
+			"docstatus": 1,
+		}
+		return frappe.get_all("Payment Entry", filters=filters, pluck="name") + frappe.get_all(
+			"Journal Entry", filters=filters, pluck="name"
+		)
+
+	def test_represent_rechecks_request(self):
+		"""A bounced cheque reserves nothing: once another cheque took the money, it cannot be re-presented."""
+		self.use_company_settings(outgoing_party_posting="Manual")
+		req = self.request()
+		first = self.delivered(req)
+		self.assertEqual(first.accounting_status, "Not Posted")
+		first.bounce(bounce_date=today(), reason="Bounced")
+		self.assert_status(first, "Bounced", "Not Posted")
+		second = cheque_from_request(req.name)
+		self.assertEqual(flt(second.amount), 10000)
+		self.assert_refused(
+			lambda: first.represent(represent_date=today()),
+			_("At most {0} can still be paid on Custody Request {1}.").format(
+				fmt_money(0, currency="EGP"), frappe.bold(req.name)
+			),
+		)
+		self.assert_status(first, "Bounced", "Not Posted")
+		self.assertEqual(cint(frappe.db.get_value(DOCTYPE, first.name, "cycle")), 1)
+
+		# without the second cheque the request still accepts it
+		second.cancel_cheque(reason="Not needed")
+		first.reload()
+		first.represent(represent_date=today())
+		self.assert_status(first, "Delivered", "Not Posted")
+
+	def test_replace_refused_by_custody(self):
+		"""Custody refuses to cancel the party Payment Entry: the old cheque stays Delivered, no replacement."""
 		use_custody_settings(self, allow_overspend=0)
 		req = self.request()
 		cheque = self.delivered(req)
 		make_settlement(req.name, 4000)
-		frappe.clear_messages()
 		with self.assertRaises(frappe.ValidationError):
-			cheque.bounce(bounce_date=today(), reason="Bounced")
-		self.assertIn("Custody Already Used", self.messages())
-		self.assertIn("could not be cancelled (see the message above)", self.messages())
-		self.assertNotIn("On Bounce", self.messages())
+			cheque.replace(new_cheque_values={"cheque_no": unique_cheque_no(), "reason": "Damaged"})
 		self.assert_status(cheque, "Delivered", "Party Posted")
+		self.assertFalse(cheque.replaced_by)
+		self.assertEqual(frappe.get_all(DOCTYPE, filters={"replaces": cheque.name}), [])
 		self.assertEqual(frappe.db.get_value("Payment Entry", cheque.party_payment_entry, "docstatus"), 1)
 
 	def test_represent_after_bounce(self):
@@ -324,6 +416,52 @@ class TestCustodyCheques(CustodyChequeTestCase):
 		)
 		self.assertEqual(frappe.db.get_value("Payment Entry", party_pe, "docstatus"), 2)
 		self.assertFalse(cheque.reversal_journal)
+		assert_request(self, req.name, balance_amount=3000, status="Partly Settled", is_closed=0)
+
+	def test_bounce_return_cheque_cancel_mode(self):
+		"""On Bounce = Cancel: the Under Collection transfer and the party Payment Entry are both cancelled."""
+		self.use_company_settings(on_bounce="Cancel Payment Entry")
+		req, cheque = self.returned()
+		party_pe = cheque.party_payment_entry
+		cheque.deposit(deposit_date=today())
+		cheque.reload()
+		under_collection = cheque.under_collection_payment_entry
+		cheque.bounce(bounce_date=today(), reason="Bounced")
+		self.assert_status(cheque, "Bounced", "Reversed")
+		for name in (under_collection, party_pe):
+			self.assertEqual(frappe.db.get_value("Payment Entry", name, "docstatus"), 2, name)
+		self.assertFalse(cheque.reversal_payment_entry or cheque.reversal_journal)
+		self.assertEqual(self.vouchers_of(cheque, lifecycle.EVENT_UNDER_COLLECTION + "_reversal"), [])
+		cancelled = [r.voucher_no for r in cheque.status_log if r.event == "Voucher Cancelled"]
+		self.assertEqual(cancelled, [under_collection, party_pe])
+		assert_request(self, req.name, balance_amount=3000, status="Partly Settled", is_closed=0)
+
+	def test_bounce_return_cheque_je_settlement(self):
+		"""Bank Settlement Voucher = Journal Entry, On Bounce = Reverse: the Under Collection Journal Entry is
+		reversed by a Journal Entry, then the custodian's party Payment Entry is cancelled."""
+		egp = self.data.egp
+		self.use_company_settings(bank_settlement_voucher="Journal Entry")
+		req, cheque = self.returned()
+		party_pe = cheque.party_payment_entry
+		cheque.deposit(deposit_date=today())
+		cheque.reload()
+		self.assertTrue(cheque.under_collection_journal)
+		cheque.bounce(bounce_date=today(), reason="Bounced")
+		self.assert_status(cheque, "Bounced", "Reversed")
+		reversals = self.vouchers_of(cheque, lifecycle.EVENT_UNDER_COLLECTION + "_reversal")
+		self.assertEqual(len(reversals), 1)
+		assert_gl_entries(
+			self,
+			"Journal Entry",
+			reversals[0],
+			[(egp.pdc_receivable, 3000, 0, None, today()), (egp.under_collection, 0, 3000, None, today())],
+		)
+		self.assertEqual(frappe.db.get_value("Journal Entry", cheque.under_collection_journal, "docstatus"), 1)
+		self.assertEqual(frappe.db.get_value("Payment Entry", party_pe, "docstatus"), 2)
+		self.assertFalse(cheque.reversal_journal)
+		events = [(r.event, r.voucher_no) for r in cheque.status_log]
+		self.assertIn(("Voucher Reversed", reversals[0]), events)
+		self.assertIn(("Voucher Cancelled", party_pe), events)
 		assert_request(self, req.name, balance_amount=3000, status="Partly Settled", is_closed=0)
 
 	# ------------------------------------------------------------------ permanent custody

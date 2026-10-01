@@ -9,7 +9,7 @@ frappe.provide("treasury.payment_buttons");
 
 // Open the unsaved document a mapper returns (nothing is written until the user saves it).
 // options: {target: doctype being prepared, from: {doctype, name} of the clicked form, hint: extra line shown
-// under an account refusal}
+// under an account refusal, type: "GET" for a mapper whitelisted for GET only}
 treasury.payment_buttons.open = (method, args, options = {}) => {
 	const error_handlers = {};
 	if (options.hint) {
@@ -19,6 +19,7 @@ treasury.payment_buttons.open = (method, args, options = {}) => {
 		.call({
 			method,
 			args,
+			type: options.type || "POST",
 			freeze: true,
 			freeze_message: options.target
 				? frappe.utils.escape_html(__("Preparing {0}…", [__(options.target)]))

@@ -33,25 +33,29 @@ TRANSFER_METHOD_CHOICES = ("Normal", "Fawran")
 OPEN_DOCUMENTS_SHOWN = 3
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_payment_context(custody_request: str) -> dict:
 	"""What the Treasury buttons of the request may offer: {pay: {amount, purpose, reason, blocked,
 	draft_payment_entry}, receive: {...}, can_cheque, can_transfer, default_method, currency, custodian_name,
 	transfer_banks: {Normal, Fawran} (the banks the transfer mapper would pick), open_documents (the open
 	cheques / transfers of the request the user may read, at most 3), more_documents}. Amounts are net of the
-	open cheques / transfers."""
+	open cheques / transfers. Without a Treasury role or the create permission of a cheque / transfer: only
+	{can_cheque: False, can_transfer: False} (no Treasury details)."""
 	with sd.treasury_refusals():
 		_require_installed()
 		req = _get_request(custody_request)
+		has_role = _has_treasury_role()
+		can_cheque = bool(has_role and frappe.has_permission(CHEQUE, "create"))
+		can_transfer = bool(has_role and frappe.has_permission(TRANSFER, "create"))
+		if not (can_cheque or can_transfer):
+			return {"can_cheque": False, "can_transfer": False}
 		pay = _side(req, OUTGOING)
 		receive = _side(req, INCOMING)
-		has_role = _has_treasury_role()
-		can_transfer = bool(has_role and frappe.has_permission(TRANSFER, "create"))
-		open_docs, more = documents.open_documents(req.name, OPEN_DOCUMENTS_SHOWN) if has_role else ([], 0)
+		open_docs, more = documents.open_documents(req.name, OPEN_DOCUMENTS_SHOWN)
 		return {
 			"pay": pay,
 			"receive": receive,
-			"can_cheque": bool(has_role and frappe.has_permission(CHEQUE, "create")),
+			"can_cheque": can_cheque,
 			"can_transfer": can_transfer,
 			"default_method": _settings_value(req.company, "custody_default_method") or DEFAULT_METHOD,
 			"currency": erpnext.get_company_currency(req.company),
@@ -62,7 +66,7 @@ def get_payment_context(custody_request: str) -> dict:
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def make_pdc_cheque(custody_request: str, direction: str) -> dict:
 	"""A new PDC Cheque (not inserted) paying (Outgoing) or receiving back (Incoming) what the request still
 	accepts: the custodian, the request's accounting details and its "Created From" link."""
@@ -108,7 +112,7 @@ def _make_pdc_cheque(custody_request: str, direction: str) -> dict:
 	return doc.as_dict()
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def make_bank_transfer(custody_request: str, method: str | None = None) -> dict:
 	"""A new Bank Transfer (not inserted, Party Payment, Normal or Fawran) paying the custodian what the request
 	still accepts; the fee is posted on its own voucher when the transfer is sent (custody refuses deductions)."""
@@ -158,10 +162,10 @@ def _require_installed():
 
 
 def _get_request(name: str):
-	if not name or not frappe.db.exists(REQUEST, name):
-		frappe.throw(_("{0} {1} does not exist").format(_(REQUEST), name or "-"), frappe.DoesNotExistError)
-	req = frappe.get_doc(REQUEST, name)
-	req.check_permission("read")
+	"""The request the user may read; one error whether it is missing or not permitted."""
+	req = documents.get_request(name)
+	if not req or not frappe.has_permission(REQUEST, "read", req):
+		documents.request_not_permitted(name)
 	return req
 
 
@@ -191,7 +195,7 @@ def _side(req, direction: str) -> dict:
 		"amount": 0 if reason else a.amount,
 		"purpose": a.purpose if a else None,
 		"reason": reason,
-		"blocked": bool(reason and a and a.allowance > 0),
+		"blocked": bool(reason and a and a.allowance > 0 and (draft or a.amount <= 0)),
 		"draft_payment_entry": draft,
 	}
 

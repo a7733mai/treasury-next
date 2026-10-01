@@ -13344,6 +13344,12 @@ msgstr "لا يمكن التراجع عن {0} {1} إلا بإلغائه."
 msgid "Payment Entry has no field {0}."
 msgstr "سند الدفع لا يحتوي على الحقل {0}."
 
+msgid "Conflicting values for field {0} of the payment to {1} {2}: {3} and {4}."
+msgstr "قيم متعارضة للحقل {0} في الصرف إلى {1} {2}: {3} و{4}."
+
+msgid "Party rules cannot set field {0} of Payment Entry: the posting service sets it."
+msgstr "لا يمكن لقواعد الطرف تعيين الحقل {0} في سند الدفع: خدمة الترحيل هي التي تعيّنه."
+
 msgid "A payment to {0} {1} cannot be allocated to references."
 msgstr "لا يمكن تخصيص الصرف إلى {0} {1} على مستندات مرجعية."
 
@@ -13411,6 +13417,15 @@ msgstr "طلب العهدة {0} غير معتمد."
 
 msgid "Custody Request {0} is closed."
 msgstr "طلب العهدة {0} مُقفَل."
+
+msgid "Custody Request {0} does not exist or you may not read it."
+msgstr "طلب العهدة {0} غير موجود أو ليس لديك صلاحية قراءته."
+
+msgid "{0} cannot be changed on a {1} created from Custody Request {2}."
+msgstr "لا يمكن تغيير {0} في {1} منشأ من طلب العهدة {2}."
+
+msgid "Custodian {0} cannot be paid now."
+msgstr "لا يمكن الصرف لأمين العهدة {0} الآن."
 
 msgid "Draft Replenishment Exists"
 msgstr "يوجد تعويض في حالة مسودة"

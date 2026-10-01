@@ -41,7 +41,11 @@ frappe.provide("treasury.custody_request");
 		treasury.payment_buttons.open(
 			"treasury.integrations.custody.api.make_pdc_cheque",
 			{ custody_request: frm.doc.name, direction },
-			{ target: "PDC Cheque", from: from(frm, direction === OUTGOING ? ctx.pay : ctx.receive) }
+			{
+				target: "PDC Cheque",
+				from: from(frm, direction === OUTGOING ? ctx.pay : ctx.receive),
+				type: "GET",
+			}
 		);
 	};
 
@@ -129,7 +133,7 @@ frappe.provide("treasury.custody_request");
 				treasury.payment_buttons.open(
 					"treasury.integrations.custody.api.make_bank_transfer",
 					{ custody_request: frm.doc.name, method: values.method },
-					{ target: "Bank Transfer", from: from(frm, ctx.pay) }
+					{ target: "Bank Transfer", from: from(frm, ctx.pay), type: "GET" }
 				);
 			},
 		});
@@ -230,9 +234,10 @@ frappe.provide("treasury.custody_request");
 			if (frm.is_new() || frm.doc.docstatus !== 1 || frm.doc.is_closed) return;
 			if (!frappe.model.can_create("PDC Cheque") && !frappe.model.can_create("Bank Transfer")) return;
 			const name = frm.doc.name;
-			frappe.xcall("treasury.integrations.custody.api.get_payment_context", { custody_request: name }).then((ctx) => {
-				// the form may show another request by now
-				if (!ctx || frm.doc.name !== name) return;
+			const method = "treasury.integrations.custody.api.get_payment_context";
+			frappe.xcall(method, { custody_request: name }, "GET").then((ctx) => {
+				// the form may show another request by now; nothing to offer without a Treasury role
+				if (!ctx || frm.doc.name !== name || !(ctx.can_cheque || ctx.can_transfer)) return;
 				clear_block(frm);
 				const shown = add_buttons(frm, ctx);
 				show_block(frm, ctx, shown);
