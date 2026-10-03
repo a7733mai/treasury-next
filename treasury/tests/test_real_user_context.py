@@ -194,9 +194,10 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 		self.addCleanup(frappe.clear_cache)
 
 	def test_frozen_accounts_apply_to_the_real_user(self):
-		self.freeze_accounts(day(-40))
+		# the invoice is posted before the books are frozen
 		pi = make_purchase_invoice(1000, posting_date=day(-60))
 		cheque = make_pdc_cheque(amount=1000, issue_date=day(-60), due_date=day(-30), invoice=pi)
+		self.freeze_accounts(day(-40))
 		frappe.db.savepoint(SAVEPOINT)
 		with self.set_user(TREASURY_USER):
 			# the party Payment Entry is dated day(-59), inside the frozen period
@@ -233,6 +234,10 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 		self.assert_authored_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
 		shares = {"share_doctype": "Purchase Invoice", "share_name": pi.name}
 		self.assertFalse(frappe.db.exists("DocShare", shares))
+		# nor is the party left shared with the user
+		self.assertFalse(
+			frappe.db.exists("DocShare", {"share_doctype": "Supplier", "share_name": pi.supplier})
+		)
 		reference = frappe.db.get_value(
 			"Payment Entry Reference", {"parent": cheque.party_payment_entry}, "reference_name"
 		)

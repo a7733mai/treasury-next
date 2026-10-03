@@ -67,22 +67,24 @@ def _in_service_context(fn):
 
 
 @contextmanager
-def _reference_read_access(references):
-	"""Let the session user read the invoices / orders a Payment Entry allocates against, for the duration of
-	the block only.
+def _reference_read_access(references, party_type=None, party=None):
+	"""Let the session user read the invoices / orders a Payment Entry allocates against (and the party they
+	belong to), for the duration of the block only.
 
-	ERPNext's (and HRMS') Payment Entry validation calls `frappe.has_permission(<reference>, "read", <name>,
-	throw=True)` for the SESSION user, with no bypass flag, and Treasury roles hold no permission on these
-	doctypes (the app grants none). Instead of running as Administrator or granting the roles read access to
-	every invoice, the user is shared exactly the allocated documents (read only) and the shares this block
-	created are removed again on exit. Only called after the Treasury source-document permission + role check.
+	ERPNext's (and HRMS') Payment Entry validation calls `frappe.has_permission(<reference / party>, "read",
+	<name>, throw=True)` for the SESSION user, with no bypass flag, and Treasury roles hold no permission on
+	these doctypes (the app grants none). Instead of running as Administrator or granting the roles read
+	access to every invoice, the user is shared exactly the allocated documents and the party (read only)
+	and the shares this block created are removed again on exit. Only called after the Treasury source-document permission + role check.
 	"""
 	user = frappe.session.user
 	created: list[str] = []
 	if user != "Administrator":
 		seen = set()
-		for ref in references or []:
-			key = (ref.reference_doctype, ref.reference_name)
+		keys = [(ref.reference_doctype, ref.reference_name) for ref in references or []]
+		if references and party_type and party:
+			keys.append((party_type, party))
+		for key in keys:
 			if key in seen or not all(key):
 				continue
 			seen.add(key)
@@ -588,7 +590,7 @@ def create_payment_entry(
 	_apply_rule_fields(pe, rules.fields)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
 	pe.flags.ignore_permissions = True  # SECURITY: after the source-document permission + role check
-	with _reference_read_access(pe.get("references")):
+	with _reference_read_access(pe.get("references"), party_type, party):
 		pe.insert()
 		if charges:
 			_absorb_rounding(pe, charges_account, party_cap, amounts.precision)
