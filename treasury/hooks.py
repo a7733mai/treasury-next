@@ -103,6 +103,7 @@ jinja = {
 		"treasury.utils.amount_in_words.treasury_amount_in_words",
 		"treasury.utils.print_helpers.treasury_print_direction",
 		"treasury.utils.print_helpers.treasury_print_date",
+		"treasury.utils.voucher_print.treasury_voucher_context",
 		"treasury.utils.print_helpers.treasury_batch_receipt",
 		"treasury.utils.print_helpers.treasury_payment_entries",
 		"treasury.utils.print_helpers.treasury_party_account_no",
