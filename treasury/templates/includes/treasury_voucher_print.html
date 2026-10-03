@@ -1,0 +1,192 @@
+{#- Shared macros of the bilingual Treasury vouchers (Receipt / Payment / Journal Voucher). Arabic and English
+    are printed side by side whatever the print language. Tables only (wkhtmltopdf), no fixed widths in mm so the
+    page fits A4 and A5; every value is escaped with | e (Frappe's Jinja does not autoescape). -#}
+
+{% macro style() -%}
+<style>
+	.tv { font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "DejaVu Sans", Tahoma, Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #000; position: relative; }
+	.tv table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+	.tv .tv-company { text-align: center; font-size: 13pt; font-weight: bold; margin: 0 0 4px; }
+	.tv .tv-title { text-align: center; margin: 4px 0 8px; }
+	.tv .tv-title b { display: block; font-size: 14pt; }
+	.tv .tv-title span { display: block; font-size: 11pt; }
+	.tv td, .tv th { border: 0.75pt solid #888; padding: 3px 5px; vertical-align: top; }
+	.tv th { background: #F2F2F2; }
+	.tv td.tv-label { width: 20%; background: #F2F2F2; white-space: nowrap; }
+	.tv .lbl b { display: block; }
+	.tv .lbl i { display: block; font-size: 8pt; color: #555; font-style: normal; }
+	.tv .tv-amount td { font-size: 11pt; }
+	.tv .tv-figure { font-size: 14pt; font-weight: bold; }
+	.tv .tv-words-ar { direction: rtl; text-align: right; }
+	.tv .tv-words-en { direction: ltr; text-align: left; }
+	.tv .num { direction: ltr; unicode-bidi: embed; white-space: nowrap; }
+	.tv td.tv-num, .tv th.tv-num { text-align: right; direction: ltr; }
+	.tv .tv-total td { font-weight: bold; border-top: 3px double #000; }
+	.tv .tv-sign { page-break-inside: avoid; margin-top: 10px; }
+	.tv .tv-sign td { width: 25%; height: 22mm; text-align: center; }
+	.tv .tv-sign .tv-line { margin-top: 3mm; font-size: 9pt; }
+	.tv .tv-narration td { min-height: 12mm; }
+	.tv .tv-watermark { position: absolute; top: 30%; left: 10%; width: 80%; text-align: center; font-size: 48pt; opacity: 0.12; transform: rotate(-30deg); }
+	.tv bdi { unicode-bidi: isolate; }
+</style>
+{%- endmacro %}
+
+{% macro L(pair) -%}
+<span class="lbl"><b>{{ pair[0] | e }}</b><i>{{ pair[1] | e }}</i></span>
+{%- endmacro %}
+
+{% macro header(doc, letter_head, no_letterhead, c) -%}
+{%- if c.docstatus == 0 -%}
+<div class="tv-watermark">{{ c.labels.draft[0] | e }} / {{ c.labels.draft[1] | e }}</div>
+{%- elif c.docstatus == 2 -%}
+<div class="tv-watermark">{{ c.labels.cancelled[0] | e }} / {{ c.labels.cancelled[1] | e }}</div>
+{%- endif -%}
+{%- if letter_head and not no_letterhead -%}
+<div class="letter-head">{{ letter_head }}</div>
+{%- else -%}
+<p class="tv-company">{{ doc.company | e }}</p>
+{%- endif -%}
+<div class="tv-title"><b>{{ c.title[0] | e }}</b><span>{{ c.title[1] | e }}</span></div>
+<script>document.title = {{ doc.name | string | tojson }};</script>
+{%- endmacro %}
+
+{% macro amount_box(c) -%}
+<table class="tv-amount">
+	<tr><td class="tv-label">{{ L(c.labels.amount) }}</td><td><span class="tv-figure num">{{ c.amount_formatted | e }}</span></td></tr>
+	<tr>
+		<td class="tv-label">{{ L(c.labels.in_words) }}</td>
+		<td>
+			<div class="tv-words-ar">{{ c.words_ar | e }}</div>
+			<div class="tv-words-en">{{ c.words_en | e }}</div>
+		</td>
+	</tr>
+</table>
+{%- endmacro %}
+
+{% macro narration(c) -%}
+<table class="tv-narration">
+	<tr><td class="tv-label">{{ L(c.labels.narration) }}</td><td>{{ (c.narration or "") | e }}</td></tr>
+</table>
+{%- endmacro %}
+
+{% macro signatures(c, receiver=True) -%}
+<table class="tv-sign">
+	<tr>
+		{%- set cells = [(c.labels.prepared_by, c.prepared_by), (c.labels.checked_by, ""), (c.labels.approved_by, "")] -%}
+		{%- if receiver %}{% set cells = cells + [(c.labels.received_by, "")] %}{% endif -%}
+		{%- for label, person in cells %}
+		<td>
+			{{ L(label) }}
+			<div class="tv-line">{{ c.labels.name[0] | e }} / {{ c.labels.name[1] | e }}: {{ (person or "__________") | e }}</div>
+			<div class="tv-line">{{ c.labels.signature[0] | e }} / {{ c.labels.signature[1] | e }}: __________</div>
+		</td>
+		{%- endfor %}
+	</tr>
+</table>
+{%- endmacro %}
+
+{#- the Payment Entry voucher: Receipt and Payment share it (the context decides the wording) -#}
+{% macro payment_entry_voucher(doc, letter_head, no_letterhead) -%}
+{%- set c = treasury_voucher_context(doc) -%}
+{{ style() }}
+<div class="tv" dir="ltr">
+	{{ header(doc, letter_head, no_letterhead, c) }}
+	<table>
+		<tr>
+			<td class="tv-label">{{ L(c.labels.number) }}</td><td><bdi>{{ doc.name | e }}</bdi></td>
+			<td class="tv-label">{{ L(c.labels.date) }}</td><td>{{ frappe.utils.formatdate(doc.posting_date) }}</td>
+		</tr>
+		<tr>
+			<td class="tv-label">{{ L(c.party_label) }}</td><td colspan="3"><bdi>{{ c.party | e }}</bdi>{% if c.party_id and c.party_id != c.party %} <small>(<bdi>{{ c.party_id | e }}</bdi>)</small>{% endif %}</td>
+		</tr>
+	</table>
+	{{ amount_box(c) }}
+	<table>
+		<tr>
+			<td class="tv-label">{{ L(c.labels.mode) }}</td>
+			<td>{{ c.mode_label[0] | e }} / {{ c.mode_label[1] | e }}{% if c.mode_of_payment %} · <bdi>{{ c.mode_of_payment | e }}</bdi>{% endif %}</td>
+			<td class="tv-label">{{ L(c.account_label) }}</td><td><bdi>{{ (c.account or "") | e }}</bdi></td>
+		</tr>
+		{%- if c.cheque_no or c.cheque_date or c.bank %}
+		<tr>
+			<td class="tv-label">{{ L(c.labels.cheque_no) }}</td><td><bdi>{{ (c.cheque_no or "") | e }}</bdi></td>
+			<td class="tv-label">{{ L(c.labels.cheque_date) }}</td><td>{{ frappe.utils.formatdate(c.cheque_date) if c.cheque_date else "" }}</td>
+		</tr>
+		{%- if c.bank %}
+		<tr><td class="tv-label">{{ L(c.labels.bank) }}</td><td colspan="3"><bdi>{{ c.bank | e }}</bdi></td></tr>
+		{%- endif %}
+		{%- endif %}
+		{%- if c.project or c.cost_center %}
+		<tr>
+			<td class="tv-label">{{ L(c.labels.project) }}</td><td><bdi>{{ (c.project or "") | e }}</bdi></td>
+			<td class="tv-label">{{ L(c.labels.cost_center) }}</td><td><bdi>{{ (c.cost_center or "") | e }}</bdi></td>
+		</tr>
+		{%- endif %}
+	</table>
+	{%- if c.references %}
+	<table>
+		<tr><th>{{ L(c.labels.type) }}</th><th>{{ L(c.labels.reference) }}</th><th class="tv-num">{{ L(c.labels.allocated) }}</th></tr>
+		{%- for ref in c.references %}
+		<tr><td>{{ ref.type | e }}</td><td><bdi>{{ ref.name | e }}</bdi></td><td class="tv-num">{{ ref.allocated | e }}</td></tr>
+		{%- endfor %}
+	</table>
+	{%- endif %}
+	{{ narration(c) }}
+	{{ signatures(c, receiver=True) }}
+</div>
+{%- endmacro %}
+
+{% macro journal_voucher(doc, letter_head, no_letterhead) -%}
+{%- set c = treasury_voucher_context(doc) -%}
+{{ style() }}
+<div class="tv" dir="ltr">
+	{{ header(doc, letter_head, no_letterhead, c) }}
+	<table>
+		<tr>
+			<td class="tv-label">{{ L(c.labels.number) }}</td><td><bdi>{{ doc.name | e }}</bdi></td>
+			<td class="tv-label">{{ L(c.labels.date) }}</td><td>{{ frappe.utils.formatdate(doc.posting_date) }}</td>
+		</tr>
+		<tr>
+			<td class="tv-label">{{ L(c.labels.voucher_type) }}</td><td>{{ (c.voucher_type or "") | e }}</td>
+			<td class="tv-label">{{ L(c.labels.mode) }}</td>
+			<td>{% if c.mode == "cash" %}{{ c.labels.cash[0] | e }} / {{ c.labels.cash[1] | e }}{% elif c.mode == "bank" %}{{ c.labels.bank_mode[0] | e }} / {{ c.labels.bank_mode[1] | e }}{% endif %}</td>
+		</tr>
+		{%- if c.cheque_no or c.cheque_date %}
+		<tr>
+			<td class="tv-label">{{ L(c.labels.cheque_no) }}</td><td><bdi>{{ (c.cheque_no or "") | e }}</bdi></td>
+			<td class="tv-label">{{ L(c.labels.cheque_date) }}</td><td>{{ frappe.utils.formatdate(c.cheque_date) if c.cheque_date else "" }}</td>
+		</tr>
+		{%- endif %}
+		{%- if c.project or c.cost_center %}
+		<tr>
+			<td class="tv-label">{{ L(c.labels.project) }}</td><td><bdi>{{ (c.project or "") | e }}</bdi></td>
+			<td class="tv-label">{{ L(c.labels.cost_center) }}</td><td><bdi>{{ (c.cost_center or "") | e }}</bdi></td>
+		</tr>
+		{%- endif %}
+	</table>
+	<table>
+		<tr>
+			<th>{{ L(c.labels.account) }}</th>
+			<th>{{ L(c.labels.line_party) }}</th>
+			<th class="tv-num">{{ L(c.labels.debit) }}</th>
+			<th class="tv-num">{{ L(c.labels.credit) }}</th>
+		</tr>
+		{%- for line in c.lines %}
+		<tr>
+			<td><bdi>{{ line.account | e }}</bdi>{% if line.remark %}<br><small>{{ line.remark | e }}</small>{% endif %}</td>
+			<td><bdi>{{ line.party | e }}</bdi></td>
+			<td class="tv-num">{{ line.debit | e }}</td>
+			<td class="tv-num">{{ line.credit | e }}</td>
+		</tr>
+		{%- endfor %}
+		<tr class="tv-total">
+			<td colspan="2">{{ L(c.labels.total) }}</td>
+			<td class="tv-num">{{ c.total_debit | e }}</td>
+			<td class="tv-num">{{ c.total_credit | e }}</td>
+		</tr>
+	</table>
+	{{ amount_box(c) }}
+	{{ narration(c) }}
+	{{ signatures(c, receiver=False) }}
+</div>
+{%- endmacro %}
