@@ -35,7 +35,7 @@ from treasury.balance_alerts import guard
 from treasury.bank_facilities import accounting as facility_accounting
 from treasury.bank_facilities import instruments
 from treasury.bank_transfers import bank_supplier, fees
-from treasury.utils.context import SYSTEM_USER, elevated, real_user
+from treasury.utils.context import SYSTEM_USER, real_user, service_context
 from treasury.utils.protected_fields import insert_log_row
 
 DOCTYPE = "Bank Transfer"
@@ -384,7 +384,7 @@ def send(name: str, system: bool = False) -> dict:
 	"""Send a Scheduled transfer on its execution date (the daily job: `system=True`, as Administrator, who
 	is also the acting user; the approval was checked when the transfer was submitted)."""
 	if system:
-		with elevated(actor=SYSTEM_USER):
+		with service_context(actor=SYSTEM_USER):
 			return _send_scheduled(name, system=True)
 	return _send_scheduled(name)
 

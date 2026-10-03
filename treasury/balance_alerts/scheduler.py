@@ -28,7 +28,7 @@ from treasury.balance_alerts.positions import (
 	horizon,
 )
 from treasury.pdc.report_utils import get_precision
-from treasury.utils.context import SYSTEM_USER, elevated
+from treasury.utils.context import SYSTEM_USER, service_context
 
 LOG_DOCTYPE = "Treasury Alert Log"
 SETTINGS = "Treasury Company Settings"
@@ -69,7 +69,7 @@ def evaluate_company(company: str, now=None, send_digest: bool = False) -> dict:
 		return result
 	# serialises the hourly job and the event jobs of one company
 	frappe.db.get_value(SETTINGS, company, "name", for_update=True)
-	with elevated(actor=SYSTEM_USER):
+	with service_context(actor=SYSTEM_USER):
 		positions = evaluate(company, today=now.date())
 	digest_hour = cint(settings.balance_digest_hour)
 	if send_digest and settings.send_balance_digest and now.hour >= digest_hour:

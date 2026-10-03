@@ -15,8 +15,8 @@ from treasury.utils.settings import set_missing_single_defaults
 TREASURY_ROLES = ("Treasury Manager", "Treasury User", "Cheque Approver")
 TREASURY_MODULE = "Treasury Setup"
 
-# The app grants no permission on core doctypes: the posting service builds the vouchers in an elevated
-# context (treasury.accounting.posting). Earlier development versions granted the Treasury roles read
+# The app grants no permission on core doctypes: the posting service builds the vouchers as the real user, each
+# document with a narrow ignore_permissions (treasury.accounting.posting). Earlier development versions granted the Treasury roles read
 # access to these doctypes through Custom DocPerm, which also copied (froze) their standard permissions;
 # `remove_legacy_permissions` undoes that once per site.
 LEGACY_PERMISSION_ROLES = ("Treasury Manager", "Treasury User")

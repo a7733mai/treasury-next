@@ -11,7 +11,7 @@ Equality contract (tested): for a bank B and day d, `closing` equals the Daily "
 the report run with bank_account = [B], Bank Currency, include_overdue = 1, from = today, to = today + H - 1
 (day 0: the "today" row, after the Overdue row).
 
-Permissions are the caller's (the engine reads with `frappe.get_list`); system callers run it in `elevated()`.
+Permissions are the caller's (the engine reads with `frappe.get_list`); system callers run it in `service_context()`.
 """
 
 import frappe

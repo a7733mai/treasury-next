@@ -16,8 +16,6 @@ import json
 import frappe
 from frappe import _
 
-from treasury.utils.context import real_user
-
 SETTINGS = "Treasury Company Settings"
 MAP_DOCTYPE = "Treasury Payment Mode Map"
 METHODS = (
@@ -82,7 +80,7 @@ def validate_name_template(template: str | None):
 
 def generate(settings_doc, methods=None, bank_accounts=None) -> dict:
 	"""Create the missing Modes of Payment of (bank account, method) and append the missing map rows to
-	`settings_doc` (the caller saves it). Runs in `elevated` after the caller's permission check.
+	`settings_doc` (the caller saves it). Runs in `service_context` after the caller's permission check.
 
 	Returns {"created": [modes], "linked": [modes given a row for the company], "skipped": [{"mode", "reason"}]}.
 	"""
@@ -156,9 +154,9 @@ def _ensure_mode(name: str, company: str, gl_account: str, result: dict) -> str 
 				"accounts": [{"company": company, "default_account": gl_account}],
 			}
 		)
-		mode.flags.ignore_permissions = True  # the caller checked the user's role on the settings
+		# SECURITY: after the caller checked the user's role on the settings
+		mode.flags.ignore_permissions = True
 		mode.insert()
-		_stamp_owner(mode.name)
 		result["created"].append(mode.name)
 		return None
 
@@ -173,18 +171,11 @@ def _ensure_mode(name: str, company: str, gl_account: str, result: dict) -> str 
 			row.default_account = gl_account
 		else:
 			mode.append("accounts", {"company": company, "default_account": gl_account})
+		# SECURITY: after the caller checked the user's role on the settings
 		mode.flags.ignore_permissions = True
 		mode.save()
 		result["linked"].append(mode.name)
 	return None
-
-
-def _stamp_owner(name: str):
-	user = real_user()
-	if user != frappe.session.user:
-		frappe.db.set_value(
-			"Mode of Payment", name, {"owner": user, "modified_by": user}, update_modified=False
-		)
 
 
 def _bank_values(bank_account: str) -> frappe._dict:

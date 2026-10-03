@@ -33,7 +33,7 @@ from treasury.balance_alerts import guard
 from treasury.pdc import cheque_printing
 from treasury.pdc.batch_status import in_batch_operation, lock_batch, update_batch_status
 from treasury.pdc.doctype.cheque_book.cheque_book import record_cancelled_leaf
-from treasury.utils.context import SYSTEM_USER, elevated, real_user
+from treasury.utils.context import SYSTEM_USER, real_user, service_context
 from treasury.utils.protected_fields import insert_log_row
 
 DOCTYPE = "PDC Cheque"
@@ -136,7 +136,7 @@ def after_insert(doc):
 		return
 	# No `_begin` permission check here: the user's *create* permission on PDC Cheque, checked by
 	# `Document.insert` before this hook runs, is what authorises this posting. Only after it does the
-	# posting service build the Payment Entry in its elevated context (treasury.utils.context.elevated).
+	# posting service build the Payment Entry in `treasury.utils.context.service_context`.
 	_post_party(doc, doc.issue_date)
 	# The parent insert is still running: write the changes in place instead of a nested save.
 	# This relies on Frappe's insert order (the parent row and its existing children are already in the
@@ -199,13 +199,13 @@ def post_party(name: str, posting_date=None, *, system: bool = False) -> dict:
 	The default posting date is the effective (possibly postponed) due date, or the handover / receipt date
 	when the cheque was handed over after its due date.
 
-	`system=True` is the internal entry point of the scheduler (treasury.pdc.scheduler): it skips the user
-	permission / role check and runs as Administrator (`treasury.utils.context.elevated`), who is also
+	permission / role check and runs in `treasury.utils.context.service_context` with Administrator recorded
+	as the acting user (the scheduler session user is Administrator too), whoever the session user is;
 	recorded as the acting user, whoever the session user is; every business rule of `_post_party_now`
 	still applies. Never pass it from a whitelisted method.
 	"""
 	if system:
-		with elevated(actor=SYSTEM_USER):
+		with service_context(actor=SYSTEM_USER):
 			return _post_party_now(name, posting_date, system=True)
 	return _post_party_now(name, posting_date)
 
@@ -1175,8 +1175,8 @@ def _cancel_voucher(doctype: str, name: str, hint: bool = True):
 def _begin(name: str, roles: tuple[str, ...] | None = None, ptype: str = "write", system: bool = False):
 	"""Lock the cheque row, reload it and check permissions.
 
-	`system`: internal service call (scheduler, run inside `elevated`) — no user permission / role check.
-	The vouchers themselves are built by the posting service in an elevated context, *after* this check.
+	`system`: internal service call (scheduler, run inside `service_context`) — no user permission / role check.
+	The vouchers themselves are built by the posting service in `service_context`, *after* this check.
 
 	A cheque of a Cheque Batch locks the batch row first (always batch before cheque, so no deadlock): the
 	actions on cheques of one batch are serialised and the batch status is never refreshed from stale data.

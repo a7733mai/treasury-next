@@ -19,7 +19,7 @@ from frappe.utils import cint, flt, fmt_money, getdate, today
 
 from treasury.accounting import posting
 from treasury.bank_facilities import accounting, repayment
-from treasury.utils.context import SYSTEM_USER, elevated
+from treasury.utils.context import SYSTEM_USER, service_context
 
 DRAWDOWN = "Facility Drawdown"
 SCHEDULE = "Facility Repayment Schedule"
@@ -62,7 +62,7 @@ def post_due_auto_debits(as_of=None) -> dict:
 	):
 		frappe.db.savepoint(SAVEPOINT)
 		try:
-			with elevated(actor=SYSTEM_USER):
+			with service_context(actor=SYSTEM_USER):
 				names = _post_drawdown(drawdown.name, as_of)
 		except Exception:
 			frappe.db.rollback(save_point=SAVEPOINT)
