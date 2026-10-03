@@ -61,28 +61,45 @@ def treasury_amount_in_words(
 	# a currency without fraction units still has cents: its fraction is worded, never dropped
 	fraction_units = fraction_units or DEFAULT_FRACTION_UNITS
 
+	# round to the currency's decimals first: 10.999 is 11.00, never "ten and 100/100"
+	amount = flt(amount, len(str(fraction_units)) - 1)
 	main = int(amount)
 	fraction = round((amount - main) * fraction_units) if fraction_units else 0
 	if fraction_units and fraction >= fraction_units:
 		main, fraction = main + 1, 0
+
+	# Arabic number-noun agreement applies to the known currencies' own names (not to a Cheque Layout's)
+	arabic = (lang or "en").split("-")[0].split("_")[0] == "ar"
+	forms = ARABIC_FORMS.get(currency or "") if arabic else None
+	main_forms = forms[0] if forms and currency_name is None else None
+	fraction_forms = forms[1] if forms and fraction_name is None else None
 
 	if currency_name is None:
 		currency_name = CURRENCY_NAMES.get(currency, currency or "")
 		currency_name = _(currency_name, lang=lang, context=CONTEXT) if currency_name else ""
 	# a fraction-only amount (0.75) is the fraction alone: "seventy five dirhams", never "zero riyals and ..."
 	fraction_only = main == 0 and fraction > 0 and fraction_style != "Figures"
-	text = "" if fraction_only else f"{number_in_words(main, lang)} {currency_name}".strip()
+	if fraction_only:
+		text = ""
+	elif main_forms:
+		text = counted_in_arabic(main, main_forms)
+	else:
+		text = f"{number_in_words(main, lang)} {currency_name}".strip()
 	if fraction and fraction_style == "Figures":
 		text = _("{0} and {1}/{2}", lang=lang, context=CONTEXT).format(text, fraction, fraction_units)
 	elif fraction:
 		if fraction_name is None:
 			fraction_name = _(default_fraction, lang=lang, context=CONTEXT) if default_fraction else ""
-		if fraction_only:
-			text = f"{number_in_words(fraction, lang)} {fraction_name}".strip()
+		if fraction_forms:
+			fraction_text = counted_in_arabic(fraction, fraction_forms)
 		else:
-			text = _("{0} and {1} {2}", lang=lang, context=CONTEXT).format(
-				text, number_in_words(fraction, lang), fraction_name
-			)
+			fraction_text = f"{number_in_words(fraction, lang)} {fraction_name}".strip()
+		if fraction_only:
+			text = fraction_text
+		elif arabic:
+			text = f"{text} و{fraction_text}"  # the Arabic conjunction attaches to the word it introduces
+		else:
+			text = _("{0} and {1} {2}", lang=lang, context=CONTEXT).format(text, fraction_text, "")
 	text = text.strip()
 	return _("{0} only", lang=lang, context=CONTEXT).format(text) if only else text
 
@@ -98,4 +115,55 @@ def number_in_words(number: int, lang: str = "en") -> str:
 		code = "en"
 		words = num2words(int(number), lang=code)
 	words = words.replace("-", " ")
+	if code == "ar":
+		words = words.replace(" و ", " و")  # the conjunction attaches to the word it introduces
 	return words.title() if code == "en" else words
+
+
+# Arabic forms of a currency and of its fraction unit, per currency code: (singular, dual, plural,
+# accusative singular). Arabic counts nouns by number, not by a plural suffix: see `counted_in_arabic`.
+ARABIC_FORMS = {
+	"QAR": (
+		("ريال قطري", "ريالان قطريان", "ريالات قطرية", "ريالاً قطرياً"),
+		("درهم", "درهمان", "دراهم", "درهماً"),
+	),
+	"SAR": (
+		("ريال سعودي", "ريالان سعوديان", "ريالات سعودية", "ريالاً سعودياً"),
+		("هللة", "هللتان", "هللات", "هللةً"),
+	),
+	"AED": (
+		("درهم إماراتي", "درهمان إماراتيان", "دراهم إماراتية", "درهماً إماراتياً"),
+		("فلس", "فلسان", "فلوس", "فلساً"),
+	),
+	"KWD": (
+		("دينار كويتي", "ديناران كويتيان", "دنانير كويتية", "ديناراً كويتياً"),
+		("فلس", "فلسان", "فلوس", "فلساً"),
+	),
+	"USD": (
+		("دولار أمريكي", "دولاران أمريكيان", "دولارات أمريكية", "دولاراً أمريكياً"),
+		("سنت", "سنتان", "سنتات", "سنتاً"),
+	),
+	"EGP": (
+		("جنيه مصري", "جنيهان مصريان", "جنيهات مصرية", "جنيهاً مصرياً"),
+		("قرش", "قرشان", "قروش", "قرشاً"),
+	),
+}
+
+
+def counted_in_arabic(number: int, forms: tuple[str, str, str, str]) -> str:
+	"""`number` of a noun in Arabic, the noun in the form its number requires (`forms`: singular, dual,
+	plural, accusative singular): 1 follows the noun ("ريال قطري واحد"); 2 is the dual alone; the last two
+	digits 3-10 take the plural; 11-99 (and 1 or 2 after hundreds/thousands, "مئة وواحد ريالاً") the
+	accusative singular; a round hundred, thousand or million, and zero, the genitive singular."""
+	singular, dual, plural, accusative = forms
+	tail = number % 100
+	if number == 1:
+		return f"{singular} {number_in_words(1, 'ar')}"
+	if number == 2:
+		return dual
+	words = number_in_words(number, "ar")
+	if 3 <= tail <= 10:
+		return f"{words} {plural}"
+	if tail == 0:
+		return f"{words} {singular}"
+	return f"{words} {accusative}"

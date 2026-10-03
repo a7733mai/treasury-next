@@ -189,7 +189,7 @@ class TestChequePrinting(TreasuryTestMixin, IntegrationTestCase):
 		self.assertTrue(leaf.words.startswith("فقط"), leaf.words)
 		self.assertTrue(leaf.words.endswith("لا غير"), leaf.words)
 		self.assertIn("ألف", leaf.words)
-		self.assertIn("جنيه مصري", leaf.words)
+		self.assertIn("جنيهاً مصرياً", leaf.words)
 		self.assertEqual(leaf.crossing, "لحساب المستفيد الأول")
 
 	def test_arabic_indic_digits(self):

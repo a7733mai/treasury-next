@@ -16,6 +16,7 @@ from treasury.tests.utils import (
 	make_purchase_invoice,
 	make_sales_invoice,
 )
+from treasury.utils.amount_in_words import number_in_words
 from treasury.utils.voucher_print import (
 	arabic_amount_in_words,
 	english_amount_in_words,
@@ -55,14 +56,14 @@ class TestVoucherAmountInWords(IntegrationTestCase):
 	def test_arabic_amounts(self):
 		words = arabic_amount_in_words(1250.50, "QAR")
 		self.assertTrue(ARABIC.search(words))
-		for part in ("ألف", "ريال قطري", "درهم", "فقط", "لا غير"):
+		for part in ("ألف", "ريالاً قطرياً", "درهماً", "فقط", "لا غير"):
 			self.assertIn(part, words)
 
 	def test_arabic_fraction_only(self):
 		words = arabic_amount_in_words(0.75, "QAR")
 		self.assertIn("درهم", words)
 		self.assertNotIn("ريال", words)
-		self.assertIn("خمسة و سبعون", words)  # num2words spells the conjunction apart
+		self.assertIn("خمسة وسبعون", words)
 
 	def test_one_million(self):
 		self.assertIn("مليون", arabic_amount_in_words(1000000, "QAR"))
@@ -201,39 +202,55 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 
 
 class TestArabicAmountInWordsGrammar(IntegrationTestCase):
-	"""Arabic wording of QAR amounts: "فقط <riyals> ريال قطري و<dirhams> درهم لا غير"."""
+	"""Arabic number-noun agreement of QAR amounts: "فقط <riyals> <riyal form> و<dirhams> <dirham form> لا غير"."""
 
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
 		frappe.db.set_value("Currency", "QAR", {"enabled": 1, "fraction": "Dirham", "fraction_units": 100})
 
-	def test_1250_50_qar_structure(self):
-		words = arabic_amount_in_words(1250.50, "QAR")
-		self.assertTrue(words.startswith("فقط "), words)
-		self.assertTrue(words.endswith(" لا غير"), words)
-		# riyals first, then the dirham fraction joined with the conjunction "و"
-		self.assertLess(words.index("ألف"), words.index("ريال قطري"))
-		self.assertRegex(words, r"ريال قطري و\S+ درهم لا غير$")
-		self.assertIn("خمسون درهم", words)  # 50 dirhams
+	def words(self, amount):
+		return arabic_amount_in_words(amount, "QAR")
+
+	def test_one_follows_the_noun(self):
+		self.assertEqual(self.words(1), "فقط ريال قطري واحد لا غير")
+
+	def test_two_is_the_dual_alone(self):
+		self.assertEqual(self.words(2), "فقط ريالان قطريان لا غير")
+
+	def test_three_to_ten_take_the_plural(self):
+		self.assertEqual(self.words(3), f"فقط {number_in_words(3, 'ar')} ريالات قطرية لا غير")
+
+	def test_eleven_to_ninety_nine_take_the_accusative_singular(self):
+		self.assertEqual(self.words(11), f"فقط {number_in_words(11, 'ar')} ريالاً قطرياً لا غير")
+		self.assertEqual(self.words(50), "فقط خمسون ريالاً قطرياً لا غير")
+
+	def test_round_hundreds_and_millions_take_the_genitive_singular(self):
+		self.assertEqual(self.words(100), f"فقط {number_in_words(100, 'ar')} ريال قطري لا غير")
+		self.assertEqual(self.words(1000000), "فقط مليون ريال قطري لا غير")
+
+	def test_1250_50_qar(self):
+		words = self.words(1250.50)
+		self.assertEqual(words, f"فقط {number_in_words(1250, 'ar')} ريالاً قطرياً وخمسون درهماً لا غير")
+		self.assertNotIn(" و ", words)  # the conjunction is attached to the word it introduces
 
 	def test_0_75_qar_is_dirhams_only(self):
-		words = arabic_amount_in_words(0.75, "QAR")
-		self.assertEqual(words, "فقط خمسة و سبعون درهم لا غير")
+		self.assertEqual(self.words(0.75), f"فقط {number_in_words(75, 'ar')} درهماً لا غير")
 
-	def test_1_000_000_qar_has_no_fraction(self):
-		words = arabic_amount_in_words(1000000, "QAR")
-		self.assertEqual(words, "فقط مليون ريال قطري لا غير")
+	def test_fraction_counts_agree_too(self):
+		self.assertEqual(self.words(1.01), "فقط ريال قطري واحد ودرهم واحد لا غير")
+		self.assertEqual(self.words(1.02), "فقط ريال قطري واحد ودرهمان لا غير")
+		self.assertEqual(self.words(1.05), f"فقط ريال قطري واحد و{number_in_words(5, 'ar')} دراهم لا غير")
+
+	def test_conjunction_attached_in_number_words(self):
+		self.assertNotIn(" و ", number_in_words(75, "ar"))
+
+	def test_amount_is_rounded_to_the_currency_decimals_first(self):
+		# 1.999 is 2.00: the dual, never "one riyal and one hundred dirhams"
+		self.assertEqual(self.words(1.999), "فقط ريالان قطريان لا غير")
 
 	def test_whole_riyals_have_no_dirham_part(self):
-		self.assertNotIn("درهم", arabic_amount_in_words(2, "QAR"))
-		self.assertIn("ريال قطري", arabic_amount_in_words(2, "QAR"))
-
-	def test_fraction_rounding_carries_into_riyals(self):
-		# 0.999 rounds to 100 dirhams = one more riyal, never "مئة درهم"
-		words = arabic_amount_in_words(1.999, "QAR")
-		self.assertNotIn("درهم", words)
-		self.assertIn("ريال قطري", words)
+		self.assertNotIn("درهم", self.words(2))
 
 	def test_zero_and_negative(self):
-		self.assertEqual(arabic_amount_in_words(-5, "QAR"), "")
+		self.assertEqual(self.words(-5), "")
