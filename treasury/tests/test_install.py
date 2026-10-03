@@ -32,7 +32,9 @@ class TestInstall(IntegrationTestCase):
 	def test_before_install_creates_the_payee_group_and_is_registered(self):
 		# init_singles saves Treasury Settings (default Payee Supplier Group, a validated Link) before
 		# after_install: the group must already exist then, so the hook creates it.
-		self.assertIn("treasury.install.before_install", frappe.get_hooks("before_install", app_name="treasury"))
+		self.assertIn(
+			"treasury.install.before_install", frappe.get_hooks("before_install", app_name="treasury")
+		)
 		install.before_install()
 		self.assertTrue(frappe.db.exists("Supplier Group", DEFAULT_PAYEE_GROUP))
 		install.before_install()  # idempotent
