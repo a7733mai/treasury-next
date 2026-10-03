@@ -25,7 +25,7 @@ from treasury.balance_alerts import positions as balance_positions
 from treasury.balance_alerts import recipients
 from treasury.pdc import scheduler as pdc_scheduler
 from treasury.pdc.report_utils import validate_company
-from treasury.utils.context import SYSTEM_USER, elevated
+from treasury.utils.context import SYSTEM_USER, service_context
 
 DIGEST_TEMPLATE = "treasury/templates/emails/bank_position_digest.html"
 ALERT_TEMPLATE = "treasury/templates/emails/balance_alert.html"
@@ -531,7 +531,7 @@ def _manager_company(company: str) -> str:
 def _visible_positions(company: str, user: str, today) -> list:
 	"""The positions `user` would receive, limited to the banks the acting manager may see too: a preview never
 	shows a bank outside the manager's own User Permissions."""
-	with elevated(actor=SYSTEM_USER):
+	with service_context(actor=SYSTEM_USER):
 		positions = balance_positions.evaluate(company, today=today)
 	names = [p.bank_account for p in positions]
 	banks = set(recipients.visible_banks(user, company, names))

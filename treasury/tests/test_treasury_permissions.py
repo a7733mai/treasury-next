@@ -1,7 +1,7 @@
 """Treasury roles without any ERPNext accounting role can run the posting actions end to end.
 
 The app grants the Treasury roles no permission on core doctypes: the posting service builds the vouchers
-in an elevated context (treasury.utils.context.elevated) after the lifecycle checked the user's permission
+as the real user in `treasury.utils.context.service_context` after the lifecycle checked the user's permission
 on the cheque. Also covers the one-time removal of the Custom DocPerm grants of earlier versions.
 """
 
@@ -40,7 +40,7 @@ from treasury.tests.utils import (
 	make_sales_invoice,
 	set_bank_suppliers,
 )
-from treasury.utils.context import REAL_USER_FLAG, elevated, real_user
+from treasury.utils.context import REAL_USER_FLAG, real_user, service_context
 
 TREASURY_USER = "treasury-perm-user@example.com"
 TREASURY_MANAGER = "treasury-perm-manager@example.com"
@@ -81,11 +81,11 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 				doctype,
 			)
 
-	def test_elevated_restores_user_after_exception(self):
+	def test_service_context_restores_state_after_exception(self):
 		with self.set_user(TREASURY_USER):
 			with self.assertRaises(ValueError):
-				with elevated():
-					self.assertEqual(frappe.session.user, "Administrator")
+				with service_context():
+					self.assertEqual(frappe.session.user, TREASURY_USER)  # the session is never switched
 					self.assertEqual(real_user(), TREASURY_USER)
 					raise ValueError("forced")
 			self.assertEqual(frappe.session.user, TREASURY_USER)
@@ -93,7 +93,7 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 			self.assertEqual(real_user(), TREASURY_USER)
 
 	def test_failed_posting_restores_user(self):
-		# the voucher fails inside the posting service's elevated block (as a closed period would)
+		# the voucher fails inside the posting service's service_context block (as a closed period would)
 		cheque = make_pdc_cheque(amount=1111, issue_date=day(-60), due_date=day(-30))
 		frappe.db.savepoint(SAVEPOINT_FAILED_POSTING)
 		self.addCleanup(frappe.db.rollback, save_point=SAVEPOINT_FAILED_POSTING)
@@ -120,7 +120,7 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 
 		with self.set_user(TREASURY_USER):
 			cheque.deliver(handover_date=day(-59))
-			self.assertEqual(frappe.session.user, TREASURY_USER)  # the elevated context was left
+			self.assertEqual(frappe.session.user, TREASURY_USER)  # the service_context block was left
 			self.assert_status(cheque, "Delivered", "Party Posted")
 			cheque.clear(clearance_date=day(-25))
 			self.assert_status(cheque, "Cleared", "Bank Posted")
@@ -212,7 +212,7 @@ class TestTreasuryRolePermissions(TreasuryTestMixin, IntegrationTestCase):
 		)
 
 	def test_bank_charge_roles(self):
-		"""Phase 7d: a Treasury User creates and submits a Bank Charge (its Payment Entry is built elevated and
+		"""Phase 7d: a Treasury User creates and submits a Bank Charge (its Payment Entry is built in service_context and
 		owned by the user) but cannot cancel it; an Accounts User may read charges, not create them."""
 		self.use_company_settings(**BANK_CHARGE_SETTINGS)
 		set_bank_suppliers(self, [])

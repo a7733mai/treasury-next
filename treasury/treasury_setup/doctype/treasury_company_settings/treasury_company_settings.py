@@ -10,7 +10,7 @@ from frappe.model.naming import NamingSeries
 from frappe.utils import cint, flt
 
 from treasury.accounting import payment_modes
-from treasury.utils.context import elevated
+from treasury.utils.context import service_context
 
 # Roles allowed to generate Modes of Payment from the settings.
 GENERATE_ROLES = ("Treasury Manager", "System Manager")
@@ -421,7 +421,7 @@ class TreasuryCompanySettings(Document):
 		for method in methods or ():
 			if method not in payment_modes.METHODS:
 				frappe.throw(_("Unknown method {0}.").format(frappe.bold(method)))
-		with elevated():
+		with service_context():
 			result = payment_modes.generate(doc, methods, bank_accounts)
 		# the user's write permission and role were checked above
 		doc.flags.ignore_permissions = True

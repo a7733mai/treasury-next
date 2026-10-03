@@ -9,7 +9,7 @@ import frappe
 from frappe import _, scrub
 from frappe.utils.nestedset import get_root_of
 
-from treasury.utils.context import elevated
+from treasury.utils.context import service_context
 
 DEFAULT_PAYEE_GROUP = "Treasury Payees"
 ROOT_SUPPLIER_GROUP = "All Supplier Groups"
@@ -81,12 +81,10 @@ def create_payee(supplier_name: str) -> dict:
 
 	# the user's create permission on the cheque doctypes and role were checked above; Treasury users need
 	# not hold the Supplier create permission
-	with elevated() as user:
+	with service_context():
 		supplier = frappe.get_doc({"doctype": "Supplier", "supplier_name": name, "supplier_group": group})
+		# SECURITY: after the create permission + role check above
 		supplier.insert(ignore_permissions=True)
-		frappe.db.set_value(
-			"Supplier", supplier.name, {"owner": user, "modified_by": user}, update_modified=False
-		)
 	return _payee(supplier.name, supplier.supplier_name, created=True)
 
 

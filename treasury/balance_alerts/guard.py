@@ -12,7 +12,7 @@ calls `begin` before it changes anything and `finish` after it wrote its changes
   type Override and returned for the document's own log. Ignore checks nothing.
 
 After every guarded action on a company with thresholds, whatever the mode, the company is evaluated again
-after the commit (alerts only, treasury.balance_alerts.scheduler.evaluate_company). Evaluations run elevated:
+after the commit (alerts only, treasury.balance_alerts.scheduler.evaluate_company). Evaluations run in `service_context`:
 the user must not be blocked by, nor miss, flows they cannot read.
 
 Batch operations use `batch_guard`: one check around the whole operation (the per-cheque guards are skipped).
@@ -27,7 +27,7 @@ from frappe.utils import cint, fmt_money, formatdate, getdate, strip_html, today
 from treasury.balance_alerts.positions import epsilon, evaluate, get_thresholds, horizon, with_gl_siblings
 from treasury.bank_transfers import fees
 from treasury.pdc.report_utils import get_precision, report_today
-from treasury.utils.context import elevated, real_user
+from treasury.utils.context import real_user, service_context
 
 OVERRIDE_ROLES = ("Treasury Manager", "System Manager")
 SETTINGS = "Treasury Company Settings"
@@ -98,7 +98,7 @@ def begin(company: str, bank_accounts: list[str], *, system: bool = False) -> fr
 	for bank in banks:  # name order, after the document's own row
 		fees.lock_bank_account(bank)
 	day = getdate(report_today())
-	with elevated():
+	with service_context():
 		pre = evaluate(company, banks, today=day)
 	return frappe._dict(company=company, banks=banks, mode=mode, pre=pre, today=day)
 
@@ -213,7 +213,7 @@ def finish(
 	Treasury Manager overrode a Block, else None."""
 	if not snapshot:
 		return None
-	with elevated():
+	with service_context():
 		post = evaluate(snapshot.company, snapshot.banks, today=snapshot.today)
 	found = breaches(snapshot.pre, post)
 	text = None

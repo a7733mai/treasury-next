@@ -8,7 +8,7 @@ party row (the whole amount is a deduction), so the supplier's balance is never 
 import frappe
 from frappe import _
 
-from treasury.utils.context import elevated, real_user
+from treasury.utils.context import service_context
 
 SETTINGS = "Treasury Settings"
 ROW_DOCTYPE = "Treasury Bank Supplier"
@@ -29,8 +29,8 @@ def get_bank_supplier(bank: str) -> str | None:
 
 def ensure_bank_supplier(bank: str) -> str:
 	"""The enabled Supplier of `bank`, created (or found by the Bank's name) and mapped on first use. The
-	caller has checked the user's Bank Charge permission; this runs elevated."""
-	with elevated():
+	caller has checked the user's Bank Charge permission; this runs in `service_context` (as the real user)."""
+	with service_context():
 		return _ensure(bank)
 
 
@@ -72,9 +72,8 @@ def _ensure(bank: str) -> str:
 				"supplier_type": "Company",
 			}
 		)
+		# SECURITY: after the caller checked the user's Bank Charge permission
 		doc.insert(ignore_permissions=True)
-		user = real_user()
-		frappe.db.set_value("Supplier", doc.name, {"owner": user, "modified_by": user}, update_modified=False)
 		supplier = doc.name
 
 	_map(bank, supplier)
