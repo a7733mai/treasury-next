@@ -81,7 +81,9 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 		return self.finish(pe, "Cash" if cash else "Wire Transfer", cash, values)
 
 	def pay(self, cash: bool = True, **values):
-		pe = get_payment_entry("Purchase Invoice", make_purchase_invoice(800).name, bank_account=self.data.egp.bank_gl)
+		pe = get_payment_entry(
+			"Purchase Invoice", make_purchase_invoice(800).name, bank_account=self.data.egp.bank_gl
+		)
 		return self.finish(pe, "Cash" if cash else "Wire Transfer", cash, values)
 
 	def finish(self, pe, mode, cash, values):
@@ -103,12 +105,21 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 		return frappe.get_print(doc.doctype, doc.name, print_format=print_format)
 
 	def test_formats_are_shipped_standard_in_treasury(self):
-		for name, doctype in ((RECEIPT, "Payment Entry"), (PAYMENT, "Payment Entry"), (JOURNAL, "Journal Entry")):
+		for name, doctype in (
+			(RECEIPT, "Payment Entry"),
+			(PAYMENT, "Payment Entry"),
+			(JOURNAL, "Journal Entry"),
+		):
 			values = frappe.db.get_value(
-				"Print Format", name, ["doc_type", "standard", "print_format_type", "module", "disabled"], as_dict=True
+				"Print Format",
+				name,
+				["doc_type", "standard", "print_format_type", "module", "disabled"],
+				as_dict=True,
 			)
 			self.assertEqual(values.doc_type, doctype)
-			self.assertEqual((values.standard, values.print_format_type, values.disabled), ("Yes", "Jinja", 0))
+			self.assertEqual(
+				(values.standard, values.print_format_type, values.disabled), ("Yes", "Jinja", 0)
+			)
 			self.assertEqual(values.module, "Treasury Setup")
 
 	def test_cash_receipt(self):
@@ -116,7 +127,14 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 		context = treasury_voucher_context(pe)
 		self.assertEqual((context["kind"], context["mode"]), ("receipt", "cash"))
 		html = self.render(pe, RECEIPT)
-		for text in ("سند قبض نقدي", "Cash Receipt Voucher", "استلمنا من", "المبلغ كتابة", "Narration test", "CHQ-001"):
+		for text in (
+			"سند قبض نقدي",
+			"Cash Receipt Voucher",
+			"استلمنا من",
+			"المبلغ كتابة",
+			"Narration test",
+			"CHQ-001",
+		):
 			self.assertIn(text, html)
 		self.assertIn(pe.name, html)
 		self.assertIn("فقط", html)
@@ -125,7 +143,15 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 	def test_bank_payment_has_signatures_and_prepared_by(self):
 		pe = self.pay(cash=False)
 		html = self.render(pe, PAYMENT)
-		for text in ("سند صرف", "Payment Voucher", "صرفنا إلى", "Prepared by", "Checked by", "Approved by", "Received by"):
+		for text in (
+			"سند صرف",
+			"Payment Voucher",
+			"صرفنا إلى",
+			"Prepared by",
+			"Checked by",
+			"Approved by",
+			"Received by",
+		):
 			self.assertIn(text, html)
 		self.assertIn(frappe.utils.get_fullname(pe.owner), html)
 
@@ -157,7 +183,15 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 		context = treasury_voucher_context(je)
 		self.assertEqual((context["kind"], context["mode"]), ("journal", "cash"))
 		html = self.render(je, JOURNAL)
-		for text in ("سند قيد يومية", "Journal Voucher", "JV-CHQ-7", "Journal narration", "مدين", "Debit", "Prepared by"):
+		for text in (
+			"سند قيد يومية",
+			"Journal Voucher",
+			"JV-CHQ-7",
+			"Journal narration",
+			"مدين",
+			"Debit",
+			"Prepared by",
+		):
 			self.assertIn(text, html)
 		self.assertNotIn("Received by", html)
 

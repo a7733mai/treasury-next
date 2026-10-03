@@ -79,7 +79,9 @@ def arabic_amount_in_words(amount, currency: str | None) -> str:
 
 def _mode_kind(mode_of_payment: str | None, account: str | None) -> str:
 	"""`cash` / `bank` / `other`: the Mode of Payment type, else the type of the cash / bank GL account."""
-	mode_type = frappe.get_cached_value("Mode of Payment", mode_of_payment, "type") if mode_of_payment else None
+	mode_type = (
+		frappe.get_cached_value("Mode of Payment", mode_of_payment, "type") if mode_of_payment else None
+	)
 	account_type = frappe.get_cached_value("Account", account, "account_type") if account else None
 	for value in (mode_type, account_type):
 		if value in ("Cash", "Bank"):
@@ -128,9 +130,15 @@ def _payment_entry(doc) -> dict:
 	mode = _mode_kind(doc.mode_of_payment, cash_side)
 	flow = "receipt" if receive else "payment" if pay else "transfer"
 	title_key = f"{mode}_{flow}" if mode in ("cash", "bank") and flow != "transfer" else flow
-	mode_label = LABELS["cash"] if mode == "cash" else LABELS["bank_mode"] if mode == "bank" else LABELS["other"]
+	mode_label = (
+		LABELS["cash"] if mode == "cash" else LABELS["bank_mode"] if mode == "bank" else LABELS["other"]
+	)
 	account_label = (
-		LABELS["cash_account"] if mode == "cash" else LABELS["bank_account"] if mode == "bank" else LABELS["account"]
+		LABELS["cash_account"]
+		if mode == "cash"
+		else LABELS["bank_account"]
+		if mode == "bank"
+		else LABELS["account"]
 	)
 	context = _common(doc, flow, amount, currency)
 	context.update(
@@ -141,7 +149,11 @@ def _payment_entry(doc) -> dict:
 			"mode_of_payment": doc.mode_of_payment,
 			"account": cash_side,
 			"account_label": account_label,
-			"party_label": LABELS["received_from"] if receive else LABELS["paid_to"] if pay else LABELS["party"],
+			"party_label": LABELS["received_from"]
+			if receive
+			else LABELS["paid_to"]
+			if pay
+			else LABELS["party"],
 			"party": doc.get("party_name") or doc.get("party") or (doc.paid_from if receive else doc.paid_to),
 			"party_type": doc.get("party_type"),
 			"party_id": doc.get("party"),
