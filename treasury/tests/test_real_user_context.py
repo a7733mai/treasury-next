@@ -231,7 +231,8 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 			self.assertFalse(frappe.has_permission("Purchase Invoice", "read", pi.name))
 		cheque.reload()
 		self.assert_authored_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
-		self.assertFalse(frappe.db.exists("DocShare", {"share_doctype": "Purchase Invoice", "share_name": pi.name}))
+		shares = {"share_doctype": "Purchase Invoice", "share_name": pi.name}
+		self.assertFalse(frappe.db.exists("DocShare", shares))
 		reference = frappe.db.get_value(
 			"Payment Entry Reference", {"parent": cheque.party_payment_entry}, "reference_name"
 		)
