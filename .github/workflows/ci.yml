@@ -22,7 +22,7 @@ env:
   FRAPPE_BRANCH: version-16
   ERPNEXT_BRANCH: version-16
   HRMS_BRANCH: version-16
-  PAYMENTS_BRANCH: develop # same pin the official erpnext/hrms CI uses
+  PAYMENTS_BRANCH: version-16 # payments develop requires frappe v17; version-16 matches the v16 stack
 
 jobs:
   tests:
@@ -124,8 +124,17 @@ jobs:
           bench new-site test_site --db-host 127.0.0.1 --db-root-username root --db-root-password root             --mariadb-user-host-login-scope='%' --admin-password admin --install-app erpnext
           bench --site test_site install-app hrms
           bench --site test_site install-app custody
+          # CI workaround (app defect, see baseline report): `install-app treasury` fails in init_singles because
+          # Treasury Settings defaults to the Supplier Group "Treasury Payees", which treasury's after_install
+          # creates only afterwards. Pre-create it so install and tests can proceed on unchanged app code.
+          bench --site test_site console <<'PY'
+          import frappe
+          if not frappe.db.exists("Supplier Group", "Treasury Payees"):
+              frappe.get_doc({"doctype": "Supplier Group", "supplier_group_name": "Treasury Payees", "parent_supplier_group": "All Supplier Groups"}).insert(ignore_permissions=True)
+              frappe.db.commit()
+          PY
           bench --site test_site install-app treasury
-          bench --site test_site set-config -p allow_tests true
+          bench --site test_site set-config -p allow_tests True
           bench --site test_site set-config -p throttle_user_limit 100
 
       - name: Run tests (treasury)
