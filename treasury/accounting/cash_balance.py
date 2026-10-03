@@ -56,7 +56,9 @@ def get_balance(account: str, posting_date) -> float:
 	rows = (
 		frappe.qb.from_(gle)
 		.select(Coalesce(Sum(gle.debit - gle.credit), 0))
-		.where((gle.account == account) & (gle.is_cancelled == 0) & (gle.posting_date <= getdate(posting_date)))
+		.where(
+			(gle.account == account) & (gle.is_cancelled == 0) & (gle.posting_date <= getdate(posting_date))
+		)
 		.run()
 	)
 	return flt(rows[0][0]) if rows else 0.0

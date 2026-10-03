@@ -17,15 +17,14 @@ def api():
 	if "custody" not in frappe.get_installed_apps():
 		frappe.throw(_("The Custody app is not installed."))
 	try:
-		from custody.api import CustodyApiVersionError, require_api
-		from custody.api import v1
+		from custody.api import CustodyApiVersionError, require_api, v1
 
 		require_api(API_MAJOR)
 	except (ImportError, CustodyApiVersionError):
 		frappe.throw(
-			_("This Treasury version needs the Custody app with public API version {0}. Update the Custody app.").format(
-				API_MAJOR
-			)
+			_(
+				"This Treasury version needs the Custody app with public API version {0}. Update the Custody app."
+			).format(API_MAJOR)
 		)
 	return v1
 

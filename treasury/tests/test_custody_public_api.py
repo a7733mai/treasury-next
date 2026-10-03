@@ -32,14 +32,18 @@ class TestCustodyBridgeContract(IntegrationTestCase):
 					continue
 				offenders.setdefault(rel, []).append(module)
 		self.assertEqual(offenders, {})
-		self.assertNotIn("custody.custody", (root / "integrations/custody/compat.py").read_text(encoding="utf-8"))
+		self.assertNotIn(
+			"custody.custody", (root / "integrations/custody/compat.py").read_text(encoding="utf-8")
+		)
 
 	def test_provider_is_registered_for_custody(self):
 		self.assertIn(
 			"treasury.integrations.custody.documents.reservation_provider",
 			frappe.get_hooks("custody_reservation_providers"),
 		)
-		self.assertTrue(callable(frappe.get_attr("treasury.integrations.custody.documents.reservation_provider")))
+		self.assertTrue(
+			callable(frappe.get_attr("treasury.integrations.custody.documents.reservation_provider"))
+		)
 
 	def test_graceful_without_custody(self):
 		with mock.patch("frappe.get_installed_apps", return_value=["frappe", "erpnext", "treasury"]):
@@ -95,7 +99,9 @@ class TestCustodyReservations(TreasuryTestMixin, IntegrationTestCase):
 		from treasury.tests.custody_utils import make_custodian, make_request
 
 		_employee, custodian = make_custodian()
-		return make_request(custodian, amount, cost_center=frappe.get_cached_value("Company", COMPANY, "cost_center"))
+		return make_request(
+			custodian, amount, cost_center=frappe.get_cached_value("Company", COMPANY, "cost_center")
+		)
 
 	def direct_pe(self, request: str, amount: float, submit=True):
 		from custody.custody.payments import make_payment_entry

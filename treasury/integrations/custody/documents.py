@@ -80,7 +80,9 @@ def reservation_provider(request: str, payment_type: str, voucher=None) -> float
 	direction = next((d for d, ptype in PAYMENT_TYPE.items() if ptype == payment_type), None)
 	if not direction:
 		return 0.0
-	source = (voucher.get("treasury_source_doctype"), voucher.get("treasury_source_name")) if voucher else None
+	source = (
+		(voucher.get("treasury_source_doctype"), voucher.get("treasury_source_name")) if voucher else None
+	)
 	if source and source[0] in SOURCE_DOCTYPES:
 		return reserved(request, direction, exclude=source[1], exclude_doctype=source[0])
 	return reserved(request, direction)

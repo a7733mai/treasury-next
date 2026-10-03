@@ -43,7 +43,11 @@ class TestCashBalance(TreasuryTestMixin, IntegrationTestCase):
 				"company": COMPANY,
 				"posting_date": date or today(),
 				"accounts": [
-					{"account": account, "debit_in_account_currency": debit, "credit_in_account_currency": credit}
+					{
+						"account": account,
+						"debit_in_account_currency": debit,
+						"credit_in_account_currency": credit,
+					}
 					for account, debit, credit in rows
 				],
 				**values,
@@ -129,9 +133,7 @@ class TestCashBalance(TreasuryTestMixin, IntegrationTestCase):
 	def test_debit_and_net_credit(self):
 		"""Only the net credit on the account counts: a row debiting and crediting the box nets out."""
 		self.fund(100)
-		doc = self.journal(
-			[(self.box, 50, 0), (self.box, 0, 150), (self.expense, 100, 0)], submit=False
-		)
+		doc = self.journal([(self.box, 50, 0), (self.box, 0, 150), (self.expense, 100, 0)], submit=False)
 		self.assertEqual(cash_balance.cash_credits(doc), {self.box: 100})
 		doc.submit()
 		self.assertEqual(self.balance(), 0)
@@ -160,13 +162,21 @@ class TestCashBalance(TreasuryTestMixin, IntegrationTestCase):
 	def test_credits_of_a_pay_payment_entry(self):
 		"""Pay / Internal Transfer take money out of `paid_from`; Receive takes nothing out."""
 		pay = frappe._dict(
-			doctype="Payment Entry", payment_type="Pay", paid_from=self.box, paid_to=self.expense,
-			base_paid_amount=75, base_received_amount=75,
+			doctype="Payment Entry",
+			payment_type="Pay",
+			paid_from=self.box,
+			paid_to=self.expense,
+			base_paid_amount=75,
+			base_received_amount=75,
 		)
 		self.assertEqual(cash_balance.cash_credits(pay), {self.box: 75})
 		receive = frappe._dict(
-			doctype="Payment Entry", payment_type="Receive", paid_from=self.income, paid_to=self.box,
-			base_paid_amount=75, base_received_amount=75,
+			doctype="Payment Entry",
+			payment_type="Receive",
+			paid_from=self.income,
+			paid_to=self.box,
+			base_paid_amount=75,
+			base_received_amount=75,
 		)
 		self.assertEqual(cash_balance.cash_credits(receive), {})
 
