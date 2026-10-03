@@ -9,6 +9,7 @@ that are not posted yet are reserved here, so the request is never promised twic
 import erpnext
 import frappe
 from frappe import _
+from frappe.model.document import Document
 from frappe.utils import cint, flt, fmt_money
 
 from treasury.integrations.custody import PARTY_TYPE, REQUEST, compat, is_installed
@@ -70,18 +71,21 @@ def reserved(
 	return flt(total, _precision())
 
 
-def reservation_provider(request: str, payment_type: str, voucher=None) -> float:
+def reservation_provider(request: str, payment_type: str, voucher: Document | None = None) -> float:
 	"""Hook `custody_reservation_providers` (EC-20): the amount custody must treat as unavailable to its own
 	Payment Entries, i.e. what open cheques / transfers of the request already promise (EC-20, AC-F18).
 
-	`voucher`: the Payment Entry custody is about to post; when Treasury itself creates it for a cheque or
-	transfer (custom fields `treasury_source_doctype` / `treasury_source_name`), that document's own
-	reservation does not count, or the cheque would block its own posting."""
+	`voucher`: `Document | None` (custody API contract): the Payment Entry DOCUMENT custody is about to post, or
+	None when custody only asks (a draft, a proposal, a report). When Treasury itself creates the voucher for a
+	cheque or transfer (custom fields `treasury_source_doctype` / `treasury_source_name`), that document's own
+	reservation does not count, or the cheque would block its own posting. With None everything counts."""
 	direction = next((d for d, ptype in PAYMENT_TYPE.items() if ptype == payment_type), None)
 	if not direction:
 		return 0.0
 	source = (
-		(voucher.get("treasury_source_doctype"), voucher.get("treasury_source_name")) if voucher else None
+		(voucher.get("treasury_source_doctype"), voucher.get("treasury_source_name"))
+		if voucher is not None
+		else None
 	)
 	if source and source[0] in SOURCE_DOCTYPES:
 		return reserved(request, direction, exclude=source[1], exclude_doctype=source[0])
@@ -129,12 +133,19 @@ def open_documents(request: str, limit: int) -> tuple[list[dict], int]:
 	return shown, max(len(rows) - limit, 0)
 
 
-def available(req, direction: str, exclude: str | None = None) -> frappe._dict:
+def available(req, direction: str, exclude: str | None = None, for_update: bool = False) -> frappe._dict:
 	"""{amount, allowance, purpose, totals}: what a new cheque / transfer of the request may still move
-	(custody's allowance less the reserved amount, never below 0) and the purpose custody will give it."""
+	(custody's allowance less the reserved amount, never below 0) and the purpose custody will give it.
+
+	`for_update`: the figure is about to become a reservation (a cheque / transfer is being created, edited or
+	re-presented): custody's locking duty of a consumer, in the caller's transaction: the custodian is locked
+	(`lock_custodians`, idempotent) and the totals are read with `for_update=True`, so two concurrent
+	reservations cannot both see the same availability. A plain question (the buttons) does not lock."""
 	payment_type = PAYMENT_TYPE[direction]
 	precision = _precision()
-	totals = compat.request_totals(req.name)
+	if for_update:
+		compat.lock_custodian(req.custodian)
+	totals = compat.request_totals(req.name, for_update=for_update)
 	allowance = flt(compat.payment_allowance(req, payment_type, totals), precision)
 	amount = max(flt(allowance - reserved(req.name, direction, exclude), precision), 0.0)
 	return frappe._dict(
@@ -230,7 +241,7 @@ def check_request(req, direction: str, amount=None, exclude: str | None = None) 
 
 def _check_amount(req, direction: str, amount=None, exclude: str | None = None) -> frappe._dict:
 	"""`check_request` of a request already checked open (`_check_open`)."""
-	a = available(req, direction, exclude)
+	a = available(req, direction, exclude, for_update=True)
 	if reason := draft_refusal(req, direction, a):
 		frappe.throw(reason, title=_("Draft Replenishment Exists"))
 	if amount is None:

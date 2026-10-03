@@ -165,3 +165,46 @@ class TestCustodyReservations(TreasuryTestMixin, IntegrationTestCase):
 		self.assertEqual(documents.reservation_provider(req.name, "Pay"), 5000)
 		self.assertEqual(documents.reservation_provider(req.name, "Receive"), 0)
 		self.assertIsNotNone(second)
+
+	def test_provider_accepts_a_payment_entry_document(self):
+		"""Custody's contract: `voucher` is a Document or None; the provider reads the Treasury source fields."""
+		from treasury.tests.custody_utils import cheque_from_request
+
+		req = self.request(10000)
+		first = cheque_from_request(req.name, amount=2000)
+		cheque_from_request(req.name, amount=3000)
+		voucher = frappe.new_doc("Payment Entry")
+		voucher.update({"treasury_source_doctype": "PDC Cheque", "treasury_source_name": first.name})
+		self.assertEqual(documents.reservation_provider(req.name, "Pay", voucher=voucher), 3000)
+		self.assertEqual(
+			documents.reservation_provider(req.name, "Pay", voucher=frappe.new_doc("Payment Entry")), 5000
+		)
+		self.assertEqual(documents.reservation_provider(req.name, "Pay", voucher=None), 5000)
+
+	def test_creating_a_reservation_follows_the_custody_locking_duty(self):
+		"""Custody's locking duty of a consumer: lock the custodian, then read the totals FOR UPDATE, in the
+		transaction that saves the reservation. A plain question (the buttons) takes no lock."""
+		req = self.request(10000)
+		calls = mock.Mock()
+		with (
+			mock.patch.object(compat, "lock_custodian", side_effect=calls.lock),
+			mock.patch.object(compat, "request_totals", wraps=compat.request_totals) as totals,
+		):
+			totals.side_effect = lambda name, for_update=False: (
+				calls.totals(name, for_update=for_update),
+				compat.api().get_request_totals(name, for_update=for_update),
+			)[1]
+			documents.available(req, "Outgoing")
+			self.assertEqual(calls.mock_calls, [mock.call.totals(req.name, for_update=False)])
+			calls.reset_mock()
+			documents.available(req, "Outgoing", for_update=True)
+			self.assertEqual(
+				calls.mock_calls,
+				[mock.call.lock(req.custodian), mock.call.totals(req.name, for_update=True)],
+			)
+			calls.reset_mock()
+			documents._check_amount(req, "Outgoing", 1000)  # the save-time check of a new cheque / transfer
+			self.assertEqual(
+				calls.mock_calls,
+				[mock.call.lock(req.custodian), mock.call.totals(req.name, for_update=True)],
+			)
