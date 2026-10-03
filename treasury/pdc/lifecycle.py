@@ -199,10 +199,10 @@ def post_party(name: str, posting_date=None, *, system: bool = False) -> dict:
 	The default posting date is the effective (possibly postponed) due date, or the handover / receipt date
 	when the cheque was handed over after its due date.
 
+	`system=True` is the internal entry point of the scheduler (treasury.pdc.scheduler): it skips the user
 	permission / role check and runs in `treasury.utils.context.service_context` with Administrator recorded
-	as the acting user (the scheduler session user is Administrator too), whoever the session user is;
-	recorded as the acting user, whoever the session user is; every business rule of `_post_party_now`
-	still applies. Never pass it from a whitelisted method.
+	as the acting user (the scheduler session user is Administrator too); every business rule of
+	`_post_party_now` still applies. Never pass it from a whitelisted method.
 	"""
 	if system:
 		with service_context(actor=SYSTEM_USER):
