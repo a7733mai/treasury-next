@@ -274,18 +274,24 @@ class TestCustodyEdits(CustodyTransferTestCase):
 			calls.append(("available", args[0].name))
 			return available(*args, **kwargs)
 
-		# the custodian is locked before the request (custody's order, review 9b minor 1)
-		expected = [("lock", req.name), ("custodian", req.custodian), ("available", req.name)]
+		# custody's order: the custodian is locked before the request row is, and both before what the request
+		# still accepts is read (`available(for_update=True)` locks the custodian again: idempotent)
+		expected = [
+			("lock", req.name),
+			("custodian", req.custodian),
+			("available", req.name),
+			("custodian", req.custodian),
+		]
 		with (
 			patch.object(documents, "lock_request", side_effect=record_lock),
 			patch.object(compat, "lock_custodian", side_effect=record_custodian),
 			patch.object(documents, "available", side_effect=record_available),
 		):
 			cheque = cheque_from_request(req.name, amount=1000)
-			self.assertEqual(calls[-3:], expected)
+			self.assertEqual(calls[-4:], expected)
 			calls.clear()
 			self.saved(cheque, amount=2000)
-			self.assertEqual(calls, expected)
+			self.assertEqual(calls[-4:], expected)
 
 	def test_checks_read_request_under_lock(self):
 		"""The checks run on the request read under the lock, not on the copy loaded before it (9b minor 2)."""
