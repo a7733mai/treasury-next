@@ -127,7 +127,15 @@ jobs:
           # CI workaround (app defect, see baseline report): `install-app treasury` fails in init_singles because
           # Treasury Settings defaults to the Supplier Group "Treasury Payees", which treasury's after_install
           # creates only afterwards. Pre-create it with the app's own helper so install and tests can proceed on unchanged app code.
-          bench --site test_site execute treasury.utils.party.ensure_payee_supplier_group
+          (cd sites && ../env/bin/python - <<'PY'
+          import frappe
+          frappe.init(site="test_site", sites_path=".")
+          frappe.connect()
+          from treasury.utils.party import ensure_payee_supplier_group
+          print("payee group:", ensure_payee_supplier_group())
+          frappe.db.commit()
+          PY
+          )
           bench --site test_site install-app treasury
           bench --site test_site set-config -p allow_tests True
           bench --site test_site set-config -p throttle_user_limit 100
