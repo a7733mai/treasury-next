@@ -242,3 +242,45 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 			"Payment Entry Reference", {"parent": cheque.party_payment_entry}, "reference_name"
 		)
 		self.assertEqual(reference, pi.name)
+
+	def share_row(self, doctype: str, name: str, user: str, **perms):
+		"""A DocShare row that exists before the Treasury action (rolled back with the class transaction)."""
+		share = frappe.get_doc(
+			{"doctype": "DocShare", "user": user, "share_doctype": doctype, "share_name": name, **perms}
+		)
+		share.flags.ignore_share_permission = True
+		return share.insert(ignore_permissions=True)
+
+	def test_preexisting_share_without_read_is_restored_not_deleted(self):
+		"""A DocShare row of the user that exists but grants no read: the temporary read access is added to it
+		and, on exit, the row is back exactly as it was (never deleted)."""
+		pi = make_purchase_invoice(1000, posting_date=day(-60))
+		cheque = make_pdc_cheque(amount=1000, issue_date=day(-60), due_date=day(-30), invoice=pi)
+		prior = self.share_row("Purchase Invoice", pi.name, TREASURY_USER, read=0, write=0, share=0, submit=0)
+		with self.set_user(TREASURY_USER):
+			self.assertFalse(frappe.has_permission("Purchase Invoice", "read", pi.name))
+			cheque.deliver(day(-59))
+			self.assertFalse(frappe.has_permission("Purchase Invoice", "read", pi.name))
+		cheque.reload()
+		self.assertEqual(cheque.accounting_status, "Party Posted")
+		after = frappe.db.get_value(
+			"DocShare", prior.name, ["read", "write", "share", "submit", "user"], as_dict=True
+		)
+		self.assertIsNotNone(after, "the pre-existing share row was deleted")
+		self.assertEqual(
+			(after.read, after.write, after.share, after.submit, after.user),
+			(0, 0, 0, 0, TREASURY_USER),
+		)
+
+	def test_preexisting_read_share_is_kept(self):
+		"""The user already holds a read share of the invoice: nothing is added and the row stays as it was."""
+		pi = make_purchase_invoice(1000, posting_date=day(-60))
+		cheque = make_pdc_cheque(amount=1000, issue_date=day(-60), due_date=day(-30), invoice=pi)
+		prior = self.share_row("Purchase Invoice", pi.name, TREASURY_USER, read=1, write=0, share=0)
+		with self.set_user(TREASURY_USER):
+			cheque.deliver(day(-59))
+		cheque.reload()
+		self.assertEqual(cheque.accounting_status, "Party Posted")
+		after = frappe.db.get_value("DocShare", prior.name, ["read", "write", "share"], as_dict=True)
+		self.assertIsNotNone(after, "the pre-existing share row was deleted")
+		self.assertEqual((after.read, after.write, after.share), (1, 0, 0))

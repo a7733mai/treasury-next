@@ -90,9 +90,13 @@ def build_periods(from_date, to_date, periodicity: str) -> list[frappe._dict]:
 
 
 class BankPositionForecast:
-	def __init__(self, filters=None):
+	def __init__(self, filters=None, *, system: bool = False):
+		"""`system=True` (Python callers of Treasury service code only: never a report filter, so a client cannot
+		ask for it) is the company-wide view: cheques and hook sources are read with `get_all`, the user's
+		permissions and User Permissions are not applied."""
 		filters = frappe._dict(filters or {})
-		self.company = validate_company(filters.company)
+		self.system = bool(system)
+		self.company = validate_company(filters.company, system=self.system)
 		self.per_bank = cint(filters.per_bank)
 		self.today = getdate(filters.today) if self.per_bank and filters.today else report_today()
 		self.from_date = getdate(filters.from_date or self.today)
@@ -109,7 +113,7 @@ class BankPositionForecast:
 		self.include_overdue = 1 if filters.get("include_overdue") is None else cint(filters.include_overdue)
 		self.show_details = cint(filters.show_details)
 		self.selected_banks = as_list(filters.bank_account)
-		self.banks = get_bank_accounts(self.company, self.selected_banks)
+		self.banks = get_bank_accounts(self.company, self.selected_banks, system=self.system)
 		self.bank_names = {b.name for b in self.banks}
 		# per bank: every amount stays in its bank account currency
 		self.bank_view = self.per_bank or filters.currency_view == BANK_CURRENCY
@@ -181,8 +185,9 @@ class BankPositionForecast:
 		else:
 			due_filter = ["between", [self.today, self.to_date]]
 		return get_cheques(
-			{**base, "operational_status": ["in", open_statuses], "effective_due_date": due_filter}
-		) + get_cheques({**base, "operational_status": "Cleared"})
+			{**base, "operational_status": ["in", open_statuses], "effective_due_date": due_filter},
+			system=self.system,
+		) + get_cheques({**base, "operational_status": "Cleared"}, system=self.system)
 
 	def collect_flows(self) -> list[frappe._dict]:
 		"""Every expected flow (cheques, then the hook sources), unfiltered by date."""
@@ -227,6 +232,8 @@ class BankPositionForecast:
 			currency_view=BANK_CURRENCY if self.bank_view else COMPANY_CURRENCY,
 			# per bank: the sources may leave `amount` (company currency) empty, it is never used
 			per_bank=self.per_bank,
+			# company-wide view: the sources read with get_all and skip the user permission checks
+			system=self.system,
 		)
 
 	def get_hook_flows(self) -> list[frappe._dict]:

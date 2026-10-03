@@ -66,6 +66,9 @@ def _in_service_context(fn):
 	return wrapper
 
 
+SHARE_PERMISSIONS = ("read", "write", "submit", "share")
+
+
 @contextmanager
 def _reference_read_access(references, party_type=None, party=None):
 	"""Let the session user read the invoices / orders a Payment Entry allocates against (and the party they
@@ -75,10 +78,13 @@ def _reference_read_access(references, party_type=None, party=None):
 	<name>, throw=True)` for the SESSION user, with no bypass flag, and Treasury roles hold no permission on
 	these doctypes (the app grants none). Instead of running as Administrator or granting the roles read
 	access to every invoice, the user is shared exactly the allocated documents and the party (read only)
-	and the shares this block created are removed again on exit. Only called after the Treasury source-document permission + role check.
+	and exactly the prior state is restored on exit: a share this block created is removed, a share row that already
+	existed (add_docshare would overwrite its permissions) gets its previous read / write / submit / share values back
+	and is never deleted. Only called after the Treasury source-document permission + role check.
 	"""
 	user = frappe.session.user
 	created: list[str] = []
+	changed: dict[str, dict] = {}  # pre-existing DocShare name -> its permission values before the block
 	if user != "Administrator":
 		seen = set()
 		keys = [(ref.reference_doctype, ref.reference_name) for ref in references or []]
@@ -90,11 +96,20 @@ def _reference_read_access(references, party_type=None, party=None):
 			seen.add(key)
 			if frappe.has_permission(key[0], "read", key[1], user=user):
 				continue
+			prior = frappe.db.get_value(
+				"DocShare",
+				{"user": user, "share_doctype": key[0], "share_name": key[1], "everyone": 0},
+				["name", *SHARE_PERMISSIONS],
+				as_dict=True,
+			)
 			# SECURITY: after the source-document permission + role check; read-only, removed in `finally`
 			share = frappe.share.add_docshare(
 				key[0], key[1], user=user, read=1, flags={"ignore_share_permission": True}
 			)
-			created.append(share.name)
+			if prior:
+				changed[prior.name] = {p: prior[p] for p in SHARE_PERMISSIONS}
+			else:
+				created.append(share.name)
 	try:
 		yield
 	finally:
@@ -103,6 +118,12 @@ def _reference_read_access(references, party_type=None, party=None):
 			frappe.delete_doc(
 				"DocShare", name, ignore_permissions=True, flags={"ignore_share_permission": True}, force=True
 			)
+		for name, values in changed.items():
+			# SECURITY: puts a share that existed before the block back exactly as it was (never deletes it)
+			share = frappe.get_doc("DocShare", name)
+			share.flags.ignore_share_permission = True
+			share.update(values)
+			share.save(ignore_permissions=True)
 
 
 # ---------------------------------------------------------------------------

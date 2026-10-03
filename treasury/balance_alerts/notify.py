@@ -532,7 +532,7 @@ def _visible_positions(company: str, user: str, today) -> list:
 	"""The positions `user` would receive, limited to the banks the acting manager may see too: a preview never
 	shows a bank outside the manager's own User Permissions."""
 	with service_context(actor=SYSTEM_USER):
-		positions = balance_positions.evaluate(company, today=today)
+		positions = balance_positions.evaluate(company, today=today, system=True)
 	names = [p.bank_account for p in positions]
 	banks = set(recipients.visible_banks(user, company, names))
 	viewer = frappe.session.user

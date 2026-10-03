@@ -506,10 +506,10 @@ def get_flows(filters) -> list[dict]:
 	their bank account (the documents amount less the margin held, which the bank uses first). Sight credits
 	are settled when the documents arrive, whose date is not known in advance: they are not forecast."""
 	from treasury.bank_facilities.forecast import _rate
-	from treasury.pdc.report_utils import get_precision, report_today
+	from treasury.pdc.report_utils import can_read, get_precision, read_list, report_today
 
 	filters = frappe._dict(filters)
-	if not filters.bank_accounts or not frappe.has_permission(DOCTYPE, "read"):
+	if not filters.bank_accounts or not can_read(DOCTYPE, filters.system):
 		return []
 	conditions = {
 		"company": filters.company,
@@ -523,8 +523,9 @@ def get_flows(filters) -> list[dict]:
 	today = report_today()
 	rates: dict[str, float] = {}
 	flows = []
-	for row in frappe.get_list(
+	for row in read_list(
 		DOCTYPE,
+		filters.system,
 		filters=conditions,
 		fields=[
 			"name",

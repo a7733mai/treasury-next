@@ -16,7 +16,7 @@ from frappe.utils import flt, getdate
 
 from treasury.bank_facilities.forecast import BANK_CURRENCY, _rate, company_amount
 from treasury.bank_transfers import lifecycle
-from treasury.pdc.report_utils import get_precision, report_today
+from treasury.pdc.report_utils import can_read, get_precision, read_list, report_today
 
 DOCTYPE = "Bank Transfer"
 FIELDS = [
@@ -47,17 +47,22 @@ def _movements(row, bank_accounts: set) -> list[tuple[str, str, str, float]]:
 
 
 def _transfers(filters, status: str, to_date=None) -> list:
+	# `filters.system`: company-wide view of the balance guard and alerts (no permission checks)
 	conditions = {"company": filters.company, "docstatus": 1, "status": status}
 	if to_date:
 		conditions["execution_date"] = ["<=", getdate(to_date)]
-	return frappe.get_list(
-		DOCTYPE, filters=conditions, fields=FIELDS, order_by="execution_date asc, name asc"
+	return read_list(
+		DOCTYPE,
+		filters.system,
+		filters=conditions,
+		fields=FIELDS,
+		order_by="execution_date asc, name asc",
 	)
 
 
 def get_flows(filters) -> list[dict]:
 	filters = frappe._dict(filters)
-	if not filters.bank_accounts or not frappe.has_permission(DOCTYPE, "read"):
+	if not filters.bank_accounts or not can_read(DOCTYPE, filters.system):
 		return []
 	bank_accounts = set(filters.bank_accounts)
 	today = report_today()

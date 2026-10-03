@@ -167,13 +167,17 @@ def is_permitted_value(
 	return not restrictions or value in {p.get("doc") for p in restrictions}
 
 
-def validate_company(company: str | None, doctype: str = DOCTYPE) -> str:
+def validate_company(company: str | None, doctype: str = DOCTYPE, system: bool = False) -> str:
 	"""The company filter is required, and the user must be allowed to read the company's `doctype`
-	records (PDC cheques by default): read permission plus no User Permission excluding the company."""
+	records (PDC cheques by default): read permission plus no User Permission excluding the company.
+	`system=True` (company-wide views run by Treasury service code, never by a user request) skips the
+	permission checks and only validates the company."""
 	if not company:
 		frappe.throw(_("Company is required."))
 	if not frappe.db.exists("Company", company):
 		frappe.throw(_("{0} {1} does not exist").format(_("Company"), company), frappe.DoesNotExistError)
+	if system:
+		return company
 	frappe.has_permission(doctype, "read", throw=True)
 	if not is_permitted_value("Company", company, doctype):
 		frappe.throw(
@@ -208,12 +212,15 @@ def validate_date_range(from_date, to_date):
 # ---------------------------------------------------------------------------
 
 
-def get_bank_accounts(company: str, names: list[str] | None = None) -> list[frappe._dict]:
+def get_bank_accounts(
+	company: str, names: list[str] | None = None, system: bool = False
+) -> list[frappe._dict]:
 	"""Company bank accounts (all, or `names`) the user may see, with their GL account and its currency.
 
 	User Permissions on Bank Account (applicable to PDC Cheque) apply: the others are left out, and naming
 	one of them in `names` raises a PermissionError. A bank account without a GL account has `account` and
-	`currency` None (it has no GL balance)."""
+	`currency` None (it has no GL balance).
+	`system=True`: every company bank account, whatever the user's User Permissions."""
 	filters = {"company": company, "is_company_account": 1}
 	if names:
 		filters["name"] = ["in", names]
@@ -226,7 +233,7 @@ def get_bank_accounts(company: str, names: list[str] | None = None) -> list[frap
 					", ".join(frappe.bold(m) for m in sorted(missing)), frappe.bold(company)
 				)
 			)
-		forbidden = [r.name for r in rows if not is_permitted_value("Bank Account", r.name)]
+		forbidden = [] if system else [r.name for r in rows if not is_permitted_value("Bank Account", r.name)]
 		if forbidden:
 			frappe.throw(
 				_("You are not permitted to view Bank Account {0}.").format(
@@ -235,7 +242,8 @@ def get_bank_accounts(company: str, names: list[str] | None = None) -> list[frap
 				frappe.PermissionError,
 				title=_("Not Permitted"),
 			)
-	rows = [r for r in rows if is_permitted_value("Bank Account", r.name)]
+	if not system:
+		rows = [r for r in rows if is_permitted_value("Bank Account", r.name)]
 	for row in rows:
 		row.currency = get_account_currency(row.account) if row.account else None
 	return rows
@@ -288,10 +296,25 @@ class AmountConverter:
 
 
 def get_cheques(
-	filters: dict, fields: list[str] | None = None, order_by: str = "effective_due_date asc, name asc"
+	filters: dict,
+	fields: list[str] | None = None,
+	order_by: str = "effective_due_date asc, name asc",
+	system: bool = False,
 ):
-	"""PDC Cheques the user may read (`frappe.get_list`: permissions and User Permissions apply)."""
-	return frappe.get_list(DOCTYPE, filters=filters, fields=fields or CHEQUE_FIELDS, order_by=order_by)
+	"""PDC Cheques the user may read (`frappe.get_list`: permissions and User Permissions apply). `system=True`
+	is the company-wide view of Treasury service code (balance guard, alerts): `frappe.get_all`, so a user's
+	restrictions never hide a cheque from a check that protects the company's money."""
+	return read_list(DOCTYPE, system, filters=filters, fields=fields or CHEQUE_FIELDS, order_by=order_by)
+
+
+def read_list(doctype: str, system: bool = False, **kwargs):
+	"""`frappe.get_list` (the user's view) or, for `system`, `frappe.get_all` (company-wide view)."""
+	return (frappe.get_all if system else frappe.get_list)(doctype, **kwargs)
+
+
+def can_read(doctype: str, system: bool = False) -> bool:
+	"""Read permission of the session user on `doctype`; always true for a system view."""
+	return bool(system or frappe.has_permission(doctype, "read"))
 
 
 def expected_statuses(direction: str, include_created: bool = False) -> list[str]:

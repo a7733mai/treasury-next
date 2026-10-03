@@ -19,7 +19,7 @@ from frappe.utils import flt, getdate
 from treasury.accounting import posting
 from treasury.bank_facilities.facility import ACTIVE
 from treasury.bank_facilities.utilisation import OVERDRAFT, get_utilisation
-from treasury.pdc.report_utils import get_precision, report_today
+from treasury.pdc.report_utils import can_read, get_precision, read_list, report_today
 
 DRAWDOWN = "Facility Drawdown"
 SCHEDULE = "Facility Repayment Schedule"
@@ -42,7 +42,7 @@ def company_amount(filters, amount: float, currency: str, company: str, date, ca
 
 def get_flows(filters) -> list[dict]:
 	filters = frappe._dict(filters)
-	if not filters.bank_accounts or not frappe.has_permission(DRAWDOWN, "read"):
+	if not filters.bank_accounts or not can_read(DRAWDOWN, filters.system):
 		return []
 	precision = get_precision()
 	today = report_today()
@@ -81,7 +81,9 @@ def get_flows(filters) -> list[dict]:
 		query = query.where(row.due_date <= getdate(filters.to_date))
 	# only the drawdowns the user may read
 	readable = set(
-		frappe.get_list(DRAWDOWN, filters={"company": filters.company, "docstatus": 1}, pluck="name")
+		read_list(
+			DRAWDOWN, filters.system, filters={"company": filters.company, "docstatus": 1}, pluck="name"
+		)
 	)
 	rates: dict[str, float] = {}
 	flows = []

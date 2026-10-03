@@ -70,7 +70,7 @@ def evaluate_company(company: str, now=None, send_digest: bool = False) -> dict:
 	# serialises the hourly job and the event jobs of one company
 	frappe.db.get_value(SETTINGS, company, "name", for_update=True)
 	with service_context(actor=SYSTEM_USER):
-		positions = evaluate(company, today=now.date())
+		positions = evaluate(company, today=now.date(), system=True)
 	digest_hour = cint(settings.balance_digest_hour)
 	if send_digest and settings.send_balance_digest and now.hour >= digest_hour:
 		result["digest"] = send_digest_if_due(company, positions, now)
@@ -83,14 +83,23 @@ def enqueue_evaluation(company: str):
 	"""The event trigger of a guarded action: evaluate the company after the commit (alerts only)."""
 	# `deduplicate` also drops a job enqueued while the same job is *running*: a breach committed during that
 	# run is then reported by the next hourly job (accepted, spec 7e §8.1)
-	frappe.enqueue(
-		"treasury.balance_alerts.scheduler.evaluate_company",
-		queue="short",
-		company=company,
-		job_id=f"treasury-balance-alerts-{company}",
-		deduplicate=True,
-		enqueue_after_commit=True,
-	)
+	# `frappe.enqueue` records the session user as the job's user: the job runs as Administrator, never as the
+	# user whose action happened to enqueue it (the dedup job_id lets one enqueue stand for the whole company).
+	# Only the recorded user is swapped, for the duration of the call (`frappe.set_user` would reset the request).
+	session = frappe.local.session
+	acting = session.user
+	session.user = SYSTEM_USER
+	try:
+		frappe.enqueue(
+			"treasury.balance_alerts.scheduler.evaluate_company",
+			queue="short",
+			company=company,
+			job_id=f"treasury-balance-alerts-{company}",
+			deduplicate=True,
+			enqueue_after_commit=True,
+		)
+	finally:
+		session.user = acting
 
 
 def _isolated(company: str, fn):

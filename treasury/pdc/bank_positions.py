@@ -11,7 +11,10 @@ Equality contract (tested): for a bank B and day d, `closing` equals the Daily "
 the report run with bank_account = [B], Bank Currency, include_overdue = 1, from = today, to = today + H - 1
 (day 0: the "today" row, after the Overdue row).
 
-Permissions are the caller's (the engine reads with `frappe.get_list`); system callers run it in `service_context()`.
+Permissions are the caller's by default (the engine reads with `frappe.get_list`: User Permissions apply, so the
+view may be partial). A check that protects the company's money (the entry-time balance guard, the alert
+scheduler) must not run on a partial view: it passes `system=True`, the company-wide view (`frappe.get_all`)
+that does not switch the session user.
 """
 
 import frappe
@@ -32,16 +35,24 @@ from treasury.pdc.report_utils import (
 
 
 def get_bank_positions(
-	company: str, horizon_days: int, bank_accounts: list[str] | None = None, today=None
+	company: str,
+	horizon_days: int,
+	bank_accounts: list[str] | None = None,
+	today=None,
+	system: bool = False,
 ) -> list[frappe._dict]:
 	"""Positions sorted by `bank_account`: {bank_account, bank_accounts, account, currency, bank, disabled,
 	opening, current_balance, overdue_in, overdue_out, unassigned_flows, days: [{date, actual_in, actual_out,
 	expected_in, expected_out, net, closing, flows}]} for today .. today + horizon_days - 1."""
-	return collect_positions(company, horizon_days, bank_accounts, today)[0]
+	return collect_positions(company, horizon_days, bank_accounts, today, system)[0]
 
 
 def collect_positions(
-	company: str, horizon_days: int, bank_accounts: list[str] | None = None, today=None
+	company: str,
+	horizon_days: int,
+	bank_accounts: list[str] | None = None,
+	today=None,
+	system: bool = False,
 ) -> tuple[list[frappe._dict], list[frappe._dict]]:
 	"""(positions, flows): the positions of `get_bank_positions` and every expected flow of the engine dated up
 	to today + horizon_days - 1 (overdue ones and flows without a bank account included).
@@ -62,7 +73,8 @@ def collect_positions(
 			"bank_account": bank_accounts or None,
 			"per_bank": 1,
 			"today": today,
-		}
+		},
+		system=system,
 	)
 	flows = [f for f in engine.collect_flows() if f.date <= to_date]
 	precision = get_precision()

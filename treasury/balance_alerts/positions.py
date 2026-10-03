@@ -100,12 +100,14 @@ def day_level(closing: float, minimum: float, warning: float) -> str:
 	return OK
 
 
-def evaluate(company: str, bank_accounts=None, today=None, horizon_days: int | None = None) -> list:
+def evaluate(
+	company: str, bank_accounts=None, today=None, horizon_days: int | None = None, system: bool = False
+) -> list:
 	"""`get_bank_positions` with the thresholds applied: each position gets `minimum`, `warning` (None without
 	thresholds), `level` (worst day), `lowest` ({date, closing}: the lowest day, earliest on a tie),
 	`first_breach` (date of the first day that is not OK), `breaches` ([{date, level, closing, threshold}])
-	and a `level` on every day."""
-	positions = get_bank_positions(company, horizon_days or horizon(), bank_accounts, today)
+	and a `level` on every day. `system=True`: the company-wide view (see `get_bank_positions`)."""
+	positions = get_bank_positions(company, horizon_days or horizon(), bank_accounts, today, system=system)
 	thresholds = get_thresholds(company)
 	for position in positions:
 		apply_thresholds(position, [thresholds[b] for b in position.bank_accounts if b in thresholds])

@@ -20,7 +20,7 @@ from frappe import _
 from frappe.utils import cint, flt, getdate
 
 from treasury.integrations.custody import REQUEST, documents, is_installed
-from treasury.pdc.report_utils import get_precision, report_today
+from treasury.pdc.report_utils import can_read, get_precision, read_list, report_today
 from treasury.utils import source_documents as sd
 
 TEMPORARY, PERMANENT = "Temporary", "Permanent"
@@ -42,7 +42,7 @@ FIELDS = [
 
 def get_flows(filters) -> list[dict]:
 	filters = frappe._dict(filters)
-	if not is_installed() or not filters.bank_accounts or not frappe.has_permission(REQUEST, "read"):
+	if not is_installed() or not filters.bank_accounts or not can_read(REQUEST, filters.system):
 		return []
 	settings = _settings(filters.company)
 	if not settings:
@@ -54,8 +54,9 @@ def get_flows(filters) -> list[dict]:
 	today = getdate(report_today())
 	precision = get_precision()
 	flows = []
-	for row in frappe.get_list(
+	for row in read_list(
 		REQUEST,
+		filters.system,
 		filters={"company": filters.company, "docstatus": 1, "is_closed": 0},
 		fields=FIELDS,
 		order_by="posting_date asc, name asc",

@@ -12,8 +12,11 @@ calls `begin` before it changes anything and `finish` after it wrote its changes
   type Override and returned for the document's own log. Ignore checks nothing.
 
 After every guarded action on a company with thresholds, whatever the mode, the company is evaluated again
-after the commit (alerts only, treasury.balance_alerts.scheduler.evaluate_company). Evaluations run in `service_context`:
-the user must not be blocked by, nor miss, flows they cannot read.
+after the commit (alerts only, treasury.balance_alerts.scheduler.evaluate_company, enqueued as Administrator).
+Every evaluation is the company-wide view (`evaluate(..., system=True)`: the engine reads cheques and the forecast
+sources with `frappe.get_all`) inside `service_context`, WITHOUT switching the session user: a user with restricted
+User Permissions is neither blocked by nor misses flows they cannot read, and a Block threshold is never judged on
+a partial view.
 
 Batch operations use `batch_guard`: one check around the whole operation (the per-cheque guards are skipped).
 """
@@ -99,7 +102,7 @@ def begin(company: str, bank_accounts: list[str], *, system: bool = False) -> fr
 		fees.lock_bank_account(bank)
 	day = getdate(report_today())
 	with service_context():
-		pre = evaluate(company, banks, today=day)
+		pre = evaluate(company, banks, today=day, system=True)
 	return frappe._dict(company=company, banks=banks, mode=mode, pre=pre, today=day)
 
 
@@ -214,7 +217,7 @@ def finish(
 	if not snapshot:
 		return None
 	with service_context():
-		post = evaluate(snapshot.company, snapshot.banks, today=snapshot.today)
+		post = evaluate(snapshot.company, snapshot.banks, today=snapshot.today, system=True)
 	found = breaches(snapshot.pre, post)
 	text = None
 	if found:

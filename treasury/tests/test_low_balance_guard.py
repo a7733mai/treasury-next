@@ -12,14 +12,16 @@ from frappe import _
 from frappe.tests import IntegrationTestCase
 from frappe.utils import escape_html, fmt_money, formatdate, strip_html
 
-from treasury.balance_alerts import guard, notify
+from treasury.balance_alerts import guard, notify, scheduler
 from treasury.bank_transfers import fees
 from treasury.bank_transfers.scheduler import post_scheduled_transfers
+from treasury.pdc.bank_positions import get_bank_positions
 from treasury.pdc.report.bank_position_forecast import bank_position_forecast
 from treasury.tests.utils import (
 	COMPANY,
 	SUPPLIER,
 	BalanceAlertTestMixin,
+	add_user_permission,
 	alert_logs,
 	ensure_alert_bank,
 	ensure_charge_category,
@@ -142,6 +144,51 @@ class TestLowBalanceGuard(BalanceAlertTestMixin, IntegrationTestCase):
 		self.assertEqual((c3.operational_status, c3.accounting_status), ("Created", "Not Posted"))
 		self.assertFalse(c3.party_payment_entry)
 		self.assertFalse(frappe.db.exists("Payment Entry", {"treasury_source_name": c3.name}))
+
+	def restrict_user_to_other_mode(self, user: str, hidden_cheque: str):
+		"""`user` is restricted (User Permission) to Mode of Payment B; `hidden_cheque` carries Mode of Payment A,
+		so frappe.get_list hides it from `user` (a cheque without a mode stays visible)."""
+		for mode in ("_Test Guard Mode A", "_Test Guard Mode B"):
+			if not frappe.db.exists("Mode of Payment", mode):
+				frappe.get_doc(
+					{"doctype": "Mode of Payment", "mode_of_payment": mode, "type": "Bank"}
+				).insert(ignore_permissions=True)
+		frappe.db.set_value("PDC Cheque", hidden_cheque, "mode_of_payment", "_Test Guard Mode A")
+		add_user_permission(user, "Mode of Payment", "_Test Guard Mode B")
+		self.addCleanup(frappe.db.delete, "User Permission", {"user": user, "allow": "Mode of Payment"})
+		frappe.clear_cache(user=user)
+
+	def test_block_is_decided_on_the_company_wide_view(self):
+		"""A user whose User Permissions hide C1 (30,000 out on T+1) sees a partial forecast on which the action
+		would not breach the minimum; the guard evaluates the company-wide view, so the action is still blocked."""
+		set_thresholds(self, [{"bank_account": self.bank, "warning_balance": 50000, "minimum_balance": 4000}])
+		self.mode("Block")
+		c3 = self.cheque(15000, 4)
+		self.restrict_user_to_other_mode(TREASURY_USER, self.e1.c1)
+		system_day4 = self.day(4)
+		with self.set_user(TREASURY_USER):
+			# the setup bites: the user's own view lacks C1 (30,000 higher than the company's)
+			own = {d.date: d.closing for d in get_bank_positions(COMPANY, 7, [self.bank])[0].days}
+			self.assertTrue(frappe.has_permission("PDC Cheque", "read", c3.name))
+			self.assertFalse(frappe.has_permission("PDC Cheque", "read", self.e1.c1))
+			with self.assertRaises(guard.LowBalanceError):
+				self.attempt(frappe.get_doc("PDC Cheque", c3.name).deliver, handover_date=self.today)
+		company_view = {
+			d.date: d.closing for d in get_bank_positions(COMPANY, 7, [self.bank], system=True)[0].days
+		}
+		self.assertEqual(own[system_day4], company_view[system_day4] + 30000)
+		c3.reload()
+		self.assertEqual((c3.operational_status, c3.accounting_status), ("Created", "Not Posted"))
+
+	def test_event_job_is_enqueued_as_administrator(self):
+		"""`frappe.enqueue` records the session user as the job's user: the company evaluation job must not run
+		as (nor be decided by the view of) the user whose action enqueued it."""
+		recorded = []
+		self.enqueue.side_effect = lambda *args, **kwargs: recorded.append(frappe.session.user)
+		with self.set_user(TREASURY_USER):
+			scheduler.enqueue_evaluation(COMPANY)
+			self.assertEqual(frappe.session.user, TREASURY_USER)  # restored
+		self.assertEqual(recorded, ["Administrator"])
 
 	def test_block_override_manager(self):
 		self.mode("Block")
