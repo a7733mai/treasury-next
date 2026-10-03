@@ -18,12 +18,12 @@ SETTING = "block_negative_cash_balance"
 
 
 class TestCashBalance(TreasuryTestMixin, IntegrationTestCase):
+	sequence = 0
+
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
 		frappe.set_user("Administrator")
-		cls.box = ensure_account(BOX, "Cash In Hand", "Cash")
-		cls.other_box = ensure_account(OTHER_BOX, "Cash In Hand", "Cash")
 		cls.income = ensure_account(INCOME, "Indirect Income")
 		cls.expense = ensure_account(EXPENSE, "Indirect Expenses")
 		ensure_fiscal_year(COMPANY, today())
@@ -32,6 +32,10 @@ class TestCashBalance(TreasuryTestMixin, IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
 		frappe.set_user("Administrator")
+		# IntegrationTestCase rolls back only at the end of the class: every test gets its own empty cash boxes
+		TestCashBalance.sequence += 1
+		self.box = ensure_account(f"{BOX} {self.sequence}", "Cash In Hand", "Cash")
+		self.other_box = ensure_account(f"{OTHER_BOX} {self.sequence}", "Cash In Hand", "Cash")
 
 	# ------------------------------------------------------------------ helpers
 

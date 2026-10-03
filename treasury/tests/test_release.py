@@ -49,8 +49,11 @@ class TestRelease(IntegrationTestCase):
 		lines = (REPO_PATH / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
 		self.assertEqual(lines[0], "# Changelog")
 		headings = [(i, line) for i, line in enumerate(lines) if line.startswith("## ")]
+		# work merged after the release is listed under a leading "## Unreleased" until the next release is cut
+		if headings[0][1] == "## Unreleased":
+			headings = headings[1:]
 		self.assertEqual(headings[0][1], "## 1.3.0 — 2026-10-01")
-		self.assertFalse([line for line in lines if "Unreleased" in line])
+		self.assertFalse([line for line in lines[headings[0][0] :] if "Unreleased" in line])
 
 		# 1.3.0: the upgrade steps, then the Phase 9 section
 		section = lines[headings[0][0] : headings[1][0]]
