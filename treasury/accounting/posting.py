@@ -21,10 +21,9 @@ from functools import wraps
 
 import erpnext
 import frappe
-import frappe.share
 from erpnext.accounts.doctype.account.account import get_account_currency
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_accounting_dimensions
-from erpnext.accounts.party import get_party_gle_account, get_party_gle_currency
+from erpnext.accounts.party import get_party_advance_account, get_party_gle_account, get_party_gle_currency
 from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.model.document import Document
@@ -66,64 +65,109 @@ def _in_service_context(fn):
 	return wrapper
 
 
-SHARE_PERMISSIONS = ("read", "write", "submit", "share")
+def _party_accounts_read_by_erpnext(party_type, party, company, references) -> list[str]:
+	"""The Account(s) ERPNext's Payment Entry validation reads with `frappe.has_permission("Account")` for the
+	session user while the entry is built: the party account (`get_reference_details`, for a Sales / Purchase
+	Order reference) and, when the Company books advances in a separate party account, the party's advance
+	account too (`set_liability_account`, `get_party_account(include_advance=True)`)."""
+	if not (party_type and party and company):
+		return []
+	separate_advance = party_type in ("Customer", "Supplier") and frappe.get_cached_value(
+		"Company", company, "book_advance_payments_in_separate_party_account"
+	)
+	orders = any(ref.reference_doctype in ORDER_DOCTYPES for ref in references or [])
+	if not (orders or separate_advance):
+		return []
+	accounts = [get_party_account(party_type, party, company)]
+	if separate_advance:
+		accounts.append(get_party_advance_account(party_type, party, company))
+	return [account for account in accounts if account]
 
 
 @contextmanager
-def _reference_read_access(references, party_type=None, party=None):
-	"""Let the session user read the invoices / orders a Payment Entry allocates against (and the party they
-	belong to), for the duration of the block only.
+def _reference_read_access(references, party_type=None, party=None, company=None):
+	"""Let the session user read the invoices / orders a Payment Entry allocates against, the party they belong
+	to and the party Account(s) ERPNext reads, for the duration of the block only.
 
-	ERPNext's (and HRMS') Payment Entry validation calls `frappe.has_permission(<reference / party>, "read",
-	<name>, throw=True)` for the SESSION user, with no bypass flag, and Treasury roles hold no permission on
-	these doctypes (the app grants none). Instead of running as Administrator or granting the roles read
-	access to every invoice, the user is shared exactly the allocated documents and the party (read only)
-	and exactly the prior state is restored on exit: a share this block created is removed, a share row that already
-	existed (add_docshare would overwrite its permissions) gets its previous read / write / submit / share values back
-	and is never deleted. Only called after the Treasury source-document permission + role check.
+	ERPNext's (and HRMS') Payment Entry validation calls `frappe.has_permission(<reference / party / account>,
+	"read", <name>, throw=True)` for the SESSION user, with no bypass flag, and Treasury roles hold no permission
+	on these doctypes (the app grants none). Instead of running as Administrator or granting the roles read
+	access to every invoice, the user is shared exactly those documents (read only) and exactly the prior state
+	is restored on exit: a DocShare row this block created is deleted, a row that already existed gets its previous
+	`read` value back and is never deleted. Only called after the Treasury source-document permission + role check.
+
+	The DocShare rows are written directly (`db_insert` / `set_value`), not through `frappe.share.add_docshare`
+	or the DocShare controller: those add a "Shared" / "Un-shared" timeline Comment on the shared document and
+	(`add_docshare`) make a user who has `follow_shared_documents` follow it, none of which a temporary technical
+	share should leave behind. The permission check reads the DocShare table directly (no cache), so the rows
+	are effective at once. A cleanup failure is logged and never replaces the exception of the block itself.
 	"""
 	user = frappe.session.user
 	created: list[str] = []
-	changed: dict[str, dict] = {}  # pre-existing DocShare name -> its permission values before the block
-	if user != "Administrator":
-		seen = set()
-		keys = [(ref.reference_doctype, ref.reference_name) for ref in references or []]
-		if references and party_type and party:
-			keys.append((party_type, party))
-		for key in keys:
-			if key in seen or not all(key):
-				continue
-			seen.add(key)
-			if frappe.has_permission(key[0], "read", key[1], user=user):
-				continue
-			prior = frappe.db.get_value(
-				"DocShare",
-				{"user": user, "share_doctype": key[0], "share_name": key[1], "everyone": 0},
-				["name", *SHARE_PERMISSIONS],
-				as_dict=True,
-			)
-			# SECURITY: after the source-document permission + role check; read-only, removed in `finally`
-			share = frappe.share.add_docshare(
-				key[0], key[1], user=user, read=1, flags={"ignore_share_permission": True}
-			)
-			if prior:
-				changed[prior.name] = {p: prior[p] for p in SHARE_PERMISSIONS}
-			else:
-				created.append(share.name)
+	changed: dict[str, int] = {}  # pre-existing DocShare name -> its `read` value before the block
+	original: BaseException | None = None
 	try:
-		yield
-	finally:
-		for name in created:
-			# SECURITY: removes only the shares created above
-			frappe.delete_doc(
-				"DocShare", name, ignore_permissions=True, flags={"ignore_share_permission": True}, force=True
+		if user != "Administrator":
+			seen = set()
+			keys = [(ref.reference_doctype, ref.reference_name) for ref in references or []]
+			if references and party_type and party:
+				keys.append((party_type, party))
+			keys.extend(
+				("Account", acc)
+				for acc in _party_accounts_read_by_erpnext(party_type, party, company, references)
 			)
-		for name, values in changed.items():
-			# SECURITY: puts a share that existed before the block back exactly as it was (never deletes it)
-			share = frappe.get_doc("DocShare", name)
-			share.flags.ignore_share_permission = True
-			share.update(values)
-			share.save(ignore_permissions=True)
+			for key in keys:
+				if key in seen or not all(key):
+					continue
+				seen.add(key)
+				if frappe.has_permission(key[0], "read", key[1], user=user):
+					continue
+				prior = frappe.db.get_value(
+					"DocShare",
+					{"user": user, "share_doctype": key[0], "share_name": key[1], "everyone": 0},
+					["name", "read"],
+					as_dict=True,
+				)
+				# SECURITY: after the source-document permission + role check; read-only, removed in `finally`
+				if prior:
+					frappe.db.set_value("DocShare", prior.name, "read", 1, update_modified=False)
+					changed[prior.name] = cint(prior.read)
+				else:
+					share = frappe.get_doc(
+						{
+							"doctype": "DocShare",
+							"user": user,
+							"share_doctype": key[0],
+							"share_name": key[1],
+							"everyone": 0,
+							"read": 1,
+						}
+					)
+					share.set_user_and_timestamp()
+					share.db_insert()
+					created.append(share.name)
+		yield
+	except BaseException as exc:
+		original = exc
+		raise
+	finally:
+		failure: Exception | None = None
+		for name in created:
+			try:
+				# SECURITY: removes only the shares created above
+				frappe.db.delete("DocShare", {"name": name})
+			except Exception as exc:
+				failure = failure or exc
+				frappe.log_error(title="Treasury: temporary DocShare cleanup failed")
+		for name, read in changed.items():
+			try:
+				# SECURITY: puts a share that existed before the block back exactly as it was (never deletes it)
+				frappe.db.set_value("DocShare", name, "read", read, update_modified=False)
+			except Exception as exc:
+				failure = failure or exc
+				frappe.log_error(title="Treasury: temporary DocShare restore failed")
+		if failure and original is None:
+			raise failure
 
 
 # ---------------------------------------------------------------------------
@@ -611,7 +655,7 @@ def create_payment_entry(
 	_apply_rule_fields(pe, rules.fields)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
 	pe.flags.ignore_permissions = True  # SECURITY: after the source-document permission + role check
-	with _reference_read_access(pe.get("references"), party_type, party):
+	with _reference_read_access(pe.get("references"), party_type, party, company):
 		pe.insert()
 		if charges:
 			_absorb_rounding(pe, charges_account, party_cap, amounts.precision)

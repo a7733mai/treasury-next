@@ -2,6 +2,8 @@
 role-based accounting guards apply to that user, while Treasury's own permission + role check stays the
 authorization gate (treasury.utils.context.service_context)."""
 
+from unittest.mock import patch
+
 import frappe
 from erpnext.accounts.party import get_party_account as erpnext_get_party_account
 from frappe.tests import IntegrationTestCase
@@ -17,10 +19,13 @@ from treasury.tests.utils import (
 	TRANSFER_SETTINGS,
 	TreasuryTestMixin,
 	day,
+	ensure_account,
 	ensure_user,
 	make_bank_transfer,
 	make_pdc_cheque,
 	make_purchase_invoice,
+	make_purchase_order,
+	make_sales_order,
 )
 from treasury.utils.context import REAL_USER_FLAG, real_user, service_context
 
@@ -284,3 +289,157 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 		after = frappe.db.get_value("DocShare", prior.name, ["read", "write", "share"], as_dict=True)
 		self.assertIsNotNone(after, "the pre-existing share row was deleted")
 		self.assertEqual((after.read, after.write, after.share), (1, 0, 0))
+
+	# ------------------------------------------------------------------ orders, advance accounts, side effects
+
+	def assert_no_share_left(self, *documents: tuple[str, str]):
+		for doctype, name in documents:
+			self.assertFalse(
+				frappe.db.exists(
+					"DocShare", {"share_doctype": doctype, "share_name": name, "user": TREASURY_USER}
+				),
+				f"{doctype} {name} is still shared with the user",
+			)
+			self.assertFalse(
+				frappe.has_permission(doctype, "read", name, user=TREASURY_USER), (doctype, name)
+			)
+
+	def enable_separate_advance_accounts(self):
+		"""The company books advances in a separate party account (restored by a cleanup)."""
+		fields = [
+			"book_advance_payments_in_separate_party_account",
+			"default_advance_received_account",
+			"default_advance_paid_account",
+		]
+		previous = frappe.db.get_value("Company", COMPANY, fields, as_dict=True)
+		self.addCleanup(self.set_company_values, dict(previous))
+		self.set_company_values(
+			{
+				"book_advance_payments_in_separate_party_account": 1,
+				"default_advance_received_account": ensure_account(
+					"Treasury Advance Received", "Current Liabilities", "Receivable"
+				),
+				"default_advance_paid_account": ensure_account(
+					"Treasury Advance Paid", "Current Assets", "Payable"
+				),
+			}
+		)
+		return frappe.db.get_value("Company", COMPANY, fields, as_dict=True)
+
+	@staticmethod
+	def set_company_values(values: dict):
+		frappe.db.set_value("Company", COMPANY, values)
+		frappe.clear_document_cache("Company", COMPANY)
+
+	def test_sales_order_allocation_by_a_treasury_user_posts_and_leaves_no_share(self):
+		so = make_sales_order(2500)
+		cheque = make_pdc_cheque("Incoming", amount=2500, issue_date=day(-5), due_date=day(20), invoice=so)
+		with self.set_user(TREASURY_USER):
+			self.assertFalse(frappe.has_permission("Account", "read", self.data.receivable))
+			cheque.receive(receipt_date=day(-4))
+			self.assertFalse(frappe.has_permission("Account", "read", self.data.receivable))
+		cheque.reload()
+		self.assertEqual(cheque.accounting_status, "Party Posted")
+		self.assert_authored_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
+		self.assert_no_share_left(
+			("Sales Order", so.name), ("Customer", so.customer), ("Account", self.data.receivable)
+		)
+
+	def test_purchase_order_allocation_by_a_treasury_user_posts_and_leaves_no_share(self):
+		po = make_purchase_order(1800)
+		cheque = make_pdc_cheque(amount=1800, issue_date=day(-5), due_date=day(20), invoice=po)
+		with self.set_user(TREASURY_USER):
+			cheque.deliver(day(-4))
+		cheque.reload()
+		self.assertEqual(cheque.accounting_status, "Party Posted")
+		self.assert_authored_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
+		self.assert_no_share_left(
+			("Purchase Order", po.name), ("Supplier", po.supplier), ("Account", self.data.payable)
+		)
+
+	def test_separate_advance_accounts_for_a_treasury_user(self):
+		"""Company.book_advance_payments_in_separate_party_account: ERPNext also reads the party's advance account
+		(set_liability_account) - for a receive against an order and a pay against an order."""
+		company = self.enable_separate_advance_accounts()
+		advance_received = company.default_advance_received_account
+		advance_paid = company.default_advance_paid_account
+		so = make_sales_order(1200)
+		receive = make_pdc_cheque("Incoming", amount=1200, issue_date=day(-5), due_date=day(20), invoice=so)
+		po = make_purchase_order(700)
+		pay = make_pdc_cheque(amount=700, issue_date=day(-5), due_date=day(20), invoice=po)
+		with self.set_user(TREASURY_USER):
+			self.assertFalse(frappe.has_permission("Account", "read", advance_received))
+			receive.receive(receipt_date=day(-4))
+			pay.deliver(day(-4))
+			self.assertFalse(frappe.has_permission("Account", "read", advance_received))
+			self.assertFalse(frappe.has_permission("Account", "read", advance_paid))
+		for cheque in (receive, pay):
+			cheque.reload()
+			self.assertEqual(cheque.accounting_status, "Party Posted")
+			self.assert_authored_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
+		self.assertEqual(
+			frappe.db.get_value("Payment Entry", receive.party_payment_entry, "paid_from"), advance_received
+		)
+		self.assertFalse(
+			frappe.get_all("DocShare", filters={"user": TREASURY_USER, "share_doctype": "Account"}),
+		)
+		self.assert_no_share_left(
+			("Sales Order", so.name),
+			("Purchase Order", po.name),
+			("Account", advance_received),
+			("Account", advance_paid),
+		)
+
+	def test_temporary_share_leaves_no_follow_row_and_no_timeline_comment(self):
+		"""A user with follow_shared_documents + document_follow_notify: the technical share neither makes the
+		user follow the invoice nor adds a Shared / Un-shared Comment to it."""
+		frappe.db.set_value(
+			"User", TREASURY_USER, {"follow_shared_documents": 1, "document_follow_notify": 1}
+		)
+		frappe.clear_document_cache("User", TREASURY_USER)
+		self.addCleanup(self.reset_follow_flags)
+		pi = make_purchase_invoice(1000, posting_date=day(-60))
+		so = make_sales_order(900)
+		shared = (("Purchase Invoice", pi.name), ("Sales Order", so.name))
+		comments_before = frappe.db.count("Comment", {"comment_type": ["in", ["Shared", "Unshared"]]})
+		cheque = make_pdc_cheque(amount=1000, issue_date=day(-60), due_date=day(-30), invoice=pi)
+		receive = make_pdc_cheque("Incoming", amount=900, issue_date=day(-5), due_date=day(20), invoice=so)
+		with self.set_user(TREASURY_USER):
+			cheque.deliver(day(-59))
+			receive.receive(receipt_date=day(-4))
+		for doctype, name in shared:
+			self.assertFalse(
+				frappe.db.exists("Document Follow", {"ref_doctype": doctype, "ref_docname": name})
+			)
+		self.assertFalse(frappe.db.exists("Document Follow", {"user": TREASURY_USER}))
+		self.assertEqual(
+			frappe.db.count("Comment", {"comment_type": ["in", ["Shared", "Unshared"]]}), comments_before
+		)
+		self.assert_no_share_left(*shared)
+
+	def reset_follow_flags(self):
+		frappe.db.set_value(
+			"User", TREASURY_USER, {"follow_shared_documents": 0, "document_follow_notify": 0}
+		)
+		frappe.clear_document_cache("User", TREASURY_USER)
+
+	def test_cleanup_failure_does_not_mask_the_original_exception(self):
+		pi = make_purchase_invoice(1000, posting_date=day(-60))
+		reference = frappe._dict(reference_doctype="Purchase Invoice", reference_name=pi.name)
+		self.addCleanup(
+			frappe.db.delete, "DocShare", {"share_doctype": "Purchase Invoice", "share_name": pi.name}
+		)
+
+		def failing_delete(*args, **kwargs):
+			raise RuntimeError("cleanup failed")
+
+		with self.set_user(TREASURY_USER):
+			with patch.object(frappe.db, "delete", failing_delete), patch.object(frappe, "log_error") as log:
+				with self.assertRaises(ValueError):
+					with posting._reference_read_access([reference]):
+						raise ValueError("original")
+				self.assertTrue(log.called)
+				# no original exception: the cleanup failure surfaces
+				with self.assertRaises(RuntimeError):
+					with posting._reference_read_access([reference]):
+						pass

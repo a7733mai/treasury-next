@@ -86,6 +86,8 @@ def enqueue_evaluation(company: str):
 	# `frappe.enqueue` records the session user as the job's user: the job runs as Administrator, never as the
 	# user whose action happened to enqueue it (the dedup job_id lets one enqueue stand for the whole company).
 	# Only the recorded user is swapped, for the duration of the call (`frappe.set_user` would reset the request).
+	# PINNED to frappe v16: `frappe.utils.background_jobs.enqueue` reads `frappe.session.user` at call time
+	# (`kwargs["user"]`), not when the job is queued after the commit; re-verify on a frappe upgrade.
 	session = frappe.local.session
 	acting = session.user
 	session.user = SYSTEM_USER
