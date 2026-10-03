@@ -69,15 +69,20 @@ def treasury_amount_in_words(
 	if currency_name is None:
 		currency_name = CURRENCY_NAMES.get(currency, currency or "")
 		currency_name = _(currency_name, lang=lang, context=CONTEXT) if currency_name else ""
-	text = f"{number_in_words(main, lang)} {currency_name}".strip()
+	# a fraction-only amount (0.75) is the fraction alone: "seventy five dirhams", never "zero riyals and ..."
+	fraction_only = main == 0 and fraction > 0 and fraction_style != "Figures"
+	text = "" if fraction_only else f"{number_in_words(main, lang)} {currency_name}".strip()
 	if fraction and fraction_style == "Figures":
 		text = _("{0} and {1}/{2}", lang=lang, context=CONTEXT).format(text, fraction, fraction_units)
 	elif fraction:
 		if fraction_name is None:
 			fraction_name = _(default_fraction, lang=lang, context=CONTEXT) if default_fraction else ""
-		text = _("{0} and {1} {2}", lang=lang, context=CONTEXT).format(
-			text, number_in_words(fraction, lang), fraction_name
-		)
+		if fraction_only:
+			text = f"{number_in_words(fraction, lang)} {fraction_name}".strip()
+		else:
+			text = _("{0} and {1} {2}", lang=lang, context=CONTEXT).format(
+				text, number_in_words(fraction, lang), fraction_name
+			)
 	text = text.strip()
 	return _("{0} only", lang=lang, context=CONTEXT).format(text) if only else text
 

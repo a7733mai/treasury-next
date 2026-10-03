@@ -62,7 +62,7 @@ class TestVoucherAmountInWords(IntegrationTestCase):
 		words = arabic_amount_in_words(0.75, "QAR")
 		self.assertIn("درهم", words)
 		self.assertNotIn("ريال", words)
-		self.assertIn("خمسة وسبعون", words)
+		self.assertIn("خمسة و سبعون", words)  # num2words spells the conjunction apart
 
 	def test_one_million(self):
 		self.assertIn("مليون", arabic_amount_in_words(1000000, "QAR"))
@@ -72,7 +72,12 @@ class TestVoucherAmountInWords(IntegrationTestCase):
 
 class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 	def receive(self, cash: bool = True, **values):
-		pe = get_payment_entry("Sales Invoice", make_sales_invoice(1250.5).name, bank_account=self.data.egp.bank_gl)
+		# the fraction must survive: without disable_rounded_total the invoice (and the payment) rounds to 1,250
+		invoice = make_sales_invoice(1250.5, submit=False)
+		invoice.disable_rounded_total = 1
+		invoice.save(ignore_permissions=True)
+		invoice.submit()
+		pe = get_payment_entry("Sales Invoice", invoice.name, bank_account=self.data.egp.bank_gl)
 		return self.finish(pe, "Cash" if cash else "Wire Transfer", cash, values)
 
 	def pay(self, cash: bool = True, **values):
@@ -89,6 +94,7 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 		pe.mode_of_payment = mode if frappe.db.exists("Mode of Payment", mode) else None
 		pe.reference_no = values.get("reference_no", "CHQ-001")
 		pe.reference_date = today()
+		pe.custom_remarks = 1  # keep the narration as typed (ERPNext otherwise regenerates it)
 		pe.remarks = values.get("remarks", "Narration test")
 		pe.insert(ignore_permissions=True)
 		return pe
@@ -179,7 +185,7 @@ class TestArabicAmountInWordsGrammar(IntegrationTestCase):
 
 	def test_0_75_qar_is_dirhams_only(self):
 		words = arabic_amount_in_words(0.75, "QAR")
-		self.assertEqual(words, "فقط خمسة وسبعون درهم لا غير")
+		self.assertEqual(words, "فقط خمسة و سبعون درهم لا غير")
 
 	def test_1_000_000_qar_has_no_fraction(self):
 		words = arabic_amount_in_words(1000000, "QAR")
