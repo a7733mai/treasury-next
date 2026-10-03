@@ -158,3 +158,42 @@ class TestTreasuryVouchers(TreasuryTestMixin, IntegrationTestCase):
 	def test_draft_watermark(self):
 		html = self.render(self.receive(), RECEIPT)
 		self.assertIn("مسودة", html)
+
+
+class TestArabicAmountInWordsGrammar(IntegrationTestCase):
+	"""Arabic wording of QAR amounts: "فقط <riyals> ريال قطري و<dirhams> درهم لا غير"."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.db.set_value("Currency", "QAR", {"enabled": 1, "fraction": "Dirham", "fraction_units": 100})
+
+	def test_1250_50_qar_structure(self):
+		words = arabic_amount_in_words(1250.50, "QAR")
+		self.assertTrue(words.startswith("فقط "), words)
+		self.assertTrue(words.endswith(" لا غير"), words)
+		# riyals first, then the dirham fraction joined with the conjunction "و"
+		self.assertLess(words.index("ألف"), words.index("ريال قطري"))
+		self.assertRegex(words, r"ريال قطري و\S+ درهم لا غير$")
+		self.assertIn("خمسون درهم", words)  # 50 dirhams
+
+	def test_0_75_qar_is_dirhams_only(self):
+		words = arabic_amount_in_words(0.75, "QAR")
+		self.assertEqual(words, "فقط خمسة وسبعون درهم لا غير")
+
+	def test_1_000_000_qar_has_no_fraction(self):
+		words = arabic_amount_in_words(1000000, "QAR")
+		self.assertEqual(words, "فقط مليون ريال قطري لا غير")
+
+	def test_whole_riyals_have_no_dirham_part(self):
+		self.assertNotIn("درهم", arabic_amount_in_words(2, "QAR"))
+		self.assertIn("ريال قطري", arabic_amount_in_words(2, "QAR"))
+
+	def test_fraction_rounding_carries_into_riyals(self):
+		# 0.999 rounds to 100 dirhams = one more riyal, never "مئة درهم"
+		words = arabic_amount_in_words(1.999, "QAR")
+		self.assertNotIn("درهم", words)
+		self.assertIn("ريال قطري", words)
+
+	def test_zero_and_negative(self):
+		self.assertEqual(arabic_amount_in_words(-5, "QAR"), "")
