@@ -233,7 +233,7 @@ frappe.ui.form.on("Cheque Batch", {
 		}
 		frm.add_custom_button(__("Generate Cheques"), () => {
 			const generate = () =>
-				frm.call({ doc: frm.doc, method: "generate_rows", doc: frm.doc, freeze: true }).then((r) => {
+				frm.call({ doc: frm.doc, method: "generate_rows", freeze: true }).then((r) => {
 					frm.refresh_fields();
 					const numbers = (r.message && r.message.cheque_numbers) || [];
 					if (numbers.length) {
@@ -267,7 +267,7 @@ frappe.ui.form.on("Cheque Batch", {
 		});
 		if (frm.doc.allocation_method === "FIFO Invoices") {
 			frm.add_custom_button(__("Allocate FIFO"), () => {
-				frm.call({ doc: frm.doc, method: "allocate_fifo", doc: frm.doc, freeze: true }).then((r) => {
+				frm.call({ doc: frm.doc, method: "allocate_fifo", freeze: true }).then((r) => {
 					frm.refresh_fields();
 					frm.events.show_fifo_summary(frm, r.message);
 				});
@@ -386,7 +386,7 @@ frappe.ui.form.on("Cheque Batch", {
 					cheque_batch_print_cheques(frm);
 					return;
 				}
-				frm.call({ doc: frm.doc, method: "print_all", doc: frm.doc }).then((r) => {
+				frm.call({ doc: frm.doc, method: "print_all" }).then((r) => {
 					const info = r.message;
 					if (!info || !info.names.length) {
 						frappe.msgprint(__("No cheques to print."));

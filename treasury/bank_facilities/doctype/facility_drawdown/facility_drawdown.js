@@ -143,7 +143,7 @@ frappe.ui.form.on("Facility Drawdown", {
 
 	generate_schedule(frm) {
 		const run = () =>
-			frm.call({ doc: frm.doc, method: "generate_schedule", doc: frm.doc, freeze: true }).then((r) => {
+			frm.call({ doc: frm.doc, method: "generate_schedule", freeze: true }).then((r) => {
 				if (r.message) {
 					frappe.model.sync(r.message);
 					frm.refresh();
