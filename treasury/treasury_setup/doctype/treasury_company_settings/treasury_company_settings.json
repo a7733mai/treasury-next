@@ -72,6 +72,8 @@
   "custody_cheque_book",
   "column_break_custody",
   "include_custody_replenishment_in_forecast",
+  "cash_boxes_section",
+  "block_negative_cash_balance",
   "facilities_section",
   "accrue_facility_interest",
   "column_break_facilities",
@@ -519,6 +521,18 @@
    "label": "Include custody replenishment in forecast"
   },
   {
+   "fieldname": "cash_boxes_section",
+   "fieldtype": "Section Break",
+   "label": "Cash Boxes"
+  },
+  {
+   "default": "1",
+   "description": "Refuse a Payment Entry or Journal Entry that would take a Cash account (a cash box) below zero on its posting date.",
+   "fieldname": "block_negative_cash_balance",
+   "fieldtype": "Check",
+   "label": "Block negative cash balance"
+  },
+  {
    "fieldname": "facilities_section",
    "fieldtype": "Section Break",
    "label": "Bank Facilities"
@@ -564,7 +578,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-25 12:00:00.000000",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Treasury Setup",
  "name": "Treasury Company Settings",

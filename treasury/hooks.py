@@ -179,11 +179,14 @@ before_uninstall = "treasury.install.before_uninstall"
 
 doc_events = {
 	"Payment Entry": {
+		# CB-14: a Cash account (cash box) never goes negative (treasury.accounting.cash_balance)
+		"before_submit": "treasury.accounting.cash_balance.before_submit",
 		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
 		"on_cancel": "treasury.overrides.voucher_guard.on_cancel",
 		"on_trash": "treasury.overrides.voucher_guard.on_trash",
 	},
 	"Journal Entry": {
+		"before_submit": "treasury.accounting.cash_balance.before_submit",
 		"before_cancel": "treasury.overrides.voucher_guard.before_cancel",
 		# the Treasury back links ignored on cancel; an Invoice Discounting's loan Journal Entries (its status)
 		"on_submit": "treasury.bank_facilities.invoice_discounting.on_journal_entry",
@@ -214,6 +217,9 @@ doc_events = {
 treasury_party_payment_hooks = ["treasury.integrations.custody.rules.party_rules"]
 # Doctypes a PDC Cheque / Bank Transfer may be "Created From" (treasury.utils.document_sources)
 treasury_document_sources = ["Custody Request"]
+# Read by the custody app (hook `custody_reservation_providers`, EC-20): the amount open cheques / transfers of a
+# Custody Request already promise, so a direct custody Payment Entry cannot consume it. Inert without custody.
+custody_reservation_providers = ["treasury.integrations.custody.documents.reservation_provider"]
 
 # Scheduled Tasks
 # ---------------

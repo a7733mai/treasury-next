@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Custody bridge uses custody's public API only (EC-21).** `integrations/custody/compat.py` imports
+  `custody.api.v1` (major 1) and nothing private; without custody, or with another API major, its calls raise
+  a clear error and the rest of Treasury is unaffected.
+- **Reservation provider for custody (EC-20).** Hook `custody_reservation_providers` registers
+  `documents.reservation_provider`: open cheques and scheduled transfers of a Custody Request are unavailable
+  to custody's own Payment Entries. The Payment Entry a cheque or transfer creates does not count its own
+  reservation.
+- **Block negative cash balance (CB-14).** A Payment Entry or Journal Entry that takes a Cash account below
+  zero on its posting date is refused at submit. New setting *Block negative cash balance* in Treasury Company
+  Settings (default on, also for a company without settings). Validation only. After `bench migrate`, existing
+  settings rows get the default (on): turn it off per company if a cash account is allowed to run negative.
+
+
 ## 1.3.0 — 2026-10-01
 
 Treasury 1.3 pays and receives back the employee custody of the **Custody** app by cheque or bank transfer.

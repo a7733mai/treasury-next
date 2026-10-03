@@ -61,6 +61,7 @@ class TreasuryCompanySettings(Document):
 		accrue_facility_interest: DF.Check
 		auto_debit_posting: DF.Literal["On Due Date", "On Bank Statement Match"]
 		auto_select_cheque_book: DF.Check
+		block_negative_cash_balance: DF.Check
 		balance_alerts_help: DF.HTML | None
 		balance_thresholds: DF.Table[TreasuryBalanceThreshold]
 		bank_charge_clearance: DF.Literal["On Posting", "On Bank Transaction"]
