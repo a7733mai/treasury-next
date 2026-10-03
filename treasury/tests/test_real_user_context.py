@@ -123,6 +123,7 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 			cheque.receive(receipt_date=day(-49))
 		with self.set_user(TREASURY_MANAGER):
 			cheque.bounce(bounce_date=day(-10), reason="Insufficient funds")
+		cheque.reload()
 		pe = cheque.party_payment_entry
 		self.assertEqual(frappe.db.get_value("Payment Entry", pe, "docstatus"), 2)
 		self.assertEqual(frappe.db.get_value("Payment Entry", pe, "modified_by"), TREASURY_MANAGER)
@@ -181,11 +182,14 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 	# ------------------------------------------------------------------ ERPNext's role-based guard: frozen accounts
 
 	def freeze_accounts(self, upto):
-		"""Accounts Settings: books frozen up to `upto`, modifiable by FROZEN_MODIFIER_ROLE only."""
-		for field, value in (("acc_frozen_upto", upto), ("frozen_accounts_modifier", FROZEN_MODIFIER_ROLE)):
-			previous = frappe.db.get_single_value("Accounts Settings", field)
-			frappe.db.set_single_value("Accounts Settings", field, value)
-			self.addCleanup(frappe.db.set_single_value, "Accounts Settings", field, previous)
+		"""Company: books frozen up to `upto`, modifiable by FROZEN_MODIFIER_ROLE only (ERPNext 16 fields)."""
+		for field, value in (
+			("accounts_frozen_till_date", upto),
+			("role_allowed_for_frozen_entries", FROZEN_MODIFIER_ROLE),
+		):
+			previous = frappe.db.get_value("Company", COMPANY, field)
+			frappe.db.set_value("Company", COMPANY, field, value)
+			self.addCleanup(frappe.db.set_value, "Company", COMPANY, field, previous)
 		frappe.clear_cache()
 		self.addCleanup(frappe.clear_cache)
 
@@ -214,3 +218,21 @@ class TestRealUserContext(TreasuryTestMixin, IntegrationTestCase):
 			cheque.deliver(day(-59))
 		cheque.reload()
 		self.assertEqual(cheque.accounting_status, "Party Posted")
+
+	# ------------------------------------------------------------------ allocation against an invoice
+
+	def test_invoice_allocation_by_a_user_without_invoice_permission_leaves_no_share(self):
+		pi = make_purchase_invoice(1000, posting_date=day(-60))
+		cheque = make_pdc_cheque(amount=1000, issue_date=day(-60), due_date=day(-30), invoice=pi)
+		with self.set_user(TREASURY_USER):
+			self.assertFalse(frappe.has_permission("Purchase Invoice", "read", pi.name))
+			cheque.deliver(day(-59))
+			# the temporary read share is gone again
+			self.assertFalse(frappe.has_permission("Purchase Invoice", "read", pi.name))
+		cheque.reload()
+		self.assert_authored_by("Payment Entry", cheque.party_payment_entry, TREASURY_USER)
+		self.assertFalse(frappe.db.exists("DocShare", {"share_doctype": "Purchase Invoice", "share_name": pi.name}))
+		reference = frappe.db.get_value(
+			"Payment Entry Reference", {"parent": cheque.party_payment_entry}, "reference_name"
+		)
+		self.assertEqual(reference, pi.name)

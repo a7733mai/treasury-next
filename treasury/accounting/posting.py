@@ -16,10 +16,12 @@ permission (the app grants none), so each document the service builds sets `flag
 (`get_party_account`) is replaced by `get_party_account` below. Scheduler jobs run as Administrator.
 """
 
+from contextlib import contextmanager
 from functools import wraps
 
 import erpnext
 import frappe
+import frappe.share
 from erpnext.accounts.doctype.account.account import get_account_currency
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_accounting_dimensions
 from erpnext.accounts.party import get_party_gle_account, get_party_gle_currency
@@ -62,6 +64,43 @@ def _in_service_context(fn):
 			return fn(*args, **kwargs)
 
 	return wrapper
+
+
+@contextmanager
+def _reference_read_access(references):
+	"""Let the session user read the invoices / orders a Payment Entry allocates against, for the duration of
+	the block only.
+
+	ERPNext's (and HRMS') Payment Entry validation calls `frappe.has_permission(<reference>, "read", <name>,
+	throw=True)` for the SESSION user, with no bypass flag, and Treasury roles hold no permission on these
+	doctypes (the app grants none). Instead of running as Administrator or granting the roles read access to
+	every invoice, the user is shared exactly the allocated documents (read only) and the shares this block
+	created are removed again on exit. Only called after the Treasury source-document permission + role check.
+	"""
+	user = frappe.session.user
+	created: list[str] = []
+	if user != "Administrator":
+		seen = set()
+		for ref in references or []:
+			key = (ref.reference_doctype, ref.reference_name)
+			if key in seen or not all(key):
+				continue
+			seen.add(key)
+			if frappe.has_permission(key[0], "read", key[1], user=user):
+				continue
+			# SECURITY: after the source-document permission + role check; read-only, removed in `finally`
+			share = frappe.share.add_docshare(
+				key[0], key[1], user=user, read=1, flags={"ignore_share_permission": True}
+			)
+			created.append(share.name)
+	try:
+		yield
+	finally:
+		for name in created:
+			# SECURITY: removes only the shares created above
+			frappe.delete_doc(
+				"DocShare", name, ignore_permissions=True, flags={"ignore_share_permission": True}, force=True
+			)
 
 
 # ---------------------------------------------------------------------------
@@ -549,13 +588,14 @@ def create_payment_entry(
 	_apply_rule_fields(pe, rules.fields)
 	_set_treasury_fields(pe, source_doctype, source_name, event, cycle)
 	pe.flags.ignore_permissions = True  # SECURITY: after the source-document permission + role check
-	pe.insert()
-	if charges:
-		_absorb_rounding(pe, charges_account, party_cap, amounts.precision)
-	if submit:
-		pe.submit()
-		if clearance_date:
-			_set_clearance_date(pe.name, clearance_date, "Payment Entry")
+	with _reference_read_access(pe.get("references")):
+		pe.insert()
+		if charges:
+			_absorb_rounding(pe, charges_account, party_cap, amounts.precision)
+		if submit:
+			pe.submit()
+			if clearance_date:
+				_set_clearance_date(pe.name, clearance_date, "Payment Entry")
 	return pe.name
 
 
