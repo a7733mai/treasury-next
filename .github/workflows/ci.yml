@@ -125,8 +125,8 @@ jobs:
           bench --site test_site install-app hrms
           bench --site test_site install-app custody
           bench --site test_site install-app treasury
-          bench --site test_site set-config allow_tests true
-          bench --site test_site set-config throttle_user_limit 100
+          bench --site test_site set-config -p allow_tests true
+          bench --site test_site set-config -p throttle_user_limit 100
 
       - name: Run tests (treasury)
         working-directory: /home/runner/frappe-bench
