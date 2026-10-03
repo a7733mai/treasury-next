@@ -117,7 +117,7 @@ jinja = {
 # Installation
 # ------------
 
-# before_install = "treasury.install.before_install"
+before_install = "treasury.install.before_install"
 after_install = "treasury.install.after_install"
 after_migrate = "treasury.install.after_migrate"
 
