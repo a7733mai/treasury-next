@@ -29,6 +29,15 @@ class TestInstall(IntegrationTestCase):
 		cls.dimension_field = ensure_branch_dimension()
 		super().setUpClass()
 
+	def test_before_install_creates_the_payee_group_and_is_registered(self):
+		# init_singles saves Treasury Settings (default Payee Supplier Group, a validated Link) before
+		# after_install: the group must already exist then, so the hook creates it.
+		self.assertIn("treasury.install.before_install", frappe.get_hooks("before_install", app_name="treasury"))
+		install.before_install()
+		self.assertTrue(frappe.db.exists("Supplier Group", DEFAULT_PAYEE_GROUP))
+		install.before_install()  # idempotent
+		self.assertEqual(frappe.db.count("Supplier Group", {"name": DEFAULT_PAYEE_GROUP}), 1)
+
 	def test_payee_supplier_group(self):
 		# the steps of `setup` (after_install / after_migrate): the group, then the Treasury Settings
 		# defaults. Run here: the test depends neither on the site's migrate history nor on the setup wizard.
