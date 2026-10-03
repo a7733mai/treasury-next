@@ -13654,3 +13654,24 @@ msgstr "{0} عهدة دائمة"
 
 msgid "Floats {0} · {1} request(s)"
 msgstr "السقوف {0} · {1} طلب"
+
+# Cash boxes: block negative cash balance (CB-14)
+msgctxt "Treasury Company Settings"
+msgid "Cash Boxes"
+msgstr "صناديق النقدية"
+
+msgctxt "Treasury Company Settings"
+msgid "Block negative cash balance"
+msgstr "منع الرصيد النقدي السالب"
+
+msgid "Refuse a Payment Entry or Journal Entry that would take a Cash account (a cash box) below zero on its posting date."
+msgstr "رفض سند الدفع أو قيد اليومية الذي يجعل رصيد حساب نقدي (صندوق) أقل من الصفر في تاريخ الترحيل."
+
+msgid "Negative Cash Balance"
+msgstr "رصيد نقدي سالب"
+
+msgid "Cash account {0} would be negative on {1}: its balance is {2} and this voucher takes out {3}. Fund the cash box first, or turn off Block negative cash balance in the Treasury Company Settings of {4}."
+msgstr "رصيد الحساب النقدي {0} سيصبح سالباً في {1}: رصيده {2} وهذا السند يصرف {3}. قم بتمويل الصندوق أولاً أو أوقف خيار منع الرصيد النقدي السالب في إعدادات الخزينة للشركة {4}."
+
+msgid "This Treasury version needs the Custody app with public API version {0}. Update the Custody app."
+msgstr "هذا الإصدار من الخزينة يحتاج تطبيق العهد بإصدار واجهة عامة {0}. قم بتحديث تطبيق العهد."
