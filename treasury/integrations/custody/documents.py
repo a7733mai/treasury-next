@@ -43,8 +43,12 @@ def _precision() -> int:
 	return frappe.get_precision("PDC Cheque", "amount") or 2
 
 
-def reserved(request: str, direction: str, exclude: str | None = None) -> float:
-	"""What open cheques / transfers of the request that are not posted to the party yet already cover."""
+def reserved(
+	request: str, direction: str, exclude: str | None = None, exclude_doctype: str | None = None
+) -> float:
+	"""What open cheques / transfers of the request that are not posted to the party yet already cover.
+	`exclude`: a document that does not count (the one being edited); with `exclude_doctype` only a document
+	of that doctype is skipped, without it a document of either doctype with that name."""
 	filters = {
 		"source_doctype": REQUEST,
 		"source_name": request,
@@ -52,18 +56,34 @@ def reserved(request: str, direction: str, exclude: str | None = None) -> float:
 		"accounting_status": NOT_POSTED,
 		"operational_status": ["in", OPEN_CHEQUE_STATUSES],
 	}
-	if exclude:
+	if exclude and exclude_doctype in (None, "PDC Cheque"):
 		filters["name"] = ["!=", exclude]
 	total = sum(flt(amount) for amount in frappe.get_all("PDC Cheque", filters=filters, pluck="amount"))
 	if direction == OUTGOING and frappe.get_meta(TRANSFER).has_field("source_name"):
 		base = {"source_doctype": REQUEST, "source_name": request, "transfer_type": PARTY_PAYMENT}
-		if exclude:
+		if exclude and exclude_doctype in (None, TRANSFER):
 			base["name"] = ["!=", exclude]
 		for extra in ({"docstatus": 0}, {"docstatus": 1, "status": "Scheduled"}):
 			total += sum(
 				flt(amount) for amount in frappe.get_all(TRANSFER, filters={**base, **extra}, pluck="amount")
 			)
 	return flt(total, _precision())
+
+
+def reservation_provider(request: str, payment_type: str, voucher=None) -> float:
+	"""Hook `custody_reservation_providers` (EC-20): the amount custody must treat as unavailable to its own
+	Payment Entries, i.e. what open cheques / transfers of the request already promise (EC-20, AC-F18).
+
+	`voucher`: the Payment Entry custody is about to post; when Treasury itself creates it for a cheque or
+	transfer (custom fields `treasury_source_doctype` / `treasury_source_name`), that document's own
+	reservation does not count, or the cheque would block its own posting."""
+	direction = next((d for d, ptype in PAYMENT_TYPE.items() if ptype == payment_type), None)
+	if not direction:
+		return 0.0
+	source = (voucher.get("treasury_source_doctype"), voucher.get("treasury_source_name")) if voucher else None
+	if source and source[0] in SOURCE_DOCTYPES:
+		return reserved(request, direction, exclude=source[1], exclude_doctype=source[0])
+	return reserved(request, direction)
 
 
 def open_documents(request: str, limit: int) -> tuple[list[dict], int]:
