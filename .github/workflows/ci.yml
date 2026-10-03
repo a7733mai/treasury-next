@@ -126,8 +126,8 @@ jobs:
           bench --site test_site install-app custody
           # CI workaround (app defect, see baseline report): `install-app treasury` fails in init_singles because
           # Treasury Settings defaults to the Supplier Group "Treasury Payees", which treasury's after_install
-          # creates only afterwards. Pre-create it so install and tests can proceed on unchanged app code.
-          bench --site test_site execute frappe.client.insert --kwargs '{"doc": {"doctype": "Supplier Group", "supplier_group_name": "Treasury Payees", "parent_supplier_group": "All Supplier Groups"}}'
+          # creates only afterwards. Pre-create it with the app's own helper so install and tests can proceed on unchanged app code.
+          bench --site test_site execute treasury.utils.party.ensure_payee_supplier_group
           bench --site test_site install-app treasury
           bench --site test_site set-config -p allow_tests True
           bench --site test_site set-config -p throttle_user_limit 100
