@@ -83,6 +83,13 @@ def after_migrate():
 	setup()
 
 
+def before_install():
+	"""Create the "Treasury Payees" Supplier Group before the app's doctypes are synced: `bench install-app`
+	saves the Single doctypes with their field defaults (init_singles) before `after_install` runs, and
+	Treasury Settings.payee_supplier_group defaults to this group (a Link, validated on save)."""
+	ensure_payee_supplier_group()
+
+
 def before_uninstall():
 	"""Remove what the app added to core doctypes. The Treasury roles (and their assignment to users) are
 	kept on purpose: they hold no permission outside the app's own doctypes once it is uninstalled, and a

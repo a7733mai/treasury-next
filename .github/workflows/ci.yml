@@ -1,47 +1,57 @@
 name: CI
 
+# Installs Frappe + ERPNext + HRMS (all pinned to the v16 branches), creates a disposable test
+# site and runs the full test suite of the app with `bench run-tests`. Mirrors the official
+# frappe/erpnext + frappe/hrms version-16 CI (Python 3.14, Node 24, MariaDB 11.8).
+
 on:
   push:
     branches:
       - develop
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: develop-treasury-${{ github.event.number }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  FRAPPE_BRANCH: version-16
+  ERPNEXT_BRANCH: version-16
+  HRMS_BRANCH: version-16
+  PAYMENTS_BRANCH: version-16 # payments develop requires frappe v17; version-16 matches the v16 stack
 
 jobs:
   tests:
+    name: Server tests (treasury)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: Server
+    timeout-minutes: 180
 
     services:
-      redis-cache:
-        image: redis:alpine
-        ports:
-          - 13000:6379
-      redis-queue:
-        image: redis:alpine
-        ports:
-          - 11000:6379
       mariadb:
         image: mariadb:11.8
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=10
 
     steps:
-      - name: Clone
+      - name: Clone treasury
         uses: actions/checkout@v6
+        with:
+          path: src/treasury
 
-      - name: Find tests
-        run: |
-          echo "Finding tests"
-          grep -rn "def test" > /dev/null
+      - name: Clone custody-next (private; read-only deploy key)
+        uses: actions/checkout@v6
+        with:
+          repository: a7733mai/custody-next
+          ref: main
+          ssh-key: ${{ secrets.CUSTODY_NEXT_DEPLOY_KEY }}
+          path: src/custody
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -54,52 +64,95 @@ jobs:
           node-version: 24
           check-latest: true
 
+      - name: Add to Hosts
+        run: echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml', '**/setup.py', '**/setup.cfg') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-            ${{ runner.os }}-
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: 'echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT'
-
-      - uses: actions/cache@v4
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Install MariaDB Client
+      - name: Install system packages
         run: |
-          sudo apt update
-          sudo apt-get install mariadb-client
+          sudo apt-get update
+          sudo apt-get remove -y mysql-server mysql-client || true
+          sudo apt-get install -y libcups2-dev redis-server mariadb-client libmariadb-dev pkg-config
 
-      - name: Setup
+      - name: Create bench
         run: |
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+          bench init --skip-assets --frappe-branch "$FRAPPE_BRANCH" --python "$(which python)" ~/frappe-bench
+          cd ~/frappe-bench
+          # no scheduler / watcher / socketio needed for tests
+          sed -i 's/watch:/# watch:/g' Procfile
+          sed -i 's/schedule:/# schedule:/g' Procfile
+          sed -i 's/socketio:/# socketio:/g' Procfile
+          sed -i 's/redis_socketio:/# redis_socketio:/g' Procfile
 
-      - name: Install
+      - name: Get apps
         working-directory: /home/runner/frappe-bench
-        run: |
-          bench get-app treasury $GITHUB_WORKSPACE
-          bench setup requirements --dev
-          bench new-site --db-root-password root --admin-password admin test_site
-          bench --site test_site install-app treasury
-          bench build
         env:
           CI: 'Yes'
+        run: |
+          bench get-app payments --branch "$PAYMENTS_BRANCH"
+          bench get-app erpnext --branch "$ERPNEXT_BRANCH"
+          bench get-app hrms --branch "$HRMS_BRANCH"
+          bench get-app custody "$GITHUB_WORKSPACE/src/custody"
+          bench get-app treasury "$GITHUB_WORKSPACE/src/treasury"
+          bench setup requirements --dev
+          echo "## Versions under test" >> "$GITHUB_STEP_SUMMARY"
+          for a in frappe payments erpnext hrms custody; do
+            echo "- $a: $(git -C apps/$a rev-parse HEAD) ($(git -C apps/$a rev-parse --abbrev-ref HEAD))" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
 
-      - name: Run Tests
+      - name: Start bench services (redis)
         working-directory: /home/runner/frappe-bench
         run: |
-          bench --site test_site set-config allow_tests true
-          bench --site test_site run-tests --app treasury
+          bench start >> bench_start.log 2>&1 &
+          for i in $(seq 1 60); do
+            (exec 3<>/dev/tcp/127.0.0.1/13000) 2>/dev/null && break
+            sleep 1
+          done
+
+      - name: Create site and install apps
+        working-directory: /home/runner/frappe-bench
+        run: |
+          mariadb --host 127.0.0.1 -u root -proot -e "SET GLOBAL character_set_server='utf8mb4'; SET GLOBAL collation_server='utf8mb4_unicode_ci'"
+          bench new-site test_site --db-host 127.0.0.1 --db-root-username root --db-root-password root             --mariadb-user-host-login-scope='%' --admin-password admin --install-app erpnext
+          bench --site test_site install-app hrms
+          bench --site test_site install-app custody
+          bench --site test_site install-app treasury
+          bench --site test_site set-config -p allow_tests True
+          bench --site test_site set-config -p throttle_user_limit 100
+
+      - name: Run tests (treasury)
+        working-directory: /home/runner/frappe-bench
         env:
           TYPE: server
+        run: |
+          set +e
+          START=$(date +%s)
+          bench --site test_site run-tests --app treasury 2>&1 | tee test-run.log
+          RC=${PIPESTATUS[0]}
+          echo "run-tests exit code: $RC; runtime: $(($(date +%s)-START))s" | tee -a test-run.log
+          {
+            echo "## Test result (treasury)"
+            echo "exit code: $RC, runtime: $(($(date +%s)-START))s"
+            echo '```'
+            tail -n 15 test-run.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $RC
+
+      - name: Upload test log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-run-log
+          path: |
+            /home/runner/frappe-bench/test-run.log
+            /home/runner/frappe-bench/bench_start.log
+          if-no-files-found: ignore
