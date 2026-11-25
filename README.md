@@ -109,7 +109,7 @@ No posting changes: the accounting of every cheque is exactly the one of 1.1.
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
+bench get-app https://github.com/a7733mai/treasury-next --branch develop
 bench --site <site> install-app treasury
 bench compile-po-to-mo --app treasury      # Arabic and English wording (locale/*.po -> sites/assets/locale)
 ```
@@ -136,7 +136,7 @@ bench compile-po-to-mo --app treasury      # Arabic and English wording (locale/
 ### Upgrading from 1.2
 
 ```bash
-cd apps/treasury && git fetch --tags && git checkout v1.3.0 && cd ../..   # or: bench get-app $URL --branch v1.3.0
+cd apps/treasury && git fetch --tags && git checkout v1.3.0 && cd ../..   # or: bench get-app https://github.com/a7733mai/treasury-next --branch v1.3.0
 bench --site <site> migrate                 # no patch: new columns only
 bench compile-po-to-mo --app treasury
 bench --site <site> clear-cache
